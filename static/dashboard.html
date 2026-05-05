@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waystone - Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css?v=1">
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <a href="/" class="logo">Waystone</a>
+        </div>
+        <div class="header-center">
+            <h1>Dashboard</h1>
+        </div>
+        <div class="header-right">
+            <span class="user-name" id="userName"></span>
+            <button id="logoutBtn" class="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <div class="nav-bar">
+        <a href="/" class="nav-item active" data-page="dashboard">Dashboard</a>
+        <a href="/campaigns" class="nav-item" data-page="campaigns">Campaigns</a>
+    </div>
+
+    <div class="container">
+        <div class="dashboard">
+            <h2>Select a Module</h2>
+            
+            <div class="modules-grid">
+                <!-- Campaigns (Active) -->
+                <a href="/campaigns" class="module-card active">
+                    <div class="card-inner">
+                        <h3>Campaigns</h3>
+                        <p class="description">Event Scheduling & Sign-ups</p>
+                        <span class="status-badge">Active</span>
+                    </div>
+                </a>
+
+                <!-- Chat Games (Disabled) -->
+                <div class="module-card disabled">
+                    <div class="card-inner">
+                        <h3>Chat Games</h3>
+                        <p class="description">Interactive Games</p>
+                        <span class="status-badge coming-soon">Coming Soon</span>
+                    </div>
+                </div>
+
+                <!-- Anevion Wiki (Disabled) -->
+                <div class="module-card disabled">
+                    <div class="card-inner">
+                        <h3>Anevion Wiki</h3>
+                        <p class="description">World Database</p>
+                        <span class="status-badge coming-soon">Coming Soon</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>

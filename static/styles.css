@@ -1,0 +1,309 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Fira Code', monospace;
+    background: #000000;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    color: #e0e0e0;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 40px;
+    border-bottom: 1px solid #333333;
+    gap: 20px;
+}
+
+.header-left {
+    flex: 0 0 auto;
+}
+
+.header-left .logo {
+    color: #ffffff;
+    font-size: 1.3em;
+    letter-spacing: 2px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+.header-left .logo:hover {
+    color: #00d9ff;
+}
+
+.header-center {
+    flex: 1;
+    text-align: center;
+}
+
+.header-center h1 {
+    color: #ffffff;
+    font-size: 1.2em;
+    letter-spacing: 1px;
+    font-weight: 500;
+    margin: 0;
+}
+
+.header-right {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-name {
+    color: #b0b0b0;
+    font-size: 0.9em;
+}
+
+.container {
+    flex: 1;
+    background: #000000;
+    max-width: 600px;
+    width: 100%;
+    padding: 40px;
+    margin: 0 auto;
+}
+
+.logout-btn {
+    padding: 8px 16px;
+    background: #000000;
+    color: #00d9ff;
+    border: 1px solid #00d9ff;
+    cursor: pointer;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.85em;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.logout-btn:hover {
+    background: #00d9ff;
+    color: #000000;
+}
+
+/* Navigation Bar */
+.nav-bar {
+    display: flex;
+    gap: 0;
+    padding: 0 40px;
+    border-bottom: 1px solid #333333;
+    background: #0a0a0a;
+}
+
+.nav-item {
+    padding: 15px 20px;
+    color: #888888;
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.nav-item:hover {
+    color: #e0e0e0;
+    border-bottom-color: #00d9ff;
+}
+
+.nav-item.active {
+    color: #ffffff;
+    border-bottom-color: #00d9ff;
+}
+
+h2 {
+    color: #e0e0e0;
+    margin-top: 30px;
+    margin-bottom: 20px;
+    font-size: 1.2em;
+    letter-spacing: 1px;
+}
+}
+
+.events-section {
+    margin-bottom: 30px;
+}
+
+.events-list {
+    background: #0a0a0a;
+    padding: 15px;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #2a2a2a;
+}
+
+.event-item {
+    padding: 10px;
+    margin-bottom: 10px;
+    background: #111111;
+    border-left: 2px solid #00d9ff;
+}
+
+.event-item strong {
+    color: #ffffff;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.event-item small {
+    color: #888888;
+}
+
+.signup-section {
+    border-top: 1px solid #333333;
+    padding-top: 30px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    color: #b0b0b0;
+    font-weight: 500;
+    font-size: 0.9em;
+}
+
+input,
+select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #333333;
+    background: #0a0a0a;
+    color: #e0e0e0;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.95em;
+    transition: border-color 0.3s;
+}
+
+input::placeholder {
+    color: #555555;
+}
+
+input:focus,
+select:focus {
+    outline: none;
+    border-color: #00d9ff;
+}
+
+.submit-btn {
+    width: 100%;
+    padding: 12px;
+    background: #000000;
+    color: #00d9ff;
+    border: 1px solid #00d9ff;
+    font-family: 'Fira Code', monospace;
+    font-size: 1em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.submit-btn:hover {
+    background: #00d9ff;
+    color: #000000;
+}
+
+.submit-btn:active {
+    opacity: 0.8;
+}
+
+.message {
+    margin-top: 15px;
+    padding: 12px;
+    display: none;
+    text-align: center;
+    font-size: 0.9em;
+    border: 1px solid;
+}
+
+.message.success {
+    background: #0a1a1a;
+    color: #00ff7f;
+    border-color: #00ff7f;
+    display: block;
+}
+
+.message.error {
+    background: #1a0a0a;
+    color: #ff006e;
+    border-color: #ff006e;
+    display: block;
+}
+
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        gap: 10px;
+        padding: 15px 20px;
+    }
+
+    .header-center h1 {
+        font-size: 1em;
+    }
+
+    .header-right {
+        gap: 10px;
+    }
+
+    .user-name {
+        font-size: 0.8em;
+    }
+
+    .logout-btn {
+        padding: 6px 12px;
+        font-size: 0.75em;
+    }
+
+    .nav-bar {
+        padding: 0 20px;
+        gap: 0;
+    }
+
+    .nav-item {
+        padding: 12px 15px;
+        font-size: 0.75em;
+    }
+
+    .container {
+        padding: 20px;
+        max-width: 100%;
+    }
+
+    h2 {
+        font-size: 1em;
+        margin-bottom: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    input, select {
+        font-size: 0.9em;
+        padding: 10px;
+    }
+
+    .submit-btn {
+        padding: 10px;
+        font-size: 0.9em;
+    }
+}
