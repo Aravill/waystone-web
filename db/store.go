@@ -3,10 +3,10 @@ package db
 import (
 	"encoding/json"
 	"fmt"
-	"waystone-web/config"
-	"waystone-web/models"
 	"sync"
 	"time"
+	"waystone-web/config"
+	"waystone-web/models"
 
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -153,6 +153,59 @@ func (s *LevelDBStore) GetEventByID(id int) (*models.Event, error) {
 		return nil, err
 	}
 	return &event, nil
+}
+
+func (s *LevelDBStore) GetAllCampaigns() ([]models.Campaign, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	var campaigns []models.Campaign
+	iter := s.db.NewIterator(nil, nil)
+	defer iter.Release()
+
+	for iter.Next() {
+		key := string(iter.Key())
+		if len(key) > 9 && key[:9] == "campaign:" {
+			var campaign models.Campaign
+			err := json.Unmarshal(iter.Value(), &campaign)
+			if err == nil {
+				campaigns = append(campaigns, campaign)
+			}
+		}
+	}
+
+	return campaigns, nil
+}
+
+func (s *LevelDBStore) SaveCampaign(campaign models.Campaign) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	data, err := json.Marshal(campaign)
+	if err != nil {
+		return err
+	}
+
+	key := fmt.Sprintf("campaign:%d", campaign.ID)
+	return s.db.Put([]byte(key), data, nil)
+}
+
+func (s *LevelDBStore) GetCampaignByID(id int) (*models.Campaign, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	key := fmt.Sprintf("campaign:%d", id)
+	data, err := s.db.Get([]byte(key), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var campaign models.Campaign
+	if err := json.Unmarshal(data, &campaign); err != nil {
+		return nil, err
+	}
+
+	return &campaign, nil
 }
 
 func (s *LevelDBStore) SaveSignup(signup models.Signup) error {
