@@ -2,17 +2,18 @@
 
 ## Architecture Overview
 
-**Waystone Web** is a full-stack event sign-up application with a clear separation between backend and frontend:
+**Waystone Web** is a full-stack event sign-up and campaign application with a clear separation between backend and frontend:
 
-- **Backend**: Single-file Go HTTP server (`main.go`) using only the standard library
+- **Backend**: Single-file Go HTTP server (`main.go`) using the standard library and LevelDB
   - Serves static files from `./static` directory at the root path
-  - Exposes two REST API endpoints for events and sign-ups
-  - No external dependencies (yet) - uses Go 1.21 stdlib
+  - Exposes REST API endpoints for events, campaigns, and sign-ups
 
-- **Frontend**: Three-file SPA in `./static` directory
+- **Frontend**: Multi-page app in `./static` directory
   - `index.html` - Form structure with event listing section
+  - `campaigns.html` - Campaign listing page
   - `styles.css` - Responsive design (mobile-first, gradient background)
   - `script.js` - Fetch-based API calls with basic form validation
+  - `campaigns.js` - Fetch-based campaign listing logic
 
 - **Deployment**: Docker-first approach
   - Multi-stage Dockerfile (build in Go 1.21 Alpine, runtime in minimal Alpine)
@@ -88,6 +89,7 @@ Currently, the project has no tests or linters configured. Before adding tests o
 
 - `/` - Serves `index.html` and static assets (catch-all file server)
 - `/api/events` - GET only, returns JSON array of event objects
+- `/api/campaigns` - GET only, returns JSON array of campaign objects
 - `/api/signup` - POST only, accepts JSON signup data, returns `{"status": "success", "message": "..."}`
 
 ### Environment Variables
