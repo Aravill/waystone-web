@@ -158,13 +158,18 @@ function createDMField(campaign) {
 
     field.appendChild(labelEl);
 
-    // If dm_user exists, render it as a button; otherwise use raw dm ID
+    // If dm_user exists, render it as a button; otherwise use raw dm ID or show "Unassigned"
     if (campaign?.dm_user) {
         field.appendChild(createUserButton(campaign.dm_user));
     } else if (campaign?.dm) {
         const valueEl = document.createElement("p");
         valueEl.className = "campaign-value campaign-nameplate";
         valueEl.textContent = campaign.dm;
+        field.appendChild(valueEl);
+    } else {
+        const valueEl = document.createElement("p");
+        valueEl.className = "campaign-value campaign-nameplate";
+        valueEl.textContent = "Unassigned";
         field.appendChild(valueEl);
     }
 
@@ -173,7 +178,7 @@ function createDMField(campaign) {
 
 function createUserButton(user) {
     const button = document.createElement("a");
-    button.href = user.profile_url || `/profile?user_id=${user.id}`;
+    button.href = user.profile_url || `/profile?user_id=${encodeURIComponent(user.id)}`;
     button.className = "user-button";
     button.textContent = user.display_name || user.name || user.email || "Unknown";
     return button;
