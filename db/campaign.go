@@ -1,6 +1,10 @@
 package db
 
-import "waystone-web/models"
+import (
+	"waystone-web/models"
+
+	"github.com/google/uuid"
+)
 
 func GetAllCampaigns() ([]models.Campaign, error) {
 	return GetStore().GetAllCampaigns()
@@ -14,18 +18,6 @@ func GetCampaignByID(id int) (*models.Campaign, error) {
 	return GetStore().GetCampaignByID(id)
 }
 
-func GetNextCampaignID() int {
-	campaigns, err := GetAllCampaigns()
-	if err != nil {
-		return 1
-	}
-
-	maxID := 0
-	for _, campaign := range campaigns {
-		if campaign.ID > maxID {
-			maxID = campaign.ID
-		}
-	}
-
-	return maxID + 1
+func GetNextCampaignID() string {
+	return uuid.New().String()
 }
