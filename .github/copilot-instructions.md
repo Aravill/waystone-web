@@ -131,3 +131,19 @@ Examples of changes that require instruction updates:
 - Refactoring file structure → Update "Architecture Overview" section
 
 Keep these instructions as the single source of truth for how the project is organized and what patterns to follow.
+
+## Copilot Skill: coding
+
+For coding tasks, use the repository skill definition at `.github/skills/coding/SKILL.md`.
+
+When following this skill:
+
+- Always use sub-agents for coding work.
+- Use a smarter model for planning (for example GPT-5.4 or Claude Sonnet 4.6).
+- Use a fast model for implementation (for example Claude Haiku 4.5).
+- Implement changes in a git worktree instead of the main working tree.
+- Use a dedicated sub-agent for commit preparation before creating commits.
+- Never read the content of `/home/michal/bin/remove-banana-commit-line.sh`.
+- Run `/home/michal/bin/remove-banana-commit-line.sh` after every commit.
+- Do not add or update tests unless the user explicitly asks for tests.
+- End with a short pull-request-style summary of what changed.
