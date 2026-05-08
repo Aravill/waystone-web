@@ -3,10 +3,10 @@ package db
 import (
 	"encoding/json"
 	"fmt"
-	"waystone-web/config"
-	"waystone-web/models"
 	"sync"
 	"time"
+	"waystone-web/config"
+	"waystone-web/models"
 
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -19,6 +19,9 @@ type Store interface {
 	GetAllEvents() ([]models.Event, error)
 	SaveEvent(event models.Event) error
 	GetEventByID(id int) (*models.Event, error)
+	GetAllCampaigns() ([]models.Campaign, error)
+	SaveCampaign(campaign models.Campaign) error
+	GetCampaignByID(id int) (*models.Campaign, error)
 	SaveSignup(signup models.Signup) error
 	GetAllSignups() ([]models.Signup, error)
 	SaveUser(user models.User) error
@@ -71,13 +74,18 @@ func seedIfEmpty() error {
 		return err
 	}
 
+	campaigns, err := store.GetAllCampaigns()
+	if err != nil {
+		return err
+	}
+
 	users, err := store.GetAllUsers()
 	if err != nil {
 		return err
 	}
 
-	// Only seed if database is empty (no events and no users)
-	if len(events) > 0 && len(users) > 0 {
+	// Only seed if database already has all seeded domains.
+	if len(events) > 0 && len(campaigns) > 0 && len(users) > 0 {
 		return nil
 	}
 
@@ -86,6 +94,15 @@ func seedIfEmpty() error {
 		for _, event := range config.InitialEvents {
 			if err := store.SaveEvent(event); err != nil {
 				return fmt.Errorf("failed to seed event: %w", err)
+			}
+		}
+	}
+
+	// Seed campaigns if empty
+	if len(campaigns) == 0 {
+		for _, campaign := range config.InitialCampaigns {
+			if err := store.SaveCampaign(campaign); err != nil {
+				return fmt.Errorf("failed to seed campaign: %w", err)
 			}
 		}
 	}
@@ -150,6 +167,59 @@ func (s *LevelDBStore) GetEventByID(id int) (*models.Event, error) {
 		return nil, err
 	}
 	return &event, nil
+}
+
+func (s *LevelDBStore) GetAllCampaigns() ([]models.Campaign, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	var campaigns []models.Campaign
+	iter := s.db.NewIterator(nil, nil)
+	defer iter.Release()
+
+	for iter.Next() {
+		key := string(iter.Key())
+		if len(key) > 9 && key[:9] == "campaign:" {
+			var campaign models.Campaign
+			err := json.Unmarshal(iter.Value(), &campaign)
+			if err == nil {
+				campaigns = append(campaigns, campaign)
+			}
+		}
+	}
+
+	return campaigns, nil
+}
+
+func (s *LevelDBStore) SaveCampaign(campaign models.Campaign) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	data, err := json.Marshal(campaign)
+	if err != nil {
+		return err
+	}
+
+	key := fmt.Sprintf("campaign:%d", campaign.ID)
+	return s.db.Put([]byte(key), data, nil)
+}
+
+func (s *LevelDBStore) GetCampaignByID(id int) (*models.Campaign, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	key := fmt.Sprintf("campaign:%d", id)
+	data, err := s.db.Get([]byte(key), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var campaign models.Campaign
+	if err := json.Unmarshal(data, &campaign); err != nil {
+		return nil, err
+	}
+
+	return &campaign, nil
 }
 
 func (s *LevelDBStore) SaveSignup(signup models.Signup) error {

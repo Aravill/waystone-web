@@ -1,6 +1,6 @@
-# Waystone Web - Event Sign-up Sheet
+# Waystone Web - Event & Campaign Management
 
-A lightweight Go application hosting a sign-up sheet for various events. Built as a Docker container for easy deployment.
+A lightweight Go application hosting event sign-up and campaign management. Built as a Docker container for easy deployment.
 
 ## Project Structure
 
@@ -19,17 +19,22 @@ A lightweight Go application hosting a sign-up sheet for various events. Built a
 │   ├── router.go        # Route registration
 │   ├── auth.go          # OAuth authentication handlers
 │   ├── events.go        # Event management handlers
+│   ├── campaigns.go     # Campaign management handlers
 │   ├── signup.go        # Signup handlers
 │   └── roles.go         # Role management endpoints
 ├── db/                  # Database layer
-│   ├── leveldb.go       # LevelDB initialization
+│   ├── store.go         # LevelDB storage interface and implementation
 │   ├── event.go         # Event CRUD operations
+│   ├── campaign.go      # Campaign CRUD operations
 │   ├── signup.go        # Signup CRUD operations
 │   └── user.go          # User CRUD operations
 ├── middleware/          # HTTP middleware
 │   └── auth.go          # Authentication middleware
 ├── models/              # Data models and types
-│   ├── types.go         # User, Event, Signup structs
+│   ├── event.go         # Event struct
+│   ├── campaign.go      # Campaign struct + status lifecycle
+│   ├── signup.go        # Signup struct
+│   ├── user.go          # User struct
 │   └── roles.go         # Role constants and helper functions
 └── static/              # Frontend files
     ├── index.html       # Main application page
@@ -83,6 +88,10 @@ Visit: **http://localhost:8080**
 ### Get Events
 - **GET** `/api/events`
 - Returns: List of available events
+
+### Get Campaigns
+- **GET** `/api/campaigns`
+- Returns: List of campaigns with title, status, summary, description, DM, players, and sign-up openness.
 
 ### Sign Up
 - **POST** `/api/signup`

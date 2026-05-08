@@ -35,6 +35,7 @@ func RegisterRoutes() {
 	// Protected API endpoints (wrapped with auth middleware)
 	http.Handle("/api/events", middleware.AuthMiddleware(http.HandlerFunc(HandleGetEvents)))
 	http.Handle("/api/signup", middleware.AuthMiddleware(http.HandlerFunc(HandleSignup)))
+	http.Handle("/api/campaigns", middleware.AuthMiddleware(http.HandlerFunc(HandleGetCampaigns)))
 
 	// Protected role management endpoints (wrapped with auth middleware)
 	http.Handle("/api/roles", middleware.AuthMiddleware(http.HandlerFunc(HandleAssignRoles)))
@@ -46,7 +47,7 @@ func RegisterRoutes() {
 
 	// Static files - MUST be registered BEFORE "/" handler to take precedence
 	fs := http.FileServer(http.Dir("./static"))
-	
+
 	// Individual static file handlers for CSS, JS (no auth required)
 	http.HandleFunc("/dashboard.css", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/dashboard.css")
@@ -60,10 +61,13 @@ func RegisterRoutes() {
 	http.HandleFunc("/script.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/script.js")
 	})
+	http.HandleFunc("/campaigns.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/campaigns.js")
+	})
 	http.HandleFunc("/login.html", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/login.html")
 	})
-	
+
 	// /static/ prefix for any other static assets
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
@@ -71,4 +75,3 @@ func RegisterRoutes() {
 	http.Handle("/", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("dashboard.html"))))
 	http.Handle("/campaigns", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("campaigns.html"))))
 }
-
