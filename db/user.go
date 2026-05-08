@@ -72,9 +72,12 @@ func DeleteUserAndCleanupCampaigns(userID string) (removedAsDM int, removedAsPla
 	// Clean up campaign references
 	for i := range campaigns {
 		campaign := &campaigns[i]
+		changed := false
+
 		if campaign.DM == userID {
 			campaign.DM = ""
 			removedAsDM++
+			changed = true
 		}
 
 		// Remove from players list
@@ -84,13 +87,16 @@ func DeleteUserAndCleanupCampaigns(userID string) (removedAsDM int, removedAsPla
 				newPlayers = append(newPlayers, playerID)
 			} else {
 				removedAsPlayer++
+				changed = true
 			}
 		}
 		campaign.Players = newPlayers
 
-		// Save updated campaign
-		if err := SaveCampaign(*campaign); err != nil {
-			return removedAsDM, removedAsPlayer, fmt.Errorf("failed to save campaign: %w", err)
+		// Save updated campaign only if it changed
+		if changed {
+			if err := SaveCampaign(*campaign); err != nil {
+				return removedAsDM, removedAsPlayer, fmt.Errorf("failed to save campaign: %w", err)
+			}
 		}
 	}
 
