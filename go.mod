@@ -6,6 +6,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.10.0
 	github.com/gorilla/sessions v1.2.2
 	github.com/syndtr/goleveldb v1.0.0
+	github.com/google/uuid v1.6.0
 	golang.org/x/oauth2 v0.13.0
 )
 
