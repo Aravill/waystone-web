@@ -392,12 +392,15 @@ func (s *LevelDBStore) GetUserByID(id string) (*models.User, error) {
 	userKey := fmt.Sprintf("user:%s", id)
 	data, err := s.db.Get([]byte(userKey), nil)
 	if err != nil {
-		return nil, nil
+		if err == leveldb.ErrNotFound {
+			return nil, nil
+		}
+		return nil, err
 	}
 
 	var user models.User
 	if err := json.Unmarshal(data, &user); err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	return &user, nil
