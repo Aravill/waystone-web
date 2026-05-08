@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-	"time"
 	"waystone-web/config"
 	"waystone-web/models"
 
@@ -16,14 +15,9 @@ var (
 )
 
 type Store interface {
-	GetAllEvents() ([]models.Event, error)
-	SaveEvent(event models.Event) error
-	GetEventByID(id int) (*models.Event, error)
 	GetAllCampaigns() ([]models.Campaign, error)
 	SaveCampaign(campaign models.Campaign) error
 	GetCampaignByID(id int) (*models.Campaign, error)
-	SaveSignup(signup models.Signup) error
-	GetAllSignups() ([]models.Signup, error)
 	SaveUser(user models.User) error
 	GetUserByGoogleID(googleID string) (*models.User, error)
 	GetUserByEmail(email string) (*models.User, error)
@@ -71,10 +65,6 @@ func (s *LevelDBStore) Close() error {
 }
 
 func seedIfEmpty() error {
-	events, err := store.GetAllEvents()
-	if err != nil {
-		return err
-	}
 
 	campaigns, err := store.GetAllCampaigns()
 	if err != nil {
@@ -87,17 +77,8 @@ func seedIfEmpty() error {
 	}
 
 	// Only seed if database already has all seeded domains.
-	if len(events) > 0 && len(campaigns) > 0 && len(users) > 0 {
+	if len(campaigns) > 0 && len(users) > 0 {
 		return nil
-	}
-
-	// Seed events if empty
-	if len(events) == 0 {
-		for _, event := range config.InitialEvents {
-			if err := store.SaveEvent(event); err != nil {
-				return fmt.Errorf("failed to seed event: %w", err)
-			}
-		}
 	}
 
 	// Seed campaigns if empty
@@ -119,56 +100,6 @@ func seedIfEmpty() error {
 	}
 
 	return nil
-}
-
-func (s *LevelDBStore) GetAllEvents() ([]models.Event, error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	var events []models.Event
-	iter := s.db.NewIterator(nil, nil)
-	defer iter.Release()
-
-	for iter.Next() {
-		key := string(iter.Key())
-		if len(key) > 6 && key[:6] == "event:" {
-			var event models.Event
-			err := json.Unmarshal(iter.Value(), &event)
-			if err == nil {
-				events = append(events, event)
-			}
-		}
-	}
-	return events, nil
-}
-
-func (s *LevelDBStore) SaveEvent(event models.Event) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	data, err := json.Marshal(event)
-	if err != nil {
-		return err
-	}
-	key := fmt.Sprintf("event:%d", event.ID)
-	return s.db.Put([]byte(key), data, nil)
-}
-
-func (s *LevelDBStore) GetEventByID(id int) (*models.Event, error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	key := fmt.Sprintf("event:%d", id)
-	data, err := s.db.Get([]byte(key), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var event models.Event
-	if err := json.Unmarshal(data, &event); err != nil {
-		return nil, err
-	}
-	return &event, nil
 }
 
 func (s *LevelDBStore) GetAllCampaigns() ([]models.Campaign, error) {
@@ -222,39 +153,6 @@ func (s *LevelDBStore) GetCampaignByID(id int) (*models.Campaign, error) {
 	}
 
 	return &campaign, nil
-}
-
-func (s *LevelDBStore) SaveSignup(signup models.Signup) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	data, err := json.Marshal(signup)
-	if err != nil {
-		return err
-	}
-	key := fmt.Sprintf("signup:%d", time.Now().UnixNano())
-	return s.db.Put([]byte(key), data, nil)
-}
-
-func (s *LevelDBStore) GetAllSignups() ([]models.Signup, error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	var signups []models.Signup
-	iter := s.db.NewIterator(nil, nil)
-	defer iter.Release()
-
-	for iter.Next() {
-		key := string(iter.Key())
-		if len(key) > 7 && key[:7] == "signup:" {
-			var signup models.Signup
-			err := json.Unmarshal(iter.Value(), &signup)
-			if err == nil {
-				signups = append(signups, signup)
-			}
-		}
-	}
-	return signups, nil
 }
 
 // deleteUserEmailIndex removes the email index entry for a user
