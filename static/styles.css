@@ -144,6 +144,38 @@ h2 {
     border: 1px solid #2a2a2a;
 }
 
+.campaigns-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.campaign-item {
+    background: #0a0a0a;
+    border: 1px solid #2a2a2a;
+    border-left: 2px solid #00d9ff;
+    padding: 14px;
+}
+
+.campaign-item h3 {
+    color: #ffffff;
+    margin-bottom: 10px;
+}
+
+.campaign-item p {
+    margin-bottom: 8px;
+    color: #b0b0b0;
+    line-height: 1.4;
+}
+
+.campaign-item p:last-child {
+    margin-bottom: 0;
+}
+
+.campaign-status {
+    color: #00d9ff;
+}
+
 .event-item {
     padding: 10px;
     margin-bottom: 10px;

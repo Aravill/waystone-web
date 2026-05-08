@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event Sign-up Sheet</title>
+    <title>Campaigns</title>
     <link rel="stylesheet" href="styles.css?v=1">
 </head>
 <body>
@@ -26,44 +26,15 @@
     </div>
 
     <div class="container">
-        <div class="events-section">
-            <h2>Available Events</h2>
-            <div id="eventsList" class="events-list">
-                <p>Loading events...</p>
+        <div class="campaigns-section">
+            <h2>Available Campaigns</h2>
+            <div id="campaignsList" class="campaigns-list">
+                <p>Loading campaigns...</p>
             </div>
-        </div>
-
-        <div class="signup-section">
-            <h2>Sign Up for an Event</h2>
-            <form id="signupForm">
-                <div class="form-group">
-                    <label for="eventSelect">Select Event:</label>
-                    <select id="eventSelect" name="event" required>
-                        <option value="">-- Select an event --</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="name">Full Name:</label>
-                    <input type="text" id="name" name="name" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="email">Email:</label>
-                    <input type="email" id="email" name="email" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="phone">Phone (optional):</label>
-                    <input type="tel" id="phone" name="phone">
-                </div>
-
-                <button type="submit" class="submit-btn">Sign Up</button>
-                <div id="message" class="message"></div>
-            </form>
+            <div id="message" class="message"></div>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="campaigns.js"></script>
 </body>
 </html>
