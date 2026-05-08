@@ -14,7 +14,7 @@ func SaveCampaign(campaign models.Campaign) error {
 	return GetStore().SaveCampaign(campaign)
 }
 
-func GetCampaignByID(id int) (*models.Campaign, error) {
+func GetCampaignByID(id string) (*models.Campaign, error) {
 	return GetStore().GetCampaignByID(id)
 }
 

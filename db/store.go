@@ -17,7 +17,7 @@ var (
 type Store interface {
 	GetAllCampaigns() ([]models.Campaign, error)
 	SaveCampaign(campaign models.Campaign) error
-	GetCampaignByID(id int) (*models.Campaign, error)
+	GetCampaignByID(id string) (*models.Campaign, error)
 	SaveUser(user models.User) error
 	GetUserByGoogleID(googleID string) (*models.User, error)
 	GetUserByEmail(email string) (*models.User, error)
@@ -133,15 +133,15 @@ func (s *LevelDBStore) SaveCampaign(campaign models.Campaign) error {
 		return err
 	}
 
-	key := fmt.Sprintf("campaign:%d", campaign.ID)
+	key := fmt.Sprintf("campaign:%s", campaign.ID)
 	return s.db.Put([]byte(key), data, nil)
 }
 
-func (s *LevelDBStore) GetCampaignByID(id int) (*models.Campaign, error) {
+func (s *LevelDBStore) GetCampaignByID(id string) (*models.Campaign, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	key := fmt.Sprintf("campaign:%d", id)
+	key := fmt.Sprintf("campaign:%s", id)
 	data, err := s.db.Get([]byte(key), nil)
 	if err != nil {
 		return nil, err
