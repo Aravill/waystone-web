@@ -152,27 +152,162 @@ h2 {
 .campaign-item {
     background: #0a0a0a;
     border: 1px solid #2a2a2a;
-    border-left: 2px solid #00d9ff;
+}
+
+.campaign-row {
     padding: 14px;
 }
 
-.campaign-item h3 {
+.campaign-row-top {
+    border-bottom: 1px solid #2a2a2a;
+}
+
+.campaign-title {
+    text-align: center;
     color: #ffffff;
     margin-bottom: 10px;
+    letter-spacing: 1px;
 }
 
-.campaign-item p {
+.campaign-summary-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     margin-bottom: 8px;
+}
+
+.campaign-summary-text {
     color: #b0b0b0;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9em;
     line-height: 1.4;
+    text-align: center;
 }
 
-.campaign-item p:last-child {
-    margin-bottom: 0;
+.campaign-summary-arrow {
+    border: 0;
+    background: transparent;
+    color: #b0b0b0;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
+    cursor: pointer;
+    padding: 0 4px;
+    transition: transform 0.25s ease, color 0.2s ease;
+    transform-origin: center;
 }
 
-.campaign-status {
+.campaign-summary-arrow:hover,
+.campaign-summary-arrow:focus-visible {
+    color: #ffffff;
+    outline: none;
+}
+
+.campaign-description {
+    color: #b0b0b0;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
+    text-align: center;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    margin-top: 0;
+    transition: max-height 0.3s ease, opacity 0.25s ease, margin-top 0.3s ease;
+}
+
+.campaign-description-expanded {
+    max-height: 280px;
+    opacity: 1;
+    margin-top: 8px;
+}
+
+.campaign-summary-arrow-expanded {
+    transform: rotate(180deg);
+}
+
+.campaign-row-middle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid #2a2a2a;
+    padding: 0;
+}
+
+.campaign-column {
+    padding: 14px;
+    min-height: 210px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
+}
+
+.campaign-column-right {
+    border-left: 1px solid #2a2a2a;
+}
+
+.campaign-field {
+    text-align: center;
+}
+
+.campaign-label {
+    color: #6ecbff;
+    margin-bottom: 6px;
+    font-size: 0.82em;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.campaign-value {
+    color: #e0e0e0;
+}
+
+.campaign-nameplate {
+    display: inline-block;
+    border: 1px solid #00d9ff;
     color: #00d9ff;
+    padding: 2px 8px;
+    margin: 2px 4px;
+    font-size: 0.9em;
+}
+
+.campaign-players {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.campaign-row-bottom {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    padding: 0;
+}
+
+.campaign-action-btn {
+    padding: 12px;
+    background: #000000;
+    color: #00d9ff;
+    border: 0;
+    border-top: 1px solid #2a2a2a;
+    border-right: 1px solid #2a2a2a;
+    font-family: 'Fira Code', monospace;
+    cursor: pointer;
+}
+
+.campaign-action-btn:last-child {
+    border-right: 0;
+}
+
+.campaign-action-btn:hover:enabled {
+    background: #00d9ff;
+    color: #000000;
+}
+
+.campaign-action-btn:disabled {
+    color: #666666;
+    cursor: not-allowed;
 }
 
 .event-item {
