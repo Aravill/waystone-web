@@ -22,7 +22,7 @@ var InitialCampaigns = []models.Campaign{
 		SignUpsOpen: true,
 	},
 	{
-		ID:          "ea213cb4-9ab9-49ff-a29f-3fafb7b4799c",
+		ID:          "6e05d2bc-efc8-4464-b3c9-c6fff907940f",
 		Title:       "Embittered Arcanist",
 		Status:      models.Pitch,
 		Summary:     "Figure out who turned the Archamge into a sheep",
