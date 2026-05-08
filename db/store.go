@@ -74,13 +74,18 @@ func seedIfEmpty() error {
 		return err
 	}
 
+	campaigns, err := store.GetAllCampaigns()
+	if err != nil {
+		return err
+	}
+
 	users, err := store.GetAllUsers()
 	if err != nil {
 		return err
 	}
 
-	// Only seed if database is empty (no events and no users)
-	if len(events) > 0 && len(users) > 0 {
+	// Only seed if database already has all seeded domains.
+	if len(events) > 0 && len(campaigns) > 0 && len(users) > 0 {
 		return nil
 	}
 
@@ -89,6 +94,15 @@ func seedIfEmpty() error {
 		for _, event := range config.InitialEvents {
 			if err := store.SaveEvent(event); err != nil {
 				return fmt.Errorf("failed to seed event: %w", err)
+			}
+		}
+	}
+
+	// Seed campaigns if empty
+	if len(campaigns) == 0 {
+		for _, campaign := range config.InitialCampaigns {
+			if err := store.SaveCampaign(campaign); err != nil {
+				return fmt.Errorf("failed to seed campaign: %w", err)
 			}
 		}
 	}
