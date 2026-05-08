@@ -19,6 +19,9 @@ type Store interface {
 	GetAllEvents() ([]models.Event, error)
 	SaveEvent(event models.Event) error
 	GetEventByID(id int) (*models.Event, error)
+	GetAllCampaigns() ([]models.Campaign, error)
+	SaveCampaign(campaign models.Campaign) error
+	GetCampaignByID(id int) (*models.Campaign, error)
 	SaveSignup(signup models.Signup) error
 	GetAllSignups() ([]models.Signup, error)
 	SaveUser(user models.User) error
