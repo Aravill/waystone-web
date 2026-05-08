@@ -109,16 +109,21 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 	sessionUserID, _ := session["user_id"].(string)
 	isSelf := sessionUserID == user.ID
 
+	// Build user object; only include email for self
+	userObj := map[string]interface{}{
+		"id":       user.ID,
+		"name":     user.Name,
+		"nickname": user.Nickname,
+		"picture":  user.Picture,
+	}
+	if isSelf {
+		userObj["email"] = user.Email
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"user": map[string]interface{}{
-			"id":       user.ID,
-			"email":    user.Email,
-			"name":     user.Name,
-			"nickname": user.Nickname,
-			"picture":  user.Picture,
-		},
+		"user": userObj,
 		"avatar": map[string]interface{}{
 			"has_picture": user.Picture != "",
 			"picture":     user.Picture,
