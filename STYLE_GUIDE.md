@@ -458,6 +458,144 @@ body {
 
 ---
 
+## Profile Components
+
+### User Button
+
+```css
+.user-button {
+    display: inline-block;
+    padding: 8px 12px;
+    background: #0a1a1a;
+    border: 1px solid #00d9ff;
+    color: #00d9ff;
+    text-decoration: none;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.85em;
+    border-radius: 3px;
+    transition: all 0.3s;
+    cursor: pointer;
+}
+
+.user-button:hover {
+    background: #00d9ff;
+    color: #000000;
+}
+```
+
+**Usage**: Render user references as interactive buttons linking to user profiles. Always use `display_name` (computed: nickname → name → email).
+
+### Profile Card
+
+```css
+.profile-card {
+    background: #0a0a0a;
+    border: 1px solid #333333;
+    padding: 30px;
+    margin-bottom: 30px;
+}
+
+.profile-avatar-section {
+    display: flex;
+    gap: 25px;
+    align-items: flex-start;
+}
+
+.profile-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 5px;
+    background: #1a1a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-avatar-initials {
+    font-size: 2em;
+    font-weight: 500;
+    color: #00d9ff;
+}
+
+.profile-display-name {
+    font-size: 1.3em;
+    color: #ffffff;
+    margin-bottom: 10px;
+}
+
+.profile-meta {
+    font-size: 0.9em;
+    color: #b0b0b0;
+    margin-bottom: 8px;
+}
+```
+
+### Danger Zone
+
+```css
+.danger-zone {
+    border: 1px solid #ff006e;
+    background: #1a0a0a;
+    padding: 25px;
+    margin-top: 40px;
+}
+
+.danger-zone h2 {
+    color: #ff006e;
+    margin-bottom: 15px;
+}
+
+.danger-btn {
+    padding: 12px 20px;
+    background: transparent;
+    border: 1px solid #ff006e;
+    color: #ff006e;
+    font-family: 'Fira Code', monospace;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.danger-btn:hover {
+    background: #ff006e;
+    color: #000000;
+}
+```
+
+### Campaign Item (Profile Context)
+
+```css
+.campaign-item-profile {
+    background: #0a1a1a;
+    border: 1px solid #333333;
+    padding: 20px;
+    margin-bottom: 15px;
+    border-radius: 3px;
+}
+
+.campaign-item-profile h3 {
+    margin-bottom: 10px;
+    color: #ffffff;
+}
+
+.campaign-status {
+    font-size: 0.9em;
+    color: #b0b0b0;
+    margin: 0;
+}
+```
+
+---
+
 ## Maintenance
 
 **Version**: 1.0  
@@ -496,10 +634,11 @@ All pages use a consistent two-part header system:
 <div class="nav-bar">
     <a href="/" class="nav-item active" data-page="dashboard">Dashboard</a>
     <a href="/campaigns" class="nav-item" data-page="campaigns">Campaigns</a>
+    <a href="/profile" class="nav-item" data-page="profile">Profile</a>
 </div>
 ```
 
-**Purpose**: Shows available modules with active indicator on current page. Users can navigate between sections.
+**Purpose**: Shows available modules (Dashboard, Campaigns, Profile) with active indicator on current page. Users can navigate between sections.
 
 #### Header Styling
 

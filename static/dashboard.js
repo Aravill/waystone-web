@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             const user = await userResponse.json();
             const userNameEl = document.getElementById('userName');
             if (userNameEl) {
-                userNameEl.textContent = user.name || user.email || 'User';
+                userNameEl.textContent = user.display_name || user.name || user.email || 'User';
             }
         }
     } catch (error) {

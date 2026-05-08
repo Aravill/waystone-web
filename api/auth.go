@@ -144,6 +144,7 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 		GoogleID:  claims.GoogleID,
 		Email:     claims.Email,
 		Name:      claims.Name,
+		Nickname:  existingUser.Nickname,
 		Picture:   claims.Picture,
 		CreatedAt: existingUser.CreatedAt,
 		UpdatedAt: time.Now(),
@@ -184,20 +185,46 @@ func HandleGetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get roles from session, default to empty if not present
-	roles := []string{}
-	if rolesVal, ok := session["roles"].([]string); ok {
-		roles = rolesVal
+	userID, ok := session["user_id"].(string)
+	if !ok {
+		http.Error(w, "invalid session", http.StatusUnauthorized)
+		return
+	}
+
+	// Reload fresh user data from DB
+	user, err := db.GetUserByID(userID)
+	if err != nil {
+		log.Printf("error fetching user: %v", err)
+		http.Error(w, "failed to fetch user", http.StatusInternalServerError)
+		return
+	}
+
+	if user == nil {
+		// User was deleted - clear session and return 401
+		middleware.ClearSession(w, r)
+		http.Error(w, "user not found", http.StatusUnauthorized)
+		return
+	}
+
+	// Compute display_name: nickname > name > email
+	displayName := user.Nickname
+	if displayName == "" {
+		displayName = user.Name
+	}
+	if displayName == "" {
+		displayName = user.Email
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"user_id":  session["user_id"],
-		"google_id": session["google_id"],
-		"email":     session["email"],
-		"name":      session["name"],
-		"picture":   session["picture"],
-		"roles":     roles,
+		"user_id":      user.ID,
+		"google_id":    user.GoogleID,
+		"email":        user.Email,
+		"name":         user.Name,
+		"nickname":     user.Nickname,
+		"display_name": displayName,
+		"picture":      user.Picture,
+		"roles":        user.Roles,
 	})
 }
