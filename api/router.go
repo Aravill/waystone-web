@@ -35,6 +35,7 @@ func RegisterRoutes() {
 	// Protected API endpoints (wrapped with auth middleware)
 	http.Handle("/api/events", middleware.AuthMiddleware(http.HandlerFunc(HandleGetEvents)))
 	http.Handle("/api/signup", middleware.AuthMiddleware(http.HandlerFunc(HandleSignup)))
+	http.Handle("/api/campaigns", middleware.AuthMiddleware(http.HandlerFunc(HandleGetCampaigns)))
 
 	// Protected role management endpoints (wrapped with auth middleware)
 	http.Handle("/api/roles", middleware.AuthMiddleware(http.HandlerFunc(HandleAssignRoles)))
