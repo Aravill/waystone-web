@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"waystone-web/db"
+	"waystone-web/models"
 )
 
 func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
@@ -15,6 +16,20 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, `{"error": "failed to retrieve campaigns"}`)
 		return
+	}
+
+	// Fetch all users once to avoid N+1 queries
+	allUsers, err := db.GetAllUsers()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, `{"error": "failed to retrieve users"}`)
+		return
+	}
+
+	// Create a map for O(1) user lookup
+	userMap := make(map[string]*models.User)
+	for i := range allUsers {
+		userMap[allUsers[i].ID] = &allUsers[i]
 	}
 
 	// Build enriched campaign objects
@@ -33,8 +48,7 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 
 		// Add DM user display object if DM exists
 		if campaign.DM != "" {
-			dmUser, err := db.GetUserByID(campaign.DM)
-			if err == nil && dmUser != nil {
+			if dmUser, ok := userMap[campaign.DM]; ok && dmUser != nil {
 				displayName := dmUser.Nickname
 				if displayName == "" {
 					displayName = dmUser.Name
@@ -57,8 +71,7 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 		// Add player user display objects
 		playerUsers := []map[string]interface{}{}
 		for _, playerID := range campaign.Players {
-			playerUser, err := db.GetUserByID(playerID)
-			if err == nil && playerUser != nil {
+			if playerUser, ok := userMap[playerID]; ok && playerUser != nil {
 				displayName := playerUser.Nickname
 				if displayName == "" {
 					displayName = playerUser.Name
