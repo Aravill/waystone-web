@@ -149,3 +149,21 @@ When following this skill:
 - Run `/home/michal/bin/remove-banana-commit-line.sh` after every commit.
 - Do not add or update tests unless the user explicitly asks for tests.
 - End with a short pull-request-style summary of what changed.
+
+## Copilot Skill: code-review
+
+For code reviews, use the repository skill definition at `.github/skills/code-review/SKILL.md`.
+
+When following this skill:
+
+- Use a moderately strong model for code review (for example Claude Sonnet 4.6).
+- Review latest changes by examining `git diff HEAD` and recent commits.
+- Produce a structured numbered list of issues and improvements with:
+  - File path and line numbers
+  - Issue type (bug, security, performance, style, logic)
+  - Clear description of the problem
+  - Specific suggestion for improvement
+- **Never modify code during the review phase** — only analyze and suggest.
+- Present findings to the user and ask whether to implement improvements.
+- **Important: Skip planning when invoking the coding skill** — the review output serves as the concrete plan, so pass it as context to the coding skill and skip its planning phase.
+- Implement improvements in a git worktree (if user approves).
