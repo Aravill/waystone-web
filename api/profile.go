@@ -24,13 +24,17 @@ func HandleProfile(w http.ResponseWriter, r *http.Request) {
 func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 	session, err := middleware.GetSession(r)
 	if err != nil {
-		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "not authenticated"})
 		return
 	}
 
 	userID, ok := session["user_id"].(string)
 	if !ok {
-		http.Error(w, "invalid session", http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid session"})
 		return
 	}
 
@@ -132,13 +136,17 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 func handleDeleteProfile(w http.ResponseWriter, r *http.Request) {
 	session, err := middleware.GetSession(r)
 	if err != nil {
-		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "not authenticated"})
 		return
 	}
 
 	userID, ok := session["user_id"].(string)
 	if !ok {
-		http.Error(w, "invalid session", http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid session"})
 		return
 	}
 
