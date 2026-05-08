@@ -36,6 +36,7 @@ func RegisterRoutes() {
 	http.Handle("/api/events", middleware.AuthMiddleware(http.HandlerFunc(HandleGetEvents)))
 	http.Handle("/api/signup", middleware.AuthMiddleware(http.HandlerFunc(HandleSignup)))
 	http.Handle("/api/campaigns", middleware.AuthMiddleware(http.HandlerFunc(HandleGetCampaigns)))
+	http.Handle("/api/profile", middleware.AuthMiddleware(http.HandlerFunc(HandleProfile)))
 
 	// Protected role management endpoints (wrapped with auth middleware)
 	http.Handle("/api/roles", middleware.AuthMiddleware(http.HandlerFunc(HandleAssignRoles)))
@@ -64,6 +65,9 @@ func RegisterRoutes() {
 	http.HandleFunc("/campaigns.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/campaigns.js")
 	})
+	http.HandleFunc("/profile.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/profile.js")
+	})
 	http.HandleFunc("/login.html", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/login.html")
 	})
@@ -74,4 +78,5 @@ func RegisterRoutes() {
 	// Protected page routes - serve authenticated pages
 	http.Handle("/", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("dashboard.html"))))
 	http.Handle("/campaigns", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("campaigns.html"))))
+	http.Handle("/profile", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("profile.html"))))
 }

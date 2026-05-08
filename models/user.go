@@ -7,6 +7,7 @@ type User struct {
 	GoogleID  string    `json:"google_id"`
 	Email     string    `json:"email"`
 	Name      string    `json:"name"`
+	Nickname  string    `json:"nickname"`
 	Picture   string    `json:"picture"`
 	Roles     []string  `json:"roles"`
 	CreatedAt time.Time `json:"created_at"`

@@ -32,6 +32,7 @@ var InitialUsers = []models.User{
 		ID:        "550e8400-e29b-41d4-a716-446655440000",
 		Email:     "mozikmichal@gmail.com",
 		Name:      "Admin",
+		Nickname:  "Michi",
 		Roles:     []string{"admin"},
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile</title>
+    <link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <a href="/" class="logo">Waystone</a>
+        </div>
+        <div class="header-center">
+            <h1>Profile</h1>
+        </div>
+        <div class="header-right">
+            <span class="user-name" id="userName"></span>
+            <button id="logoutBtn" class="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <div class="nav-bar">
+        <a href="/" class="nav-item" data-page="dashboard">Dashboard</a>
+        <a href="/campaigns" class="nav-item" data-page="campaigns">Campaigns</a>
+        <a href="/profile" class="nav-item active" data-page="profile">Profile</a>
+    </div>
+
+    <div class="container">
+        <div class="profile-page">
+            <div class="profile-card" id="profileCard">
+                <p>Loading profile...</p>
+            </div>
+
+            <div class="profile-section">
+                <h2 class="section-header">Dungeon Mastering</h2>
+                <div id="dmCampaignsList" class="campaigns-list">
+                    <p>No campaigns as DM.</p>
+                </div>
+            </div>
+
+            <div class="profile-section">
+                <h2 class="section-header">Playing In</h2>
+                <div id="playingCampaignsList" class="campaigns-list">
+                    <p>Not playing in any campaigns.</p>
+                </div>
+            </div>
+
+            <div class="profile-section danger-zone" id="dangerZone" style="display: none;">
+                <h2 class="section-header">Account Management</h2>
+                <p>Delete your account and all associated data.</p>
+                <button id="deleteBtn" class="danger-btn">Delete Account</button>
+            </div>
+
+            <div id="message" class="message"></div>
+        </div>
+    </div>
+
+    <script src="profile.js"></script>
+</body>
+</html>
