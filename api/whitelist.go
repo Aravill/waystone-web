@@ -94,6 +94,7 @@ func HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	newUser := models.User{
 		Email:     req.Email,
 		Name:      req.Name,
+		Nickname:  "",
 		Picture:   "",
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),

@@ -27,7 +27,9 @@ type Store interface {
 	SaveUser(user models.User) error
 	GetUserByGoogleID(googleID string) (*models.User, error)
 	GetUserByEmail(email string) (*models.User, error)
+	GetUserByID(id string) (*models.User, error)
 	GetAllUsers() ([]models.User, error)
+	DeleteUser(id string) error
 	Close() error
 }
 
@@ -377,4 +379,56 @@ func (s *LevelDBStore) GetUserByEmail(email string) (*models.User, error) {
 	}
 
 	return &user, nil
+}
+
+func (s *LevelDBStore) GetUserByID(id string) (*models.User, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	if id == "" {
+		return nil, nil
+	}
+
+	userKey := fmt.Sprintf("user:%s", id)
+	data, err := s.db.Get([]byte(userKey), nil)
+	if err != nil {
+		if err == leveldb.ErrNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var user models.User
+	if err := json.Unmarshal(data, &user); err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (s *LevelDBStore) DeleteUser(id string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if id == "" {
+		return fmt.Errorf("user id cannot be empty")
+	}
+
+	// Get user first to clean up email index
+	userKey := fmt.Sprintf("user:%s", id)
+	data, err := s.db.Get([]byte(userKey), nil)
+	if err != nil {
+		return err
+	}
+
+	var user models.User
+	if err := json.Unmarshal(data, &user); err == nil {
+		// Delete email index if present
+		if user.Email != "" {
+			s.deleteUserEmailIndex(user.Email)
+		}
+	}
+
+	// Delete user record
+	return s.db.Delete([]byte(userKey), nil)
 }

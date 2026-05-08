@@ -11,9 +11,13 @@
 - **Frontend**: Multi-page app in `./static` directory
   - `index.html` - Form structure with event listing section
   - `campaigns.html` - Campaign listing page
+  - `profile.html` - User profile page with account management
+  - `dashboard.html` - Main authenticated dashboard
   - `styles.css` - Responsive design (mobile-first, gradient background)
   - `script.js` - Fetch-based API calls with basic form validation
-  - `campaigns.js` - Fetch-based campaign listing logic
+  - `campaigns.js` - Fetch-based campaign listing logic with user display objects
+  - `profile.js` - Profile page logic with delete account functionality
+  - `dashboard.js` - Dashboard page initialization
 
 - **Deployment**: Docker-first approach
   - Multi-stage Dockerfile (build in Go 1.21 Alpine, runtime in minimal Alpine)
@@ -67,10 +71,13 @@ Currently, the project has no tests or linters configured. Before adding tests o
 
 ### Go Code
 
-- **Handler naming**: Functions that handle HTTP endpoints are named `handle<Action>` (e.g., `handleGetEvents`, `handleSignup`)
+- **Handler naming**: Functions that handle HTTP endpoints are named `handleXxx` or `HandleXxx` (e.g., `handleGetEvents`, `HandleSignup`, `HandleProfile`)
 - **Response format**: All API responses are JSON; handlers always set `Content-Type: application/json` and appropriate status codes
-- **Method validation**: Use `if r.Method != http.MethodPost` pattern to guard endpoints (example in `handleSignup`)
-- **No request body parsing yet**: Handlers currently only read headers and URL. If parsing JSON bodies, add `json.NewDecoder(r.Body).Decode()` pattern
+- **Method validation**: Use dispatch pattern in handler functions or `if r.Method != http.MethodPost` to guard endpoints
+- **Request body parsing**: Use `json.NewDecoder(r.Body).Decode(&data)` for JSON request bodies
+- **User model**: Includes `ID`, `GoogleID`, `Email`, `Name`, `Nickname`, `Picture`, `Roles`, timestamps
+  - Display name computed from: `Nickname` (if non-empty) → `Name` → `Email`
+- **Database operations**: Use wrapper functions in `db/` package that call `GetStore()` interface methods
 
 ### Frontend (JavaScript)
 
@@ -78,6 +85,9 @@ Currently, the project has no tests or linters configured. Before adding tests o
 - **Error handling**: Try/catch wraps API calls; `catch` shows user-friendly error message via `showMessage(text, 'error')`
 - **Message display**: Use `showMessage(text, type)` helper to show success/error messages (auto-hides after 5 seconds)
 - **Event lifecycle**: `DOMContentLoaded` event triggers initial load; event listeners attached once on page load
+- **Display name precedence**: Show `display_name` in headers/user info (prefers nickname > name > email)
+- **User buttons**: Reusable component for displaying users as clickable buttons linking to their profile; shows display name and links to `/profile?user_id=<id>`
+- **HTML escaping**: Always use `textContent` over `innerHTML` for user-generated content; provide `escapeHtml()` helper when building HTML with untrusted content
 
 ### Styling
 
@@ -87,10 +97,20 @@ Currently, the project has no tests or linters configured. Before adding tests o
 
 ### Routing Structure
 
-- `/` - Serves `index.html` and static assets (catch-all file server)
+- `/` - Serves dashboard (`dashboard.html`) for authenticated users
+- `/campaigns` - Campaign listing page for authenticated users
+- `/profile` - User profile page for authenticated users (supports `?user_id=<id>` query param)
+- `/auth/login` - OAuth login initiation endpoint
+- `/auth/callback` - OAuth callback endpoint
+- `/auth/logout` - Logout endpoint (POST)
+- `/auth/current-user` - Get current session user info (GET)
 - `/api/events` - GET only, returns JSON array of event objects
-- `/api/campaigns` - GET only, returns JSON array of campaign objects
+- `/api/campaigns` - GET only, returns enriched campaign objects with `dm_user` and `player_users` display objects
+- `/api/profile` - GET to fetch user profile (supports `?user_id=<id>`), DELETE to delete current user account
 - `/api/signup` - POST only, accepts JSON signup data, returns `{"status": "success", "message": "..."}`
+- `/api/roles` - Role management endpoints
+- `/api/users` - User listing endpoint
+- `/api/users/create` - Create new user endpoint (admin only)
 
 ### Environment Variables
 
@@ -106,11 +126,13 @@ Currently, the project has no tests or linters configured. Before adding tests o
 
 When adding features, consider these patterns established in the codebase:
 
-- **New API endpoints**: Add `http.HandleFunc("/api/path", handleAction)` in `main.go`, create handler function
-- **Database integration**: Will need `go.sum`, external packages, and potential schema migrations
-- **Request body parsing**: Add `err := json.NewDecoder(r.Body).Decode(&data)` in handlers needing it
-- **Authentication**: Consider middleware pattern for shared auth logic across handlers
+- **New API endpoints**: Add route registration in `api/router.go`, create handler function in `api/` package with appropriate middleware
+- **User model changes**: Edit `models/user.go`, update seed data in `config/config.go`, preserve existing fields in `HandleCallback` and `SaveUser` flows
+- **Database integration**: Use `db/store.go` Store interface pattern; add new methods to interface, implement on LevelDBStore, create wrappers in `db/` package
+- **Request body parsing**: Use `json.NewDecoder(r.Body).Decode(&data)` in handler functions
+- **Authentication**: Use existing `middleware.AuthMiddleware` for protected routes; `middleware.GetSession()` to check auth; `middleware.ClearSession()` for logout
 - **Frontend state management**: Currently minimal; consider context API or state object if complexity grows
+- **API enrichment patterns**: Mirror campaigns API enrichment for user display objects (include raw IDs for backward compatibility, add new fields like `*_user` or `*_users` with full user display data)
 
 ## Docker Considerations
 
