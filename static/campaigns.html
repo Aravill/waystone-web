@@ -27,12 +27,58 @@
     </div>
 
     <div class="container">
-        <div class="campaigns-section">
-            <h2>Available Campaigns</h2>
-            <div id="campaignsList" class="campaigns-list">
-                <p>Loading campaigns...</p>
+        <div class="campaigns-container">
+            <!-- Left Panel -->
+            <aside class="campaigns-panel" id="campaignsPanel">
+                <div class="panel-header">
+                    <h3 class="panel-title">Actions</h3>
+                    <button type="button" id="togglePanelBtn" class="panel-toggle" aria-expanded="true" aria-controls="campaignsPanelContent">Hide</button>
+                </div>
+                <div class="panel-content" id="campaignsPanelContent">
+                    <button type="button" id="registerCampaignBtn" class="panel-button">Register campaign</button>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <div class="campaigns-section">
+                <h2>Available Campaigns</h2>
+                <div id="campaignsList" class="campaigns-list">
+                    <p>Loading campaigns...</p>
+                </div>
+                <div id="message" class="message"></div>
             </div>
-            <div id="message" class="message"></div>
+        </div>
+    </div>
+
+    <!-- Campaign Creation Modal -->
+    <div id="createCampaignModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Register a new Campaign</h2>
+                    <button type="button" class="modal-close" id="closeModalBtn">&times;</button>
+            </div>
+            <form id="createCampaignForm" class="modal-form">
+                <div class="form-group">
+                    <label for="campaignTitle">Title *</label>
+                    <input type="text" id="campaignTitle" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="campaignSummary">Summary *</label>
+                    <input type="text" id="campaignSummary" name="summary" required>
+                </div>
+                <div class="form-group">
+                    <label for="campaignDescription">Description *</label>
+                    <textarea id="campaignDescription" name="description" rows="4" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="campaignPlayerCount">Desired player count *</label>
+                    <input type="number" id="campaignPlayerCount" name="desired_player_count" min="1" step="1" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn-create">Create</button>
+                    <button type="button" class="btn-cancel" id="cancelModalBtn">Cancel</button>
+                </div>
+            </form>
         </div>
     </div>
 
