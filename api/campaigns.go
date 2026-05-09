@@ -50,14 +50,15 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 	enriched := []map[string]interface{}{}
 	for _, campaign := range campaigns {
 		campaignObj := map[string]interface{}{
-			"id":            campaign.ID,
-			"title":         campaign.Title,
-			"status":        campaign.Status,
-			"summary":       campaign.Summary,
-			"description":   campaign.Description,
-			"dm":            campaign.DM,
-			"players":       campaign.Players,
-			"sign_ups_open": campaign.SignUpsOpen,
+			"id":                   campaign.ID,
+			"title":                campaign.Title,
+			"status":               campaign.Status,
+			"summary":              campaign.Summary,
+			"description":          campaign.Description,
+			"dm":                   campaign.DM,
+			"players":              campaign.Players,
+			"sign_ups_open":        campaign.SignUpsOpen,
+			"desired_player_count": campaign.DesiredPlayerCount,
 		}
 
 		// Add DM user display object if DM exists
