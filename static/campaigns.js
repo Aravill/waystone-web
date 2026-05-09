@@ -22,7 +22,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         logoutBtn.addEventListener("click", logout);
     }
 
-    setupPanelHandlers();
     setupModalHandlers();
     loadCampaigns();
 });
@@ -36,23 +35,6 @@ async function logout() {
     } catch (error) {
         showMessage("Logout failed: " + error.message, "error");
     }
-}
-
-function setupPanelHandlers() {
-    const panel = document.getElementById("campaignsPanel");
-    const content = document.getElementById("campaignsPanelContent");
-    const toggleBtn = document.getElementById("togglePanelBtn");
-
-    if (!panel || !content || !toggleBtn) {
-        return;
-    }
-
-    toggleBtn.addEventListener("click", () => {
-        const collapsed = panel.classList.toggle("campaigns-panel-collapsed");
-        content.hidden = collapsed;
-        toggleBtn.textContent = collapsed ? "Show" : "Hide";
-        toggleBtn.setAttribute("aria-expanded", String(!collapsed));
-    });
 }
 
 function setupModalHandlers() {
