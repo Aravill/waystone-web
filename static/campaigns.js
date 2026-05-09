@@ -103,9 +103,9 @@ async function handleCreateCampaign(event) {
     const title = document.getElementById("campaignTitle").value.trim();
     const summary = document.getElementById("campaignSummary").value.trim();
     const description = document.getElementById("campaignDescription").value.trim();
-    const desired_player_count = document.getElementById("campaignPlayerCount").value.trim();
+    const desiredPlayerCount = parseInt(document.getElementById("campaignPlayerCount").value.trim(), 10);
 
-    if (!title || !summary || !description || !desired_player_count) {
+    if (!title || !summary || !description || isNaN(desiredPlayerCount) || desiredPlayerCount <= 0) {
         showMessage("All fields are required", "error");
         return;
     }
@@ -120,9 +120,14 @@ async function handleCreateCampaign(event) {
                 title,
                 summary,
                 description,
-                desired_player_count
+                desired_player_count: desiredPlayerCount
             })
         });
+
+        if (response.redirected || !response.headers.get("Content-Type")?.includes("application/json")) {
+            window.location.href = "/login.html";
+            return;
+        }
 
         const data = await response.json();
 
