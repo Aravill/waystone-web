@@ -137,7 +137,7 @@ func HandleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 		Title              string `json:"title"`
 		Summary            string `json:"summary"`
 		Description        string `json:"description"`
-		DesiredPlayerCount string `json:"desired_player_count"`
+		DesiredPlayerCount int    `json:"desired_player_count"`
 	}
 
 	var req CreateCampaignRequest
@@ -163,13 +163,7 @@ func HandleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `{"error": "description is required"}`)
 		return
 	}
-	if strings.TrimSpace(req.DesiredPlayerCount) == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `{"error": "desired player count is required"}`)
-		return
-	}
-	playerCount, err := strconv.Atoi(strings.TrimSpace(req.DesiredPlayerCount))
-	if err != nil || playerCount <= 0 {
+	if req.DesiredPlayerCount <= 0 {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, `{"error": "desired player count must be a positive number"}`)
 		return
@@ -181,7 +175,7 @@ func HandleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 		Title:              strings.TrimSpace(req.Title),
 		Summary:            strings.TrimSpace(req.Summary),
 		Description:        strings.TrimSpace(req.Description),
-		DesiredPlayerCount: strconv.Itoa(playerCount),
+		DesiredPlayerCount: strconv.Itoa(req.DesiredPlayerCount),
 		DM:                 userID,
 		Players:            []string{},
 		Status:             models.Pitch,
