@@ -1,0 +1,48 @@
+# Minimal Viable Product
+## Summary
+This document describes what must-have features are to be implemented before presenting this website to the waystone server members
+## MVP Requirements
+- [ ] Calendar & Session Planning
+    - [ ] DM can suggest session dates
+    - [ ] Players can react with confirm / reject / tentative the dates
+    - [ ] DM can see who reacted how
+    - [ ] Dates can be cancelled
+    - [ ] Calendar sync - the players & DM can import events into their google calendar
+- [ ] Signing up
+    - [ ] Users can sign up for campaigns if sign-ups are open
+    - [ ] DMs can accept or ignore signed-up players
+    - [ ] Ignored players do not show up for the DM anymore unless a special button is clicked
+- [ ] Following
+    - [ ] Users can follow campaigns (to receive notifications)
+    - [ ] Players are automatically following campaigns they're in
+- [ ] Administration
+    - [ ] Always one super admin role
+    - [ ] An admin / super admin can add or remove people from the access whitelist
+    - [ ] A super admin can make other people admins
+    - [ ] Admins can remove any campaign
+    - [ ] An admin can revoke whitelist access to a user (doesn't delete the account, just blocks their log-in)
+    - [ ] An admin can delete accounts
+- [ ] Campaigns
+    - [ ] Standard operations
+        - [x] Creating
+        - [ ] Updating
+        - [ ] Deleting
+    - [ ] Switching states according to the state transition map
+    - [ ] Removing active players
+    - [ ] Opening / Closing sign-ups
+    - [ ] Toggling sign-up auto close and auto open
+    - [ ] Campaign grid view
+    - [ ] DMs are colorfully distinct from players
+    - [ ] Visually distinct campaign statuses
+- [ ] Profile
+    - [ ] Standard operations
+        - [ ] Changing nicknames
+        - [ ] Updating avatars
+        - [ ] Deleting account (anonymizes them)
+    - [x] List of campaigns playing in and dungeon mastering
+    - [ ] Visually distinct campaign statuses
+- [ ] Initial log-in
+    - [ ] Profile creation process (set nickname and avatar)
+- [ ] Technological
+    - [ ] SQLite
+    - [ ] Alpine.js
