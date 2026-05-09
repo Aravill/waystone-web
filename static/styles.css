@@ -591,65 +591,19 @@ select:focus {
     }
 }
 
-/* Campaigns Container with Panel */
-.campaigns-container {
-    display: flex;
-    gap: 20px;
-}
-
-.campaigns-panel {
-    flex: 0 0 200px;
-    background: #0a0a0a;
-    border: 1px solid #2a2a2a;
-    padding: 20px;
-    height: fit-content;
-    transition: width 0.2s ease, padding 0.2s ease;
-}
-
-.campaigns-panel-collapsed {
-    flex-basis: 64px;
-    width: 64px;
-    padding: 12px 8px;
-}
-
-.campaigns-panel-collapsed .panel-header {
-    flex-direction: column;
-    align-items: stretch;
-}
-
-.campaigns-panel-collapsed .panel-title {
-    display: none;
-}
-
-.campaigns-panel-collapsed .panel-toggle {
+/* Campaigns Toolbar */
+.campaigns-toolbar {
     width: 100%;
-}
-
-.panel-header {
+    background: #0a0a0a;
+    border-bottom: 1px solid #2a2a2a;
+    padding: 12px 40px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
-}
-
-.panel-content {
-    display: flex;
-    flex-direction: column;
     gap: 12px;
 }
 
-.panel-title {
-    color: #6ecbff;
-    font-size: 0.95em;
-    font-weight: 600;
-    margin: 0;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.panel-button {
-    padding: 12px;
+.toolbar-button {
+    padding: 10px 18px;
     background: #000000;
     color: #00d9ff;
     border: 1px solid #00d9ff;
@@ -661,31 +615,13 @@ select:focus {
     letter-spacing: 0.5px;
 }
 
-.panel-button:hover {
+.toolbar-button:hover {
     background: #00d9ff;
     color: #000000;
 }
 
-.panel-toggle {
-    padding: 8px 12px;
-    background: #000000;
-    color: #b0b0b0;
-    border: 1px solid #2a2a2a;
-    font-family: 'Fira Code', monospace;
-    font-size: 0.75em;
-    cursor: pointer;
-    transition: all 0.3s;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.panel-toggle:hover {
-    color: #ffffff;
-    border-color: #00d9ff;
-}
-
 .campaigns-section {
-    flex: 1;
+    width: 100%;
 }
 
 /* Modal Styles */
@@ -754,21 +690,21 @@ select:focus {
     gap: 16px;
 }
 
-.form-group {
+.modal-form .form-group {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-.form-group label {
+.modal-form .form-group label {
     color: #6ecbff;
     font-size: 0.9em;
     font-weight: 600;
     letter-spacing: 0.5px;
 }
 
-.form-group input,
-.form-group textarea {
+.modal-form .form-group input,
+.modal-form .form-group textarea {
     padding: 10px 12px;
     background: #000000;
     border: 1px solid #2a2a2a;
@@ -777,8 +713,8 @@ select:focus {
     font-size: 0.9em;
 }
 
-.form-group input:focus,
-.form-group textarea:focus {
+.modal-form .form-group input:focus,
+.modal-form .form-group textarea:focus {
     outline: none;
     border-color: #00d9ff;
     box-shadow: 0 0 8px rgba(0, 217, 255, 0.3);
