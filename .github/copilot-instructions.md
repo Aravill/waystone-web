@@ -10,12 +10,12 @@
 
 - **Frontend**: Multi-page app in `./static` directory
   - `index.html` - Form structure with event listing section
-  - `campaigns.html` - Campaign listing page
+  - `campaigns.html` - Campaign listing page with left panel and campaign creation modal
+  - `campaigns.js` - Campaign listing and creation logic with user display objects and modal handlers
   - `profile.html` - User profile page with account management
   - `dashboard.html` - Main authenticated dashboard
-  - `styles.css` - Responsive design (mobile-first, gradient background)
+  - `styles.css` - Responsive design (mobile-first, gradient background) with modal and panel styles
   - `script.js` - Fetch-based API calls with basic form validation
-  - `campaigns.js` - Fetch-based campaign listing logic with user display objects
   - `profile.js` - Profile page logic with delete account functionality
   - `dashboard.js` - Dashboard page initialization
 
@@ -105,7 +105,7 @@ Currently, the project has no tests or linters configured. Before adding tests o
 - `/auth/logout` - Logout endpoint (POST)
 - `/auth/current-user` - Get current session user info (GET)
 - `/api/events` - GET only, returns JSON array of event objects
-- `/api/campaigns` - GET only, returns enriched campaign objects with `dm_user` and `player_users` display objects
+- `/api/campaigns` - GET returns enriched campaign objects with `dm_user` and `player_users` display objects; POST creates a new campaign with authenticated user as DM (requires fields: title, summary, description, desired_player_count)
 - `/api/profile` - GET to fetch user profile (supports `?user_id=<id>`), DELETE to delete current user account
 - `/api/signup` - POST only, accepts JSON signup data, returns `{"status": "success", "message": "..."}`
 - `/api/roles` - Role management endpoints
