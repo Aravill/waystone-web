@@ -22,6 +22,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         logoutBtn.addEventListener("click", logout);
     }
 
+    setupModalHandlers();
     loadCampaigns();
 });
 
@@ -33,6 +34,96 @@ async function logout() {
         }
     } catch (error) {
         showMessage("Logout failed: " + error.message, "error");
+    }
+}
+
+function setupModalHandlers() {
+    const modal = document.getElementById("createCampaignModal");
+    const openBtn = document.getElementById("registerCampaignBtn");
+    const closeBtn = document.getElementById("closeModalBtn");
+    const cancelBtn = document.getElementById("cancelModalBtn");
+    const form = document.getElementById("createCampaignForm");
+
+    if (!modal || !form) {
+        return;
+    }
+
+    if (openBtn) {
+        openBtn.addEventListener("click", () => {
+            form.reset();
+            modal.classList.add("modal-open");
+        });
+    }
+
+    if (closeBtn) {
+        closeBtn.addEventListener("click", () => {
+            modal.classList.remove("modal-open");
+        });
+    }
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener("click", () => {
+            modal.classList.remove("modal-open");
+        });
+    }
+
+    if (form) {
+        form.addEventListener("submit", handleCreateCampaign);
+    }
+
+    // Close modal when clicking outside
+    window.addEventListener("click", (event) => {
+        if (event.target === modal) {
+            modal.classList.remove("modal-open");
+        }
+    });
+}
+
+async function handleCreateCampaign(event) {
+    event.preventDefault();
+
+    const title = document.getElementById("campaignTitle").value.trim();
+    const summary = document.getElementById("campaignSummary").value.trim();
+    const description = document.getElementById("campaignDescription").value.trim();
+    const desiredPlayerCount = parseInt(document.getElementById("campaignPlayerCount").value.trim(), 10);
+
+    if (!title || !summary || !description || isNaN(desiredPlayerCount) || desiredPlayerCount <= 0) {
+        showMessage("All fields are required", "error");
+        return;
+    }
+
+    try {
+        const response = await fetch("/api/campaigns", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                title,
+                summary,
+                description,
+                desired_player_count: desiredPlayerCount
+            })
+        });
+
+        if (response.redirected || !response.headers.get("Content-Type")?.includes("application/json")) {
+            window.location.href = "/login.html";
+            return;
+        }
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            showMessage(data.error || "Failed to create campaign", "error");
+            return;
+        }
+
+        showMessage("Campaign created successfully!", "success");
+        document.getElementById("createCampaignModal").classList.remove("modal-open");
+        document.getElementById("createCampaignForm").reset();
+        loadCampaigns();
+    } catch (error) {
+        showMessage("Error creating campaign: " + error.message, "error");
     }
 }
 
