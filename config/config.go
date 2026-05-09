@@ -10,13 +10,9 @@ const (
 	DefaultPort = "8080"
 )
 
-var InitialEvents = []models.Event{
-	{ID: 1, Name: "Age of Sojourn", Date: "2024-05-10"},
-}
-
 var InitialCampaigns = []models.Campaign{
 	{
-		ID:          1,
+		ID:          "ea213cb4-9ab9-49ff-a29f-3fafb7b4799c",
 		Title:       "Age of Sojourn",
 		Status:      models.Ongoing,
 		Summary:     "An epic campaign of discovery and adventure",
@@ -25,15 +21,34 @@ var InitialCampaigns = []models.Campaign{
 		DM:          "550e8400-e29b-41d4-a716-446655440000",
 		SignUpsOpen: true,
 	},
+	{
+		ID:          "6e05d2bc-efc8-4464-b3c9-c6fff907940f",
+		Title:       "Embittered Arcanist",
+		Status:      models.Pitch,
+		Summary:     "Figure out who turned the Archamge into a sheep",
+		Description: "Lorem ipsum dolor sit amet something something bla bla bla",
+		Players:     []string{"550e8400-e29b-41d4-a716-446655440000"},
+		DM:          "7609bdaf-cc43-4131-b188-098aa07ba6dc",
+		SignUpsOpen: true,
+	},
 }
 
 var InitialUsers = []models.User{
 	{
 		ID:        "550e8400-e29b-41d4-a716-446655440000",
 		Email:     "mozikmichal@gmail.com",
-		Name:      "Admin",
-		Nickname:  "Michi",
-		Roles:     []string{"admin"},
+		Name:      "Michal Mozik",
+		Nickname:  "Aravill",
+		Roles:     []string{"admin", "user"},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	},
+	{
+		ID:        "7609bdaf-cc43-4131-b188-098aa07ba6dc",
+		Email:     "test.user@gmail.com",
+		Name:      "Test Testington",
+		Nickname:  "Testy",
+		Roles:     []string{"user"},
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	},
