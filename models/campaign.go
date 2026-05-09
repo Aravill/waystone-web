@@ -18,6 +18,6 @@ type Campaign struct {
 	Description        string         `json:"description"`
 	Players            []string       `json:"players"`
 	DM                 string         `json:"dm"`
-	DesiredPlayerCoutn string         `json:"desired_player_count"`
+	DesiredPlayerCount string         `json:"desired_player_count"`
 	SignUpsOpen        bool           `json:"sign_ups_open"`
 }

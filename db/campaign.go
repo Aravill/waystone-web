@@ -2,8 +2,6 @@ package db
 
 import (
 	"waystone-web/models"
-
-	"github.com/google/uuid"
 )
 
 func GetAllCampaigns() ([]models.Campaign, error) {
@@ -19,5 +17,5 @@ func GetCampaignByID(id string) (*models.Campaign, error) {
 }
 
 func GetNextCampaignID() string {
-	return uuid.New().String()
+	return GenerateUUID()
 }
