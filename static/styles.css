@@ -529,6 +529,16 @@ h2 {
     color: #000000;
 }
 
+.user-button--dm {
+    border-color: #ffd700;
+    color: #ffd700;
+}
+
+.user-button--dm:hover {
+    background: #ffd700;
+    color: #000000;
+}
+
 .event-item {
     padding: 10px;
     margin-bottom: 10px;

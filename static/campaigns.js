@@ -280,7 +280,9 @@ function createDMField(campaign) {
 
     // If dm_user exists, render it as a button; otherwise use raw dm ID or show "Unassigned"
     if (campaign?.dm_user) {
-        field.appendChild(createUserButton(campaign.dm_user));
+        const dmButton = createUserButton(campaign.dm_user);
+        dmButton.classList.add("user-button--dm");
+        field.appendChild(dmButton);
     } else if (campaign?.dm) {
         const valueEl = document.createElement("p");
         valueEl.className = "campaign-value campaign-nameplate";
