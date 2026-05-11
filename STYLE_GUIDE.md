@@ -291,6 +291,140 @@ input:focus, select:focus {
 }
 ```
 
+### Campaign Status Badge
+
+**Purpose:** Distinguish campaign lifecycle states (Pitch, Ongoing, Finished, On Hiatus, Cancelled) with visual badges below the campaign title.
+
+**Visual Design:**
+- Label-like appearance: no border, colored text with subtle background tint
+- Uppercase text with letter spacing for clarity
+- Responsive glow effect on hover
+
+**Status Colors:**
+- **Pitch** (#ffd700 Gold): Campaign pitch phase - recruiting players
+- **Ongoing** (#00d9ff Cyan): Campaign is actively running
+- **Finished** (#00ff7f Green): Campaign has concluded
+- **On Hiatus** (#ff8c00 Orange): Campaign is temporarily paused
+- **Cancelled** (#ff006e Pink): Campaign has been cancelled
+
+**Hover Behavior:**
+- Text glows with status-specific color
+- Tooltip appears above badge on hover and keyboard focus
+- Keyboard focus includes clear focus-visible outline
+
+**Position:** Below the campaign title in the campaign card
+
+**CSS Example:**
+```css
+.campaign-status-badge {
+    display: inline-block;
+    position: relative;
+    padding: 4px 10px;
+    border: none;
+    font-size: 0.75em;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    transition: text-shadow 0.2s ease;
+}
+
+/* Tooltip appears on hover and focus */
+.campaign-status-badge::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    background: #0a0a0a;
+    border: 1px solid;
+    padding: 6px 10px;
+    border-radius: 2px;
+    font-size: 0.85em;
+    white-space: nowrap;
+    bottom: 120%;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 1000;
+}
+
+.campaign-status-badge:hover::before,
+.campaign-status-badge:focus::before,
+.campaign-status-badge:focus-visible::before {
+    opacity: 1;
+}
+
+/* Clear focus-visible outline */
+.campaign-status-badge:focus-visible {
+    outline: 2px solid #00d9ff;
+    outline-offset: 2px;
+}
+
+/* Status variants */
+.campaign-item.status-pitch .campaign-status-badge {
+    background: rgba(255, 215, 0, 0.1);
+    color: #ffd700;
+}
+
+.campaign-item.status-ongoing .campaign-status-badge {
+    background: rgba(0, 217, 255, 0.1);
+    color: #00d9ff;
+}
+
+.campaign-item.status-finished .campaign-status-badge {
+    background: rgba(0, 255, 127, 0.1);
+    color: #00ff7f;
+}
+
+.campaign-item.status-hiatus .campaign-status-badge {
+    background: rgba(255, 140, 0, 0.1);
+    color: #ff8c00;
+}
+
+.campaign-item.status-cancelled .campaign-status-badge {
+    background: rgba(255, 0, 110, 0.1);
+    color: #ff006e;
+}
+
+/* Hover glow effects */
+.campaign-item.status-pitch .campaign-status-badge:hover {
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.6), 0 0 20px rgba(255, 215, 0, 0.3);
+}
+
+.campaign-item.status-ongoing .campaign-status-badge:hover {
+    text-shadow: 0 0 10px rgba(0, 217, 255, 0.6), 0 0 20px rgba(0, 217, 255, 0.3);
+}
+
+.campaign-item.status-finished .campaign-status-badge:hover {
+    text-shadow: 0 0 10px rgba(0, 255, 127, 0.6), 0 0 20px rgba(0, 255, 127, 0.3);
+}
+
+.campaign-item.status-hiatus .campaign-status-badge:hover {
+    text-shadow: 0 0 10px rgba(255, 140, 0, 0.6), 0 0 20px rgba(255, 140, 0, 0.3);
+}
+
+.campaign-item.status-cancelled .campaign-status-badge:hover {
+    text-shadow: 0 0 10px rgba(255, 0, 110, 0.6), 0 0 20px rgba(255, 0, 110, 0.3);
+}
+```
+
+**Required HTML Attributes (generated in JS):**
+- `data-tooltip`: Content displayed in tooltip pseudo-element
+- `title`: Accessible tooltip text for assistive technologies and native browser tooltips
+- `tabindex="0"`: Makes badge keyboard focusable
+- `aria-label`: Semantic label combining status name and meaning for screen readers
+
+**Do's:**
+- Use for campaign lifecycle state indication
+- Apply glow effect on hover
+- Show tooltip on hover and keyboard focus with descriptive text
+- Keep consistent with status colors across the campaign card
+
+**Don'ts:**
+- Don't use as a button or make it look clickable
+- Don't add borders - use color for text and background tint only
+- Don't add click handlers to the badge
+- Don't change status colors for different contexts
+
 ---
 
 ## Interactions
@@ -736,4 +870,3 @@ When updating this guide:
 2. Update the version number
 3. Ensure all existing pages follow the new guideline
 4. Get team consensus on major style changes
-
