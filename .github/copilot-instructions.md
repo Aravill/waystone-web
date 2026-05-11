@@ -4,7 +4,7 @@
 
 **Waystone Web** is a full-stack event sign-up and campaign application with a clear separation between backend and frontend:
 
-- **Backend**: Single-file Go HTTP server (`main.go`) using the standard library and LevelDB
+- **Backend**: Single-file Go HTTP server (`main.go`) using the standard library and SQLite
   - Serves static files from `./static` directory at the root path
   - Exposes REST API endpoints for events, campaigns, and sign-ups
 
@@ -128,7 +128,7 @@ When adding features, consider these patterns established in the codebase:
 
 - **New API endpoints**: Add route registration in `api/router.go`, create handler function in `api/` package with appropriate middleware
 - **User model changes**: Edit `models/user.go`, update seed data in `config/config.go`, preserve existing fields in `HandleCallback` and `SaveUser` flows
-- **Database integration**: Use `db/store.go` Store interface pattern; add new methods to interface, implement on LevelDBStore, create wrappers in `db/` package
+- **Database integration**: Use `db/store.go` Store interface pattern; add new methods to interface, implement on SQLiteStore, create wrappers in `db/` package
 - **Request body parsing**: Use `json.NewDecoder(r.Body).Decode(&data)` in handler functions
 - **Authentication**: Use existing `middleware.AuthMiddleware` for protected routes; `middleware.GetSession()` to check auth; `middleware.ClearSession()` for logout
 - **Frontend state management**: Currently minimal; consider context API or state object if complexity grows
