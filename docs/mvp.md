@@ -34,6 +34,7 @@ This document describes what must-have features are to be implemented before pre
     - [ ] Campaign grid view
     - [x] DMs are colorfully distinct from players
     - [x] Visually distinct campaign statuses
+    - [ ] Campaign types (and their visual distinction) - Campaign, Adventure, One-shot
 - [ ] Profile
     - [ ] Standard operations
         - [ ] Changing nicknames
