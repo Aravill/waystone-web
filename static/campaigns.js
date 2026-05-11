@@ -174,7 +174,7 @@ function renderCampaign(campaign) {
 
     // Status tooltip meanings
     const statusTooltips = {
-        "Pitch": "Campaign pitch phase - recruiting players",
+        "Pitch": "Campaign is recruiting players",
         "Ongoing": "Campaign is actively running",
         "Finished": "Campaign has concluded",
         "On Hiatus": "Campaign is temporarily paused",
