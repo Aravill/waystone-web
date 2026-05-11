@@ -32,8 +32,8 @@ This document describes what must-have features are to be implemented before pre
     - [ ] Opening / Closing sign-ups
     - [ ] Toggling sign-up auto close and auto open
     - [ ] Campaign grid view
-    - [ ] DMs are colorfully distinct from players
-    - [ ] Visually distinct campaign statuses
+    - [x] DMs are colorfully distinct from players
+    - [x] Visually distinct campaign statuses
 - [ ] Profile
     - [ ] Standard operations
         - [ ] Changing nicknames
@@ -46,3 +46,6 @@ This document describes what must-have features are to be implemented before pre
 - [ ] Technological
     - [ ] SQLite
     - [ ] Alpine.js
+    - [ ] Code review skill
+- [ ] Misc
+    - [ ] Waystone logo on the page
