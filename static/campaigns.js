@@ -162,17 +162,47 @@ function renderCampaign(campaign) {
     const signUpsOpen = campaign?.sign_ups_open === true;
     const nextSession = "N/A";
 
+    // Convert status to CSS class name
+    const statusMap = {
+        "Pitch": "pitch",
+        "Ongoing": "ongoing",
+        "Finished": "finished",
+        "On Hiatus": "hiatus",
+        "Cancelled": "cancelled"
+    };
+    const statusClass = statusMap[status] || status.toLowerCase().replace(/\s+/g, "-");
+
+    // Status tooltip meanings
+    const statusTooltips = {
+        "Pitch": "Campaign pitch phase - recruiting players",
+        "Ongoing": "Campaign is actively running",
+        "Finished": "Campaign has concluded",
+        "On Hiatus": "Campaign is temporarily paused",
+        "Cancelled": "Campaign has been cancelled"
+    };
+
     const card = document.createElement("article");
-    card.className = "campaign-item";
+    card.className = `campaign-item status-${statusClass}`;
     card.id = `campaign-${campaign?.id ?? "unknown"}`;
 
     // Row 1: title + summary toggle + optional long description
     const topRow = document.createElement("section");
     topRow.className = "campaign-row campaign-row-top";
 
+    const titleContainer = document.createElement("div");
+    titleContainer.className = "campaign-title-container";
+
     const titleEl = document.createElement("h3");
     titleEl.className = "campaign-title";
     titleEl.textContent = title;
+
+    const statusBadge = document.createElement("span");
+    statusBadge.className = "campaign-status-badge";
+    statusBadge.textContent = status;
+    statusBadge.setAttribute("data-tooltip", statusTooltips[status] || status);
+
+    titleContainer.appendChild(titleEl);
+    titleContainer.appendChild(statusBadge);
 
     const summaryRow = document.createElement("div");
     summaryRow.className = "campaign-summary-row";
@@ -203,7 +233,7 @@ function renderCampaign(campaign) {
     summaryRow.appendChild(summaryText);
     summaryRow.appendChild(summaryArrowBtn);
 
-    topRow.appendChild(titleEl);
+    topRow.appendChild(titleContainer);
     topRow.appendChild(summaryRow);
     topRow.appendChild(descriptionEl);
 
@@ -213,7 +243,6 @@ function renderCampaign(campaign) {
 
     const leftCol = document.createElement("div");
     leftCol.className = "campaign-column campaign-column-left";
-    leftCol.appendChild(createField("Status", status));
     leftCol.appendChild(createDMField(campaign));
     leftCol.appendChild(createField("Sign-ups", signUpsOpen ? "Open" : "Closed"));
 
