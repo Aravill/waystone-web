@@ -23,11 +23,11 @@ A lightweight Go application hosting event sign-up and campaign management. Buil
 │   ├── signup.go        # Signup handlers
 │   └── roles.go         # Role management endpoints
 ├── db/                  # Database layer
-│   ├── store.go         # LevelDB storage interface and implementation
-│   ├── event.go         # Event CRUD operations
+│   ├── store.go         # SQLite storage interface and implementation
+│   ├── sqlite_store.go  # SQLite database store implementation
 │   ├── campaign.go      # Campaign CRUD operations
-│   ├── signup.go        # Signup CRUD operations
-│   └── user.go          # User CRUD operations
+│   ├── user.go          # User CRUD operations
+│   ├── uuid.go          # UUID generation utilities
 ├── middleware/          # HTTP middleware
 │   └── auth.go          # Authentication middleware
 ├── models/              # Data models and types
@@ -46,7 +46,7 @@ A lightweight Go application hosting event sign-up and campaign management. Buil
 ## Features
 
 - **Go Backend**: Lightweight HTTP server with event management APIs
-- **LevelDB Storage**: Persistent data storage for events and signups using Google's LevelDB
+- **SQLite Storage**: Persistent data storage for campaigns and user whitelist using SQLite
 - **Web Frontend**: Responsive sign-up form with black minimalistic design and Fira Code monospace font
 - **Docker Support**: Containerized for consistent deployment with persistent data volumes
 - **Easy Deployment**: Simple deploy script for local Docker deployment
@@ -194,11 +194,11 @@ See `.env.example` in the repository for a complete template with all available 
 
 ## Data Persistence
 
-The application uses **LevelDB** (Google's embedded key-value database) to store all event and signup data. Data is persisted in a Docker volume (`waystone-data`) mounted at `/root/data` in the container.
+The application uses **SQLite** (embedded SQL database) to store campaigns, user whitelist, and role information. Data is persisted in a Docker volume (`waystone-data`) mounted at `/root/data` in the container.
 
 ### Data Storage Location
 - Docker volume: `waystone-data`
-- Container path: `/root/data/leveldb`
+- Container path: `/root/data/waystone.db`
 
 ### Data Preservation
 - Data persists across container restarts: `docker-compose restart`
@@ -206,11 +206,11 @@ The application uses **LevelDB** (Google's embedded key-value database) to store
 - Data survives container recreation during rebuilds
 
 ### Initial Data
-On first run, the application automatically seeds two sample events:
-1. "Tech Conference 2024" (2024-05-10)
-2. "Web Summit" (2024-06-15)
+On first run, the application automatically seeds two sample campaigns:
+1. "Age of Sojourn" - An epic campaign of discovery and adventure
+2. "Embittered Arcanist" - Figure out who turned the Archmage into a sheep
 
-These can be replaced by modifying the `seedInitialEvents()` function in `main.go`.
+These can be replaced by modifying the `InitialCampaigns` list in `config/config.go`.
 
 ## Authentication & Whitelist
 
@@ -264,7 +264,7 @@ curl -X POST http://localhost:8080/api/users/create \
 
 On first deployment, at least one admin must be created to whitelist other users. This can be done by:
 
-1. **Option A: Manual Database Edit** - Edit the LevelDB database directly and add a user record with admin role
+1. **Option A: Manual Database Edit** - Edit the SQLite database directly and add a user record with admin role
 2. **Option B: Bootstrap Email** (Future) - Set `BOOTSTRAP_ADMIN_EMAIL` environment variable for automatic first-user admin creation
 
 ### Login Flow
@@ -397,13 +397,13 @@ curl http://localhost:8080/api/users
 ### Getting Started with Roles
 
 1. **First Login** - Use Google OAuth to log in. Your account will be created with no roles.
-2. **Manual Admin Setup** - Add the first admin user by manually editing the LevelDB database or asking an existing admin to assign the "admin" role.
+2. **Manual Admin Setup** - Add the first admin user by manually editing the SQLite database or asking an existing admin to assign the "admin" role.
 3. **Role Assignment** - Once an admin exists, they can use the `/api/roles` endpoint to assign roles to other users.
 4. **Verify Permissions** - Test role-based access control by attempting to access protected endpoints with different users and roles.
 
 ### Implementation Details
 
-- **Storage**: Roles are stored as JSON strings in LevelDB alongside user data. No separate roles table is needed.
+- **Storage**: Roles are stored as JSON strings in SQLite alongside user data. No separate roles table is needed.
 - **Session Management**: Roles are included in the session cookie and persist across authenticated requests.
 - **Authorization Pattern**: Each handler explicitly checks roles using helper methods like `user.IsAdmin()` or `user.HasRole("admin")`.
 - **Backward Compatibility**: Existing users with no roles are automatically handled; their role array defaults to empty.

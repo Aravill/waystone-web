@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	DBPath      = "./data/leveldb"
+	DBPath      = "./data/waystone.db"
 	DefaultPort = "8080"
 )
 
