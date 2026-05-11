@@ -153,7 +153,7 @@ window.campaignsPage = function() {
                         <h3 class="campaign-title">${escapeHtml(title)}</h3>
                         <div class="campaign-summary-row">
                             <p class="campaign-summary-text">${escapeHtml(summary)}</p>
-                            <button type="button" class="campaign-summary-arrow" aria-expanded="false" aria-label="Expand campaign description" onclick="this.classList.toggle('campaign-summary-arrow-expanded'); this.parentElement.nextElementSibling.classList.toggle('campaign-description-expanded'); this.setAttribute('aria-expanded', this.getAttribute('aria-expanded') === 'false' ? 'true' : 'false');">▼</button>
+                            <button type="button" class="campaign-summary-arrow" aria-expanded="false" aria-label="Expand campaign description" onclick="const expanded = this.getAttribute('aria-expanded') !== 'true'; this.classList.toggle('campaign-summary-arrow-expanded', expanded); this.parentElement.nextElementSibling.classList.toggle('campaign-description-expanded', expanded); this.setAttribute('aria-expanded', expanded ? 'true' : 'false'); this.setAttribute('aria-label', expanded ? 'Collapse campaign description' : 'Expand campaign description');">▼</button>
                         </div>
                         <p class="campaign-description">${escapeHtml(description || 'No additional description.')}</p>
                     </section>
