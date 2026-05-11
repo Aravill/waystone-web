@@ -1,61 +1,62 @@
-document.addEventListener('DOMContentLoaded', async () => {
-    // Check authentication status and display user name
-    try {
-        const userResponse = await fetch('/auth/current-user');
-        if (!userResponse.ok) {
-            if (userResponse.status === 401) {
+// Signup Page Alpine component
+window.signupPage = function() {
+    return {
+        displayName: 'User',
+        messageVisible: false,
+        messageText: '',
+        messageType: '',
+        formData: {
+            name: '',
+            email: '',
+            phone: ''
+        },
+        
+        async init() {
+            try {
+                const userResponse = await fetch('/auth/current-user');
+                if (!userResponse.ok) {
+                    if (userResponse.status === 401) {
+                        window.location.href = '/login.html';
+                        return;
+                    }
+                    throw new Error('Failed to fetch user');
+                }
+                const user = await userResponse.json();
+                
+                this.displayName = user.name || user.email || 'User';
+            } catch (error) {
+                console.error('Auth check failed:', error);
                 window.location.href = '/login.html';
                 return;
             }
-            throw new Error('Failed to fetch user');
-        }
-        const user = await userResponse.json();
+        },
         
-        // Display user name in header
-        const userName = document.getElementById('userName');
-        if (userName) {
-            userName.textContent = user.name || user.email || 'User';
-        }
+        async handleLogout() {
+            try {
+                const response = await fetch('/auth/logout', { method: 'POST' });
+                if (response.ok) {
+                    window.location.href = '/login.html';
+                }
+            } catch (error) {
+                this.showMessage('Logout failed: ' + error.message, 'error');
+            }
+        },
         
-        // Set up logout button
-        const logoutBtn = document.getElementById('logoutBtn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', logout);
+        async handleSignup() {
+            // Form submission stub - empty per original implementation
+        },
+        
+        showMessage(text, type) {
+            this.messageText = text;
+            this.messageType = type;
+            this.messageVisible = true;
+            
+            setTimeout(() => {
+                this.messageVisible = false;
+            }, 5000);
         }
-    } catch (error) {
-        console.error('Auth check failed:', error);
-        window.location.href = '/login.html';
-        return;
-    }
-
-    document.getElementById('signupForm').addEventListener('submit', handleSignup);
-});
-
-async function logout() {
-    try {
-        const response = await fetch('/auth/logout', { method: 'POST' });
-        if (response.ok) {
-            window.location.href = '/login.html';
-        }
-    } catch (error) {
-        showMessage('Logout failed: ' + error.message, 'error');
-    }
-}
-
-async function handleSignup(e) {
-    e.preventDefault();
-}
-
-function showMessage(text, type) {
-    const messageDiv = document.getElementById('message');
-    messageDiv.className = 'message ' + type;
-    messageDiv.textContent = text;
-    messageDiv.style.display = 'block';
-    
-    setTimeout(() => {
-        messageDiv.style.display = 'none';
-    }, 5000);
-}
+    };
+};
 
 function escapeHtml(text) {
     if (!text) return '';
