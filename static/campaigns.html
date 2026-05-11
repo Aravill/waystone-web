@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Campaigns</title>
     <link rel="stylesheet" href="styles.css?v=1">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
-<body>
+<body x-data="campaignsPage()" x-init="init()">
     <div class="header">
         <div class="header-left">
             <a href="/" class="logo">Waystone</a>
@@ -15,8 +16,8 @@
             <h1>Campaigns</h1>
         </div>
         <div class="header-right">
-            <span class="user-name" id="userName"></span>
-            <button id="logoutBtn" class="logout-btn">Logout</button>
+            <span class="user-name" x-text="displayName"></span>
+            <button @click="handleLogout()" class="logout-btn">Logout</button>
         </div>
     </div>
 
@@ -28,46 +29,52 @@
 
     <!-- Campaigns Toolbar -->
     <div class="campaigns-toolbar">
-        <button type="button" id="registerCampaignBtn" class="toolbar-button">Register campaign</button>
+        <button type="button" @click="openModal()" class="toolbar-button">Register campaign</button>
     </div>
 
     <div class="container">
         <div class="campaigns-section">
             <h2>Available Campaigns</h2>
             <div id="campaignsList" class="campaigns-list">
-                <p>Loading campaigns...</p>
+                <p x-show="loading">Loading campaigns...</p>
+                <template x-if="campaigns.length === 0 && !loading">
+                    <p>No campaigns available.</p>
+                </template>
+                <template x-for="campaign in campaigns" :key="campaign.id">
+                    <div x-html="renderCampaignHtml(campaign)"></div>
+                </template>
             </div>
-            <div id="message" class="message"></div>
+            <div id="message" class="message" :class="messageType" x-show="messageVisible" x-text="messageText"></div>
         </div>
     </div>
 
     <!-- Campaign Creation Modal -->
-    <div id="createCampaignModal" class="modal">
+    <div id="createCampaignModal" class="modal" :class="{ 'modal-open': modalOpen }" @click="handleModalBackdropClick($event)">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Register a new Campaign</h2>
-                    <button type="button" class="modal-close" id="closeModalBtn">&times;</button>
+                <button type="button" class="modal-close" @click="closeModal()">&times;</button>
             </div>
-            <form id="createCampaignForm" class="modal-form">
+            <form @submit.prevent="handleCreateCampaign()" class="modal-form">
                 <div class="form-group">
                     <label for="campaignTitle">Title *</label>
-                    <input type="text" id="campaignTitle" name="title" required>
+                    <input type="text" id="campaignTitle" name="title" x-model="formData.title" required>
                 </div>
                 <div class="form-group">
                     <label for="campaignSummary">Summary *</label>
-                    <input type="text" id="campaignSummary" name="summary" required>
+                    <input type="text" id="campaignSummary" name="summary" x-model="formData.summary" required>
                 </div>
                 <div class="form-group">
                     <label for="campaignDescription">Description *</label>
-                    <textarea id="campaignDescription" name="description" rows="4" required></textarea>
+                    <textarea id="campaignDescription" name="description" rows="4" x-model="formData.description" required></textarea>
                 </div>
                 <div class="form-group">
                     <label for="campaignPlayerCount">Desired player count *</label>
-                    <input type="number" id="campaignPlayerCount" name="desired_player_count" min="1" step="1" required>
+                    <input type="number" id="campaignPlayerCount" name="desired_player_count" x-model.number="formData.desired_player_count" min="1" step="1" required>
                 </div>
                 <div class="modal-actions">
                     <button type="submit" class="btn-create">Create</button>
-                    <button type="button" class="btn-cancel" id="cancelModalBtn">Cancel</button>
+                    <button type="button" class="btn-cancel" @click="closeModal()">Cancel</button>
                 </div>
             </form>
         </div>

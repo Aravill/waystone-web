@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile</title>
     <link rel="stylesheet" href="styles.css?v=1">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
-<body>
+<body x-data="profilePage()" x-init="init()">
     <div class="header">
         <div class="header-left">
             <a href="/" class="logo">Waystone</a>
@@ -15,8 +16,8 @@
             <h1>Profile</h1>
         </div>
         <div class="header-right">
-            <span class="user-name" id="userName"></span>
-            <button id="logoutBtn" class="logout-btn">Logout</button>
+            <span class="user-name" x-text="displayName"></span>
+            <button @click="handleLogout()" class="logout-btn">Logout</button>
         </div>
     </div>
 
@@ -29,30 +30,41 @@
     <div class="container">
         <div class="profile-page">
             <div class="profile-card" id="profileCard">
-                <p>Loading profile...</p>
+                <p x-show="loading">Loading profile...</p>
+                <div x-show="!loading" x-html="renderProfileHtml()"></div>
             </div>
 
             <div class="profile-section">
                 <h2 class="section-header">Dungeon Mastering</h2>
                 <div id="dmCampaignsList" class="campaigns-list">
-                    <p>No campaigns as DM.</p>
+                    <template x-if="dmCampaigns.length === 0">
+                        <p>No campaigns as DM.</p>
+                    </template>
+                    <template x-for="campaign in dmCampaigns" :key="campaign.id">
+                        <a :href="`/campaigns#campaign-${campaign.id}`" class="campaign-link-button" x-text="campaign.title || 'Untitled'"></a>
+                    </template>
                 </div>
             </div>
 
             <div class="profile-section">
                 <h2 class="section-header">Playing In</h2>
                 <div id="playingCampaignsList" class="campaigns-list">
-                    <p>Not playing in any campaigns.</p>
+                    <template x-if="playingCampaigns.length === 0">
+                        <p>Not playing in any campaigns.</p>
+                    </template>
+                    <template x-for="campaign in playingCampaigns" :key="campaign.id">
+                        <a :href="`/campaigns#campaign-${campaign.id}`" class="campaign-link-button" x-text="campaign.title || 'Untitled'"></a>
+                    </template>
                 </div>
             </div>
 
-            <div class="profile-section danger-zone" id="dangerZone" style="display: none;">
+            <div class="profile-section danger-zone" x-show="isSelf">
                 <h2 class="section-header">Account Management</h2>
                 <p>Delete your account and all associated data.</p>
-                <button id="deleteBtn" class="danger-btn">Delete Account</button>
+                <button @click="deleteProfile()" class="danger-btn">Delete Account</button>
             </div>
 
-            <div id="message" class="message"></div>
+            <div id="message" class="message" :class="messageType" x-show="messageVisible" x-text="messageText"></div>
         </div>
     </div>
 

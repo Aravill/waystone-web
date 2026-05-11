@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Waystone - Dashboard</title>
     <link rel="stylesheet" href="dashboard.css?v=1">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
-<body>
+<body x-data="dashboardPage()" x-init="init()">
     <div class="header">
         <div class="header-left">
             <a href="/" class="logo">Waystone</a>
@@ -15,8 +16,8 @@
             <h1>Dashboard</h1>
         </div>
         <div class="header-right">
-            <span class="user-name" id="userName"></span>
-            <button id="logoutBtn" class="logout-btn">Logout</button>
+            <span class="user-name" x-text="displayName"></span>
+            <button @click="handleLogout()" class="logout-btn">Logout</button>
         </div>
     </div>
 
