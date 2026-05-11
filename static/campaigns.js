@@ -200,6 +200,9 @@ function renderCampaign(campaign) {
     statusBadge.className = "campaign-status-badge";
     statusBadge.textContent = status;
     statusBadge.setAttribute("data-tooltip", statusTooltips[status] || status);
+    statusBadge.setAttribute("title", statusTooltips[status] || status);
+    statusBadge.setAttribute("tabindex", "0");
+    statusBadge.setAttribute("aria-label", `Campaign status: ${status}. ${statusTooltips[status] || status}`);
 
     titleContainer.appendChild(titleEl);
     titleContainer.appendChild(statusBadge);

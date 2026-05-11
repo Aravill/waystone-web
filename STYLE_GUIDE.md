@@ -309,7 +309,8 @@ input:focus, select:focus {
 
 **Hover Behavior:**
 - Text glows with status-specific color
-- Tooltip appears above badge showing the full meaning
+- Tooltip appears above badge on hover and keyboard focus
+- Keyboard focus includes clear focus-visible outline
 
 **Position:** Below the campaign title in the campaign card
 
@@ -325,6 +326,37 @@ input:focus, select:focus {
     letter-spacing: 0.5px;
     text-transform: uppercase;
     transition: text-shadow 0.2s ease;
+}
+
+/* Tooltip appears on hover and focus */
+.campaign-status-badge::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    background: #0a0a0a;
+    border: 1px solid;
+    padding: 6px 10px;
+    border-radius: 2px;
+    font-size: 0.85em;
+    white-space: nowrap;
+    bottom: 120%;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 1000;
+}
+
+.campaign-status-badge:hover::before,
+.campaign-status-badge:focus::before,
+.campaign-status-badge:focus-visible::before {
+    opacity: 1;
+}
+
+/* Clear focus-visible outline */
+.campaign-status-badge:focus-visible {
+    outline: 2px solid #00d9ff;
+    outline-offset: 2px;
 }
 
 /* Status variants */
@@ -375,10 +407,16 @@ input:focus, select:focus {
 }
 ```
 
+**Required HTML Attributes (generated in JS):**
+- `data-tooltip`: Content displayed in tooltip pseudo-element
+- `title`: Accessible tooltip text for assistive technologies and native browser tooltips
+- `tabindex="0"`: Makes badge keyboard focusable
+- `aria-label`: Semantic label combining status name and meaning for screen readers
+
 **Do's:**
 - Use for campaign lifecycle state indication
 - Apply glow effect on hover
-- Show tooltip on hover with descriptive text
+- Show tooltip on hover and keyboard focus with descriptive text
 - Keep consistent with status colors across the campaign card
 
 **Don'ts:**
@@ -832,4 +870,3 @@ When updating this guide:
 2. Update the version number
 3. Ensure all existing pages follow the new guideline
 4. Get team consensus on major style changes
-

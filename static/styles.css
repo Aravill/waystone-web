@@ -166,7 +166,6 @@ h2 {
 .campaign-title {
     text-align: center;
     color: #ffffff;
-    margin-bottom: 10px;
     letter-spacing: 1px;
 }
 
@@ -210,8 +209,15 @@ h2 {
     z-index: 1000;
 }
 
-.campaign-status-badge:hover::before {
+.campaign-status-badge:hover::before,
+.campaign-status-badge:focus::before,
+.campaign-status-badge:focus-visible::before {
     opacity: 1;
+}
+
+.campaign-status-badge:focus-visible {
+    outline: 2px solid #00d9ff;
+    outline-offset: 2px;
 }
 
 /* Status-specific styles */
