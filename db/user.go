@@ -7,13 +7,19 @@ import (
 )
 
 func SaveUser(user models.User) error {
+	now := time.Now()
+
 	if user.ID == "" {
 		user.ID = GenerateUUID()
 	}
 	if user.CreatedAt.IsZero() {
-		user.CreatedAt = time.Now()
+		user.CreatedAt = now
 	}
-	user.UpdatedAt = time.Now()
+	if user.UpdatedAt.IsZero() {
+		user.UpdatedAt = user.CreatedAt
+	} else {
+		user.UpdatedAt = now
+	}
 
 	// Initialize empty roles if not set
 	if user.Roles == nil {
