@@ -25,6 +25,9 @@ A lightweight Go application hosting event sign-up and campaign management. Buil
 ├── db/                  # Database layer
 │   ├── store.go         # SQLite storage interface and implementation
 │   ├── sqlite_store.go  # SQLite database store implementation
+│   ├── campaign.go      # Campaign CRUD operations
+│   ├── user.go          # User CRUD operations
+│   ├── uuid.go          # UUID generation utilities
 ├── middleware/          # HTTP middleware
 │   └── auth.go          # Authentication middleware
 ├── models/              # Data models and types
@@ -43,7 +46,7 @@ A lightweight Go application hosting event sign-up and campaign management. Buil
 ## Features
 
 - **Go Backend**: Lightweight HTTP server with event management APIs
-- **SQLite Storage**: Persistent data storage for events and signups using SQLite
+- **SQLite Storage**: Persistent data storage for campaigns and user whitelist using SQLite
 - **Web Frontend**: Responsive sign-up form with black minimalistic design and Fira Code monospace font
 - **Docker Support**: Containerized for consistent deployment with persistent data volumes
 - **Easy Deployment**: Simple deploy script for local Docker deployment
@@ -191,7 +194,7 @@ See `.env.example` in the repository for a complete template with all available 
 
 ## Data Persistence
 
-The application uses **SQLite** (embedded SQL database) to store all event and signup data. Data is persisted in a Docker volume (`waystone-data`) mounted at `/root/data` in the container.
+The application uses **SQLite** (embedded SQL database) to store campaigns, user whitelist, and role information. Data is persisted in a Docker volume (`waystone-data`) mounted at `/root/data` in the container.
 
 ### Data Storage Location
 - Docker volume: `waystone-data`
@@ -203,11 +206,11 @@ The application uses **SQLite** (embedded SQL database) to store all event and s
 - Data survives container recreation during rebuilds
 
 ### Initial Data
-On first run, the application automatically seeds two sample events:
-1. "Tech Conference 2024" (2024-05-10)
-2. "Web Summit" (2024-06-15)
+On first run, the application automatically seeds two sample campaigns:
+1. "Age of Sojourn" - An epic campaign of discovery and adventure
+2. "Embittered Arcanist" - Figure out who turned the Archmage into a sheep
 
-These can be replaced by modifying the `seedInitialEvents()` function in `main.go`.
+These can be replaced by modifying the `InitialCampaigns` list in `config/config.go`.
 
 ## Authentication & Whitelist
 

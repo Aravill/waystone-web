@@ -58,8 +58,8 @@ func (s *SQLiteStore) initSchema() error {
 		nickname TEXT,
 		picture TEXT,
 		roles TEXT NOT NULL DEFAULT '[]',
-		created_at TEXT,
-		updated_at TEXT
+		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE TABLE IF NOT EXISTS campaigns (
@@ -72,8 +72,8 @@ func (s *SQLiteStore) initSchema() error {
 		dm TEXT,
 		desired_player_count TEXT,
 		sign_ups_open INTEGER DEFAULT 0,
-		created_at TEXT,
-		updated_at TEXT
+		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);

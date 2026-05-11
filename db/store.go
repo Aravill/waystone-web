@@ -77,7 +77,7 @@ func seedIfEmpty() error {
 	// Seed users if empty
 	if len(users) == 0 {
 		for _, user := range config.InitialUsers {
-			if err := store.SaveUser(user); err != nil {
+			if err := SaveUser(user); err != nil {
 				return fmt.Errorf("failed to seed user: %w", err)
 			}
 		}
