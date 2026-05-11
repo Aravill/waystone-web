@@ -23,7 +23,7 @@ window.signupPage = function() {
                 }
                 const user = await userResponse.json();
                 
-                this.displayName = user.name || user.email || 'User';
+                this.displayName = user.display_name || user.name || user.email || 'User';
             } catch (error) {
                 console.error('Auth check failed:', error);
                 window.location.href = '/login.html';
