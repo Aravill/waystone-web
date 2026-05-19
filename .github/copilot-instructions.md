@@ -10,8 +10,8 @@
 
 - **Frontend**: Multi-page app in `./static` directory
   - `index.html` - Form structure with event listing section
-  - `campaigns.html` - Campaign listing page with slide-out tools panel and campaign creation modal
-  - `campaigns.js` - Campaign listing and creation logic with user display objects and modal handlers
+  - `campaigns.html` - Campaign listing page with campaign creation and calendar/session modals
+  - `campaigns.js` - Campaign listing, creation, and campaign calendar/session modal logic
   - `profile.html` - User profile page with account management
   - `dashboard.html` - Main authenticated dashboard
   - `styles.css` - Responsive design (mobile-first) with toolbar, modal, and campaign listing styles
@@ -106,6 +106,9 @@ Currently, the project has no tests or linters configured. Before adding tests o
 - `/auth/current-user` - Get current session user info (GET)
 - `/api/events` - GET only, returns JSON array of event objects
 - `/api/campaigns` - GET returns enriched campaign objects with `dm_user` and `player_users` display objects; POST creates a new campaign with authenticated user as DM (requires fields: title, summary, description, desired_player_count)
+- `/api/campaigns/{id}/sessions` - GET returns month-scoped sessions (`?month=YYYY-MM`) with reaction counts/pending count and current user participation; POST creates a suggested session (DM only)
+- `/api/campaigns/{id}/sessions/{session_id}` - PUT updates session status (DM only); `Cancelled` removes suggested sessions and marks confirmed sessions as cancelled
+- `/api/campaigns/{id}/sessions/{session_id}/responses` - POST creates/updates player participation relation (accepted/declined/tentative, one per player+session); GET returns grouped responses and pending players
 - `/api/profile` - GET to fetch user profile (supports `?user_id=<id>`), DELETE to delete current user account
 - `/api/signup` - POST only, accepts JSON signup data, returns `{"status": "success", "message": "..."}`
 - `/api/roles` - Role management endpoints
@@ -129,6 +132,7 @@ When adding features, consider these patterns established in the codebase:
 - **New API endpoints**: Add route registration in `api/router.go`, create handler function in `api/` package with appropriate middleware
 - **User model changes**: Edit `models/user.go`, update seed data in `config/config.go`, preserve existing fields in `HandleCallback` and `SaveUser` flows
 - **Database integration**: Use `db/store.go` Store interface pattern; add new methods to interface, implement on SQLiteStore, create wrappers in `db/` package
+- **Campaign sessions**: Store in `campaign_sessions` and `session_responses` tables; keep response relations upsert-only per `(session_id, user_id)` and compute pending players from campaign player list
 - **Request body parsing**: Use `json.NewDecoder(r.Body).Decode(&data)` in handler functions
 - **Authentication**: Use existing `middleware.AuthMiddleware` for protected routes; `middleware.GetSession()` to check auth; `middleware.ClearSession()` for logout
 - **Frontend state management**: Currently minimal; consider context API or state object if complexity grows
