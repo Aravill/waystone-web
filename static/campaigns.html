@@ -80,6 +80,216 @@
         </div>
     </div>
 
+    <!-- Calendar Modal -->
+    <div id="calendarModal" class="modal" :class="{ 'modal-open': calendarModalOpen }" @click="handleCalendarBackdropClick($event)">
+        <div class="modal-content calendar-modal-content">
+            <div class="modal-header">
+                <h2 x-text="`Calendar: ${currentCampaignTitle}`"></h2>
+                <button type="button" class="modal-close" @click="closeCalendarModal()">&times;</button>
+            </div>
+            <div class="calendar-container">
+                <!-- Month Navigation -->
+                <div class="calendar-nav">
+                    <button type="button" class="nav-btn" @click="previousMonth()"><<</button>
+                    <span class="current-month" x-text="formatMonthYear()"></span>
+                    <button type="button" class="nav-btn" @click="nextMonth()">>></button>
+                </div>
+
+                <!-- Calendar Grid -->
+                <div class="calendar-grid">
+                    <!-- Day headers -->
+                    <div class="calendar-day-header">Mon</div>
+                    <div class="calendar-day-header">Tue</div>
+                    <div class="calendar-day-header">Wed</div>
+                    <div class="calendar-day-header">Thu</div>
+                    <div class="calendar-day-header">Fri</div>
+                    <div class="calendar-day-header">Sat</div>
+                    <div class="calendar-day-header">Sun</div>
+
+                    <!-- Calendar days -->
+                    <template x-for="(day, idx) in calendarDays" :key="idx">
+                        <div class="calendar-day" 
+                             :class="{
+                                 'other-month': !isCurrentMonth(day),
+                                 'has-session': hasSession(day),
+                                 'day-suggested': getDayStatusClass(day) === 'day-suggested',
+                                 'day-confirmed': getDayStatusClass(day) === 'day-confirmed',
+                                 'day-cancelled': getDayStatusClass(day) === 'day-cancelled'
+                             }"
+                             @click="selectDay(day)">
+                            <span class="day-pending-total"
+                                  x-show="hasSession(day)"
+                                  x-text="getPendingResponsesForDay(day)"
+                                  @mouseenter.stop="handleDayReactionHover(day, 'pending')"
+                                  @mouseleave.stop="clearDayHoverPanel()"></span>
+                            <div class="day-number" x-text="day.getDate()"></div>
+                            <template x-if="hasSession(day)">
+                                <div class="day-session-summary">
+                                    <div class="day-session-time" x-text="(getPrimarySessionForDay(day).time || '') + ' - ' + getSessionEndTime(getPrimarySessionForDay(day))"></div>
+                                    <div class="day-reactions-row">
+                                        <span class="day-reaction-badge day-reaction-accept"
+                                              x-text="getAcceptedReaction(getPrimarySessionForDay(day))"
+                                              @mouseenter.stop="handleDayReactionHover(day, 'accepted')"
+                                              @mouseleave.stop="clearDayHoverPanel()"></span>
+                                        <span class="day-reaction-badge day-reaction-decline"
+                                              x-text="getDeclinedReaction(getPrimarySessionForDay(day))"
+                                              @mouseenter.stop="handleDayReactionHover(day, 'declined')"
+                                              @mouseleave.stop="clearDayHoverPanel()"></span>
+                                        <span class="day-reaction-badge day-reaction-tentative"
+                                              x-text="getTentativeReaction(getPrimarySessionForDay(day))"
+                                              @mouseenter.stop="handleDayReactionHover(day, 'tentative')"
+                                              @mouseleave.stop="clearDayHoverPanel()"></span>
+                                    </div>
+                                </div>
+                            </template>
+                            <template x-if="isHoverPanelVisibleForDay(day)">
+                                <div class="day-hover-panel">
+                                    <p class="day-hover-title" x-text="getHoverPanelTitle(hoverResponsePanel.type)"></p>
+                                    <template x-if="hoverResponsePanel.loading">
+                                        <p class="day-hover-empty">Loading...</p>
+                                    </template>
+                                    <template x-if="!hoverResponsePanel.loading && hoverResponsePanel.error">
+                                        <p class="day-hover-empty" x-text="hoverResponsePanel.error"></p>
+                                    </template>
+                                    <template x-if="!hoverResponsePanel.loading && !hoverResponsePanel.error && hoverResponsePanel.users.length === 0">
+                                        <p class="day-hover-empty">No users</p>
+                                    </template>
+                                    <template x-for="user in hoverResponsePanel.users" :key="`hover-${hoverResponsePanel.type}-${user.id || user.user_id || getUserDisplayName(user)}`">
+                                        <div class="day-hover-user">
+                                            <img x-show="user.picture" :src="user.picture" :alt="getUserDisplayName(user)" class="day-hover-avatar">
+                                            <span class="day-hover-name" x-text="getUserDisplayName(user)"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Session interaction menu (visible when session selected) -->
+                <template x-if="selectedSession !== null && !isCurrentUserDM">
+                    <div class="session-menu">
+                        <h3>Session: <span x-text="selectedSession.time"></span></h3>
+                        <div class="player-responses">
+                            <p>Your response:</p>
+                            <button type="button" class="btn-response" 
+                                    :class="{ 'selected': playerResponse === 'Accepted' }"
+                                    @click="submitResponse('Accepted')">Accept</button>
+                            <button type="button" class="btn-response" 
+                                    :class="{ 'selected': playerResponse === 'Declined' }"
+                                    @click="submitResponse('Declined')">Decline</button>
+                            <button type="button" class="btn-response" 
+                                    :class="{ 'selected': playerResponse === 'Tentative' }"
+                                    @click="submitResponse('Tentative')">Tentative</button>
+                        </div>
+                        <button type="button" class="btn-view-responses" @click="showResponseBreakdown(selectedSession)">View Responses</button>
+                        <button type="button" class="btn-close" @click="clearSelectedSession()">Close</button>
+                    </div>
+                </template>
+
+                <!-- Response breakdown modal -->
+                <template x-if="showResponses">
+                    <div class="response-breakdown">
+                        <h3>Response Breakdown</h3>
+                        <div class="response-list">
+                            <template x-for="response in sessionResponses" :key="response.id">
+                                <div class="response-item">
+                                    <div class="response-user-info">
+                                        <img x-show="response.user && response.user.picture" :src="response.user.picture" :alt="response.user.display_name" class="user-avatar-small">
+                                        <span class="response-name" x-text="response.user ? response.user.display_name : 'Unknown'"></span>
+                                    </div>
+                                    <span class="response-status" :class="getParticipationClass(response.participation)" x-text="response.participation"></span>
+                                </div>
+                            </template>
+                            <template x-for="pendingUser in pendingResponses" :key="`pending-${pendingUser.id}`">
+                                <div class="response-item">
+                                    <div class="response-user-info">
+                                        <img x-show="pendingUser.picture" :src="pendingUser.picture" :alt="pendingUser.display_name" class="user-avatar-small">
+                                        <span class="response-name" x-text="pendingUser.display_name"></span>
+                                    </div>
+                                    <span class="response-status">Pending</span>
+                                </div>
+                            </template>
+                        </div>
+                        <button type="button" class="btn-close" @click="showResponses = false">Close</button>
+                    </div>
+                </template>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-cancel" @click="closeCalendarModal()">Close Calendar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Creation Modal -->
+    <div id="createSessionModal" class="modal create-session-modal" :class="{ 'modal-open': showCreateSessionModal }" @click="handleCreateSessionBackdropClick($event)">
+        <div class="modal-content create-session-modal-content compact-modal-content">
+            <div class="modal-header">
+                <h2>Create Session</h2>
+                <button type="button" class="modal-close" @click="clearSelectedDay()">&times;</button>
+            </div>
+            <form @submit.prevent="createSession()" class="modal-form compact-modal-form">
+                <div class="form-group">
+                    <label for="sessionDate">Date</label>
+                    <input type="date" id="sessionDate" x-model="sessionFormData.date" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="sessionTime">Time *</label>
+                    <input type="time" id="sessionTime" x-model="sessionFormData.time" required>
+                </div>
+                <div class="form-group">
+                    <label>Duration *</label>
+                    <div class="duration-row">
+                        <div class="duration-unit">
+                            <span class="duration-unit-label">H</span>
+                            <div class="duration-control">
+                                <input type="number" id="sessionDurationHours" class="duration-input" x-model.number="sessionFormData.durationHours" min="0" step="1" required>
+                                <div class="duration-arrows">
+                                    <button type="button" class="duration-arrow-btn" @click="adjustDurationPart('durationHours', 1)">▲</button>
+                                    <button type="button" class="duration-arrow-btn" @click="adjustDurationPart('durationHours', -1)">▼</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="duration-unit">
+                            <span class="duration-unit-label">M</span>
+                            <div class="duration-control">
+                                <input type="number" id="sessionDurationMinutes" class="duration-input" x-model.number="sessionFormData.durationMinutes" min="0" max="59" step="1" required>
+                                <div class="duration-arrows">
+                                    <button type="button" class="duration-arrow-btn" @click="adjustDurationPart('durationMinutes', 1)">▲</button>
+                                    <button type="button" class="duration-arrow-btn" @click="adjustDurationPart('durationMinutes', -1)">▼</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn-create">Create</button>
+                    <button type="button" class="btn-cancel" @click="clearSelectedDay()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Session Status Modal (DM only) -->
+    <div id="sessionStatusModal" class="modal session-status-modal" :class="{ 'modal-open': showSessionStatusModal }" @click="handleSessionStatusBackdropClick($event)">
+        <div class="modal-content session-status-modal-content compact-modal-content">
+            <div class="modal-header">
+                <h2>Manage Session</h2>
+            </div>
+            <div class="modal-form compact-modal-form">
+                <div class="session-actions session-status-actions">
+                    <button type="button" class="btn-action btn-action-confirm" @click="confirmSession()" :disabled="!selectedSession || selectedSession.status !== 'Suggested'">Confirm</button>
+                    <button type="button" class="btn-action btn-action-cancel" @click="cancelSession()" :disabled="!selectedSession">Cancel</button>
+                </div>
+                <p class="session-status-warning" x-show="pendingSessionAction" x-text="getSessionStatusWarning()"></p>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" @click="clearSelectedSession()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="campaigns.js"></script>
 </body>
 </html>
