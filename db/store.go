@@ -20,6 +20,12 @@ type Store interface {
 	GetUserByID(id string) (*models.User, error)
 	GetAllUsers() ([]models.User, error)
 	DeleteUser(id string) error
+	GetSessionsByMonth(campaignID string, year int, month int) ([]models.CampaignSession, error)
+	GetSessionByID(sessionID string) (*models.CampaignSession, error)
+	SaveSession(session models.CampaignSession) error
+	UpsertSessionResponse(response models.SessionResponse) error
+	GetSessionResponses(sessionID string) ([]models.SessionResponse, error)
+	DeleteSession(sessionID string) error
 	Close() error
 }
 
