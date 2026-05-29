@@ -114,16 +114,18 @@
                                  'has-session': hasSession(day),
                                  'day-suggested': getDayStatusClass(day) === 'day-suggested',
                                  'day-confirmed': getDayStatusClass(day) === 'day-confirmed',
-                                 'day-cancelled': getDayStatusClass(day) === 'day-cancelled'
+                                'day-historical': getDayStatusClass(day) === 'day-historical'
                              }"
+                             :title="getDayTitle(day)"
+                             :aria-label="getDayAriaLabel(day)"
                              @click="selectDay(day)">
                             <span class="day-pending-total"
-                                  x-show="hasSession(day)"
+                                  x-show="hasPlannedSession(day)"
                                   x-text="getPendingResponsesForDay(day)"
                                   @mouseenter.stop="handleDayReactionHover(day, 'pending')"
                                   @mouseleave.stop="clearDayHoverPanel()"></span>
                             <div class="day-number" x-text="day.getDate()"></div>
-                            <template x-if="hasSession(day)">
+                            <template x-if="hasPlannedSession(day)">
                                 <div class="day-session-summary">
                                     <div class="day-session-time" x-text="(getPrimarySessionForDay(day).time || '') + ' - ' + getSessionEndTime(getPrimarySessionForDay(day))"></div>
                                     <div class="day-reactions-row">
@@ -140,6 +142,12 @@
                                               @mouseenter.stop="handleDayReactionHover(day, 'tentative')"
                                               @mouseleave.stop="clearDayHoverPanel()"></span>
                                     </div>
+                                </div>
+                            </template>
+                            <template x-if="isHistoricalDay(day)">
+                                <div class="day-session-summary">
+                                    <div class="day-history-indicator">Was planned</div>
+                                    <div class="day-session-time day-session-time--historical" x-text="(getPrimarySessionForDay(day).time || '') + ' - ' + getSessionEndTime(getPrimarySessionForDay(day))"></div>
                                 </div>
                             </template>
                             <template x-if="isHoverPanelVisibleForDay(day)">

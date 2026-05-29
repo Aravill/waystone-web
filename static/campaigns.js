@@ -365,6 +365,14 @@ window.campaignsPage = function () {
             return this.getSessionsForDay(date).length > 0;
         },
 
+        hasPlannedSession(date) {
+            return this.getPlannedSessionsForDay(date).length > 0;
+        },
+
+        isHistoricalDay(date) {
+            return this.hasSession(date) && !this.hasPlannedSession(date);
+        },
+
         getSessionsForDay(date) {
             const dateStr = this.formatDateLocal(date);
             return this.sessions.filter((session) => session.date === dateStr);
@@ -374,14 +382,23 @@ window.campaignsPage = function () {
             return this.getSessionsForDay(date).filter((session) => session.status !== 'Cancelled');
         },
 
+        getEarliestSession(sessions) {
+            if (!Array.isArray(sessions) || sessions.length === 0) return null;
+            return [...sessions].sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')))[0];
+        },
+
+        getPrimaryPlannedSessionForDay(date) {
+            return this.getEarliestSession(this.getPlannedSessionsForDay(date));
+        },
+
         getPrimarySessionForDay(date) {
-            const daySessions = this.getSessionsForDay(date);
-            if (daySessions.length === 0) return null;
-            return [...daySessions].sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')))[0];
+            const primaryPlanned = this.getPrimaryPlannedSessionForDay(date);
+            if (primaryPlanned) return primaryPlanned;
+            return this.getEarliestSession(this.getSessionsForDay(date));
         },
 
         getPendingResponsesForDay(date) {
-            return this.getSessionsForDay(date).reduce((total, session) => total + (Number(session?.pending_count) || 0), 0);
+            return this.getPlannedSessionsForDay(date).reduce((total, session) => total + (Number(session?.pending_count) || 0), 0);
         },
 
         getDayStatusClass(date) {
@@ -389,7 +406,21 @@ window.campaignsPage = function () {
             if (!primarySession) return '';
             if (primarySession.status === 'Suggested') return 'day-suggested';
             if (primarySession.status === 'Confirmed') return 'day-confirmed';
-            return 'day-cancelled';
+            return 'day-historical';
+        },
+
+        getDayTitle(date) {
+            if (!this.isHistoricalDay(date)) return '';
+            return this.isCurrentUserDM
+                ? 'Previously planned session is inactive. Click to suggest a new one.'
+                : 'Previously planned session is inactive.';
+        },
+
+        getDayAriaLabel(date) {
+            if (!this.isHistoricalDay(date)) return '';
+            return this.isCurrentUserDM
+                ? 'Previously planned session is inactive. Select this day to suggest a new session.'
+                : 'Previously planned session is inactive.';
         },
 
         getSessionEndTime(session) {

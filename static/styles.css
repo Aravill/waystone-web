@@ -1139,9 +1139,9 @@ select:focus {
     border-color: #00d9ff;
 }
 
-.calendar-day.day-cancelled {
-    background: #7a7a7a;
-    border-color: #7a7a7a;
+.calendar-day.day-historical {
+    border-color: #4b4b4b;
+    box-shadow: inset 0 0 0 1px rgba(145, 145, 145, 0.2);
 }
 
 .calendar-day.day-suggested .day-number,
@@ -1151,9 +1151,8 @@ select:focus {
     color: #00141a;
 }
 
-.calendar-day.day-cancelled .day-number,
-.calendar-day.day-cancelled .day-session-time {
-    color: #f0f0f0;
+.calendar-day.day-historical .day-number {
+    color: #9cc3cf;
 }
 
 .calendar-day.other-month {
@@ -1246,12 +1245,6 @@ select:focus {
     background: rgba(0, 20, 26, 0.14);
 }
 
-.calendar-day.day-cancelled .day-reaction-badge {
-    color: #f0f0f0;
-    border-color: rgba(255, 255, 255, 0.28);
-    background: rgba(0, 0, 0, 0.18);
-}
-
 .day-reaction-accept:hover {
     background: rgba(40, 167, 69, 0.85);
     border-color: #28a745;
@@ -1274,6 +1267,20 @@ select:focus {
     background: rgba(120, 120, 120, 0.8);
     border-color: #9e9e9e;
     color: #f5f5f5;
+}
+
+.day-history-indicator {
+    color: #8e969a;
+    font-size: 0.62em;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.day-session-time--historical {
+    color: #8fa2ab;
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
 }
 
 .day-hover-panel {
