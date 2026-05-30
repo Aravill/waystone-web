@@ -22,6 +22,7 @@ window.campaignsPage = function () {
         isCurrentUserDM: false,
         calendarDays: [],
         sessions: [],
+        sessionMap: {},
         selectedDay: null,
         showCreateSessionModal: false,
         showSessionStatusModal: false,
@@ -355,9 +356,29 @@ window.campaignsPage = function () {
                 }
                 const data = await response.json();
                 this.sessions = Array.isArray(data) ? data : [];
+                this.buildSessionMap();
             } catch (error) {
                 this.showMessage('Error loading sessions: ' + error.message, 'error');
                 this.sessions = [];
+                this.sessionMap = {};
+            }
+        },
+
+        buildSessionMap() {
+            this.sessionMap = {};
+            for (const session of this.sessions) {
+                const dateStr = session.date;
+                if (!this.sessionMap[dateStr]) {
+                    this.sessionMap[dateStr] = { all: [], planned: [] };
+                }
+                this.sessionMap[dateStr].all.push(session);
+                if (session.status !== 'Cancelled') {
+                    this.sessionMap[dateStr].planned.push(session);
+                }
+            }
+            for (const dateStr in this.sessionMap) {
+                const primary = this.getEarliestSession(this.sessionMap[dateStr].planned);
+                this.sessionMap[dateStr].primary = primary || this.getEarliestSession(this.sessionMap[dateStr].all);
             }
         },
 
@@ -375,11 +396,12 @@ window.campaignsPage = function () {
 
         getSessionsForDay(date) {
             const dateStr = this.formatDateLocal(date);
-            return this.sessions.filter((session) => session.date === dateStr);
+            return this.sessionMap[dateStr]?.all || [];
         },
 
         getPlannedSessionsForDay(date) {
-            return this.getSessionsForDay(date).filter((session) => session.status !== 'Cancelled');
+            const dateStr = this.formatDateLocal(date);
+            return this.sessionMap[dateStr]?.planned || [];
         },
 
         getEarliestSession(sessions) {
@@ -392,9 +414,8 @@ window.campaignsPage = function () {
         },
 
         getPrimarySessionForDay(date) {
-            const primaryPlanned = this.getPrimaryPlannedSessionForDay(date);
-            if (primaryPlanned) return primaryPlanned;
-            return this.getEarliestSession(this.getSessionsForDay(date));
+            const dateStr = this.formatDateLocal(date);
+            return this.sessionMap[dateStr]?.primary || null;
         },
 
         getPendingResponsesForDay(date) {
