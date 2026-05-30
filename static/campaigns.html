@@ -114,7 +114,8 @@
                                  'has-session': hasSession(day),
                                  'day-suggested': getDayStatusClass(day) === 'day-suggested',
                                  'day-confirmed': getDayStatusClass(day) === 'day-confirmed',
-                                'day-historical': getDayStatusClass(day) === 'day-historical'
+                                 'day-historical': getDayStatusClass(day) === 'day-historical',
+                                 'day-cancelled': getDayStatusClass(day) === 'day-cancelled'
                              }"
                              :title="getDayTitle(day)"
                              :aria-label="getDayAriaLabel(day)"
@@ -297,7 +298,6 @@
             </div>
         </div>
     </div>
-
     <script src="campaigns.js"></script>
 </body>
 </html>

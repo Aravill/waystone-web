@@ -1139,6 +1139,11 @@ select:focus {
     border-color: #00d9ff;
 }
 
+.calendar-day.day-cancelled {
+    background: #7a7a7a;
+    border-color: #7a7a7a;
+}
+
 .calendar-day.day-historical {
     border-color: #4b4b4b;
     box-shadow: inset 0 0 0 1px rgba(145, 145, 145, 0.2);
@@ -1149,6 +1154,11 @@ select:focus {
 .calendar-day.day-confirmed .day-number,
 .calendar-day.day-confirmed .day-session-time {
     color: #00141a;
+}
+
+.calendar-day.day-cancelled .day-number,
+.calendar-day.day-cancelled .day-session-time {
+    color: #f0f0f0;
 }
 
 .calendar-day.day-historical .day-number {
@@ -1205,10 +1215,10 @@ select:focus {
 
 .day-session-time {
     color: #b3e5fc;
-    font-size: 0.68em;
-    font-weight: 600;
+    font-size: 0.63em;
+    font-weight: 500;
     line-height: 1.1;
-    letter-spacing: 0;
+    letter-spacing: -0.2px;
 }
 
 .day-session-value {
@@ -1218,24 +1228,19 @@ select:focus {
 }
 
 .day-reactions-row {
-    margin-top: auto;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
     gap: 2px;
-    width: 100%;
+    align-items: center;
+    justify-content: flex-start;
 }
 
 .day-reaction-badge {
     color: #a0e3ff;
-    font-size: 0.68em;
-    font-weight: 600;
+    font-size: 0.58em;
+    font-weight: 500;
+    min-width: 14px;
     text-align: center;
-    line-height: 1.1;
-    padding: 3px 0;
-    width: 100%;
-    border: 1px solid rgba(0, 217, 255, 0.35);
-    background: rgba(0, 217, 255, 0.1);
-    cursor: default;
+    line-height: 1;
 }
 
 .calendar-day.day-suggested .day-reaction-badge,

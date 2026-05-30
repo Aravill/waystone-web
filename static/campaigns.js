@@ -784,7 +784,6 @@ window.campaignsPage = function () {
             }
             return '';
         },
-
         showMessage(text, type) {
             this.messageText = text;
             this.messageType = type;
