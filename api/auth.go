@@ -68,73 +68,15 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if existingUser == nil {
-		// User not whitelisted - show error page
+		// User not whitelisted - redirect to not-whitelisted page
 		log.Printf("login attempt from non-whitelisted email: %s", claims.Email)
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		errorHTML := fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Access Denied - Waystone</title>
-    <style>
-        body {
-            background: linear-gradient(135deg, #000000 0%%, #1a1a1a 100%%);
-            color: #ffffff;
-            font-family: 'Fira Code', monospace;
-            margin: 0;
-            padding: 20px;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .error-container {
-            text-align: center;
-            padding: 40px;
-            border: 1px solid #333333;
-            border-radius: 5px;
-            max-width: 500px;
-            background: #0d0d0d;
-        }
-        h1 {
-            color: #ff6b6b;
-            margin-top: 0;
-        }
-        p {
-            line-height: 1.6;
-            margin: 20px 0;
-        }
-        .email {
-            color: #667eea;
-            font-weight: bold;
-        }
-        a {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 12px 30px;
-            background: #667eea;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            transition: background 0.3s;
-        }
-        a:hover {
-            background: #764ba2;
-        }
-    </style>
-</head>
-<body>
-    <div class="error-container">
-        <h1>Access Denied</h1>
-        <p>Your email <span class="email">%s</span> is not whitelisted.</p>
-        <p>Contact an administrator to request access.</p>
-        <a href="/login.html">Back to Login</a>
-    </div>
-</body>
-</html>`, claims.Email)
-		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(errorHTML))
+		http.Redirect(w, r, "/not-whitelisted.html", http.StatusSeeOther)
+		return
+	}
+
+	if existingUser.Blocked {
+		log.Printf("login attempt from blocked user: %s", claims.Email)
+		http.Redirect(w, r, "/blocked.html", http.StatusSeeOther)
 		return
 	}
 
@@ -203,6 +145,14 @@ func HandleGetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		// User was deleted - clear session and return 401
 		middleware.ClearSession(w, r)
 		http.Error(w, "user not found", http.StatusUnauthorized)
+		return
+	}
+
+	if user.Blocked {
+		middleware.ClearSession(w, r)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": "account blocked"})
 		return
 	}
 
