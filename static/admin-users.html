@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Users - Waystone</title>
+    <link rel="stylesheet" href="dashboard.css?v=1">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
+    <style>
+        .btn { padding: 8px 16px; border: 1px solid #667eea; background: #667eea; color: white; cursor: pointer; font-family: 'Fira Code', monospace; font-size: 0.85rem; transition: background 0.2s; }
+        .btn:hover { background: #764ba2; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+        .btn-danger { background: #ff006e; border-color: #ff006e; }
+        .btn-danger:hover { background: #e60066; }
+        .btn-danger-sm { padding: 6px 12px; font-size: 0.8rem; background: #ff006e; border: 1px solid #ff006e; color: white; cursor: pointer; font-family: 'Fira Code', monospace; transition: background 0.2s; }
+        .btn-danger-sm:hover { background: #e60066; }
+        .message { padding: 12px 16px; margin-bottom: 16px; border-radius: 5px; font-size: 0.9rem; }
+        .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th, td { text-align: left; padding: 10px 8px; }
+        th { color: #aaa; border-bottom: 1px solid #333; }
+        tbody tr { border-bottom: 1px solid #1a1a1a; }
+        tbody tr:hover { background: #0a0a0a; }
+    </style>
+</head>
+<body x-data="adminUsersPage()" x-init="init()">
+    <div class="header">
+        <div class="header-left">
+            <a href="/" class="logo">Waystone</a>
+        </div>
+        <div class="header-center">
+            <h1>Admin - User Management</h1>
+        </div>
+        <div class="header-right">
+            <span class="user-name" x-text="displayName"></span>
+            <button @click="logout()" class="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <div class="nav-bar">
+        <a href="/" class="nav-item" data-page="dashboard">Dashboard</a>
+        <a href="/campaigns" class="nav-item" data-page="campaigns">Campaigns</a>
+        <a href="/profile" class="nav-item" data-page="profile">Profile</a>
+        <a href="/admin/users" class="nav-item active" data-page="admin-users" x-show="isAdmin">Admin</a>
+    </div>
+
+    <main class="container" style="max-width: 1000px; margin: 0 auto; padding: 20px;">
+        <!-- Add user form -->
+        <section class="card" style="margin-bottom: 24px;">
+            <h2 style="margin-bottom: 16px; font-size: 1rem; letter-spacing: 0.05em;">Add User to Whitelist</h2>
+            <form @submit.prevent="addUser()" style="display: flex; gap: 8px;">
+                <input type="email" x-model="newEmail" placeholder="user@example.com" required
+                    style="flex: 1; background: #111; border: 1px solid #333; color: #fff; padding: 10px 14px; font-family: 'Fira Code', monospace; font-size: 0.9rem;">
+                <button type="submit" :disabled="loading" class="btn">Add</button>
+            </form>
+        </section>
+
+        <!-- Message area -->
+        <div x-show="messageVisible" x-text="messageText"
+            :class="messageType === 'error' ? 'message error' : 'message success'"
+            style="display: none; margin-bottom: 16px;"></div>
+
+        <!-- Search -->
+        <div style="margin-bottom: 16px;">
+            <input type="text" x-model="searchQuery" placeholder="search by email or name..."
+                style="width: 100%; background: #111; border: 1px solid #333; color: #fff; padding: 10px 14px; font-family: 'Fira Code', monospace; font-size: 0.9rem;">
+        </div>
+
+        <!-- Users table -->
+        <div class="card" style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="padding: 10px 8px;">Email</th>
+                        <th style="padding: 10px 8px;">Display Name</th>
+                        <th style="padding: 10px 8px;">Status</th>
+                        <th style="padding: 10px 8px;">Roles</th>
+                        <th style="padding: 10px 8px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="user in filteredUsers" :key="user.id">
+                        <tr>
+                            <td style="padding: 10px 8px;" x-text="user.email"></td>
+                            <td style="padding: 10px 8px;" x-text="user.nickname || user.name || '—'"></td>
+                            <td style="padding: 10px 8px;">
+                                <span x-show="user.blocked" style="color: #ff006e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">blocked</span>
+                                <span x-show="!user.blocked && user.activated" style="color: #00d9ff; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">active</span>
+                                <span x-show="!user.blocked && !user.activated" style="color: #555; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">pending</span>
+                            </td>
+                            <td style="padding: 10px 8px;">
+                                <span x-show="user.roles && user.roles.includes('admin')" style="color: #00d9ff; font-size: 0.75rem;">admin</span>
+                                <span x-show="!user.roles || !user.roles.includes('admin')" style="color: #555; font-size: 0.75rem;">—</span>
+                            </td>
+                            <td style="padding: 10px 8px;">
+                                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                    <button x-show="!user.blocked" @click="confirmAction('block user', 'block ' + user.email + '?', () => blockUser(user.id))" class="btn-danger-sm">block</button>
+                                    <button x-show="user.blocked" @click="unblockUser(user.id)" class="btn-sm">unblock</button>
+                                    <button x-show="!user.roles || !user.roles.includes('admin')" @click="confirmAction('make admin', 'promote ' + user.email + ' to admin?', () => makeAdmin(user.id))" class="btn-sm">make admin</button>
+                                    <button x-show="user.roles && user.roles.includes('admin')" @click="confirmAction('remove admin', 'remove admin from ' + user.email + '?', () => removeAdmin(user.id))" class="btn-danger-sm">remove admin</button>
+                                    <button @click="confirmAction('remove user', 'permanently remove ' + user.email + '?', () => removeUser(user.id))" class="btn-danger-sm">remove</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="filteredUsers.length === 0">
+                        <td colspan="5" style="padding: 20px 8px; color: #555; text-align: center;">no users found</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Confirm modal -->
+        <div x-show="confirmModal.visible" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 100;">
+            <div class="card" style="max-width: 400px; width: 90%; text-align: center;">
+                <h3 x-text="confirmModal.title" style="margin-bottom: 12px; font-size: 1rem;"></h3>
+                <p x-text="confirmModal.message" style="color: #aaa; margin-bottom: 24px; font-size: 0.9rem;"></p>
+                <div style="display: flex; gap: 12px; justify-content: center;">
+                    <button @click="confirmModal.onConfirm(); confirmModal.visible = false" class="btn-danger">Confirm</button>
+                    <button @click="confirmModal.visible = false" class="btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="admin-users.js"></script>
+</body>
+</html>
