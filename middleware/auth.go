@@ -2,10 +2,14 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"strings"
 
+	"waystone-web/db"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gorilla/sessions"
 	"golang.org/x/oauth2"
@@ -124,6 +128,29 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		session, err := GetSession(r)
 		if err != nil || session["user_id"] == nil {
 			http.Redirect(w, r, "/login.html", http.StatusSeeOther)
+			return
+		}
+
+		// DB check: handle deleted users and blocked users
+		userID := session["user_id"].(string)
+		dbUser, dbErr := db.GetUserByID(userID)
+		if dbErr != nil {
+			log.Printf("AuthMiddleware: DB error for user %s: %v", userID, dbErr)
+			// fail open on transient DB errors
+		} else if dbUser == nil {
+			// stale cookie — user deleted
+			ClearSession(w, r)
+			http.Redirect(w, r, "/login.html", http.StatusSeeOther)
+			return
+		} else if dbUser.Blocked {
+			ClearSession(w, r)
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				json.NewEncoder(w).Encode(map[string]string{"error": "account blocked"})
+			} else {
+				http.Redirect(w, r, "/blocked.html", http.StatusSeeOther)
+			}
 			return
 		}
 
