@@ -17,7 +17,7 @@ var InitialCampaigns = []models.Campaign{
 		Status:      models.Ongoing,
 		Summary:     "An epic campaign of discovery and adventure",
 		Description: "A long-running D&D campaign where players explore a mysterious world filled with ancient ruins and untold secrets.",
-		Players:     []string{},
+		Players:     []string{"7609bdaf-cc43-4131-b188-098aa07ba6dc"},
 		DM:          "550e8400-e29b-41d4-a716-446655440000",
 		SignUpsOpen: true,
 	},

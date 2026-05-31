@@ -3,9 +3,10 @@ name: coding
 description: >
   Use this skill for implementation requests in this repository. Follow the
   repository-specific workflow: plan with a stronger model, implement in a git
-  worktree with a fast sub-agent, use a commit-prep sub-agent before commits,
-  avoid adding or modifying tests unless explicitly requested, and end with a
-  short pull-request-style summary.
+  worktree stored under `./.github/worktrees` with a fast sub-agent, avoid
+  adding or modifying tests unless explicitly requested, prefer minimal code
+  changes with DRY abstractions, and end with a short pull-request-style
+  summary.
 ---
 
 # Skill: coding
@@ -15,14 +16,13 @@ Use this skill for implementation requests in this repository.
 ## Required workflow
 
 1. If the user provides a pre-made implementation plan, accept it as the execution plan and skip the planning sub-agent step. If no plan is provided, start a planning sub-agent using a stronger model (for example `gpt-5.4` or `claude-sonnet-4.6`) to produce a concrete implementation plan.
-2. Create and use a git worktree for the implementation work. Keep coding changes inside that worktree.
+2. Create and use a git worktree for the implementation work under `./.github/worktrees` only. Do not create or use worktrees outside `./.github/worktrees`.
 3. Start an implementation sub-agent using a fast model (for example `claude-haiku-4.5`) and execute the approved plan in the worktree.
 4. Do not commit changes, wait until the user asks for it explicitly, or does it themselves
 5. Do not add new tests or modify tests unless the user explicitly asks for tests.
-6. Deliver a short pull-request-style summary at completion of the changes
-
-
-
+6. Prefer minimal, surgical changes to existing code. Avoid broad refactors unless explicitly requested.
+7. Ensure DRY and abstraction: reuse existing helpers/patterns first, and only introduce new abstractions when they clearly reduce duplication.
+8. Deliver a short pull-request-style summary at completion of the changes
 
 
 

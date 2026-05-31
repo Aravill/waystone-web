@@ -1,9 +1,11 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"waystone-web/middleware"
 )
 
@@ -34,6 +36,7 @@ func RegisterRoutes() {
 
 	// Protected API endpoints (wrapped with auth middleware)
 	http.Handle("/api/campaigns", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaigns)))
+	http.Handle("/api/campaigns/", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaignRoutes)))
 	http.Handle("/api/profile", middleware.AuthMiddleware(http.HandlerFunc(HandleProfile)))
 
 	// Protected role management endpoints (wrapped with auth middleware)
@@ -77,4 +80,26 @@ func RegisterRoutes() {
 	http.Handle("/", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("dashboard.html"))))
 	http.Handle("/campaigns", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("campaigns.html"))))
 	http.Handle("/profile", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("profile.html"))))
+}
+
+func HandleCampaignRoutes(w http.ResponseWriter, r *http.Request) {
+	// Handle nested campaign routes like /api/campaigns/{id}/sessions...
+	path := r.URL.Path
+
+	// For other nested campaign routes, dispatch based on path
+	parts := strings.Split(strings.TrimPrefix(path, "/api/campaigns/"), "/")
+	if len(parts) >= 2 && parts[1] == "sessions" {
+		// Handle session list and creation
+		if len(parts) == 2 {
+			HandleSessions(w, r)
+		} else {
+			// Handle session-specific actions
+			HandleSessionActions(w, r)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNotFound)
+	fmt.Fprintf(w, `{"error": "not found"}`)
 }
