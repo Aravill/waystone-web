@@ -132,7 +132,12 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// DB check: handle deleted users and blocked users
-		userID := session["user_id"].(string)
+		userID, ok := session["user_id"].(string)
+		if !ok || userID == "" {
+			ClearSession(w, r)
+			http.Redirect(w, r, "/login.html", http.StatusSeeOther)
+			return
+		}
 		dbUser, dbErr := db.GetUserByID(userID)
 		if dbErr != nil {
 			log.Printf("AuthMiddleware: DB error for user %s: %v", userID, dbErr)

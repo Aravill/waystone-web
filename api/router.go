@@ -72,6 +72,12 @@ func RegisterRoutes() {
 	http.HandleFunc("/login.html", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/login.html")
 	})
+	http.HandleFunc("/blocked.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/blocked.html")
+	})
+	http.HandleFunc("/not-whitelisted.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/not-whitelisted.html")
+	})
 
 	// /static/ prefix for any other static assets
 	http.Handle("/static/", http.StripPrefix("/static/", fs))

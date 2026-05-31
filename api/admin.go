@@ -181,8 +181,8 @@ func HandleAdminUserActions(w http.ResponseWriter, r *http.Request) {
 			adminError(w, http.StatusConflict, "cannot delete your own account")
 			return
 		}
-		// Guard: can't delete last admin
-		if target.IsAdmin() {
+		// Guard: can't delete last active admin
+		if target.IsAdmin() && !target.Blocked {
 			all, _ := db.GetAllUsers()
 			if countActiveAdmins(all) <= 1 {
 				adminError(w, http.StatusConflict, "cannot delete the last admin")
@@ -249,10 +249,12 @@ func HandleAdminUserActions(w http.ResponseWriter, r *http.Request) {
 			adminError(w, http.StatusConflict, "cannot remove your own admin role")
 			return
 		}
-		all, _ := db.GetAllUsers()
-		if countActiveAdmins(all) <= 1 {
-			adminError(w, http.StatusConflict, "cannot remove the last admin")
-			return
+		if !target.Blocked {
+			all, _ := db.GetAllUsers()
+			if countActiveAdmins(all) <= 1 {
+				adminError(w, http.StatusConflict, "cannot remove the last admin")
+				return
+			}
 		}
 		newRoles := []string{}
 		for _, role := range target.Roles {
