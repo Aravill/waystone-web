@@ -12,4 +12,5 @@ type User struct {
 	Roles     []string  `json:"roles"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	Blocked   bool      `json:"blocked"`
 }
