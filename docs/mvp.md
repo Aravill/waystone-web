@@ -15,12 +15,12 @@ This document describes what must-have features are to be implemented before pre
 - [ ] Following
     - [ ] Users can follow campaigns (to receive notifications)
     - [ ] Players are automatically following campaigns they're in
-- [ ] Administration
-    - [ ] Always one super admin role
-    - [ ] An admin / super admin can add or remove people from the access whitelist
-    - [ ] A super admin can make other people admins
+- [x] Administration
+    - [x] Always one super admin role
+    - [x] An admin / super admin can add or remove people from the access whitelist
+    - [x] A super admin can make other people admins
     - [ ] Admins can remove any campaign
-    - [ ] An admin can revoke whitelist access to a user (doesn't delete the account, just blocks their log-in)
+    - [x] An admin can revoke whitelist access to a user (doesn't delete the account, just blocks their log-in)
     - [ ] An admin can delete accounts
 - [ ] Campaigns
     - [ ] Standard operations
