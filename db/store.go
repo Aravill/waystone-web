@@ -20,6 +20,7 @@ type Store interface {
 	GetUserByID(id string) (*models.User, error)
 	GetAllUsers() ([]models.User, error)
 	DeleteUser(id string) error
+	SetUserBlocked(id string, blocked bool) error
 	GetSessionsByMonth(campaignID string, year int, month int) ([]models.CampaignSession, error)
 	GetSessionByID(sessionID string) (*models.CampaignSession, error)
 	SaveSession(session models.CampaignSession) error

@@ -2,6 +2,7 @@
 window.profilePage = function() {
     return {
         displayName: 'User',
+        isAdmin: false,
         loading: true,
         profile: null,
         dmCampaigns: [],
@@ -21,6 +22,7 @@ window.profilePage = function() {
                 
                 const user = await userResponse.json();
                 this.displayName = user.display_name || user.name || user.email || 'User';
+                this.isAdmin = (user.roles || []).includes('admin');
             } catch (error) {
                 console.error('Auth check failed:', error);
                 window.location.href = '/login.html';

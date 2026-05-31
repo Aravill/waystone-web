@@ -113,3 +113,8 @@ func DeleteUserAndCleanupCampaigns(userID string) (removedAsDM int, removedAsPla
 
 	return removedAsDM, removedAsPlayer, nil
 }
+
+// SetUserBlocked updates the blocked status of a user
+func SetUserBlocked(id string, blocked bool) error {
+	return GetStore().SetUserBlocked(id, blocked)
+}

@@ -2,6 +2,7 @@
 window.campaignsPage = function () {
     return {
         displayName: 'User',
+        isAdmin: false,
         currentUserId: '',
         campaigns: [],
         loading: true,
@@ -58,6 +59,7 @@ window.campaignsPage = function () {
 
                 const user = await userResponse.json();
                 this.displayName = user.display_name || user.name || user.email || 'User';
+                this.isAdmin = (user.roles || []).includes('admin');
                 this.currentUserId = user.user_id || user.id || '';
 
                 if (!this._calendarButtonHandler) {

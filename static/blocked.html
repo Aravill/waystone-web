@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blocked — Waystone</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #000000;
+            color: #ffffff;
+            font-family: 'Fira Code', monospace;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            border: 1px solid #333333;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        .status {
+            color: #ff006e;
+            font-size: 0.85rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 24px;
+        }
+        h1 { font-size: 1.5rem; margin-bottom: 16px; }
+        p { color: #aaaaaa; line-height: 1.6; margin-bottom: 24px; }
+        a {
+            display: inline-block;
+            padding: 10px 24px;
+            border: 1px solid #00d9ff;
+            color: #00d9ff;
+            text-decoration: none;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            transition: background 0.2s, color 0.2s;
+        }
+        a:hover { background: #00d9ff; color: #000000; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <p class="status">access denied</p>
+        <h1>you've been blocked</h1>
+        <p>you've been misbehaving and have been blocked from waystone. contact an administrator if you think this is a mistake.</p>
+        <a href="/login.html">back to login</a>
+    </div>
+</body>
+</html>
