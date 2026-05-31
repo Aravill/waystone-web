@@ -113,7 +113,7 @@
         </div>
 
         <!-- Confirm modal -->
-        <div x-show="confirmModal.visible" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 100;">
+        <div x-cloak x-show="confirmModal.visible" style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 100;">
             <div class="card" style="max-width: 400px; width: 90%; text-align: center;">
                 <h3 x-text="confirmModal.title" style="margin-bottom: 12px; font-size: 1rem;"></h3>
                 <p x-text="confirmModal.message" style="color: #aaa; margin-bottom: 24px; font-size: 0.9rem;"></p>
@@ -125,6 +125,6 @@
         </div>
     </main>
 
-    <script src="admin-users.js"></script>
+    <script src="/admin-users.js"></script>
 </body>
 </html>
