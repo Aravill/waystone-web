@@ -2,11 +2,11 @@
 ## Summary
 This document describes what must-have features are to be implemented before presenting this website to the waystone server members
 ## MVP Requirements
-- [ ] Calendar & Session Planning
-    - [ ] DM can suggest session dates
-    - [ ] Players can react with confirm / reject / tentative the dates
-    - [ ] DM can see who reacted how
-    - [ ] Dates can be cancelled
+- [x] Calendar & Session Planning
+    - [x] DM can suggest session dates
+    - [x] Players can react with confirm / reject / tentative the dates
+    - [x] DM can see who reacted how
+    - [x] Dates can be cancelled
     - [ ] Calendar sync - the players & DM can import events into their google calendar
 - [ ] Signing up
     - [ ] Users can sign up for campaigns if sign-ups are open
@@ -44,9 +44,9 @@ This document describes what must-have features are to be implemented before pre
     - [ ] Visually distinct campaign statuses
 - [ ] Initial log-in
     - [ ] Profile creation process (set nickname and avatar)
-- [ ] Technological
-    - [ ] SQLite
-    - [ ] Alpine.js
-    - [ ] Code review skill
+- [x] Technological
+    - [x] SQLite
+    - [x] Alpine.js
+    - [x] Code review skill
 - [ ] Misc
     - [ ] Waystone logo on the page
