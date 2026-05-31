@@ -7,20 +7,57 @@
     <link rel="stylesheet" href="/dashboard.css?v=1">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
     <style>
-        .btn { padding: 8px 16px; border: 1px solid #667eea; background: #667eea; color: white; cursor: pointer; font-family: 'Fira Code', monospace; font-size: 0.85rem; transition: background 0.2s; }
-        .btn:hover { background: #764ba2; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
-        .btn-danger { background: #ff006e; border-color: #ff006e; }
-        .btn-danger:hover { background: #e60066; }
-        .btn-danger-sm { padding: 6px 12px; font-size: 0.8rem; background: #ff006e; border: 1px solid #ff006e; color: white; cursor: pointer; font-family: 'Fira Code', monospace; transition: background 0.2s; }
-        .btn-danger-sm:hover { background: #e60066; }
-        .message { padding: 12px 16px; margin-bottom: 16px; border-radius: 5px; font-size: 0.9rem; }
-        .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        /* Action buttons — style-guide compliant */
+        .action-btn {
+            padding: 6px 14px;
+            background: #000;
+            color: #00d9ff;
+            border: 1px solid #00d9ff;
+            cursor: pointer;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .action-btn:hover { background: #00d9ff; color: #000; }
+        .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .action-btn.danger { color: #ff006e; border-color: #ff006e; }
+        .action-btn.danger:hover { background: #ff006e; color: #000; }
+        /* Submit button for add-user form */
+        .submit-btn {
+            padding: 10px 20px;
+            background: #000;
+            color: #00d9ff;
+            border: 1px solid #00d9ff;
+            cursor: pointer;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+        }
+        .submit-btn:hover { background: #00d9ff; color: #000; }
+        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        /* Messages */
+        .message { padding: 12px 16px; margin-bottom: 16px; font-size: 0.9rem; border: 1px solid; }
+        .message.success { background: #0a1a0a; color: #00ff7f; border-color: #00ff7f; }
+        .message.error { background: #1a0a0a; color: #ff006e; border-color: #ff006e; }
+        /* Confirm modal overlay — display:flex here so x-show toggling display:none doesn't revert to block */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        /* Table */
         table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         th, td { text-align: left; padding: 10px 8px; }
-        th { color: #aaa; border-bottom: 1px solid #333; }
+        th { color: #888; border-bottom: 1px solid #333; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; }
         tbody tr { border-bottom: 1px solid #1a1a1a; }
         tbody tr:hover { background: #0a0a0a; }
     </style>
@@ -46,26 +83,28 @@
         <a href="/admin/users" class="nav-item active" data-page="admin-users" x-show="isAdmin">Admin</a>
     </div>
 
-    <main class="container" style="max-width: 1000px; margin: 0 auto; padding: 20px;">
+    <main class="container" style="max-width: 1100px; margin: 0 auto; padding: 20px; flex-direction: column; align-items: stretch; justify-content: flex-start;">
         <!-- Add user form -->
-        <section class="card" style="margin-bottom: 24px;">
-            <h2 style="margin-bottom: 16px; font-size: 1rem; letter-spacing: 0.05em;">Add User to Whitelist</h2>
+        <section class="card" style="margin-bottom: 16px;">
+            <h2 style="margin-bottom: 16px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; color: #888;">Add User to Whitelist</h2>
             <form @submit.prevent="addUser()" style="display: flex; gap: 8px;">
                 <input type="email" x-model="newEmail" placeholder="user@example.com" required
-                    style="flex: 1; background: #111; border: 1px solid #333; color: #fff; padding: 10px 14px; font-family: 'Fira Code', monospace; font-size: 0.9rem;">
-                <button type="submit" :disabled="loading" class="btn">Add</button>
+                    style="flex: 1; background: #0a0a0a; border: 1px solid #333; color: #e0e0e0; padding: 10px 14px; font-family: 'Fira Code', monospace; font-size: 0.9rem; transition: border-color 0.2s;"
+                    onfocus="this.style.borderColor='#00d9ff'" onblur="this.style.borderColor='#333'">
+                <button type="submit" :disabled="loading" class="submit-btn">Add</button>
             </form>
         </section>
 
         <!-- Message area -->
         <div x-show="messageVisible" x-text="messageText"
             :class="messageType === 'error' ? 'message error' : 'message success'"
-            style="display: none; margin-bottom: 16px;"></div>
+            style="display: none;"></div>
 
         <!-- Search -->
         <div style="margin-bottom: 16px;">
             <input type="text" x-model="searchQuery" placeholder="search by email or name..."
-                style="width: 100%; background: #111; border: 1px solid #333; color: #fff; padding: 10px 14px; font-family: 'Fira Code', monospace; font-size: 0.9rem;">
+                style="width: 100%; background: #0a0a0a; border: 1px solid #333; color: #e0e0e0; padding: 10px 14px; font-family: 'Fira Code', monospace; font-size: 0.9rem; transition: border-color 0.2s;"
+                onfocus="this.style.borderColor='#00d9ff'" onblur="this.style.borderColor='#333'">
         </div>
 
         <!-- Users table -->
@@ -73,34 +112,34 @@
             <table>
                 <thead>
                     <tr>
-                        <th style="padding: 10px 8px;">Email</th>
-                        <th style="padding: 10px 8px;">Display Name</th>
-                        <th style="padding: 10px 8px;">Status</th>
-                        <th style="padding: 10px 8px;">Roles</th>
-                        <th style="padding: 10px 8px;">Actions</th>
+                        <th>Email</th>
+                        <th>Display Name</th>
+                        <th>Status</th>
+                        <th>Roles</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-for="user in filteredUsers" :key="user.id">
                         <tr>
-                            <td style="padding: 10px 8px;" x-text="user.email"></td>
-                            <td style="padding: 10px 8px;" x-text="user.nickname || user.name || '—'"></td>
-                            <td style="padding: 10px 8px;">
+                            <td x-text="user.email"></td>
+                            <td x-text="user.nickname || user.name || '—'"></td>
+                            <td>
                                 <span x-show="user.blocked" style="color: #ff006e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">blocked</span>
                                 <span x-show="!user.blocked && user.activated" style="color: #00d9ff; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">active</span>
                                 <span x-show="!user.blocked && !user.activated" style="color: #555; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">pending</span>
                             </td>
-                            <td style="padding: 10px 8px;">
-                                <span x-show="user.roles && user.roles.includes('admin')" style="color: #00d9ff; font-size: 0.75rem;">admin</span>
+                            <td>
+                                <span x-show="user.roles && user.roles.includes('admin')" style="color: #00d9ff; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">admin</span>
                                 <span x-show="!user.roles || !user.roles.includes('admin')" style="color: #555; font-size: 0.75rem;">—</span>
                             </td>
-                            <td style="padding: 10px 8px;">
+                            <td>
                                 <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                                    <button x-show="!user.blocked" @click="confirmAction('block user', 'block ' + user.email + '?', () => blockUser(user.id))" class="btn-danger-sm">block</button>
-                                    <button x-show="user.blocked" @click="unblockUser(user.id)" class="btn-sm">unblock</button>
-                                    <button x-show="!user.roles || !user.roles.includes('admin')" @click="confirmAction('make admin', 'promote ' + user.email + ' to admin?', () => makeAdmin(user.id))" class="btn-sm">make admin</button>
-                                    <button x-show="user.roles && user.roles.includes('admin')" @click="confirmAction('remove admin', 'remove admin from ' + user.email + '?', () => removeAdmin(user.id))" class="btn-danger-sm">remove admin</button>
-                                    <button @click="confirmAction('remove user', 'permanently remove ' + user.email + '?', () => removeUser(user.id))" class="btn-danger-sm">remove</button>
+                                    <button x-show="!user.blocked" @click="confirmAction('block user', 'block ' + user.email + '?', () => blockUser(user.id))" class="action-btn danger">block</button>
+                                    <button x-show="user.blocked" @click="unblockUser(user.id)" class="action-btn">unblock</button>
+                                    <button x-show="!user.roles || !user.roles.includes('admin')" @click="confirmAction('make admin', 'promote ' + user.email + ' to admin?', () => makeAdmin(user.id))" class="action-btn">make admin</button>
+                                    <button x-show="user.roles && user.roles.includes('admin')" @click="confirmAction('remove admin', 'remove admin from ' + user.email + '?', () => removeAdmin(user.id))" class="action-btn danger">remove admin</button>
+                                    <button @click="confirmAction('remove user', 'permanently remove ' + user.email + '?', () => removeUser(user.id))" class="action-btn danger">remove</button>
                                 </div>
                             </td>
                         </tr>
@@ -113,18 +152,18 @@
         </div>
 
         <!-- Confirm modal -->
-        <div x-cloak x-show="confirmModal.visible" style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 100;">
+        <div x-cloak x-show="confirmModal.visible" class="modal-overlay">
             <div class="card" style="max-width: 400px; width: 90%; text-align: center;">
                 <h3 x-text="confirmModal.title" style="margin-bottom: 12px; font-size: 1rem;"></h3>
-                <p x-text="confirmModal.message" style="color: #aaa; margin-bottom: 24px; font-size: 0.9rem;"></p>
+                <p x-text="confirmModal.message" style="color: #888; margin-bottom: 24px; font-size: 0.9rem;"></p>
                 <div style="display: flex; gap: 12px; justify-content: center;">
-                    <button @click="confirmModal.onConfirm(); confirmModal.visible = false" class="btn-danger">Confirm</button>
-                    <button @click="confirmModal.visible = false" class="btn">Cancel</button>
+                    <button @click="confirmModal.onConfirm(); confirmModal.visible = false" class="action-btn danger">Confirm</button>
+                    <button @click="confirmModal.visible = false" class="action-btn">Cancel</button>
                 </div>
             </div>
         </div>
     </main>
 
-    <script src="/admin-users.js"></script>
+    <script src="/admin-users.js?v=1"></script>
 </body>
 </html>
