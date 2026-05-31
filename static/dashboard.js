@@ -2,6 +2,7 @@
 window.dashboardPage = function() {
     return {
         displayName: 'User',
+        isAdmin: false,
         
         async init() {
             try {
@@ -9,6 +10,7 @@ window.dashboardPage = function() {
                 if (userResponse.ok) {
                     const user = await userResponse.json();
                     this.displayName = user.display_name || user.name || user.email || 'User';
+                    this.isAdmin = (user.roles || []).includes('admin');
                 } else {
                     window.location.href = '/login.html';
                 }
