@@ -52,9 +52,9 @@ echo ""
 echo "📦 Building Docker image..."
 docker-compose build
 
-# Stop any existing container
-echo "🛑 Stopping any existing containers..."
-docker-compose down 2>/dev/null || true
+# Stop any existing container and wipe the data volume for a clean DB
+echo "🛑 Stopping any existing containers and clearing data..."
+docker-compose down -v 2>/dev/null || true
 
 # Start the container
 echo "▶️  Starting container..."
