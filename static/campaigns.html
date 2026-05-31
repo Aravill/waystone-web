@@ -119,7 +119,11 @@
                              }"
                              :title="getDayTitle(day)"
                              :aria-label="getDayAriaLabel(day)"
-                             @click="selectDay(day)">
+                             role="button"
+                             tabindex="0"
+                             @click="selectDay(day)"
+                             @keydown.enter.prevent="selectDay(day)"
+                             @keydown.space.prevent="selectDay(day)">
                             <span class="day-pending-total"
                                   x-show="hasPlannedSession(day)"
                                   x-text="getPendingResponsesForDay(day)"

@@ -427,6 +427,7 @@ window.campaignsPage = function () {
             if (!primarySession) return '';
             if (primarySession.status === 'Suggested') return 'day-suggested';
             if (primarySession.status === 'Confirmed') return 'day-confirmed';
+            if (primarySession.status === 'Cancelled') return 'day-cancelled';
             return 'day-historical';
         },
 

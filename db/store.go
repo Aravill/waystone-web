@@ -25,6 +25,7 @@ type Store interface {
 	SaveSession(session models.CampaignSession) error
 	UpsertSessionResponse(response models.SessionResponse) error
 	GetSessionResponses(sessionID string) ([]models.SessionResponse, error)
+	GetSessionResponsesBySessionIDs(sessionIDs []string) (map[string][]models.SessionResponse, error)
 	DeleteSession(sessionID string) error
 	Close() error
 }

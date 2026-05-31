@@ -22,6 +22,10 @@ func GetSessionResponses(sessionID string) ([]models.SessionResponse, error) {
 	return GetStore().GetSessionResponses(sessionID)
 }
 
+func GetSessionResponsesBySessionIDs(sessionIDs []string) (map[string][]models.SessionResponse, error) {
+	return GetStore().GetSessionResponsesBySessionIDs(sessionIDs)
+}
+
 func DeleteSession(sessionID string) error {
 	return GetStore().DeleteSession(sessionID)
 }

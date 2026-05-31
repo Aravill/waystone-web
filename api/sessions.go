@@ -53,7 +53,7 @@ func HandleSessionActions(w http.ResponseWriter, r *http.Request) {
 		case http.MethodPost:
 			handleSubmitSessionResponse(w, r, campaignID, sessionID)
 		case http.MethodGet:
-			handleGetSessionResponses(w, campaignID, sessionID)
+			handleGetSessionResponses(w, r, campaignID, sessionID)
 		default:
 			writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
@@ -106,19 +106,34 @@ func handleGetSessions(w http.ResponseWriter, r *http.Request, campaignID string
 		return
 	}
 
+	userID, ok := r.Context().Value("user_id").(string)
+	if !ok || userID == "" {
+		writeJSONError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+	if !hasCampaignSessionAccess(campaign, userID) {
+		writeJSONError(w, http.StatusForbidden, "only campaign DM and registered players can view sessions")
+		return
+	}
+
 	sessions, err := db.GetSessionsByMonth(campaignID, year, month)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve sessions")
 		return
 	}
 
-	userID, _ := r.Context().Value("user_id").(string)
+	sessionIDs := make([]string, 0, len(sessions))
+	for _, session := range sessions {
+		sessionIDs = append(sessionIDs, session.ID)
+	}
+	responsesBySession, err := db.GetSessionResponsesBySessionIDs(sessionIDs)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve session responses")
+		return
+	}
+
 	for i := range sessions {
-		responses, err := db.GetSessionResponses(sessions[i].ID)
-		if err != nil {
-			writeJSONError(w, http.StatusInternalServerError, "failed to retrieve session responses")
-			return
-		}
+		responses := responsesBySession[sessions[i].ID]
 
 		var accepted, declined, tentative int
 		currentParticipation := ""
@@ -405,7 +420,7 @@ func handleSubmitSessionResponse(w http.ResponseWriter, r *http.Request, campaig
 	})
 }
 
-func handleGetSessionResponses(w http.ResponseWriter, campaignID, sessionID string) {
+func handleGetSessionResponses(w http.ResponseWriter, r *http.Request, campaignID, sessionID string) {
 	campaign, session, err := validateSessionCampaign(campaignID, sessionID)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve session")
@@ -417,6 +432,16 @@ func handleGetSessionResponses(w http.ResponseWriter, campaignID, sessionID stri
 	}
 	if session == nil {
 		writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(string)
+	if !ok || userID == "" {
+		writeJSONError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+	if !hasCampaignSessionAccess(campaign, userID) {
+		writeJSONError(w, http.StatusForbidden, "only campaign DM and registered players can view responses")
 		return
 	}
 
@@ -505,6 +530,21 @@ func validateSessionCampaign(campaignID, sessionID string) (*models.Campaign, *m
 		return campaign, nil, nil
 	}
 	return campaign, session, nil
+}
+
+func hasCampaignSessionAccess(campaign *models.Campaign, userID string) bool {
+	if campaign == nil || userID == "" {
+		return false
+	}
+	if campaign.DM == userID {
+		return true
+	}
+	for _, playerID := range campaign.Players {
+		if playerID == userID {
+			return true
+		}
+	}
+	return false
 }
 
 func responsesByParticipation(responses []sessionResponsePayload) map[string][]sessionResponsePayload {

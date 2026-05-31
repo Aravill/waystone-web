@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -735,6 +736,59 @@ func (s *SQLiteStore) GetSessionResponses(sessionID string) ([]models.SessionRes
 	return responses, rows.Err()
 }
 
+func (s *SQLiteStore) GetSessionResponsesBySessionIDs(sessionIDs []string) (map[string][]models.SessionResponse, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	responsesBySession := make(map[string][]models.SessionResponse, len(sessionIDs))
+	if len(sessionIDs) == 0 {
+		return responsesBySession, nil
+	}
+
+	args := make([]interface{}, 0, len(sessionIDs))
+	for _, sessionID := range sessionIDs {
+		if sessionID == "" {
+			continue
+		}
+		responsesBySession[sessionID] = []models.SessionResponse{}
+		args = append(args, sessionID)
+	}
+	if len(args) == 0 {
+		return responsesBySession, nil
+	}
+
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(args)), ",")
+	query := fmt.Sprintf(`
+		SELECT id, session_id, user_id, participation, created_at, updated_at
+		FROM session_responses
+		WHERE session_id IN (%s)
+		ORDER BY created_at ASC
+	`, placeholders)
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var response models.SessionResponse
+		if err := rows.Scan(
+			&response.ID,
+			&response.SessionID,
+			&response.UserID,
+			&response.Participation,
+			&response.CreatedAt,
+			&response.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		responsesBySession[response.SessionID] = append(responsesBySession[response.SessionID], response)
+	}
+
+	return responsesBySession, rows.Err()
+}
+
 func (s *SQLiteStore) DeleteSession(sessionID string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -748,7 +802,10 @@ func (s *SQLiteStore) DeleteSession(sessionID string) error {
 	query := `SELECT status FROM campaign_sessions WHERE id = ?`
 	err := s.db.QueryRow(query, sessionID).Scan(&status)
 	if err != nil {
-		return fmt.Errorf("session not found")
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("session not found")
+		}
+		return err
 	}
 
 	if status != string(models.SessionSuggested) {
