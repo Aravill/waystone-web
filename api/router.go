@@ -80,6 +80,21 @@ func RegisterRoutes() {
 	http.Handle("/", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("dashboard.html"))))
 	http.Handle("/campaigns", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("campaigns.html"))))
 	http.Handle("/profile", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("profile.html"))))
+
+	// Admin page
+	http.Handle("/admin/users", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminUsersPage)))
+	http.Handle("/admin", middleware.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+	})))
+
+	// Admin API
+	http.Handle("/api/admin/users", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminUsers)))
+	http.Handle("/api/admin/users/", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminUserActions)))
+
+	// Admin static
+	http.HandleFunc("/admin-users.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/admin-users.js")
+	})
 }
 
 func HandleCampaignRoutes(w http.ResponseWriter, r *http.Request) {
