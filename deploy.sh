@@ -9,8 +9,8 @@ if [ ! -f .env ]; then
     if [ -f .env.example ]; then
         echo "📋 Creating .env file from .env.example..."
         cp .env.example .env
-        echo "⚠️  Please edit .env and set your GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET"
-        echo "   You can continue deployment without these for development mode."
+        echo "⚠️  Please edit .env and set ADMIN_PASSWORD (and optionally ADMIN_USERNAME)"
+        echo "   Without ADMIN_PASSWORD the admin account cannot log in."
     else
         echo "⚠️  Warning: Neither .env nor .env.example found"
         echo "   Environment variables will use system defaults"
@@ -26,20 +26,14 @@ if [ -f .env ]; then
 fi
 
 # Display loaded configuration (without secrets)
-if [ ! -z "$GOOGLE_CLIENT_ID" ]; then
-    echo "✓ GOOGLE_CLIENT_ID is set"
+if [ ! -z "$ADMIN_PASSWORD" ]; then
+    echo "✓ ADMIN_PASSWORD is set"
 else
-    echo "⚠️  GOOGLE_CLIENT_ID not set (OAuth will not work)"
+    echo "⚠️  ADMIN_PASSWORD not set (admin can't log in)"
 fi
 
-if [ ! -z "$GOOGLE_CLIENT_SECRET" ]; then
-    echo "✓ GOOGLE_CLIENT_SECRET is set"
-else
-    echo "⚠️  GOOGLE_CLIENT_SECRET not set (OAuth will not work)"
-fi
-
+echo "✓ ADMIN_USERNAME=${ADMIN_USERNAME:-admin}"
 echo "✓ PORT=${PORT:-8080}"
-echo "✓ OAUTH_CALLBACK_URL=${OAUTH_CALLBACK_URL:-http://localhost:8080/auth/callback}"
 
 # Check if Docker is running
 if ! docker info > /dev/null 2>&1; then
