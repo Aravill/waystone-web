@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"waystone-web/db"
 	"waystone-web/middleware"
-	"net/http"
 )
 
 type AssignRolesRequest struct {

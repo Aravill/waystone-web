@@ -39,4 +39,3 @@ func main() {
 	log.Printf("Server starting on http://localhost%s\n", addr)
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
-
