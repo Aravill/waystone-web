@@ -29,8 +29,8 @@ func ServePageWithFallback(pageName string) http.HandlerFunc {
 
 func RegisterRoutes() {
 	// Public auth endpoints
-	http.HandleFunc("/auth/login", HandleLoginStart)
-	http.HandleFunc("/auth/callback", HandleCallback)
+	http.HandleFunc("/auth/login", HandleLogin)
+	http.HandleFunc("/auth/change-password", HandleChangePassword)
 	http.HandleFunc("/auth/logout", HandleLogout)
 	http.HandleFunc("/auth/current-user", HandleGetCurrentUser)
 
@@ -38,14 +38,6 @@ func RegisterRoutes() {
 	http.Handle("/api/campaigns", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaigns)))
 	http.Handle("/api/campaigns/", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaignRoutes)))
 	http.Handle("/api/profile", middleware.AuthMiddleware(http.HandlerFunc(HandleProfile)))
-
-	// Protected role management endpoints (wrapped with auth middleware)
-	http.Handle("/api/roles", middleware.AuthMiddleware(http.HandlerFunc(HandleAssignRoles)))
-	http.Handle("/api/user-roles", middleware.AuthMiddleware(http.HandlerFunc(HandleGetUserRoles)))
-	http.Handle("/api/users", middleware.AuthMiddleware(http.HandlerFunc(HandleListUsers)))
-
-	// Protected user management endpoints
-	http.Handle("/api/users/create", middleware.AuthMiddleware(http.HandlerFunc(HandleCreateUser)))
 
 	// Static files - MUST be registered BEFORE "/" handler to take precedence
 	fs := http.FileServer(http.Dir("./static"))
@@ -75,8 +67,8 @@ func RegisterRoutes() {
 	http.HandleFunc("/blocked.html", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/blocked.html")
 	})
-	http.HandleFunc("/not-whitelisted.html", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/not-whitelisted.html")
+	http.HandleFunc("/change-password.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/change-password.js")
 	})
 
 	// /static/ prefix for any other static assets
@@ -86,6 +78,7 @@ func RegisterRoutes() {
 	http.Handle("/", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("dashboard.html"))))
 	http.Handle("/campaigns", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("campaigns.html"))))
 	http.Handle("/profile", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("profile.html"))))
+	http.Handle("/change-password", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("change-password.html"))))
 
 	// Admin page
 	http.Handle("/admin/users", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminUsersPage)))

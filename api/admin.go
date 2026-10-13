@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"waystone-web/auth"
 	"waystone-web/db"
 	"waystone-web/middleware"
 	"waystone-web/models"
@@ -12,13 +13,14 @@ import (
 
 // adminUserJSON is a view of a user for the admin API
 type adminUserJSON struct {
-	ID        string   `json:"id"`
-	Email     string   `json:"email"`
-	Name      string   `json:"name"`
-	Nickname  string   `json:"nickname"`
-	Roles     []string `json:"roles"`
-	Blocked   bool     `json:"blocked"`
-	Activated bool     `json:"activated"`
+	ID                 string   `json:"id"`
+	Username           string   `json:"username"`
+	Name               string   `json:"name"`
+	Nickname           string   `json:"nickname"`
+	Roles              []string `json:"roles"`
+	Blocked            bool     `json:"blocked"`
+	MustChangePassword bool     `json:"must_change_password"`
+	IsEnvAdmin         bool     `json:"is_env_admin"`
 }
 
 func toAdminUserJSON(u models.User) adminUserJSON {
@@ -27,13 +29,14 @@ func toAdminUserJSON(u models.User) adminUserJSON {
 		roles = []string{}
 	}
 	return adminUserJSON{
-		ID:        u.ID,
-		Email:     u.Email,
-		Name:      u.Name,
-		Nickname:  u.Nickname,
-		Roles:     roles,
-		Blocked:   u.Blocked,
-		Activated: u.GoogleID != "",
+		ID:                 u.ID,
+		Username:           u.Username,
+		Name:               u.Name,
+		Nickname:           u.Nickname,
+		Roles:              roles,
+		Blocked:            u.Blocked,
+		MustChangePassword: u.MustChangePassword,
+		IsEnvAdmin:         auth.IsEnvAdmin(&u),
 	}
 }
 
@@ -114,24 +117,44 @@ func HandleAdminUsers(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodPost:
 		var body struct {
-			Email string `json:"email"`
+			Username string `json:"username"`
+			Name     string `json:"name"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Email == "" {
-			adminError(w, http.StatusBadRequest, "email required")
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			adminError(w, http.StatusBadRequest, "invalid request")
 			return
 		}
-		existing, err := db.GetUserByEmail(body.Email)
+		username, err := auth.ParseUsername(body.Username)
 		if err != nil {
-			adminError(w, http.StatusInternalServerError, "failed to check email")
+			adminError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		existing, err := db.GetUserByUsername(username)
+		if err != nil {
+			adminError(w, http.StatusInternalServerError, "failed to check username")
 			return
 		}
 		if existing != nil {
-			adminError(w, http.StatusConflict, "user already exists")
+			adminError(w, http.StatusConflict, "username already taken")
+			return
+		}
+		tempPassword, err := auth.GenerateTempPassword()
+		if err != nil {
+			adminError(w, http.StatusInternalServerError, "failed to generate password")
+			return
+		}
+		hash, err := auth.HashPassword(tempPassword)
+		if err != nil {
+			adminError(w, http.StatusInternalServerError, "failed to hash password")
 			return
 		}
 		newUser := models.User{
-			Email: body.Email,
-			Roles: []string{},
+			ID:                 db.GenerateUUID(),
+			Username:           username,
+			PasswordHash:       hash,
+			MustChangePassword: true,
+			Name:               strings.TrimSpace(body.Name),
+			Roles:              []string{models.RoleUser},
 		}
 		if err := db.SaveUser(newUser); err != nil {
 			adminError(w, http.StatusInternalServerError, "failed to create user")
@@ -139,7 +162,10 @@ func HandleAdminUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]string{"status": "created"})
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"user":          toAdminUserJSON(newUser),
+			"temp_password": tempPassword,
+		})
 
 	default:
 		adminError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -176,6 +202,10 @@ func HandleAdminUserActions(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case r.Method == http.MethodDelete && action == "":
+		if auth.IsEnvAdmin(target) {
+			adminError(w, http.StatusConflict, "the env admin cannot be deleted")
+			return
+		}
 		// Guard: can't delete yourself
 		if targetID == caller.ID {
 			adminError(w, http.StatusConflict, "cannot delete your own account")
@@ -197,6 +227,10 @@ func HandleAdminUserActions(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 
 	case r.Method == http.MethodPost && action == "block":
+		if auth.IsEnvAdmin(target) {
+			adminError(w, http.StatusConflict, "the env admin cannot be blocked")
+			return
+		}
 		if targetID == caller.ID {
 			adminError(w, http.StatusConflict, "cannot block yourself")
 			return
@@ -238,7 +272,37 @@ func HandleAdminUserActions(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "promoted"})
 
+	case r.Method == http.MethodPost && action == "reset-password":
+		if auth.IsEnvAdmin(target) {
+			adminError(w, http.StatusConflict, "the env admin password is set via ADMIN_PASSWORD")
+			return
+		}
+		if targetID == caller.ID {
+			adminError(w, http.StatusConflict, "cannot reset your own password")
+			return
+		}
+		tempPassword, err := auth.GenerateTempPassword()
+		if err != nil {
+			adminError(w, http.StatusInternalServerError, "failed to generate password")
+			return
+		}
+		hash, err := auth.HashPassword(tempPassword)
+		if err != nil {
+			adminError(w, http.StatusInternalServerError, "failed to hash password")
+			return
+		}
+		if err := db.SetUserPassword(targetID, hash, true); err != nil {
+			adminError(w, http.StatusInternalServerError, "failed to reset password")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"temp_password": tempPassword})
+
 	case r.Method == http.MethodPost && action == "remove-admin":
+		if auth.IsEnvAdmin(target) {
+			adminError(w, http.StatusConflict, "the env admin cannot be demoted")
+			return
+		}
 		if !target.IsAdmin() {
 			// idempotent no-op
 			w.Header().Set("Content-Type", "application/json")

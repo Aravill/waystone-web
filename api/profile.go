@@ -94,13 +94,7 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Compute display_name
-	displayName := user.Nickname
-	if displayName == "" {
-		displayName = user.Name
-	}
-	if displayName == "" {
-		displayName = user.Email
-	}
+	displayName := user.DisplayName()
 
 	// Compute initials from display name
 	initials := computeInitials(displayName)
@@ -109,15 +103,11 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 	sessionUserID, _ := session["user_id"].(string)
 	isSelf := sessionUserID == user.ID
 
-	// Build user object; only include email for self
 	userObj := map[string]interface{}{
 		"id":       user.ID,
+		"username": user.Username,
 		"name":     user.Name,
 		"nickname": user.Nickname,
-		"picture":  user.Picture,
-	}
-	if isSelf {
-		userObj["email"] = user.Email
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -125,9 +115,7 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"user": userObj,
 		"avatar": map[string]interface{}{
-			"has_picture": user.Picture != "",
-			"picture":     user.Picture,
-			"initials":    initials,
+			"initials": initials,
 		},
 		"is_self": isSelf,
 		"campaigns": map[string]interface{}{
