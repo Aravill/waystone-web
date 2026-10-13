@@ -2,6 +2,7 @@ package config
 
 import (
 	"time"
+	"waystone-web/auth"
 	"waystone-web/models"
 )
 
@@ -36,7 +37,7 @@ var InitialCampaigns = []models.Campaign{
 var InitialUsers = []models.User{
 	{
 		ID:        "550e8400-e29b-41d4-a716-446655440000",
-		Email:     "mozikmichal@gmail.com",
+		Username:  auth.AdminUsername(),
 		Name:      "Michal Mozik",
 		Nickname:  "Aravill",
 		Roles:     []string{"admin", "user"},
@@ -45,7 +46,7 @@ var InitialUsers = []models.User{
 	},
 	{
 		ID:        "7609bdaf-cc43-4131-b188-098aa07ba6dc",
-		Email:     "test.user@gmail.com",
+		Username:  "testy",
 		Name:      "Test Testington",
 		Nickname:  "Testy",
 		Roles:     []string{"user"},

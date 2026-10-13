@@ -17,11 +17,11 @@ A lightweight Go application hosting event sign-up and campaign management. Buil
 ├── .gitignore
 ├── api/                 # API handlers and routing
 │   ├── router.go        # Route registration
-│   ├── auth.go          # OAuth authentication handlers
+│   ├── auth.go          # Login, logout, change-password handlers
 │   ├── events.go        # Event management handlers
 │   ├── campaigns.go     # Campaign management handlers
 │   ├── signup.go        # Signup handlers
-│   └── roles.go         # Role management endpoints
+│   └── admin.go         # Admin user management endpoints
 ├── db/                  # Database layer
 │   ├── store.go         # SQLite storage interface and implementation
 │   ├── sqlite_store.go  # SQLite database store implementation
@@ -38,7 +38,7 @@ A lightweight Go application hosting event sign-up and campaign management. Buil
 │   └── roles.go         # Role constants and helper functions
 └── static/              # Frontend files
     ├── index.html       # Main application page
-    ├── login.html       # OAuth login page
+    ├── login.html       # Username/password login page
     ├── styles.css       # Styling (black minimalistic design)
     └── script.js        # Client-side JavaScript (Fetch API)
 ```
@@ -46,7 +46,7 @@ A lightweight Go application hosting event sign-up and campaign management. Buil
 ## Features
 
 - **Go Backend**: Lightweight HTTP server with event management APIs
-- **SQLite Storage**: Persistent data storage for campaigns and user whitelist using SQLite
+- **SQLite Storage**: Persistent data storage for campaigns and user accounts using SQLite
 - **Web Frontend**: Responsive sign-up form with black minimalistic design and Fira Code monospace font
 - **Docker Support**: Containerized for consistent deployment with persistent data volumes
 - **Easy Deployment**: Simple deploy script for local Docker deployment
@@ -162,31 +162,9 @@ A `.env` file is used to manage environment variables. The `deploy.sh` script wi
 | Variable | Default | Required | Description |
 |----------|---------|----------|-------------|
 | `PORT` | `8080` | No | Server port number |
-| `GOOGLE_CLIENT_ID` | (empty) | No* | Google OAuth 2.0 Client ID from Google Cloud Console |
-| `GOOGLE_CLIENT_SECRET` | (empty) | No* | Google OAuth 2.0 Client Secret from Google Cloud Console |
-| `OAUTH_CALLBACK_URL` | `http://localhost:8080/auth/callback` | No | OAuth callback URL (must match registered URI in Google Console) |
-| `SESSION_SECRET` | (random) | No | Secret key for signing session cookies (set to random value in production) |
-
-*OAuth variables are optional for development. The app runs without OAuth credentials but OAuth login will be unavailable until configured.
-
-### Setting Up Google OAuth
-
-To enable Google login functionality:
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project or select an existing one
-3. Enable the Google+ API
-4. Create OAuth 2.0 credentials:
-   - Application type: Web Application
-   - Authorized JavaScript origins: `http://localhost:8080` (development) or your domain
-   - Authorized redirect URIs: `http://localhost:8080/auth/callback` (development) or your domain
-5. Copy the Client ID and Client Secret
-6. Update your `.env` file:
-   ```
-   GOOGLE_CLIENT_ID=your-client-id
-   GOOGLE_CLIENT_SECRET=your-client-secret
-   ```
-7. Run `./deploy.sh` to apply the changes
+| `ADMIN_USERNAME` | `admin` | No | Username of the env-managed admin account |
+| `ADMIN_PASSWORD` | (empty) | Yes | Password of the admin account; applied on every startup. Write `$` as `$$` in `.env` (compose interpolates it). If unset, the admin cannot log in |
+| `SESSION_SECRET` | (insecure default) | Yes in production | Secret key for signing session cookies (set to a random value) |
 
 ### Example .env File
 
@@ -194,7 +172,7 @@ See `.env.example` in the repository for a complete template with all available 
 
 ## Data Persistence
 
-The application uses **SQLite** (embedded SQL database) to store campaigns, user whitelist, and role information. Data is persisted in a Docker volume (`waystone-data`) mounted at `/root/data` in the container.
+The application uses **SQLite** (embedded SQL database) to store campaigns, user accounts, and role information. Data is persisted in a Docker volume (`waystone-data`) mounted at `/root/data` in the container.
 
 ### Data Storage Location
 - Docker volume: `waystone-data`
@@ -212,78 +190,47 @@ On first run, the application automatically seeds two sample campaigns:
 
 These can be replaced by modifying the `InitialCampaigns` list in `config/config.go`.
 
-## Authentication & Whitelist
+## Authentication & Users
 
-The application uses **Google OAuth 2.0** for user authentication with a **whitelist-based access model**. Only users who have been explicitly created/approved by an administrator can log in.
+The application uses **local username/password accounts**. There is no self-registration: admins create users and hand out temporary passwords.
 
 ### How It Works
 
-1. **Whitelist Model** - Users must be pre-created by an admin before they can log in
-2. **OAuth Login** - Users click "Login with Google" and authenticate with their Google account
-3. **Email Verification** - System checks if the user's email exists in the whitelist (user database)
-4. **Access Granted/Denied** - Whitelisted users proceed to the application; non-whitelisted users see an access denied error
-5. **Auto-Update** - On first successful login, the user's Google ID is stored; subsequent logins reuse the existing user record
+1. **Admin seeding** - On every startup the user named by `ADMIN_USERNAME` (default `admin`) is created if missing, unblocked, given the `admin` role and its password is reset to `ADMIN_PASSWORD`. This account is env-managed: its password can't be changed in the app, and it can't be blocked, deleted or demoted.
+2. **Creating users** - On the Admin page an admin enters a username (2-32 characters: `a-z`, `0-9`, `_`, `-`; stored lowercase) and an optional name. The server generates a 12-character temporary password and shows it once.
+3. **First login** - Users with a temporary password are redirected to `/change-password` and cannot use the rest of the app (API calls return `403 password change required`) until they pick a new password (minimum 8 characters).
+4. **Reset** - An admin can reset any other user's password from the Admin page. This generates a new temporary password and forces a change at the next login.
+5. **Sessions** - The session cookie stores only the user ID (HttpOnly, SameSite=Lax, 30 days). Roles, blocked state and the forced-change flag are read from the database on every request.
 
-### Creating Users (Whitelist)
+### Auth Endpoints
 
-To add a user to the whitelist, call the user creation endpoint:
+| Endpoint | Description |
+|----------|-------------|
+| `POST /auth/login` | Body `{username, password}`; returns `{status, must_change_password}`. Every failure returns the same `401 invalid username or password` |
+| `POST /auth/change-password` | Body `{current_password, new_password}`; requires a session; rejected for the env admin |
+| `POST /auth/logout` | Clears the session |
+| `GET /auth/current-user` | Current user info (`username`, `display_name`, `roles`, `must_change_password`, `is_env_admin`) |
 
-```bash
-curl -X POST http://localhost:8080/api/users/create \
-  -H "Content-Type: application/json" \
-  -H "Cookie: <session_cookie>" \
-  -d {
-    "email": "user@example.com",
-    "name": "User Name (optional)"
-  }
-```
+### Admin API
 
-**Requirements:**
-- Caller must be authenticated (have a valid session cookie)
-- Caller must have the `admin` role
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/admin/users` | List users |
+| `POST /api/admin/users` | Body `{username, name?}`; returns `201 {user, temp_password}`, `409` if the username is taken |
+| `POST /api/admin/users/{id}/reset-password` | Returns `{temp_password}`; refused for the env admin and yourself |
+| `POST /api/admin/users/{id}/block` / `unblock` | Block or unblock a user |
+| `POST /api/admin/users/{id}/make-admin` / `remove-admin` | Change the admin role |
+| `DELETE /api/admin/users/{id}` | Delete a user |
 
-**Response (201 Created):**
-```json
-{
-  "status": "success",
-  "user": {
-    "email": "user@example.com",
-    "name": "User Name",
-    "created_at": "2026-05-04T22:00:00Z",
-    "roles": []
-  }
-}
-```
+All admin endpoints require the `admin` role.
 
-**Error Responses:**
-- `303 See Other` - Not authenticated; redirects to /login.html
-- `400 Bad Request` - User already exists or invalid email
-- `403 Forbidden` - Authenticated but user is not an admin
+### Initial Setup
 
-### Initial Admin Setup
-
-On first deployment, at least one admin must be created to whitelist other users. This can be done by:
-
-1. **Option A: Manual Database Edit** - Edit the SQLite database directly and add a user record with admin role
-2. **Option B: Bootstrap Email** (Future) - Set `BOOTSTRAP_ADMIN_EMAIL` environment variable for automatic first-user admin creation
-
-### Login Flow
-
-**Whitelisted User:**
-```
-Google OAuth → Email verified → Email in whitelist? YES → Login successful
-```
-
-**Non-Whitelisted User:**
-```
-Google OAuth → Email verified → Email in whitelist? NO → Access Denied page
-                                                         ↓
-                                    "Contact an administrator to request access"
-```
+Set `ADMIN_PASSWORD` (and optionally `ADMIN_USERNAME`) in `.env`, start the app and log in as the admin. The database is wiped on every `./deploy.sh` (`down -v`), but the admin is recreated from `.env` on each start. Locally, delete `./data/waystone.db` after schema changes.
 
 ## User Roles & Permissions
 
-The application implements a flexible, role-based access control (RBAC) system using Google OAuth authentication. Users can be assigned one or more roles to control access to specific features and endpoints.
+The application implements a flexible, role-based access control (RBAC) system on top of local authentication. Users can be assigned one or more roles to control access to specific features and endpoints.
 
 ### Role Model
 
@@ -291,7 +238,7 @@ Roles are stored as an array of strings on each User. This allows a single user 
 
 **Built-in Roles:**
 - **`user`** - Regular user; can view events and sign up
-- **`admin`** - Full system access; can assign roles, view all users, and manage other users' roles
+- **`admin`** - Full system access; can manage users (create, reset passwords, block, delete, change admin role)
 - **`dungeon-master`** - Custom role available for application-specific access control
 
 Additional custom roles can be added to the `models/roles.go` file as needed.
@@ -300,111 +247,21 @@ Additional custom roles can be added to the `models/roles.go` file as needed.
 
 | Endpoint | Requires Auth | Requires Role | Description |
 |----------|:-:|:-:|---|
-| `GET /auth/login` | No | - | OAuth login redirect to Google |
-| `GET /auth/callback` | No | - | OAuth callback handler (checks whitelist) |
+| `POST /auth/login` | No | - | Log in with username and password |
+| `POST /auth/change-password` | Yes | - | Change own password (not the env admin) |
 | `GET /auth/current-user` | Yes | - | Get current user info with roles |
 | `POST /auth/logout` | Yes | - | Clear session and logout |
-| `GET /api/events` | Yes | - | List all events (any authenticated user) |
-| `POST /api/events` | Yes | - | Create new event (any authenticated user) |
-| `POST /api/signup` | Yes | - | Sign up for an event (any authenticated user) |
-| `POST /api/roles` | Yes | admin | Assign roles to a user by email |
-| `GET /api/user-roles` | Yes | admin or self | Get roles for a user (admin or self-view) |
-| `GET /api/users` | Yes | admin | List all users with their roles |
-| `POST /api/users/create` | Yes | admin | Create/whitelist a new user (admin only) |
+| `GET /api/campaigns` | Yes | - | List campaigns |
+| `/api/admin/users...` | Yes | admin | User management (see Admin API) |
 
-### Role Assignment Workflow
+### Role Assignment
 
-1. **Admin Whitelists User** - Admin calls `/api/users/create` to create a user record with the user's email
-2. **User Logs In** - User clicks "Login with Google" and authenticates via Google OAuth
-3. **Whitelist Check** - System verifies user's email is in the whitelist (user exists in database)
-4. **Account Updated** - User's Google ID is stored and roles are loaded from database
-5. **Admin Assigns Roles** - Admin can call `/api/roles` endpoint to assign additional roles (e.g., "admin") to the user
-6. **Authorization Checks** - Each protected endpoint checks the user's roles before processing the request
-
-### API Endpoints for Role Management
-
-#### Assign Roles to a User
-
-```bash
-curl -X POST http://localhost:8080/api/roles \
-  -H "Content-Type: application/json" \
-  -d {
-    "email": "user@example.com",
-    "roles": ["user", "admin"]
-  }
-```
-
-**Response (200 OK):**
-```json
-{
-  "status": "success",
-  "message": "Roles updated for user@example.com"
-}
-```
-
-**Error Responses:**
-- `401 Unauthorized` - Not logged in
-- `303 See Other` - Redirects to /login.html if not authenticated
-- `403 Forbidden` - Logged in but user is not an admin
-- `400 Bad Request` - Invalid request body
-
-#### Get Current User's Roles
-
-```bash
-curl http://localhost:8080/api/user-roles
-```
-
-**Response (200 OK):**
-```json
-{
-  "email": "user@example.com",
-  "roles": ["user", "admin"]
-}
-```
-
-**Error Responses:**
-- `401 Unauthorized` - Not logged in
-- `303 See Other` - Redirects to /login.html if not authenticated
-
-#### List All Users and Their Roles
-
-```bash
-curl http://localhost:8080/api/users
-```
-
-**Response (200 OK):**
-```json
-[
-  {
-    "email": "user1@example.com",
-    "name": "User One",
-    "roles": ["user"]
-  },
-  {
-    "email": "admin@example.com",
-    "name": "Admin User",
-    "roles": ["user", "admin"]
-  }
-]
-```
-
-**Requires:** Admin role
-**Error Responses:**
-- `401 Unauthorized` - Not logged in
-- `303 See Other` - Redirects to /login.html if not authenticated
-- `403 Forbidden` - Logged in but user is not an admin
-
-### Getting Started with Roles
-
-1. **First Login** - Use Google OAuth to log in. Your account will be created with no roles.
-2. **Manual Admin Setup** - Add the first admin user by manually editing the SQLite database or asking an existing admin to assign the "admin" role.
-3. **Role Assignment** - Once an admin exists, they can use the `/api/roles` endpoint to assign roles to other users.
-4. **Verify Permissions** - Test role-based access control by attempting to access protected endpoints with different users and roles.
+Admins create users (role `user`) from the Admin page and can promote or demote other users with `make-admin` / `remove-admin`. Each protected endpoint checks the user's roles before processing the request.
 
 ### Implementation Details
 
 - **Storage**: Roles are stored as JSON strings in SQLite alongside user data. No separate roles table is needed.
-- **Session Management**: Roles are included in the session cookie and persist across authenticated requests.
+- **Session Management**: The session cookie holds only the user ID; roles are loaded from the database on each request.
 - **Authorization Pattern**: Each handler explicitly checks roles using helper methods like `user.IsAdmin()` or `user.HasRole("admin")`.
 - **Backward Compatibility**: Existing users with no roles are automatically handled; their role array defaults to empty.
 

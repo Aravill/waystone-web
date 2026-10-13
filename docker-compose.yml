@@ -9,9 +9,8 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - OAUTH_CALLBACK_URL=${OAUTH_CALLBACK_URL:-http://localhost:8080/auth/callback}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - SESSION_SECRET=${SESSION_SECRET:-your-secret-key-change-me}
     restart: unless-stopped
     volumes:

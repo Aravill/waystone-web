@@ -64,20 +64,11 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 		// Add DM user display object if DM exists
 		if campaign.DM != "" {
 			if dmUser, ok := userMap[campaign.DM]; ok && dmUser != nil {
-				displayName := dmUser.Nickname
-				if displayName == "" {
-					displayName = dmUser.Name
-				}
-				if displayName == "" {
-					displayName = dmUser.Email
-				}
-
 				campaignObj["dm_user"] = map[string]interface{}{
 					"id":           dmUser.ID,
 					"name":         dmUser.Name,
 					"nickname":     dmUser.Nickname,
-					"display_name": displayName,
-					"picture":      dmUser.Picture,
+					"display_name": dmUser.DisplayName(),
 					"profile_url":  fmt.Sprintf("/profile?user_id=%s", dmUser.ID),
 				}
 			}
@@ -87,20 +78,11 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 		playerUsers := []map[string]interface{}{}
 		for _, playerID := range campaign.Players {
 			if playerUser, ok := userMap[playerID]; ok && playerUser != nil {
-				displayName := playerUser.Nickname
-				if displayName == "" {
-					displayName = playerUser.Name
-				}
-				if displayName == "" {
-					displayName = playerUser.Email
-				}
-
 				playerUsers = append(playerUsers, map[string]interface{}{
 					"id":           playerUser.ID,
 					"name":         playerUser.Name,
 					"nickname":     playerUser.Nickname,
-					"display_name": displayName,
-					"picture":      playerUser.Picture,
+					"display_name": playerUser.DisplayName(),
 					"profile_url":  fmt.Sprintf("/profile?user_id=%s", playerUser.ID),
 				})
 			}

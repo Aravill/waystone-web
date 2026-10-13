@@ -9,7 +9,7 @@ window.dashboardPage = function() {
                 const userResponse = await fetch('/auth/current-user');
                 if (userResponse.ok) {
                     const user = await userResponse.json();
-                    this.displayName = user.display_name || user.name || user.email || 'User';
+                    this.displayName = user.display_name || user.username;
                     this.isAdmin = (user.roles || []).includes('admin');
                 } else {
                     window.location.href = '/login.html';

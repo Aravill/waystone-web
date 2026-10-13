@@ -478,8 +478,7 @@ func handleGetSessionResponses(w http.ResponseWriter, r *http.Request, campaignI
 				"id":           user.ID,
 				"name":         user.Name,
 				"nickname":     user.Nickname,
-				"display_name": getDisplayName(*user),
-				"picture":      user.Picture,
+				"display_name": user.DisplayName(),
 			}
 		}
 		enriched = append(enriched, respObj)
@@ -495,8 +494,7 @@ func handleGetSessionResponses(w http.ResponseWriter, r *http.Request, campaignI
 				"id":           user.ID,
 				"name":         user.Name,
 				"nickname":     user.Nickname,
-				"display_name": getDisplayName(*user),
-				"picture":      user.Picture,
+				"display_name": user.DisplayName(),
 			})
 			continue
 		}
@@ -561,16 +559,6 @@ func responsesByParticipation(responses []sessionResponsePayload) map[string][]s
 		grouped[key] = append(grouped[key], response)
 	}
 	return grouped
-}
-
-func getDisplayName(user models.User) string {
-	if user.Nickname != "" {
-		return user.Nickname
-	}
-	if user.Name != "" {
-		return user.Name
-	}
-	return user.Email
 }
 
 func writeJSONError(w http.ResponseWriter, code int, message string) {

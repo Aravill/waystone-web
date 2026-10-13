@@ -29,10 +29,6 @@ func SaveUser(user models.User) error {
 	return GetStore().SaveUser(user)
 }
 
-func GetUserByGoogleID(googleID string) (*models.User, error) {
-	return GetStore().GetUserByGoogleID(googleID)
-}
-
 func GetUserByID(id string) (*models.User, error) {
 	return GetStore().GetUserByID(id)
 }
@@ -62,9 +58,9 @@ func UpdateUserRoles(userID string, roles []string) error {
 	return fmt.Errorf("user not found")
 }
 
-// GetUserByEmail retrieves a user by email address
-func GetUserByEmail(email string) (*models.User, error) {
-	return GetStore().GetUserByEmail(email)
+// GetUserByUsername retrieves a user by username (case-insensitive)
+func GetUserByUsername(username string) (*models.User, error) {
+	return GetStore().GetUserByUsername(username)
 }
 
 // DeleteUserAndCleanupCampaigns removes a user from all campaigns and then deletes the user
@@ -117,4 +113,9 @@ func DeleteUserAndCleanupCampaigns(userID string) (removedAsDM int, removedAsPla
 // SetUserBlocked updates the blocked status of a user
 func SetUserBlocked(id string, blocked bool) error {
 	return GetStore().SetUserBlocked(id, blocked)
+}
+
+// SetUserPassword stores a new password hash and the must-change flag
+func SetUserPassword(id, hash string, mustChange bool) error {
+	return GetStore().SetUserPassword(id, hash, mustChange)
 }

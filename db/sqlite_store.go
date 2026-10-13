@@ -53,11 +53,11 @@ func (s *SQLiteStore) initSchema() error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS users (
 		id TEXT PRIMARY KEY,
-		google_id TEXT,
-		email TEXT,
+		username TEXT NOT NULL COLLATE NOCASE UNIQUE,
+		password_hash TEXT NOT NULL DEFAULT '',
+		must_change_password INTEGER NOT NULL DEFAULT 0,
 		name TEXT,
 		nickname TEXT,
-		picture TEXT,
 		roles TEXT NOT NULL DEFAULT '[]',
 		blocked INTEGER NOT NULL DEFAULT 0,
 		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -102,10 +102,6 @@ func (s *SQLiteStore) initSchema() error {
 		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
 
-	CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-	CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
-	CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique_nonempty ON users(email) WHERE email != '';
-	CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id_unique_nonempty ON users(google_id) WHERE google_id != '';
 	CREATE INDEX IF NOT EXISTS idx_campaign_sessions_campaign_id ON campaign_sessions(campaign_id);
 	CREATE INDEX IF NOT EXISTS idx_campaign_sessions_date ON campaign_sessions(date);
 	CREATE INDEX IF NOT EXISTS idx_session_responses_session_id ON session_responses(session_id);
@@ -274,15 +270,20 @@ func (s *SQLiteStore) SaveUser(user models.User) error {
 		blockedInt = 1
 	}
 
+	mustChangeInt := 0
+	if user.MustChangePassword {
+		mustChangeInt = 1
+	}
+
 	query := `
-	INSERT INTO users (id, google_id, email, name, nickname, picture, roles, blocked, created_at, updated_at)
+	INSERT INTO users (id, username, password_hash, must_change_password, name, nickname, roles, blocked, created_at, updated_at)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
-		google_id = excluded.google_id,
-		email = excluded.email,
+		username = excluded.username,
+		password_hash = excluded.password_hash,
+		must_change_password = excluded.must_change_password,
 		name = excluded.name,
 		nickname = excluded.nickname,
-		picture = excluded.picture,
 		roles = excluded.roles,
 		blocked = excluded.blocked,
 		updated_at = excluded.updated_at
@@ -291,11 +292,11 @@ func (s *SQLiteStore) SaveUser(user models.User) error {
 	_, err = s.db.Exec(
 		query,
 		user.ID,
-		user.GoogleID,
-		user.Email,
+		user.Username,
+		user.PasswordHash,
+		mustChangeInt,
 		user.Name,
 		user.Nickname,
-		user.Picture,
 		string(rolesJSON),
 		blockedInt,
 		user.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
@@ -305,66 +306,11 @@ func (s *SQLiteStore) SaveUser(user models.User) error {
 	return err
 }
 
-func (s *SQLiteStore) GetUserByGoogleID(googleID string) (*models.User, error) {
-	if googleID == "" {
-		return nil, nil
-	}
-
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	var user models.User
-	var rolesJSON string
-	var blockedInt int
-	var createdAtStr, updatedAtStr string
-
-	query := `SELECT id, google_id, email, name, nickname, picture, roles, blocked, created_at, updated_at FROM users WHERE google_id = ?`
-	err := s.db.QueryRow(query, googleID).Scan(
-		&user.ID,
-		&user.GoogleID,
-		&user.Email,
-		&user.Name,
-		&user.Nickname,
-		&user.Picture,
-		&rolesJSON,
-		&blockedInt,
-		&createdAtStr,
-		&updatedAtStr,
-	)
-
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	if err := json.Unmarshal([]byte(rolesJSON), &user.Roles); err != nil {
-		user.Roles = []string{}
-	}
-
-	user.Blocked = blockedInt != 0
-
-	// Parse timestamps
-	if createdAtStr != "" {
-		if t, err := parseTime(createdAtStr); err == nil {
-			user.CreatedAt = t
-		}
-	}
-	if updatedAtStr != "" {
-		if t, err := parseTime(updatedAtStr); err == nil {
-			user.UpdatedAt = t
-		}
-	}
-
-	return &user, nil
-}
-
 func (s *SQLiteStore) GetAllUsers() ([]models.User, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	rows, err := s.db.Query("SELECT id, google_id, email, name, nickname, picture, roles, blocked, created_at, updated_at FROM users ORDER BY id")
+	rows, err := s.db.Query("SELECT id, username, password_hash, must_change_password, name, nickname, roles, blocked, created_at, updated_at FROM users ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -374,16 +320,16 @@ func (s *SQLiteStore) GetAllUsers() ([]models.User, error) {
 	for rows.Next() {
 		var user models.User
 		var rolesJSON string
-		var blockedInt int
+		var blockedInt, mustChangeInt int
 		var createdAtStr, updatedAtStr string
 
 		err := rows.Scan(
 			&user.ID,
-			&user.GoogleID,
-			&user.Email,
+			&user.Username,
+			&user.PasswordHash,
+			&mustChangeInt,
 			&user.Name,
 			&user.Nickname,
-			&user.Picture,
 			&rolesJSON,
 			&blockedInt,
 			&createdAtStr,
@@ -398,6 +344,7 @@ func (s *SQLiteStore) GetAllUsers() ([]models.User, error) {
 		}
 
 		user.Blocked = blockedInt != 0
+		user.MustChangePassword = mustChangeInt != 0
 
 		// Parse timestamps
 		if createdAtStr != "" {
@@ -421,27 +368,27 @@ func (s *SQLiteStore) GetAllUsers() ([]models.User, error) {
 	return users, nil
 }
 
-func (s *SQLiteStore) GetUserByEmail(email string) (*models.User, error) {
+func (s *SQLiteStore) GetUserByUsername(username string) (*models.User, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	if email == "" {
+	if username == "" {
 		return nil, nil
 	}
 
 	var user models.User
 	var rolesJSON string
-	var blockedInt int
+	var blockedInt, mustChangeInt int
 	var createdAtStr, updatedAtStr string
 
-	query := `SELECT id, google_id, email, name, nickname, picture, roles, blocked, created_at, updated_at FROM users WHERE email = ?`
-	err := s.db.QueryRow(query, email).Scan(
+	query := `SELECT id, username, password_hash, must_change_password, name, nickname, roles, blocked, created_at, updated_at FROM users WHERE username = ?`
+	err := s.db.QueryRow(query, username).Scan(
 		&user.ID,
-		&user.GoogleID,
-		&user.Email,
+		&user.Username,
+		&user.PasswordHash,
+		&mustChangeInt,
 		&user.Name,
 		&user.Nickname,
-		&user.Picture,
 		&rolesJSON,
 		&blockedInt,
 		&createdAtStr,
@@ -460,6 +407,7 @@ func (s *SQLiteStore) GetUserByEmail(email string) (*models.User, error) {
 	}
 
 	user.Blocked = blockedInt != 0
+	user.MustChangePassword = mustChangeInt != 0
 
 	// Parse timestamps
 	if createdAtStr != "" {
@@ -486,17 +434,17 @@ func (s *SQLiteStore) GetUserByID(id string) (*models.User, error) {
 
 	var user models.User
 	var rolesJSON string
-	var blockedInt int
+	var blockedInt, mustChangeInt int
 	var createdAtStr, updatedAtStr string
 
-	query := `SELECT id, google_id, email, name, nickname, picture, roles, blocked, created_at, updated_at FROM users WHERE id = ?`
+	query := `SELECT id, username, password_hash, must_change_password, name, nickname, roles, blocked, created_at, updated_at FROM users WHERE id = ?`
 	err := s.db.QueryRow(query, id).Scan(
 		&user.ID,
-		&user.GoogleID,
-		&user.Email,
+		&user.Username,
+		&user.PasswordHash,
+		&mustChangeInt,
 		&user.Name,
 		&user.Nickname,
-		&user.Picture,
 		&rolesJSON,
 		&blockedInt,
 		&createdAtStr,
@@ -515,6 +463,7 @@ func (s *SQLiteStore) GetUserByID(id string) (*models.User, error) {
 	}
 
 	user.Blocked = blockedInt != 0
+	user.MustChangePassword = mustChangeInt != 0
 
 	// Parse timestamps
 	if createdAtStr != "" {
@@ -574,6 +523,22 @@ func (s *SQLiteStore) SetUserBlocked(id string, blocked bool) error {
 	_, err := s.db.Exec(
 		`UPDATE users SET blocked=?, updated_at=? WHERE id=?`,
 		blockedInt, time.Now().UTC().Format(time.RFC3339), id,
+	)
+	return err
+}
+
+func (s *SQLiteStore) SetUserPassword(id, hash string, mustChange bool) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	mustChangeInt := 0
+	if mustChange {
+		mustChangeInt = 1
+	}
+
+	_, err := s.db.Exec(
+		`UPDATE users SET password_hash=?, must_change_password=?, updated_at=? WHERE id=?`,
+		hash, mustChangeInt, time.Now().UTC().Format(time.RFC3339), id,
 	)
 	return err
 }

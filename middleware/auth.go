@@ -9,93 +9,44 @@ import (
 	"os"
 	"strings"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gorilla/sessions"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 	"waystone-web/db"
 )
 
-var (
-	sessionStore sessions.Store
-	oauth2Config *oauth2.Config
-	verifier     *oidc.IDTokenVerifier
+var sessionStore sessions.Store
+
+const (
+	SessionName          = "auth_session"
+	defaultSessionSecret = "default-insecure-secret-change-this"
 )
 
-const SessionName = "auth_session"
-
-type Claims struct {
-	GoogleID string `json:"sub"`
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	Picture  string `json:"picture"`
-}
-
-func InitAuth(callbackURL string) error {
-	clientID := os.Getenv("GOOGLE_CLIENT_ID")
-	clientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
+func InitAuth() {
 	sessionSecret := os.Getenv("SESSION_SECRET")
-
 	if sessionSecret == "" {
-		sessionSecret = "default-insecure-secret-change-this"
+		sessionSecret = defaultSessionSecret
+	}
+	if sessionSecret == defaultSessionSecret {
+		log.Println("WARNING: SESSION_SECRET is not set - using an insecure default")
 	}
 
-	// Always initialize session store
-	sessionStore = sessions.NewCookieStore([]byte(sessionSecret))
-
-	// OAuth is optional for development
-	if clientID == "" || clientSecret == "" {
-		return fmt.Errorf("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables required")
+	store := sessions.NewCookieStore([]byte(sessionSecret))
+	store.Options = &sessions.Options{
+		Path:     "/",
+		MaxAge:   30 * 24 * 60 * 60,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
 	}
-
-	oauth2Config = &oauth2.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		RedirectURL:  callbackURL,
-		Scopes: []string{
-			oidc.ScopeOpenID,
-			"email",
-			"profile",
-		},
-		Endpoint: google.Endpoint,
-	}
-
-	ctx := context.Background()
-	provider, err := oidc.NewProvider(ctx, "https://accounts.google.com")
-	if err != nil {
-		return fmt.Errorf("failed to create OIDC provider: %w", err)
-	}
-
-	verifier = provider.Verifier(&oidc.Config{ClientID: clientID})
-	return nil
+	sessionStore = store
 }
 
-func GetOAuth2Config() *oauth2.Config {
-	if oauth2Config == nil {
-		panic("auth not initialized")
-	}
-	return oauth2Config
-}
-
-func GetVerifier() *oidc.IDTokenVerifier {
-	if verifier == nil {
-		panic("auth not initialized")
-	}
-	return verifier
-}
-
-func SetSession(w http.ResponseWriter, r *http.Request, userID, googleID, email, name, picture string, roles []string) error {
+// SetSession stores only the user ID; everything else is read from the DB per request.
+func SetSession(w http.ResponseWriter, r *http.Request, userID string) error {
 	session, err := sessionStore.Get(r, SessionName)
 	if err != nil {
 		return err
 	}
 
 	session.Values["user_id"] = userID
-	session.Values["google_id"] = googleID
-	session.Values["email"] = email
-	session.Values["name"] = name
-	session.Values["picture"] = picture
-	session.Values["roles"] = roles
 
 	return session.Save(r, w)
 }
@@ -157,12 +108,20 @@ func AuthMiddleware(next http.Handler) http.Handler {
 				http.Redirect(w, r, "/blocked.html", http.StatusSeeOther)
 			}
 			return
+		} else if dbUser.MustChangePassword {
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				json.NewEncoder(w).Encode(map[string]string{"error": "password change required"})
+				return
+			}
+			if r.URL.Path != "/change-password" {
+				http.Redirect(w, r, "/change-password", http.StatusSeeOther)
+				return
+			}
 		}
 
 		ctx := context.WithValue(r.Context(), "user_id", session["user_id"])
-		ctx = context.WithValue(ctx, "user_email", session["email"])
-		ctx = context.WithValue(ctx, "user_name", session["name"])
-		ctx = context.WithValue(ctx, "google_id", session["google_id"])
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

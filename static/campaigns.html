@@ -170,7 +170,6 @@
                                     </template>
                                     <template x-for="user in hoverResponsePanel.users" :key="`hover-${hoverResponsePanel.type}-${user.id || user.user_id || getUserDisplayName(user)}`">
                                         <div class="day-hover-user">
-                                            <img x-show="user.picture" :src="user.picture" :alt="getUserDisplayName(user)" class="day-hover-avatar">
                                             <span class="day-hover-name" x-text="getUserDisplayName(user)"></span>
                                         </div>
                                     </template>
@@ -209,7 +208,6 @@
                             <template x-for="response in sessionResponses" :key="response.id">
                                 <div class="response-item">
                                     <div class="response-user-info">
-                                        <img x-show="response.user && response.user.picture" :src="response.user.picture" :alt="response.user.display_name" class="user-avatar-small">
                                         <span class="response-name" x-text="response.user ? response.user.display_name : 'Unknown'"></span>
                                     </div>
                                     <span class="response-status" :class="getParticipationClass(response.participation)" x-text="response.participation"></span>
@@ -218,7 +216,6 @@
                             <template x-for="pendingUser in pendingResponses" :key="`pending-${pendingUser.id}`">
                                 <div class="response-item">
                                     <div class="response-user-info">
-                                        <img x-show="pendingUser.picture" :src="pendingUser.picture" :alt="pendingUser.display_name" class="user-avatar-small">
                                         <span class="response-name" x-text="pendingUser.display_name"></span>
                                     </div>
                                     <span class="response-status">Pending</span>

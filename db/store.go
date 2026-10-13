@@ -15,12 +15,12 @@ type Store interface {
 	SaveCampaign(campaign models.Campaign) error
 	GetCampaignByID(id string) (*models.Campaign, error)
 	SaveUser(user models.User) error
-	GetUserByGoogleID(googleID string) (*models.User, error)
-	GetUserByEmail(email string) (*models.User, error)
+	GetUserByUsername(username string) (*models.User, error)
 	GetUserByID(id string) (*models.User, error)
 	GetAllUsers() ([]models.User, error)
 	DeleteUser(id string) error
 	SetUserBlocked(id string, blocked bool) error
+	SetUserPassword(id, hash string, mustChange bool) error
 	GetSessionsByMonth(campaignID string, year int, month int) ([]models.CampaignSession, error)
 	GetSessionByID(sessionID string) (*models.CampaignSession, error)
 	SaveSession(session models.CampaignSession) error
@@ -39,7 +39,10 @@ func Initialize() error {
 	}
 
 	store = sqlStore
-	return seedIfEmpty()
+	if err := seedIfEmpty(); err != nil {
+		return err
+	}
+	return EnsureAdmin()
 }
 
 func GetStore() Store {

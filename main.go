@@ -23,15 +23,7 @@ func main() {
 		port = config.DefaultPort
 	}
 
-	callbackURL := os.Getenv("OAUTH_CALLBACK_URL")
-	if callbackURL == "" {
-		callbackURL = fmt.Sprintf("http://localhost:%s/auth/callback", port)
-	}
-
-	if err := middleware.InitAuth(callbackURL); err != nil {
-		log.Printf("Warning: OAuth not fully configured: %v\n", err)
-		log.Println("OAuth features will not be available until GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set")
-	}
+	middleware.InitAuth()
 
 	api.RegisterRoutes()
 

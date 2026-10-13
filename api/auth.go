@@ -1,114 +1,156 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
-	"time"
+	"sync"
+	"waystone-web/auth"
 	"waystone-web/db"
 	"waystone-web/middleware"
-	"waystone-web/models"
 )
 
-func HandleLoginStart(w http.ResponseWriter, r *http.Request) {
-	config := middleware.GetOAuth2Config()
-	state := fmt.Sprintf("%d", time.Now().UnixNano())
+var (
+	dummyHashOnce sync.Once
+	dummyHash     string
+)
 
-	authURL := config.AuthCodeURL(state)
-	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
+// getDummyHash returns a valid bcrypt hash used to equalise login timing when
+// the user does not exist, is blocked or has no password.
+func getDummyHash() string {
+	dummyHashOnce.Do(func() {
+		dummyHash, _ = auth.HashPassword("dummy-password-for-timing")
+	})
+	return dummyHash
 }
 
-func HandleCallback(w http.ResponseWriter, r *http.Request) {
-	code := r.URL.Query().Get("code")
-	if code == "" {
-		http.Error(w, "missing authorization code", http.StatusBadRequest)
+func HandleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
 	}
 
-	config := middleware.GetOAuth2Config()
-	verifier := middleware.GetVerifier()
+	var body struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
+		return
+	}
 
-	ctx := context.Background()
-	token, err := config.Exchange(ctx, code)
+	invalid := func() {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid username or password"})
+	}
+
+	username, err := auth.ParseUsername(body.Username)
 	if err != nil {
-		log.Printf("failed to exchange token: %v", err)
-		http.Error(w, "failed to exchange token", http.StatusInternalServerError)
+		auth.CheckPassword(getDummyHash(), body.Password)
+		invalid()
 		return
 	}
 
-	rawIDToken, ok := token.Extra("id_token").(string)
-	if !ok {
-		http.Error(w, "no id_token in response", http.StatusInternalServerError)
-		return
-	}
-
-	idToken, err := verifier.Verify(ctx, rawIDToken)
+	user, err := db.GetUserByUsername(username)
 	if err != nil {
-		log.Printf("failed to verify token: %v", err)
-		http.Error(w, "failed to verify token", http.StatusInternalServerError)
+		log.Printf("login: DB error: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "login failed"})
 		return
 	}
 
-	var claims middleware.Claims
-	if err := idToken.Claims(&claims); err != nil {
-		log.Printf("failed to parse claims: %v", err)
-		http.Error(w, "failed to parse claims", http.StatusInternalServerError)
+	if user == nil || user.Blocked || user.PasswordHash == "" {
+		auth.CheckPassword(getDummyHash(), body.Password)
+		invalid()
+		return
+	}
+	if !auth.CheckPassword(user.PasswordHash, body.Password) {
+		invalid()
 		return
 	}
 
-	// Check if user exists by email (whitelist check)
-	existingUser, err := db.GetUserByEmail(claims.Email)
-	if err != nil {
-		log.Printf("error checking existing user: %v", err)
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		http.ServeContent(w, r, "error.html", time.Now(), nil)
-		return
-	}
-
-	if existingUser == nil {
-		// User not whitelisted - redirect to not-whitelisted page
-		log.Printf("login attempt from non-whitelisted email: %s", claims.Email)
-		http.Redirect(w, r, "/not-whitelisted.html", http.StatusSeeOther)
-		return
-	}
-
-	if existingUser.Blocked {
-		log.Printf("login attempt from blocked user: %s", claims.Email)
-		http.Redirect(w, r, "/blocked.html", http.StatusSeeOther)
-		return
-	}
-
-	// User is whitelisted - update Google ID and proceed
-	user := models.User{
-		ID:        existingUser.ID,
-		GoogleID:  claims.GoogleID,
-		Email:     claims.Email,
-		Name:      claims.Name,
-		Nickname:  existingUser.Nickname,
-		Picture:   claims.Picture,
-		CreatedAt: existingUser.CreatedAt,
-		UpdatedAt: time.Now(),
-		Roles:     existingUser.Roles,
-	}
-
-	if err := db.SaveUser(user); err != nil {
-		log.Printf("failed to save user: %v", err)
-		http.Error(w, "failed to save user", http.StatusInternalServerError)
-		return
-	}
-
-	if err := middleware.SetSession(w, r, user.ID, user.GoogleID, user.Email, user.Name, user.Picture, user.Roles); err != nil {
+	if err := middleware.SetSession(w, r, user.ID); err != nil {
 		log.Printf("failed to set session: %v", err)
-		http.Error(w, "failed to set session", http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to set session"})
 		return
 	}
 
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":               "ok",
+		"must_change_password": user.MustChangePassword,
+	})
+}
+
+func HandleChangePassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+
+	session, err := middleware.GetSession(r)
+	userID, _ := session["user_id"].(string)
+	if err != nil || userID == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "not authenticated"})
+		return
+	}
+
+	user, err := db.GetUserByID(userID)
+	if err != nil {
+		log.Printf("change-password: DB error: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to fetch user"})
+		return
+	}
+	if user == nil || user.Blocked {
+		middleware.ClearSession(w, r)
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "not authenticated"})
+		return
+	}
+
+	if auth.IsEnvAdmin(user) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "this account's password is set via ADMIN_PASSWORD"})
+		return
+	}
+
+	var body struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
+		return
+	}
+
+	if len(body.NewPassword) < auth.MinPasswordLength {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "new password must be at least 8 characters"})
+		return
+	}
+	if body.NewPassword == body.CurrentPassword {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "new password must differ from the current one"})
+		return
+	}
+	if user.PasswordHash == "" || !auth.CheckPassword(user.PasswordHash, body.CurrentPassword) {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "current password is incorrect"})
+		return
+	}
+
+	hash, err := auth.HashPassword(body.NewPassword)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to hash password"})
+		return
+	}
+	if err := db.SetUserPassword(user.ID, hash, false); err != nil {
+		log.Printf("change-password: failed to save: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to save password"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "password changed"})
 }
 
 func HandleLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+
 	if err := middleware.ClearSession(w, r); err != nil {
 		log.Printf("failed to clear session: %v", err)
 		http.Error(w, "failed to logout", http.StatusInternalServerError)
@@ -156,25 +198,16 @@ func HandleGetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Compute display_name: nickname > name > email
-	displayName := user.Nickname
-	if displayName == "" {
-		displayName = user.Name
-	}
-	if displayName == "" {
-		displayName = user.Email
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"user_id":      user.ID,
-		"google_id":    user.GoogleID,
-		"email":        user.Email,
-		"name":         user.Name,
-		"nickname":     user.Nickname,
-		"display_name": displayName,
-		"picture":      user.Picture,
-		"roles":        user.Roles,
+		"user_id":              user.ID,
+		"username":             user.Username,
+		"name":                 user.Name,
+		"nickname":             user.Nickname,
+		"display_name":         user.DisplayName(),
+		"roles":                user.Roles,
+		"must_change_password": user.MustChangePassword,
+		"is_env_admin":         auth.IsEnvAdmin(user),
 	})
 }

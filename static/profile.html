@@ -59,6 +59,10 @@
                 </div>
             </div>
 
+            <div class="profile-section" x-show="isSelf && !isEnvAdmin">
+                <a href="/change-password" class="campaign-link-button">Change Password</a>
+            </div>
+
             <div class="profile-section danger-zone" x-show="isSelf">
                 <h2 class="section-header">Account Management</h2>
                 <p>Delete your account and all associated data.</p>
