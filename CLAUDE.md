@@ -9,6 +9,7 @@ Waystone Web: Go (stdlib `net/http`, SQLite via `modernc.org/sqlite`, Google OAu
 - Run locally: `go run main.go` → http://localhost:8080. OAuth needs `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (see `.env.example`); without them the server starts but login doesn't work.
 - Verify changes: `go build ./... && go vet ./...`. There are no tests or linters; do not add tests unless explicitly asked.
 - `./deploy.sh` runs `docker-compose down -v`, which **wipes the SQLite data volume**. Never run it against data worth keeping.
+- For local Docker testing use `/deploy-local` (`up`/`down`/`status`), not `docker compose up`: plain compose names the project after the folder, so every worktree leaves its own image and volume behind.
 - Static files are copied into the Docker image, so frontend changes need `docker-compose build --no-cache`.
 - Local DB lives at `./data/waystone.db` (gitignored).
 
