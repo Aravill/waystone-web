@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	"time"
 	"waystone-web/db"
 	"waystone-web/middleware"
 	"waystone-web/models"
-	"net/http"
-	"time"
 )
 
 func HandleCreateUser(w http.ResponseWriter, r *http.Request) {

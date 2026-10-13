@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	"time"
 	"waystone-web/db"
 	"waystone-web/middleware"
 	"waystone-web/models"
-	"net/http"
-	"time"
 )
 
 func HandleLoginStart(w http.ResponseWriter, r *http.Request) {

@@ -2,8 +2,8 @@ package db
 
 import (
 	"fmt"
-	"waystone-web/models"
 	"time"
+	"waystone-web/models"
 )
 
 func SaveUser(user models.User) error {
