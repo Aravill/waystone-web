@@ -8,6 +8,7 @@ window.profilePage = function() {
         dmCampaigns: [],
         playingCampaigns: [],
         isSelf: false,
+        isEnvAdmin: false,
         messageVisible: false,
         messageText: '',
         messageType: '',
@@ -21,8 +22,9 @@ window.profilePage = function() {
                 }
                 
                 const user = await userResponse.json();
-                this.displayName = user.display_name || user.name || user.email || 'User';
+                this.displayName = user.display_name || user.username;
                 this.isAdmin = (user.roles || []).includes('admin');
+                this.isEnvAdmin = !!user.is_env_admin;
             } catch (error) {
                 console.error('Auth check failed:', error);
                 window.location.href = '/login.html';
@@ -82,13 +84,8 @@ window.profilePage = function() {
             const profile = this.profile;
             const displayName = profile.display_name || 'Unknown User';
             
-            let avatarHtml = '';
-            if (profile.avatar && profile.avatar.has_picture && profile.avatar.picture) {
-                avatarHtml = `<img src="${escapeHtml(profile.avatar.picture)}" alt="${escapeHtml(displayName)}">`;
-            } else {
-                const initials = (profile.avatar && profile.avatar.initials) || '?';
-                avatarHtml = `<div class="profile-avatar-initials">${escapeHtml(initials)}</div>`;
-            }
+            const initials = (profile.avatar && profile.avatar.initials) || '?';
+            const avatarHtml = `<div class="profile-avatar-initials">${escapeHtml(initials)}</div>`;
             
             let metaHtml = '';
             if (profile.user && profile.user.name) {
@@ -97,8 +94,8 @@ window.profilePage = function() {
             if (profile.user && profile.user.nickname) {
                 metaHtml += `<p class="profile-meta"><strong>Nickname:</strong> ${escapeHtml(profile.user.nickname)}</p>`;
             }
-            if (profile.user && profile.user.email) {
-                metaHtml += `<p class="profile-meta"><strong>Email:</strong> ${escapeHtml(profile.user.email)}</p>`;
+            if (profile.user && profile.user.username) {
+                metaHtml += `<p class="profile-meta"><strong>Username:</strong> ${escapeHtml(profile.user.username)}</p>`;
             }
             
             return `

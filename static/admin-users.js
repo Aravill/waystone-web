@@ -5,7 +5,9 @@ window.adminUsersPage = function () {
         loading: false,
         users: [],
         searchQuery: '',
-        newEmail: '',
+        newUsername: '',
+        newName: '',
+        tempPassword: null,
         confirmModal: { visible: false, title: '', message: '', onConfirm: null },
         messageVisible: false,
         messageText: '',
@@ -15,7 +17,7 @@ window.adminUsersPage = function () {
             const q = this.searchQuery.toLowerCase();
             if (!q) return this.users;
             return this.users.filter(u =>
-                u.email.toLowerCase().includes(q) ||
+                (u.username || '').toLowerCase().includes(q) ||
                 (u.name || '').toLowerCase().includes(q) ||
                 (u.nickname || '').toLowerCase().includes(q)
             );
@@ -26,7 +28,7 @@ window.adminUsersPage = function () {
                 const res = await fetch('/auth/current-user');
                 if (!res.ok) { window.location.href = '/login.html'; return; }
                 const user = await res.json();
-                this.displayName = user.display_name || user.email;
+                this.displayName = user.display_name || user.username;
                 this.isAdmin = (user.roles || []).includes('admin');
                 if (!this.isAdmin) { window.location.href = '/'; return; }
                 await this.loadUsers();
@@ -49,17 +51,19 @@ window.adminUsersPage = function () {
         },
 
         async addUser() {
-            if (!this.newEmail) return;
+            if (!this.newUsername) return;
             this.loading = true;
             try {
                 const res = await fetch('/api/admin/users', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: this.newEmail }),
+                    body: JSON.stringify({ username: this.newUsername, name: this.newName }),
                 });
                 const data = await res.json();
                 if (!res.ok) { this.showMessage(data.error || 'failed to add user', 'error'); return; }
-                this.newEmail = '';
+                this.newUsername = '';
+                this.newName = '';
+                this.tempPassword = { username: data.user.username, password: data.temp_password };
                 this.showMessage('user added', 'success');
                 await this.loadUsers();
             } catch {
@@ -83,6 +87,31 @@ window.adminUsersPage = function () {
 
         async removeAdmin(id) {
             await this._postAction(id, 'remove-admin', 'admin role removed', 'failed to remove admin role');
+        },
+
+        async resetPassword(user) {
+            this.loading = true;
+            try {
+                const res = await fetch(`/api/admin/users/${user.id}/reset-password`, { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) { this.showMessage(data.error || 'failed to reset password', 'error'); return; }
+                this.tempPassword = { username: user.username, password: data.temp_password };
+                this.showMessage('password reset', 'success');
+                await this.loadUsers();
+            } catch {
+                this.showMessage('failed to reset password', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async copyTempPassword() {
+            try {
+                await navigator.clipboard.writeText(this.tempPassword.password);
+                this.showMessage('password copied', 'success');
+            } catch {
+                this.showMessage('copy failed - select and copy it manually', 'error');
+            }
         },
 
         async removeUser(id) {

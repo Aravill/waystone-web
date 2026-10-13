@@ -58,7 +58,7 @@ window.campaignsPage = function () {
                 }
 
                 const user = await userResponse.json();
-                this.displayName = user.display_name || user.name || user.email || 'User';
+                this.displayName = user.display_name || user.username;
                 this.isAdmin = (user.roles || []).includes('admin');
                 this.currentUserId = user.user_id || user.id || '';
 
@@ -180,7 +180,7 @@ window.campaignsPage = function () {
 
             const dmUser = campaign?.dm_user;
             const dmHtml = dmUser
-                ? `<a href="${escapeHtml(dmUser.profile_url || `/profile?user_id=${encodeURIComponent(dmUser.id)}`)}" class="user-button user-button--dm">${escapeHtml(dmUser.display_name || dmUser.name || dmUser.email || 'Unknown')}</a>`
+                ? `<a href="${escapeHtml(dmUser.profile_url || `/profile?user_id=${encodeURIComponent(dmUser.id)}`)}" class="user-button user-button--dm">${escapeHtml(dmUser.display_name || dmUser.name || 'Unknown')}</a>`
                 : (campaign?.dm ? `<p class="campaign-value campaign-nameplate">${escapeHtml(campaign.dm)}</p>` : '<p class="campaign-value campaign-nameplate">Unassigned</p>');
 
             const playerUsers = Array.isArray(campaign?.player_users) ? campaign.player_users : [];
@@ -190,7 +190,7 @@ window.campaignsPage = function () {
                 playersHtml = '<p class="campaign-value">No players yet</p>';
             } else if (playerUsers.length > 0) {
                 playersHtml = playerUsers.map((player) =>
-                    `<a href="${escapeHtml(player.profile_url || `/profile?user_id=${encodeURIComponent(player.id)}`)}" class="user-button">${escapeHtml(player.display_name || player.name || player.email || 'Unknown')}</a>`
+                    `<a href="${escapeHtml(player.profile_url || `/profile?user_id=${encodeURIComponent(player.id)}`)}" class="user-button">${escapeHtml(player.display_name || player.name || 'Unknown')}</a>`
                 ).join('');
             } else {
                 playersHtml = players.map((player) =>
@@ -489,7 +489,7 @@ window.campaignsPage = function () {
         },
 
         getUserDisplayName(user) {
-            return user?.nickname || user?.display_name || user?.name || user?.email || 'Unknown';
+            return user?.nickname || user?.display_name || user?.name || user?.username || 'Unknown';
         },
 
         isHoverPanelVisibleForDay(date) {
