@@ -3,9 +3,11 @@ package db
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -102,6 +104,20 @@ func (s *SQLiteStore) initSchema() error {
 		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
 
+	CREATE TABLE IF NOT EXISTS campaign_signups (
+		id TEXT PRIMARY KEY,
+		campaign_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		status TEXT NOT NULL,
+		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(campaign_id, user_id),
+		FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_campaign_signups_campaign_id ON campaign_signups(campaign_id);
+	CREATE INDEX IF NOT EXISTS idx_campaign_signups_user_id ON campaign_signups(user_id);
 	CREATE INDEX IF NOT EXISTS idx_campaign_sessions_campaign_id ON campaign_sessions(campaign_id);
 	CREATE INDEX IF NOT EXISTS idx_campaign_sessions_date ON campaign_sessions(date);
 	CREATE INDEX IF NOT EXISTS idx_session_responses_session_id ON session_responses(session_id);
@@ -493,6 +509,10 @@ func (s *SQLiteStore) DeleteUser(id string) error {
 		return err
 	}
 
+	if _, err := s.db.Exec(`DELETE FROM campaign_signups WHERE user_id = ?`, id); err != nil {
+		return err
+	}
+
 	query := `DELETE FROM users WHERE id = ?`
 	result, err := s.db.Exec(query, id)
 	if err != nil {
@@ -834,4 +854,196 @@ func (s *SQLiteStore) DeleteSession(sessionID string) error {
 	}
 
 	return nil
+}
+
+var (
+	ErrSignupNotFound   = errors.New("sign-up not found")
+	ErrCampaignFull     = errors.New("campaign is full")
+	ErrCampaignNotFound = errors.New("campaign not found")
+)
+
+func (s *SQLiteStore) CreateCampaignSignup(signup models.CampaignSignup) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	if signup.CreatedAt == "" {
+		signup.CreatedAt = now
+	}
+	signup.UpdatedAt = now
+
+	_, err := s.db.Exec(
+		`INSERT INTO campaign_signups (id, campaign_id, user_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		signup.ID, signup.CampaignID, signup.UserID, signup.Status, signup.CreatedAt, signup.UpdatedAt,
+	)
+	return err
+}
+
+func (s *SQLiteStore) GetCampaignSignup(campaignID, userID string) (*models.CampaignSignup, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	var signup models.CampaignSignup
+	err := s.db.QueryRow(
+		`SELECT id, campaign_id, user_id, status, created_at, updated_at FROM campaign_signups WHERE campaign_id = ? AND user_id = ?`,
+		campaignID, userID,
+	).Scan(&signup.ID, &signup.CampaignID, &signup.UserID, &signup.Status, &signup.CreatedAt, &signup.UpdatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &signup, nil
+}
+
+func (s *SQLiteStore) GetCampaignSignups(campaignID string) ([]models.CampaignSignup, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(
+		`SELECT id, campaign_id, user_id, status, created_at, updated_at FROM campaign_signups WHERE campaign_id = ? ORDER BY created_at ASC`,
+		campaignID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	signups := []models.CampaignSignup{}
+	for rows.Next() {
+		var signup models.CampaignSignup
+		if err := rows.Scan(&signup.ID, &signup.CampaignID, &signup.UserID, &signup.Status, &signup.CreatedAt, &signup.UpdatedAt); err != nil {
+			return nil, err
+		}
+		signups = append(signups, signup)
+	}
+	return signups, rows.Err()
+}
+
+func (s *SQLiteStore) GetCampaignSignupsByUser(userID string) (map[string]models.CampaignSignup, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(
+		`SELECT id, campaign_id, user_id, status, created_at, updated_at FROM campaign_signups WHERE user_id = ?`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	signups := map[string]models.CampaignSignup{}
+	for rows.Next() {
+		var signup models.CampaignSignup
+		if err := rows.Scan(&signup.ID, &signup.CampaignID, &signup.UserID, &signup.Status, &signup.CreatedAt, &signup.UpdatedAt); err != nil {
+			return nil, err
+		}
+		signups[signup.CampaignID] = signup
+	}
+	return signups, rows.Err()
+}
+
+// SetCampaignSignupStatus changes a sign-up's status and keeps campaigns.players
+// (and sign_ups_open when the campaign fills up) consistent in one transaction.
+func (s *SQLiteStore) SetCampaignSignupStatus(campaignID, userID string, status models.SignupStatus) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var playersJSON string
+	var desired sql.NullString
+	var signUpsOpenInt int
+	err = tx.QueryRow(`SELECT players, desired_player_count, sign_ups_open FROM campaigns WHERE id = ?`, campaignID).
+		Scan(&playersJSON, &desired, &signUpsOpenInt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return ErrCampaignNotFound
+		}
+		return err
+	}
+
+	var players []string
+	if err := json.Unmarshal([]byte(playersJSON), &players); err != nil {
+		players = []string{}
+	}
+
+	var existingID string
+	hasRow := true
+	err = tx.QueryRow(`SELECT id FROM campaign_signups WHERE campaign_id = ? AND user_id = ?`, campaignID, userID).Scan(&existingID)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return err
+		}
+		hasRow = false
+	}
+
+	max, _ := strconv.Atoi(strings.TrimSpace(desired.String))
+	isPlayer := false
+	for _, p := range players {
+		if p == userID {
+			isPlayer = true
+			break
+		}
+	}
+
+	signUpsOpen := signUpsOpenInt != 0
+	switch status {
+	case models.SignupAccepted:
+		if !hasRow && !isPlayer {
+			return ErrSignupNotFound
+		}
+		if !isPlayer {
+			if max > 0 && len(players) >= max {
+				return ErrCampaignFull
+			}
+			players = append(players, userID)
+		}
+		if max > 0 && len(players) >= max {
+			signUpsOpen = false
+		}
+	case models.SignupDeclined, models.SignupKicked:
+		if !hasRow && !isPlayer {
+			return ErrSignupNotFound
+		}
+		remaining := make([]string, 0, len(players))
+		for _, p := range players {
+			if p != userID {
+				remaining = append(remaining, p)
+			}
+		}
+		players = remaining
+	default:
+		return fmt.Errorf("invalid sign-up status: %s", status)
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	if _, err := tx.Exec(
+		`INSERT INTO campaign_signups (id, campaign_id, user_id, status, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(campaign_id, user_id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`,
+		GenerateUUID(), campaignID, userID, status, now, now,
+	); err != nil {
+		return err
+	}
+
+	newPlayersJSON, err := json.Marshal(players)
+	if err != nil {
+		return err
+	}
+	open := 0
+	if signUpsOpen {
+		open = 1
+	}
+	if _, err := tx.Exec(`UPDATE campaigns SET players = ?, sign_ups_open = ? WHERE id = ?`, string(newPlayersJSON), open, campaignID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }

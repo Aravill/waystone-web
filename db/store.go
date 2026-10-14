@@ -28,6 +28,11 @@ type Store interface {
 	GetSessionResponses(sessionID string) ([]models.SessionResponse, error)
 	GetSessionResponsesBySessionIDs(sessionIDs []string) (map[string][]models.SessionResponse, error)
 	DeleteSession(sessionID string) error
+	CreateCampaignSignup(signup models.CampaignSignup) error
+	GetCampaignSignup(campaignID, userID string) (*models.CampaignSignup, error)
+	GetCampaignSignups(campaignID string) ([]models.CampaignSignup, error)
+	GetCampaignSignupsByUser(userID string) (map[string]models.CampaignSignup, error)
+	SetCampaignSignupStatus(campaignID, userID string, status models.SignupStatus) error
 	Close() error
 }
 
