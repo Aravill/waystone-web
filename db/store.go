@@ -33,6 +33,7 @@ type Store interface {
 	GetCampaignSignups(campaignID string) ([]models.CampaignSignup, error)
 	GetCampaignSignupsByUser(userID string) (map[string]models.CampaignSignup, error)
 	SetCampaignSignupStatus(campaignID, userID string, status models.SignupStatus) error
+	SetCampaignSignUpsOpen(campaignID string, open bool) error
 	Close() error
 }
 
