@@ -71,6 +71,7 @@ func (s *SQLiteStore) initSchema() error {
 		title TEXT,
 		status TEXT,
 		type TEXT NOT NULL DEFAULT 'Campaign',
+		system TEXT NOT NULL DEFAULT '',
 		summary TEXT,
 		description TEXT,
 		players TEXT NOT NULL DEFAULT '[]',
@@ -79,6 +80,15 @@ func (s *SQLiteStore) initSchema() error {
 		sign_ups_open INTEGER DEFAULT 0,
 		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS systems (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+		logo BLOB,
+		logo_type TEXT NOT NULL DEFAULT '',
+		logo_version INTEGER NOT NULL DEFAULT 0,
+		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE TABLE IF NOT EXISTS campaign_sessions (
@@ -136,12 +146,12 @@ func (s *SQLiteStore) initSchema() error {
 		return fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
-	// Add campaigns.type to databases created before campaign types existed.
+	// Add columns introduced after the first release to older databases.
 	rows, err := s.db.Query(`PRAGMA table_info(campaigns)`)
 	if err != nil {
 		return fmt.Errorf("failed to inspect campaigns table: %w", err)
 	}
-	hasType := false
+	cols := map[string]bool{}
 	for rows.Next() {
 		var cid, notnull, pk int
 		var name, ctype string
@@ -150,14 +160,17 @@ func (s *SQLiteStore) initSchema() error {
 			rows.Close()
 			return fmt.Errorf("failed to inspect campaigns table: %w", err)
 		}
-		if name == "type" {
-			hasType = true
-		}
+		cols[name] = true
 	}
 	rows.Close()
-	if !hasType {
+	if !cols["type"] {
 		if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN type TEXT NOT NULL DEFAULT 'Campaign'`); err != nil {
 			return fmt.Errorf("failed to add campaigns.type column: %w", err)
+		}
+	}
+	if !cols["system"] {
+		if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN system TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("failed to add campaigns.system column: %w", err)
 		}
 	}
 
@@ -200,7 +213,7 @@ func (s *SQLiteStore) GetAllCampaigns() ([]models.Campaign, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	rows, err := s.db.Query("SELECT id, title, status, type, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns ORDER BY id")
+	rows, err := s.db.Query("SELECT id, title, status, type, system, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -217,6 +230,7 @@ func (s *SQLiteStore) GetAllCampaigns() ([]models.Campaign, error) {
 			&campaign.Title,
 			&campaign.Status,
 			&campaign.Type,
+			&campaign.System,
 			&campaign.Summary,
 			&campaign.Description,
 			&playersJSON,
@@ -260,12 +274,13 @@ func (s *SQLiteStore) SaveCampaign(campaign models.Campaign) error {
 	}
 
 	query := `
-	INSERT INTO campaigns (id, title, status, type, summary, description, players, dm, desired_player_count, sign_ups_open)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO campaigns (id, title, status, type, system, summary, description, players, dm, desired_player_count, sign_ups_open)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
 		title = excluded.title,
 		status = excluded.status,
 		type = excluded.type,
+		system = excluded.system,
 		summary = excluded.summary,
 		description = excluded.description,
 		players = excluded.players,
@@ -280,6 +295,7 @@ func (s *SQLiteStore) SaveCampaign(campaign models.Campaign) error {
 		campaign.Title,
 		campaign.Status,
 		campaign.Type,
+		campaign.System,
 		campaign.Summary,
 		campaign.Description,
 		string(playersJSON),
@@ -303,12 +319,13 @@ func (s *SQLiteStore) GetCampaignByID(id string) (*models.Campaign, error) {
 	var playersJSON string
 	var signUpsOpen int
 
-	query := `SELECT id, title, status, type, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns WHERE id = ?`
+	query := `SELECT id, title, status, type, system, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns WHERE id = ?`
 	err := s.db.QueryRow(query, id).Scan(
 		&campaign.ID,
 		&campaign.Title,
 		&campaign.Status,
 		&campaign.Type,
+		&campaign.System,
 		&campaign.Summary,
 		&campaign.Description,
 		&playersJSON,
@@ -1022,6 +1039,7 @@ var (
 	ErrSignupNotFound   = errors.New("sign-up not found")
 	ErrCampaignFull     = errors.New("campaign is full")
 	ErrCampaignNotFound = errors.New("campaign not found")
+	ErrSystemNotFound   = errors.New("system not found")
 )
 
 func (s *SQLiteStore) CreateCampaignSignup(signup models.CampaignSignup) error {
@@ -1126,13 +1144,13 @@ func (s *SQLiteStore) SetCampaignSignUpsOpen(campaignID string, open bool) error
 	return nil
 }
 
-// UpdateCampaignDetails updates a campaign's editable fields: text, type and desired player count.
-func (s *SQLiteStore) UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, desiredPlayerCount string) error {
+// UpdateCampaignDetails updates a campaign's editable fields: text, type, system and desired player count.
+func (s *SQLiteStore) UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, system, desiredPlayerCount string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	res, err := s.db.Exec(`UPDATE campaigns SET title = ?, summary = ?, description = ?, type = ?, desired_player_count = ? WHERE id = ?`,
-		title, summary, description, campaignType, desiredPlayerCount, id)
+	res, err := s.db.Exec(`UPDATE campaigns SET title = ?, summary = ?, description = ?, type = ?, system = ?, desired_player_count = ? WHERE id = ?`,
+		title, summary, description, campaignType, system, desiredPlayerCount, id)
 	if err != nil {
 		return err
 	}
@@ -1302,4 +1320,119 @@ func (s *SQLiteStore) SetCampaignSignupStatus(campaignID, userID string, status 
 	}
 
 	return tx.Commit()
+}
+
+// GetAllSystems returns all known systems (without logo data), sorted by name.
+func (s *SQLiteStore) GetAllSystems() ([]models.System, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(`SELECT id, name, logo_type, logo_version FROM systems ORDER BY name COLLATE NOCASE`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	systems := []models.System{}
+	for rows.Next() {
+		var sys models.System
+		if err := rows.Scan(&sys.ID, &sys.Name, &sys.LogoType, &sys.LogoVersion); err != nil {
+			return nil, err
+		}
+		systems = append(systems, sys)
+	}
+	return systems, rows.Err()
+}
+
+func (s *SQLiteStore) CreateSystem(sys models.System) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	_, err := s.db.Exec(`INSERT INTO systems (id, name) VALUES (?, ?)`, sys.ID, sys.Name)
+	return err
+}
+
+// RenameSystem renames a system and updates campaigns that use the old name.
+func (s *SQLiteStore) RenameSystem(id, name string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var oldName string
+	if err := tx.QueryRow(`SELECT name FROM systems WHERE id = ?`, id).Scan(&oldName); err != nil {
+		if err == sql.ErrNoRows {
+			return ErrSystemNotFound
+		}
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE systems SET name = ? WHERE id = ?`, name, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE campaigns SET system = ? WHERE system = ? COLLATE NOCASE`, name, oldName); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// DeleteSystem removes the system row; campaigns keep their system text.
+func (s *SQLiteStore) DeleteSystem(id string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	res, err := s.db.Exec(`DELETE FROM systems WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrSystemNotFound
+	}
+	return nil
+}
+
+// SetSystemLogo stores a logo and bumps its version; empty data removes the logo.
+func (s *SQLiteStore) SetSystemLogo(id string, data []byte, contentType string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	var logo interface{}
+	if len(data) > 0 {
+		logo = data
+	} else {
+		contentType = ""
+	}
+	res, err := s.db.Exec(`UPDATE systems SET logo = ?, logo_type = ?, logo_version = logo_version + 1 WHERE id = ?`, logo, contentType, id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrSystemNotFound
+	}
+	return nil
+}
+
+// GetSystemLogo returns the logo bytes and content type; empty data means no logo.
+func (s *SQLiteStore) GetSystemLogo(id string) ([]byte, string, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	var data []byte
+	var contentType string
+	err := s.db.QueryRow(`SELECT logo, logo_type FROM systems WHERE id = ?`, id).Scan(&data, &contentType)
+	if err == sql.ErrNoRows {
+		return nil, "", ErrSystemNotFound
+	}
+	return data, contentType, err
 }

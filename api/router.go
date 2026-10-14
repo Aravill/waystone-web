@@ -40,6 +40,8 @@ func RegisterRoutes() {
 	// Protected API endpoints (wrapped with auth middleware)
 	http.Handle("/api/campaigns", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaigns)))
 	http.Handle("/api/campaigns/", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaignRoutes)))
+	http.Handle("/api/systems", middleware.AuthMiddleware(http.HandlerFunc(HandleSystems)))
+	http.Handle("/api/systems/", middleware.AuthMiddleware(http.HandlerFunc(HandleSystemRoutes)))
 	http.Handle("/api/profile", middleware.AuthMiddleware(http.HandlerFunc(HandleProfile)))
 	http.Handle("/api/profile/calendar", middleware.AuthMiddleware(http.HandlerFunc(HandleCalendarToken)))
 
@@ -93,6 +95,8 @@ func RegisterRoutes() {
 	// Admin API
 	http.Handle("/api/admin/users", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminUsers)))
 	http.Handle("/api/admin/users/", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminUserActions)))
+	http.Handle("/api/admin/systems", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminSystems)))
+	http.Handle("/api/admin/systems/", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminSystemActions)))
 
 	// Admin static
 	http.HandleFunc("/admin-users.js", func(w http.ResponseWriter, r *http.Request) {

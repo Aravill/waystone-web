@@ -38,6 +38,7 @@ type Campaign struct {
 	DM                 string         `json:"dm"`
 	DesiredPlayerCount string         `json:"desired_player_count"`
 	SignUpsOpen        bool           `json:"sign_ups_open"`
+	System             string         `json:"system"`
 }
 
 // CampaignStatusTransitions maps each status to the statuses reachable from it.

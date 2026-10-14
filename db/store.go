@@ -38,9 +38,15 @@ type Store interface {
 	GetCampaignSignupsByUser(userID string) (map[string]models.CampaignSignup, error)
 	SetCampaignSignupStatus(campaignID, userID string, status models.SignupStatus) error
 	SetCampaignSignUpsOpen(campaignID string, open bool) error
-	UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, desiredPlayerCount string) error
+	UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, system, desiredPlayerCount string) error
 	SetCampaignStatus(id string, status models.CampaignStatus) error
 	DeleteCampaign(id string) error
+	GetAllSystems() ([]models.System, error)
+	CreateSystem(sys models.System) error
+	RenameSystem(id, name string) error
+	DeleteSystem(id string) error
+	SetSystemLogo(id string, data []byte, contentType string) error
+	GetSystemLogo(id string) ([]byte, string, error)
 	Close() error
 }
 
@@ -91,6 +97,17 @@ func seedIfEmpty() error {
 
 	// Seed campaigns if empty
 	if len(campaigns) == 0 {
+		systems, err := store.GetAllSystems()
+		if err != nil {
+			return err
+		}
+		if len(systems) == 0 {
+			for _, sys := range config.InitialSystems {
+				if err := store.CreateSystem(sys); err != nil {
+					return fmt.Errorf("failed to seed system: %w", err)
+				}
+			}
+		}
 		for _, campaign := range config.InitialCampaigns {
 			if err := store.SaveCampaign(campaign); err != nil {
 				return fmt.Errorf("failed to seed campaign: %w", err)

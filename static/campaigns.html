@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Campaigns</title>
-    <link rel="stylesheet" href="styles.css?v=8">
+    <link rel="stylesheet" href="styles.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body x-data="campaignsPage()" x-init="init()">
@@ -77,6 +77,14 @@
                         </template>
                     </select>
                     <small class="form-hint" x-text="campaignTypes.find((t) => t.value === formData.type)?.description"></small>
+                </div>
+                <div class="form-group">
+                    <label for="campaignSystem">System</label>
+                    <input type="text" id="campaignSystem" name="system" list="campaignSystemOptions" x-model="formData.system" maxlength="64" autocomplete="off" placeholder="e.g. D&amp;D 5e">
+                    <datalist id="campaignSystemOptions">
+                        <template x-for="s in systems" :key="s.id"><option :value="s.name"></option></template>
+                    </datalist>
+                    <small class="form-hint">Pick a known system or type your own</small>
                 </div>
                 <div class="form-group">
                     <label for="campaignPlayerCount">Desired player count</label>
@@ -420,6 +428,6 @@
             </div>
         </div>
     </div>
-    <script src="campaigns.js?v=6"></script>
+    <script src="campaigns.js?v=7"></script>
 </body>
 </html>

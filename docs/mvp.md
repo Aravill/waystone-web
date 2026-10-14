@@ -35,6 +35,7 @@ This document describes what must-have features are to be implemented before pre
     - [x] DMs are colorfully distinct from players
     - [x] Visually distinct campaign statuses
     - [x] Campaign types (and their visual distinction) - Campaign, Adventure, One-shot
+    - [x] Game systems - admins manage known systems (optional logo); campaigns pick one or type a custom one; shown on the campaign card
 - [ ] Profile
     - [ ] Standard operations
         - [ ] Changing nicknames
