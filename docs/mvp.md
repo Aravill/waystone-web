@@ -19,22 +19,22 @@ This document describes what must-have features are to be implemented before pre
     - [x] Always one super admin role
     - [x] An admin / super admin can add or remove people from the access whitelist
     - [x] A super admin can make other people admins
-    - [ ] Admins can remove any campaign
+    - [x] Admins can remove any campaign
     - [x] An admin can revoke whitelist access to a user (doesn't delete the account, just blocks their log-in)
-    - [ ] An admin can delete accounts
+    - [x] An admin can delete accounts
 - [ ] Campaigns
-    - [ ] Standard operations
+    - [x] Standard operations
         - [x] Creating
-        - [ ] Updating
-        - [ ] Deleting
-    - [ ] Switching states according to the state transition map
+        - [x] Updating
+        - [x] Deleting
+    - [x] Switching states according to the state transition map
     - [x] Removing active players
     - [x] Opening / Closing sign-ups
-    - [ ] Toggling sign-up auto close and auto open
+    - [x] Toggling sign-up auto close and auto open - not needed: disabled by leaving the desired player count blank, and bypassed by manual opening/closing of sign-ups
     - [ ] Campaign grid view
     - [x] DMs are colorfully distinct from players
     - [x] Visually distinct campaign statuses
-    - [ ] Campaign types (and their visual distinction) - Campaign, Adventure, One-shot
+    - [x] Campaign types (and their visual distinction) - Campaign, Adventure, One-shot
 - [ ] Profile
     - [ ] Standard operations
         - [ ] Changing nicknames
