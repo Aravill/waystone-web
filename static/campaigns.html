@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Campaigns</title>
-    <link rel="stylesheet" href="styles.css?v=2">
+    <link rel="stylesheet" href="styles.css?v=3">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body x-data="campaignsPage()" x-init="init()">
@@ -316,6 +316,7 @@
                     <span class="signups-pills">
                         <span class="signups-pill signups-pill-full" x-show="isCampaignFull()">Full</span>
                         <span class="signups-pill" :class="signupsOpen ? 'signups-pill-open' : 'signups-pill-closed'" x-text="signupsOpen ? 'Sign-ups open' : 'Sign-ups closed'"></span>
+                        <button type="button" class="btn-action signups-open-toggle" @click="setSignupsOpen(!signupsOpen)" x-text="signupsOpen ? 'Close sign-ups' : 'Open sign-ups'"></button>
                     </span>
                 </div>
 
@@ -419,6 +420,6 @@
             </div>
         </div>
     </div>
-    <script src="campaigns.js?v=2"></script>
+    <script src="campaigns.js?v=3"></script>
 </body>
 </html>

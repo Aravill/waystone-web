@@ -1559,6 +1559,23 @@ select:focus {
     color: #888888;
 }
 
+#signupsModal .signups-open-toggle {
+    padding: 4px 12px;
+    font-size: 0.75em;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+#signupsModal .signups-pills {
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+#signupsModal .signups-pill,
+#signupsModal .signups-open-toggle {
+    white-space: nowrap;
+}
+
 #signupsModal .signups-pill-full {
     background: rgba(255, 215, 0, 0.1);
     color: #ffd700;
