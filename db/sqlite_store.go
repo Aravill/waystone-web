@@ -70,6 +70,7 @@ func (s *SQLiteStore) initSchema() error {
 		id TEXT PRIMARY KEY,
 		title TEXT,
 		status TEXT,
+		type TEXT NOT NULL DEFAULT 'Campaign',
 		summary TEXT,
 		description TEXT,
 		players TEXT NOT NULL DEFAULT '[]',
@@ -128,6 +129,31 @@ func (s *SQLiteStore) initSchema() error {
 		return fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
+	// Add campaigns.type to databases created before campaign types existed.
+	rows, err := s.db.Query(`PRAGMA table_info(campaigns)`)
+	if err != nil {
+		return fmt.Errorf("failed to inspect campaigns table: %w", err)
+	}
+	hasType := false
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, ctype string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			rows.Close()
+			return fmt.Errorf("failed to inspect campaigns table: %w", err)
+		}
+		if name == "type" {
+			hasType = true
+		}
+	}
+	rows.Close()
+	if !hasType {
+		if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN type TEXT NOT NULL DEFAULT 'Campaign'`); err != nil {
+			return fmt.Errorf("failed to add campaigns.type column: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -142,7 +168,7 @@ func (s *SQLiteStore) GetAllCampaigns() ([]models.Campaign, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	rows, err := s.db.Query("SELECT id, title, status, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns ORDER BY id")
+	rows, err := s.db.Query("SELECT id, title, status, type, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +184,7 @@ func (s *SQLiteStore) GetAllCampaigns() ([]models.Campaign, error) {
 			&campaign.ID,
 			&campaign.Title,
 			&campaign.Status,
+			&campaign.Type,
 			&campaign.Summary,
 			&campaign.Description,
 			&playersJSON,
@@ -201,11 +228,12 @@ func (s *SQLiteStore) SaveCampaign(campaign models.Campaign) error {
 	}
 
 	query := `
-	INSERT INTO campaigns (id, title, status, summary, description, players, dm, desired_player_count, sign_ups_open)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO campaigns (id, title, status, type, summary, description, players, dm, desired_player_count, sign_ups_open)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
 		title = excluded.title,
 		status = excluded.status,
+		type = excluded.type,
 		summary = excluded.summary,
 		description = excluded.description,
 		players = excluded.players,
@@ -219,6 +247,7 @@ func (s *SQLiteStore) SaveCampaign(campaign models.Campaign) error {
 		campaign.ID,
 		campaign.Title,
 		campaign.Status,
+		campaign.Type,
 		campaign.Summary,
 		campaign.Description,
 		string(playersJSON),
@@ -242,11 +271,12 @@ func (s *SQLiteStore) GetCampaignByID(id string) (*models.Campaign, error) {
 	var playersJSON string
 	var signUpsOpen int
 
-	query := `SELECT id, title, status, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns WHERE id = ?`
+	query := `SELECT id, title, status, type, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns WHERE id = ?`
 	err := s.db.QueryRow(query, id).Scan(
 		&campaign.ID,
 		&campaign.Title,
 		&campaign.Status,
+		&campaign.Type,
 		&campaign.Summary,
 		&campaign.Description,
 		&playersJSON,
@@ -651,6 +681,7 @@ func (s *SQLiteStore) SaveSession(session models.CampaignSession) error {
 			time = excluded.time,
 			duration = excluded.duration,
 			status = excluded.status,
+		type = excluded.type,
 			updated_at = excluded.updated_at
 	`
 
@@ -962,6 +993,81 @@ func (s *SQLiteStore) SetCampaignSignUpsOpen(campaignID string, open bool) error
 		return ErrCampaignNotFound
 	}
 	return nil
+}
+
+// UpdateCampaignDetails updates a campaign's editable fields: text, type and desired player count.
+func (s *SQLiteStore) UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, desiredPlayerCount string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	res, err := s.db.Exec(`UPDATE campaigns SET title = ?, summary = ?, description = ?, type = ?, desired_player_count = ? WHERE id = ?`,
+		title, summary, description, campaignType, desiredPlayerCount, id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrCampaignNotFound
+	}
+	return nil
+}
+
+// SetCampaignStatus changes a campaign's status.
+func (s *SQLiteStore) SetCampaignStatus(id string, status models.CampaignStatus) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	res, err := s.db.Exec(`UPDATE campaigns SET status = ? WHERE id = ?`, status, id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrCampaignNotFound
+	}
+	return nil
+}
+
+// DeleteCampaign removes a campaign with its sessions, session responses and sign-ups.
+// The foreign_keys pragma is not enabled, so ON DELETE CASCADE does not fire and the
+// cascade is done by hand.
+func (s *SQLiteStore) DeleteCampaign(id string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM session_responses WHERE session_id IN (SELECT id FROM campaign_sessions WHERE campaign_id = ?)`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM campaign_sessions WHERE campaign_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM campaign_signups WHERE campaign_id = ?`, id); err != nil {
+		return err
+	}
+	res, err := tx.Exec(`DELETE FROM campaigns WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrCampaignNotFound
+	}
+	return tx.Commit()
 }
 
 // SetCampaignSignupStatus changes a sign-up's status and keeps campaigns.players

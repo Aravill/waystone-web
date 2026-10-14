@@ -34,6 +34,9 @@ type Store interface {
 	GetCampaignSignupsByUser(userID string) (map[string]models.CampaignSignup, error)
 	SetCampaignSignupStatus(campaignID, userID string, status models.SignupStatus) error
 	SetCampaignSignUpsOpen(campaignID string, open bool) error
+	UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, desiredPlayerCount string) error
+	SetCampaignStatus(id string, status models.CampaignStatus) error
+	DeleteCampaign(id string) error
 	Close() error
 }
 
