@@ -4,6 +4,8 @@ window.adminUsersPage = function () {
         isAdmin: false,
         loading: false,
         users: [],
+        systems: [],
+        newSystemName: '',
         searchQuery: '',
         newUsername: '',
         newName: '',
@@ -32,6 +34,7 @@ window.adminUsersPage = function () {
                 this.isAdmin = (user.roles || []).includes('admin');
                 if (!this.isAdmin) { window.location.href = '/'; return; }
                 await this.loadUsers();
+                await this.loadSystems();
             } catch {
                 window.location.href = '/login.html';
             }
@@ -124,6 +127,118 @@ window.adminUsersPage = function () {
                 await this.loadUsers();
             } catch {
                 this.showMessage('failed to remove user', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async loadSystems() {
+            try {
+                const res = await fetch('/api/admin/systems');
+                if (!res.ok) throw new Error('failed');
+                this.systems = await res.json();
+            } catch {
+                this.showMessage('failed to load systems', 'error');
+            }
+        },
+
+        async _sendLogo(id, file) {
+            if (file.size > 256 * 1024) { this.showMessage('logo must be 256 KB or smaller', 'error'); return false; }
+            const res = await fetch(`/api/admin/systems/${id}/logo`, { method: 'PUT', body: file });
+            const data = await res.json();
+            if (!res.ok) { this.showMessage(data.error || 'failed to upload logo', 'error'); return false; }
+            return true;
+        },
+
+        async addSystem() {
+            const name = this.newSystemName.trim();
+            if (!name) return;
+            const input = this.$refs.newSystemLogo;
+            const file = input.files[0];
+            if (file && file.size > 256 * 1024) { this.showMessage('logo must be 256 KB or smaller', 'error'); return; }
+            this.loading = true;
+            try {
+                const res = await fetch('/api/admin/systems', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name }),
+                });
+                const data = await res.json();
+                if (!res.ok) { this.showMessage(data.error || 'failed to add system', 'error'); return; }
+                this.newSystemName = '';
+                input.value = '';
+                if (file && !(await this._sendLogo(data.id, file))) {
+                    await this.loadSystems();
+                    return;
+                }
+                this.showMessage('system added', 'success');
+                await this.loadSystems();
+            } catch {
+                this.showMessage('failed to add system', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async renameSystem(system) {
+            const name = prompt('New name', system.name);
+            if (name === null || name.trim() === '' || name.trim() === system.name) return;
+            this.loading = true;
+            try {
+                const res = await fetch(`/api/admin/systems/${system.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name }),
+                });
+                const data = await res.json();
+                if (!res.ok) { this.showMessage(data.error || 'failed to rename system', 'error'); return; }
+                this.showMessage('system renamed', 'success');
+                await this.loadSystems();
+            } catch {
+                this.showMessage('failed to rename system', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async uploadLogo(id, file) {
+            if (!file) return;
+            this.loading = true;
+            try {
+                if (await this._sendLogo(id, file)) this.showMessage('logo updated', 'success');
+                await this.loadSystems();
+            } catch {
+                this.showMessage('failed to upload logo', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async removeLogo(id) {
+            this.loading = true;
+            try {
+                const res = await fetch(`/api/admin/systems/${id}/logo`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) { this.showMessage(data.error || 'failed to remove logo', 'error'); return; }
+                this.showMessage('logo removed', 'success');
+                await this.loadSystems();
+            } catch {
+                this.showMessage('failed to remove logo', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async deleteSystem(id) {
+            this.loading = true;
+            try {
+                const res = await fetch(`/api/admin/systems/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) { this.showMessage(data.error || 'failed to delete system', 'error'); return; }
+                this.showMessage('system deleted', 'success');
+                await this.loadSystems();
+            } catch {
+                this.showMessage('failed to delete system', 'error');
             } finally {
                 this.loading = false;
             }
