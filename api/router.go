@@ -130,6 +130,15 @@ func HandleCampaignRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(parts) == 1 && parts[0] != "" {
+		HandleCampaignActions(w, r)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "status" {
+		HandleCampaignStatus(w, r)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusNotFound)
 	fmt.Fprintf(w, `{"error": "not found"}`)

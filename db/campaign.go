@@ -19,3 +19,15 @@ func GetCampaignByID(id string) (*models.Campaign, error) {
 func GetNextCampaignID() string {
 	return GenerateUUID()
 }
+
+func UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, desiredPlayerCount string) error {
+	return GetStore().UpdateCampaignDetails(id, title, summary, description, campaignType, desiredPlayerCount)
+}
+
+func SetCampaignStatus(id string, status models.CampaignStatus) error {
+	return GetStore().SetCampaignStatus(id, status)
+}
+
+func DeleteCampaign(id string) error {
+	return GetStore().DeleteCampaign(id)
+}
