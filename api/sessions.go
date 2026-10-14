@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
+	_ "time/tzdata" // alpine image ships no zoneinfo
 	"waystone-web/db"
 	"waystone-web/models"
 )
@@ -133,43 +135,47 @@ func handleGetSessions(w http.ResponseWriter, r *http.Request, campaignID string
 	}
 
 	for i := range sessions {
-		responses := responsesBySession[sessions[i].ID]
-
-		var accepted, declined, tentative int
-		currentParticipation := ""
-		respondedPlayers := map[string]bool{}
-		for _, response := range responses {
-			switch response.Participation {
-			case models.Accepted:
-				accepted++
-			case models.Declined:
-				declined++
-			case models.Tentative:
-				tentative++
-			}
-			if response.UserID == userID {
-				currentParticipation = string(response.Participation)
-			}
-			respondedPlayers[response.UserID] = true
-		}
-
-		pending := 0
-		for _, playerID := range campaign.Players {
-			if !respondedPlayers[playerID] {
-				pending++
-			}
-		}
-
-		sessions[i].AcceptedCount = accepted
-		sessions[i].DeclinedCount = declined
-		sessions[i].TentativeCount = tentative
-		sessions[i].PendingCount = pending
-		sessions[i].CurrentUserParticipation = models.ParticipationStatus(currentParticipation)
+		applySessionCounts(&sessions[i], campaign, responsesBySession[sessions[i].ID], userID)
 	}
 
 	w.WriteHeader(http.StatusOK)
 	data, _ := json.Marshal(sessions)
 	w.Write(data)
+}
+
+// applySessionCounts fills the computed response counts and the given user's
+// own participation on a session.
+func applySessionCounts(session *models.CampaignSession, campaign *models.Campaign, responses []models.SessionResponse, userID string) {
+	var accepted, declined, tentative int
+	currentParticipation := ""
+	respondedPlayers := map[string]bool{}
+	for _, response := range responses {
+		switch response.Participation {
+		case models.Accepted:
+			accepted++
+		case models.Declined:
+			declined++
+		case models.Tentative:
+			tentative++
+		}
+		if response.UserID == userID {
+			currentParticipation = string(response.Participation)
+		}
+		respondedPlayers[response.UserID] = true
+	}
+
+	pending := 0
+	for _, playerID := range campaign.Players {
+		if !respondedPlayers[playerID] {
+			pending++
+		}
+	}
+
+	session.AcceptedCount = accepted
+	session.DeclinedCount = declined
+	session.TentativeCount = tentative
+	session.PendingCount = pending
+	session.CurrentUserParticipation = models.ParticipationStatus(currentParticipation)
 }
 
 func handleCreateSession(w http.ResponseWriter, r *http.Request, campaignID string) {
@@ -197,6 +203,7 @@ func handleCreateSession(w http.ResponseWriter, r *http.Request, campaignID stri
 		Date     string `json:"date"`
 		Time     string `json:"time"`
 		Duration int    `json:"duration"`
+		Timezone string `json:"timezone"`
 	}
 	var req createSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -210,12 +217,22 @@ func handleCreateSession(w http.ResponseWriter, r *http.Request, campaignID stri
 		return
 	}
 
+	req.Timezone = strings.TrimSpace(req.Timezone)
+	if req.Timezone == "" {
+		req.Timezone = "UTC"
+	}
+	if _, err := time.LoadLocation(req.Timezone); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid timezone")
+		return
+	}
+
 	session := models.CampaignSession{
 		ID:         db.GenerateUUID(),
 		CampaignID: campaignID,
 		Date:       req.Date,
 		Time:       req.Time,
 		Duration:   req.Duration,
+		Timezone:   req.Timezone,
 		Status:     models.SessionSuggested,
 	}
 	if err := db.SaveSession(session); err != nil {
