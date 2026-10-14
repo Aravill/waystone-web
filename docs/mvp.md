@@ -29,7 +29,7 @@ This document describes what must-have features are to be implemented before pre
         - [ ] Deleting
     - [ ] Switching states according to the state transition map
     - [x] Removing active players
-    - [ ] Opening / Closing sign-ups
+    - [x] Opening / Closing sign-ups
     - [ ] Toggling sign-up auto close and auto open
     - [ ] Campaign grid view
     - [x] DMs are colorfully distinct from players
