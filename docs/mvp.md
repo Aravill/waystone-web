@@ -22,7 +22,7 @@ This document describes what must-have features are to be implemented before pre
     - [x] Admins can remove any campaign
     - [x] An admin can revoke whitelist access to a user (doesn't delete the account, just blocks their log-in)
     - [x] An admin can delete accounts
-- [ ] Campaigns
+- [x] Campaigns
     - [x] Standard operations
         - [x] Creating
         - [x] Updating
@@ -31,7 +31,7 @@ This document describes what must-have features are to be implemented before pre
     - [x] Removing active players
     - [x] Opening / Closing sign-ups
     - [x] Toggling sign-up auto close and auto open - not needed: disabled by leaving the desired player count blank, and bypassed by manual opening/closing of sign-ups
-    - [ ] Campaign grid view
+    - [x] Campaign grid view
     - [x] DMs are colorfully distinct from players
     - [x] Visually distinct campaign statuses
     - [x] Campaign types (and their visual distinction) - Campaign, Adventure, One-shot
