@@ -395,6 +395,26 @@ window.campaignsPage = function () {
             }
         },
 
+        async setSignupsOpen(open) {
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.signupsCampaignId)}/signups-open`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ open })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to update sign-ups', 'error');
+                } else {
+                    this.showMessage(data.message, 'success');
+                }
+                await this.loadSignups();
+                await this.loadCampaigns();
+            } catch (error) {
+                this.showMessage('Error updating sign-ups: ' + error.message, 'error');
+            }
+        },
+
         openCalendar(campaignId, campaignTitle, isDM) {
             this.currentCampaignId = campaignId;
             this.currentCampaignTitle = campaignTitle;

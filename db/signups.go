@@ -21,3 +21,7 @@ func GetCampaignSignupsByUser(userID string) (map[string]models.CampaignSignup, 
 func SetCampaignSignupStatus(campaignID, userID string, status models.SignupStatus) error {
 	return GetStore().SetCampaignSignupStatus(campaignID, userID, status)
 }
+
+func SetCampaignSignUpsOpen(campaignID string, open bool) error {
+	return GetStore().SetCampaignSignUpsOpen(campaignID, open)
+}
