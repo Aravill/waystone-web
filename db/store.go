@@ -24,6 +24,10 @@ type Store interface {
 	GetSessionsByMonth(campaignID string, year int, month int) ([]models.CampaignSession, error)
 	GetSessionByID(sessionID string) (*models.CampaignSession, error)
 	SaveSession(session models.CampaignSession) error
+	GetSessionsByCampaignIDs(campaignIDs []string, fromDate string) ([]models.CampaignSession, error)
+	GetCalendarToken(userID string) (string, error)
+	SetCalendarToken(userID, token string) error
+	GetUserIDByCalendarToken(token string) (string, error)
 	UpsertSessionResponse(response models.SessionResponse) error
 	GetSessionResponses(sessionID string) ([]models.SessionResponse, error)
 	GetSessionResponsesBySessionIDs(sessionIDs []string) (map[string][]models.SessionResponse, error)

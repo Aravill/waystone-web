@@ -88,9 +88,16 @@ func (s *SQLiteStore) initSchema() error {
 		time TEXT NOT NULL,
 		duration INTEGER NOT NULL,
 		status TEXT NOT NULL,
+		timezone TEXT NOT NULL DEFAULT '',
 		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
+	);
+
+	CREATE TABLE IF NOT EXISTS calendar_tokens (
+		user_id TEXT PRIMARY KEY,
+		token TEXT NOT NULL UNIQUE,
+		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE TABLE IF NOT EXISTS session_responses (
@@ -151,6 +158,31 @@ func (s *SQLiteStore) initSchema() error {
 	if !hasType {
 		if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN type TEXT NOT NULL DEFAULT 'Campaign'`); err != nil {
 			return fmt.Errorf("failed to add campaigns.type column: %w", err)
+		}
+	}
+
+	// Add campaign_sessions.timezone to databases created before per-session timezones existed.
+	rows, err = s.db.Query(`PRAGMA table_info(campaign_sessions)`)
+	if err != nil {
+		return fmt.Errorf("failed to inspect campaign_sessions table: %w", err)
+	}
+	hasTimezone := false
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, ctype string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			rows.Close()
+			return fmt.Errorf("failed to inspect campaign_sessions table: %w", err)
+		}
+		if name == "timezone" {
+			hasTimezone = true
+		}
+	}
+	rows.Close()
+	if !hasTimezone {
+		if _, err := s.db.Exec(`ALTER TABLE campaign_sessions ADD COLUMN timezone TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("failed to add campaign_sessions.timezone column: %w", err)
 		}
 	}
 
@@ -543,6 +575,10 @@ func (s *SQLiteStore) DeleteUser(id string) error {
 		return err
 	}
 
+	if _, err := s.db.Exec(`DELETE FROM calendar_tokens WHERE user_id = ?`, id); err != nil {
+		return err
+	}
+
 	query := `DELETE FROM users WHERE id = ?`
 	result, err := s.db.Exec(query, id)
 	if err != nil {
@@ -623,7 +659,7 @@ func (s *SQLiteStore) GetSessionsByMonth(campaignID string, year int, month int)
 	endDate := fmt.Sprintf("%04d-%02d-01", nextYear, nextMonth)
 
 	query := `
-		SELECT id, campaign_id, date, time, duration, status, created_at, updated_at
+		SELECT id, campaign_id, date, time, duration, status, timezone, created_at, updated_at
 		FROM campaign_sessions
 		WHERE campaign_id = ? AND date >= ? AND date < ?
 		ORDER BY date ASC, time ASC
@@ -645,6 +681,7 @@ func (s *SQLiteStore) GetSessionsByMonth(campaignID string, year int, month int)
 			&session.Time,
 			&session.Duration,
 			&session.Status,
+			&session.Timezone,
 			&session.CreatedAt,
 			&session.UpdatedAt,
 		); err != nil {
@@ -674,19 +711,112 @@ func (s *SQLiteStore) SaveSession(session models.CampaignSession) error {
 	session.UpdatedAt = now
 
 	query := `
-		INSERT INTO campaign_sessions (id, campaign_id, date, time, duration, status, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO campaign_sessions (id, campaign_id, date, time, duration, status, timezone, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			date = excluded.date,
 			time = excluded.time,
 			duration = excluded.duration,
 			status = excluded.status,
-		type = excluded.type,
+			timezone = excluded.timezone,
 			updated_at = excluded.updated_at
 	`
 
-	_, err := s.db.Exec(query, session.ID, session.CampaignID, session.Date, session.Time, session.Duration, session.Status, session.CreatedAt, session.UpdatedAt)
+	_, err := s.db.Exec(query, session.ID, session.CampaignID, session.Date, session.Time, session.Duration, session.Status, session.Timezone, session.CreatedAt, session.UpdatedAt)
 	return err
+}
+
+func (s *SQLiteStore) GetSessionsByCampaignIDs(campaignIDs []string, fromDate string) ([]models.CampaignSession, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	args := make([]interface{}, 0, len(campaignIDs)+1)
+	for _, id := range campaignIDs {
+		if id != "" {
+			args = append(args, id)
+		}
+	}
+	if len(args) == 0 {
+		return nil, nil
+	}
+	args = append(args, fromDate)
+
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(args)-1), ",")
+	query := fmt.Sprintf(`
+		SELECT id, campaign_id, date, time, duration, status, timezone, created_at, updated_at
+		FROM campaign_sessions
+		WHERE campaign_id IN (%s) AND date >= ?
+		ORDER BY date ASC, time ASC
+	`, placeholders)
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []models.CampaignSession
+	for rows.Next() {
+		var session models.CampaignSession
+		if err := rows.Scan(
+			&session.ID,
+			&session.CampaignID,
+			&session.Date,
+			&session.Time,
+			&session.Duration,
+			&session.Status,
+			&session.Timezone,
+			&session.CreatedAt,
+			&session.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, session)
+	}
+
+	return sessions, rows.Err()
+}
+
+func (s *SQLiteStore) GetCalendarToken(userID string) (string, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	var token string
+	err := s.db.QueryRow(`SELECT token FROM calendar_tokens WHERE user_id = ?`, userID).Scan(&token)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return token, err
+}
+
+func (s *SQLiteStore) SetCalendarToken(userID, token string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if userID == "" || token == "" {
+		return fmt.Errorf("user id and token cannot be empty")
+	}
+	_, err := s.db.Exec(`
+		INSERT INTO calendar_tokens (user_id, token, created_at)
+		VALUES (?, ?, ?)
+		ON CONFLICT(user_id) DO UPDATE SET token = excluded.token, created_at = excluded.created_at
+	`, userID, token, time.Now().UTC().Format(time.RFC3339))
+	return err
+}
+
+func (s *SQLiteStore) GetUserIDByCalendarToken(token string) (string, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	if token == "" {
+		return "", nil
+	}
+	var userID string
+	err := s.db.QueryRow(`SELECT user_id FROM calendar_tokens WHERE token = ?`, token).Scan(&userID)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return userID, err
 }
 
 func (s *SQLiteStore) GetSessionByID(sessionID string) (*models.CampaignSession, error) {
@@ -698,7 +828,7 @@ func (s *SQLiteStore) GetSessionByID(sessionID string) (*models.CampaignSession,
 	}
 
 	query := `
-		SELECT id, campaign_id, date, time, duration, status, created_at, updated_at
+		SELECT id, campaign_id, date, time, duration, status, timezone, created_at, updated_at
 		FROM campaign_sessions
 		WHERE id = ?
 	`
@@ -711,6 +841,7 @@ func (s *SQLiteStore) GetSessionByID(sessionID string) (*models.CampaignSession,
 		&session.Time,
 		&session.Duration,
 		&session.Status,
+		&session.Timezone,
 		&session.CreatedAt,
 		&session.UpdatedAt,
 	)

@@ -36,19 +36,16 @@ window.campaignsPage = function () {
         sessionMap: {},
         selectedDay: null,
         showCreateSessionModal: false,
-        showSessionStatusModal: false,
         pendingSessionAction: '',
         selectedSession: null,
         sessionFormData: {
             date: '',
             time: '',
             durationHours: 1,
-            durationMinutes: 0
+            durationMinutes: 0,
+            timezone: ''
         },
-        sessionResponses: [],
-        pendingResponses: [],
-        showResponses: false,
-        playerResponse: '',
+        timezoneOptions: getTimezoneOptions(),
         sessionResponseCache: {},
         signupsModalOpen: false,
         signupsCampaignId: '',
@@ -58,14 +55,6 @@ window.campaignsPage = function () {
         signupsDesiredCount: 0,
         signupsOpen: false,
         showDeclinedSignups: false,
-        hoverResponsePanel: {
-            visible: false,
-            sessionId: '',
-            type: '',
-            users: [],
-            loading: false,
-            error: ''
-        },
 
         get editingCampaign() {
             return this.campaigns.find((c) => c.id === this.editingCampaignId) || null;
@@ -514,13 +503,9 @@ window.campaignsPage = function () {
             this.calendarModalOpen = true;
             this.selectedDay = null;
             this.showCreateSessionModal = false;
-            this.showSessionStatusModal = false;
             this.selectedSession = null;
-            this.sessionResponses = [];
-            this.pendingResponses = [];
-            this.showResponses = false;
+            this.pendingSessionAction = '';
             this.sessionResponseCache = {};
-            this.clearDayHoverPanel();
             this.generateCalendarDays();
             this.loadSessions();
         },
@@ -528,12 +513,8 @@ window.campaignsPage = function () {
         closeCalendarModal() {
             this.calendarModalOpen = false;
             this.showCreateSessionModal = false;
-            this.showSessionStatusModal = false;
-            this.clearSelectedSession();
             this.clearSelectedDay();
-            this.showResponses = false;
             this.sessionResponseCache = {};
-            this.clearDayHoverPanel();
         },
 
         handleCalendarBackdropClick(event) {
@@ -544,13 +525,7 @@ window.campaignsPage = function () {
 
         handleCreateSessionBackdropClick(event) {
             if (event.target.id === 'createSessionModal') {
-                this.clearSelectedDay();
-            }
-        },
-
-        handleSessionStatusBackdropClick(event) {
-            if (event.target.id === 'sessionStatusModal') {
-                this.clearSelectedSession();
+                this.closeCreateSessionModal();
             }
         },
 
@@ -588,12 +563,14 @@ window.campaignsPage = function () {
         },
 
         previousMonth() {
+            this.clearSelectedDay();
             this.currentCalendarDate = new Date(this.currentCalendarDate.getFullYear(), this.currentCalendarDate.getMonth() - 1, 1);
             this.generateCalendarDays();
             this.loadSessions();
         },
 
         nextMonth() {
+            this.clearSelectedDay();
             this.currentCalendarDate = new Date(this.currentCalendarDate.getFullYear(), this.currentCalendarDate.getMonth() + 1, 1);
             this.generateCalendarDays();
             this.loadSessions();
@@ -673,10 +650,6 @@ window.campaignsPage = function () {
             return [...sessions].sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')))[0];
         },
 
-        getPrimaryPlannedSessionForDay(date) {
-            return this.getEarliestSession(this.getPlannedSessionsForDay(date));
-        },
-
         getPrimarySessionForDay(date) {
             const dateStr = this.formatDateLocal(date);
             return this.sessionMap[dateStr]?.primary || null;
@@ -738,35 +711,8 @@ window.campaignsPage = function () {
             return `${session?.tentative_count || 0}?`;
         },
 
-        getPrimarySessionIdForDay(date) {
-            const session = this.getPrimarySessionForDay(date);
-            return session?.id || '';
-        },
-
-        getHoverPanelTitle(type) {
-            if (type === 'accepted') return 'Accepted';
-            if (type === 'declined') return 'Declined';
-            if (type === 'tentative') return 'Tentative';
-            return 'Pending';
-        },
-
         getUserDisplayName(user) {
             return user?.nickname || user?.display_name || user?.name || user?.username || 'Unknown';
-        },
-
-        isHoverPanelVisibleForDay(date) {
-            return this.hoverResponsePanel.visible && this.hoverResponsePanel.sessionId === this.getPrimarySessionIdForDay(date);
-        },
-
-        clearDayHoverPanel() {
-            this.hoverResponsePanel = {
-                visible: false,
-                sessionId: '',
-                type: '',
-                users: [],
-                loading: false,
-                error: ''
-            };
         },
 
         async getSessionResponseDetails(sessionId) {
@@ -793,108 +739,126 @@ window.campaignsPage = function () {
             return details;
         },
 
-        getUsersForHoverType(details, type) {
-            if (type === 'pending') {
-                return details.pending;
-            }
-
-            const participation = type === 'accepted'
-                ? 'Accepted'
-                : type === 'declined'
-                    ? 'Declined'
-                    : 'Tentative';
-
-            return details.all
-                .filter((entry) => entry?.participation === participation)
-                .map((entry) => entry?.user)
-                .filter(Boolean);
-        },
-
-        async handleDayReactionHover(day, type) {
-            const sessionId = this.getPrimarySessionIdForDay(day);
-            if (!sessionId) {
-                return;
-            }
-
-            this.hoverResponsePanel = {
-                visible: true,
-                sessionId,
-                type,
-                users: [],
-                loading: true,
-                error: ''
-            };
-
-            try {
-                const details = await this.getSessionResponseDetails(sessionId);
-                if (!this.hoverResponsePanel.visible || this.hoverResponsePanel.sessionId !== sessionId || this.hoverResponsePanel.type !== type) {
-                    return;
-                }
-                this.hoverResponsePanel = {
-                    ...this.hoverResponsePanel,
-                    users: this.getUsersForHoverType(details, type),
-                    loading: false
-                };
-            } catch (error) {
-                if (!this.hoverResponsePanel.visible || this.hoverResponsePanel.sessionId !== sessionId || this.hoverResponsePanel.type !== type) {
-                    return;
-                }
-                this.hoverResponsePanel = {
-                    ...this.hoverResponsePanel,
-                    users: [],
-                    loading: false,
-                    error: error.message || 'Failed to load responses'
-                };
-            }
-        },
-
-        selectDay(date) {
+        async selectDay(date) {
             if (!this.isCurrentMonth(date)) return;
-            const daySessions = this.getPlannedSessionsForDay(date);
             this.selectedDay = date;
-
-            if (daySessions.length > 0) {
-                this.selectSession(daySessions[0], date);
-                return;
-            }
-
-            if (!this.isCurrentUserDM) {
-                return;
-            }
-
             this.selectedSession = null;
-            this.playerResponse = '';
+            this.pendingSessionAction = '';
+            this.showCreateSessionModal = false;
+            for (const session of this.getSelectedDaySessions()) {
+                this.invalidateSessionCache(session.id);
+            }
+            if (window.matchMedia('(max-width: 768px)').matches) {
+                this.$nextTick(() => {
+                    if (this.$refs.dayPanel) {
+                        this.$refs.dayPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
+            }
+            await this.loadDayResponses();
+        },
+
+        openCreateSession(date) {
+            if (!this.isCurrentUserDM || !date) return;
             this.sessionFormData = {
                 date: this.formatDateLocal(date),
                 time: '19:00',
                 durationHours: 1,
-                durationMinutes: 0
+                durationMinutes: 0,
+                timezone: getDefaultTimezone()
             };
             this.showCreateSessionModal = true;
-            this.showSessionStatusModal = false;
         },
 
-        selectSession(session, day) {
-            this.selectedSession = session;
-            this.selectedDay = day || null;
-            this.showCreateSessionModal = false;
-            this.showSessionStatusModal = this.isCurrentUserDM && session.status !== 'Cancelled';
-            this.pendingSessionAction = '';
-            this.playerResponse = session.current_user_participation || '';
-            this.showResponses = false;
+        async loadDayResponses() {
+            try {
+                await Promise.all(this.getSelectedDaySessions().map((session) => this.getSessionResponseDetails(session.id)));
+            } catch (error) {
+                this.showMessage('Error loading responses: ' + error.message, 'error');
+            }
+        },
+
+        invalidateSessionCache(sessionId) {
+            const next = { ...this.sessionResponseCache };
+            delete next[sessionId];
+            this.sessionResponseCache = next;
+        },
+
+        isSelectedDay(date) {
+            return !!this.selectedDay && this.formatDateLocal(date) === this.formatDateLocal(this.selectedDay);
+        },
+
+        isToday(date) {
+            return this.formatDateLocal(date) === this.formatDateLocal(new Date());
+        },
+
+        sortedByTime(sessions) {
+            return [...sessions].sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
+        },
+
+        getCellSessions(date) {
+            return this.sortedByTime(this.getSessionsForDay(date)).slice(0, 2);
+        },
+
+        getCellOverflow(date) {
+            return Math.max(0, this.getSessionsForDay(date).length - 2);
+        },
+
+        getSelectedDaySessions() {
+            return this.selectedDay ? this.sortedByTime(this.getSessionsForDay(this.selectedDay)) : [];
+        },
+
+        parseDateLocal(dateStr) {
+            const [year, month, day] = String(dateStr).split('-').map(Number);
+            return new Date(year, month - 1, day);
+        },
+
+        formatDayHeading(date) {
+            return date.toLocaleDateString('default', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+        },
+
+        formatAgendaDate(session) {
+            return this.parseDateLocal(session.date).toLocaleDateString('default', { weekday: 'short', day: 'numeric', month: 'short' });
+        },
+
+        getDurationLabel(session) {
+            const total = Number(session?.duration) || 0;
+            const hours = Math.floor(total / 60);
+            const minutes = total % 60;
+            if (hours && minutes) return `${hours}h ${minutes}m`;
+            if (hours) return `${hours}h`;
+            return `${minutes}m`;
+        },
+
+        getSessionMeta(session) {
+            const parts = [this.getDurationLabel(session)];
+            if (session?.timezone) parts.push(session.timezone);
+            return parts.join(' · ');
+        },
+
+        getResponseGroups(session) {
+            const details = this.sessionResponseCache[session.id];
+            if (!details) return [];
+            const byStatus = (participation) => details.all
+                .filter((entry) => entry?.participation === participation)
+                .map((entry) => entry.user || { display_name: 'Unknown' });
+            return [
+                { label: 'Accepted', cls: 'participation-accepted', users: byStatus('Accepted') },
+                { label: 'Tentative', cls: 'participation-tentative', users: byStatus('Tentative') },
+                { label: 'Declined', cls: 'participation-declined', users: byStatus('Declined') },
+                { label: 'Pending', cls: 'participation-pending', users: details.pending }
+            ];
         },
 
         clearSelectedDay() {
             this.selectedDay = null;
-            this.showCreateSessionModal = false;
-            this.sessionFormData = { date: '', time: '', durationHours: 1, durationMinutes: 0 };
+            this.selectedSession = null;
+            this.pendingSessionAction = '';
         },
 
-        clearSelectedSession() {
-            this.selectedSession = null;
-            this.showSessionStatusModal = false;
-            this.pendingSessionAction = '';
-            this.playerResponse = '';
+        closeCreateSessionModal() {
+            this.showCreateSessionModal = false;
+            this.sessionFormData = { date: '', time: '', durationHours: 1, durationMinutes: 0, timezone: '' };
         },
 
         adjustDurationPart(field, delta) {
@@ -931,7 +895,8 @@ window.campaignsPage = function () {
                 const payload = {
                     date: this.sessionFormData.date,
                     time: this.sessionFormData.time,
-                    duration: totalDuration
+                    duration: totalDuration,
+                    timezone: this.sessionFormData.timezone
                 };
                 const response = await fetch(`/api/campaigns/${this.currentCampaignId}/sessions`, {
                     method: 'POST',
@@ -944,41 +909,36 @@ window.campaignsPage = function () {
                     return;
                 }
                 this.showMessage('Session created successfully!', 'success');
-                this.clearSelectedDay();
+                this.closeCreateSessionModal();
                 await this.loadSessions();
+                await this.loadDayResponses();
             } catch (error) {
                 this.showMessage('Error creating session: ' + error.message, 'error');
             }
         },
 
-        async confirmSession() {
-            await this.requestSessionStatusChange('Confirmed');
-        },
-
-        async cancelSession() {
-            await this.requestSessionStatusChange('Cancelled');
-        },
-
-        async requestSessionStatusChange(status) {
-            if (!this.selectedSession) return;
-            if (status === 'Confirmed' && this.selectedSession.status !== 'Suggested') {
+        async requestSessionStatusChange(status, session) {
+            if (!session) return;
+            if (status === 'Confirmed' && session.status !== 'Suggested') {
                 this.showMessage('Only suggested sessions can be confirmed', 'error');
                 return;
             }
 
-            if (this.pendingSessionAction !== status) {
+            if (this.selectedSession?.id !== session.id || this.pendingSessionAction !== status) {
+                this.selectedSession = session;
                 this.pendingSessionAction = status;
                 return;
             }
 
             this.pendingSessionAction = '';
-            await this.updateSessionStatus(status);
+            this.selectedSession = null;
+            await this.updateSessionStatus(status, session);
         },
 
-        async updateSessionStatus(status) {
-            if (!this.selectedSession) return;
+        async updateSessionStatus(status, session) {
+            if (!session) return;
             try {
-                const response = await fetch(`/api/campaigns/${this.currentCampaignId}/sessions/${this.selectedSession.id}`, {
+                const response = await fetch(`/api/campaigns/${this.currentCampaignId}/sessions/${session.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status })
@@ -989,18 +949,20 @@ window.campaignsPage = function () {
                     return;
                 }
                 this.showMessage(`Session ${status.toLowerCase()} successfully`, 'success');
-                this.clearSelectedSession();
-                this.showResponses = false;
+                this.invalidateSessionCache(session.id);
                 await this.loadSessions();
+                await this.loadDayResponses();
             } catch (error) {
                 this.showMessage('Error updating session: ' + error.message, 'error');
             }
         },
 
-        async submitResponse(participation) {
-            if (!this.selectedSession) return;
+        async submitResponse(participation, session) {
+            if (!session) return;
+            this.pendingSessionAction = '';
+            this.selectedSession = null;
             try {
-                const response = await fetch(`/api/campaigns/${this.currentCampaignId}/sessions/${this.selectedSession.id}/responses`, {
+                const response = await fetch(`/api/campaigns/${this.currentCampaignId}/sessions/${session.id}/responses`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ participation })
@@ -1010,34 +972,13 @@ window.campaignsPage = function () {
                     this.showMessage(data.error || 'Failed to submit response', 'error');
                     return;
                 }
-                this.playerResponse = participation;
+                this.invalidateSessionCache(session.id);
                 await this.loadSessions();
-                this.selectedSession = this.sessions.find((session) => session.id === this.selectedSession.id) || this.selectedSession;
+                await this.loadDayResponses();
                 this.showMessage('Response submitted!', 'success');
             } catch (error) {
                 this.showMessage('Error submitting response: ' + error.message, 'error');
             }
-        },
-
-        async showResponseBreakdown(session) {
-            const targetSession = session || this.selectedSession;
-            if (!targetSession) return;
-            this.selectedSession = targetSession;
-            try {
-                const details = await this.getSessionResponseDetails(targetSession.id);
-                this.sessionResponses = details.all;
-                this.pendingResponses = details.pending;
-                this.showResponses = true;
-            } catch (error) {
-                this.showMessage('Error loading responses: ' + error.message, 'error');
-            }
-        },
-
-        getParticipationClass(participation) {
-            if (participation === 'Accepted') return 'participation-accepted';
-            if (participation === 'Declined') return 'participation-declined';
-            if (participation === 'Tentative') return 'participation-tentative';
-            return '';
         },
 
         getSessionStatusWarning() {
@@ -1059,6 +1000,27 @@ window.campaignsPage = function () {
         }
     };
 };
+
+function getDefaultTimezone() {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    } catch (error) {
+        return 'UTC';
+    }
+}
+
+function getTimezoneOptions() {
+    let zones = [];
+    try {
+        zones = Intl.supportedValuesOf('timeZone');
+    } catch (error) {
+        zones = [];
+    }
+    for (const zone of [getDefaultTimezone(), 'UTC']) {
+        if (!zones.includes(zone)) zones.push(zone);
+    }
+    return zones;
+}
 
 function escapeHtml(text) {
     if (!text) return '';

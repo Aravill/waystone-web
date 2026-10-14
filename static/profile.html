@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile</title>
-    <link rel="stylesheet" href="styles.css?v=7">
+    <link rel="stylesheet" href="styles.css?v=8">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body x-data="profilePage()" x-init="init()">
@@ -59,6 +59,24 @@
                 </div>
             </div>
 
+            <div class="profile-section" id="calendar-sync" x-show="isSelf">
+                <h2 class="section-header">Calendar Sync</h2>
+                <p class="form-hint">Subscribe in Google Calendar or any calendar app. Google refreshes subscriptions every few hours (up to ~24h). Anyone with this link can see your sessions.</p>
+                <template x-if="!calendarToken">
+                    <button type="button" class="campaign-link-button" @click="enableOrRegenerateCalendar()">Enable Calendar Sync</button>
+                </template>
+                <template x-if="calendarToken">
+                    <div class="calendar-sync-box">
+                        <input type="text" id="calendarUrl" readonly :value="calendarUrl" @focus="$event.target.select()">
+                        <div class="campaigns-list">
+                            <button type="button" class="campaign-link-button" @click="copyCalendarUrl()">Copy</button>
+                            <a :href="googleCalendarUrl" target="_blank" rel="noopener" class="campaign-link-button">Add to Google Calendar</a>
+                            <button type="button" class="danger-btn" @click="enableOrRegenerateCalendar()">Regenerate Link</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
             <div class="profile-section" x-show="isSelf && !isEnvAdmin">
                 <a href="/change-password" class="campaign-link-button">Change Password</a>
             </div>
@@ -73,6 +91,6 @@
         </div>
     </div>
 
-    <script src="profile.js?v=1"></script>
+    <script src="profile.js?v=2"></script>
 </body>
 </html>
