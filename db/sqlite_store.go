@@ -681,7 +681,6 @@ func (s *SQLiteStore) SaveSession(session models.CampaignSession) error {
 			time = excluded.time,
 			duration = excluded.duration,
 			status = excluded.status,
-		type = excluded.type,
 			updated_at = excluded.updated_at
 	`
 
