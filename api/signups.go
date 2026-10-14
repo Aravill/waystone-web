@@ -69,6 +69,56 @@ func HandleCampaignPlayerActions(w http.ResponseWriter, r *http.Request) {
 	handleKickPlayer(w, r, parts[0], parts[2])
 }
 
+// HandleCampaignSignupsOpen handles /api/campaigns/{id}/signups-open (PUT open/close).
+func HandleCampaignSignupsOpen(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/campaigns/"), "/")
+	if len(parts) != 2 || parts[1] != "signups-open" {
+		writeJSONError(w, http.StatusBadRequest, "invalid path")
+		return
+	}
+
+	if r.Method != http.MethodPut {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	campaign, userID, ok := loadCampaignAndUser(w, r, parts[0])
+	if !ok {
+		return
+	}
+	if campaign.DM != userID {
+		writeJSONError(w, http.StatusForbidden, "only the campaign DM can open or close sign-ups")
+		return
+	}
+
+	var req struct {
+		Open *bool `json:"open"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Open == nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := db.SetCampaignSignUpsOpen(parts[0], *req.Open); err != nil {
+		if errors.Is(err, db.ErrCampaignNotFound) {
+			writeJSONError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeJSONError(w, http.StatusInternalServerError, "failed to update sign-ups")
+		return
+	}
+
+	message := "sign-ups closed"
+	if *req.Open {
+		message = "sign-ups opened"
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":        "success",
+		"message":       message,
+		"sign_ups_open": *req.Open,
+	})
+}
+
 // loadCampaignAndUser authenticates the caller and loads the campaign, writing
 // an error response and returning ok=false on failure.
 func loadCampaignAndUser(w http.ResponseWriter, r *http.Request, campaignID string) (*models.Campaign, string, bool) {

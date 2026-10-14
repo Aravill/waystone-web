@@ -945,6 +945,25 @@ func (s *SQLiteStore) GetCampaignSignupsByUser(userID string) (map[string]models
 	return signups, rows.Err()
 }
 
+// SetCampaignSignUpsOpen manually opens or closes a campaign's sign-ups.
+func (s *SQLiteStore) SetCampaignSignUpsOpen(campaignID string, open bool) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	res, err := s.db.Exec(`UPDATE campaigns SET sign_ups_open = ? WHERE id = ?`, open, campaignID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrCampaignNotFound
+	}
+	return nil
+}
+
 // SetCampaignSignupStatus changes a sign-up's status and keeps campaigns.players
 // (and sign_ups_open when the campaign fills up) consistent in one transaction.
 func (s *SQLiteStore) SetCampaignSignupStatus(campaignID, userID string, status models.SignupStatus) error {
