@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Campaigns</title>
-    <link rel="stylesheet" href="styles.css?v=6">
+    <link rel="stylesheet" href="styles.css?v=7">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body x-data="campaignsPage()" x-init="init()">
@@ -33,7 +33,7 @@
         <button type="button" @click="openModal()" class="toolbar-button">Register campaign</button>
     </div>
 
-    <div class="container">
+    <div class="container container--wide">
         <div class="campaigns-section">
             <h2>Available Campaigns</h2>
             <div id="campaignsList" class="campaigns-list">

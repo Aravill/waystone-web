@@ -144,9 +144,25 @@ h2 {
 }
 
 .campaigns-list {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr));
     gap: 12px;
+}
+
+.campaigns-list > p {
+    grid-column: 1 / -1;
+}
+
+.campaigns-list > div {
+    display: flex;
+}
+
+.campaigns-list .campaign-item {
+    flex: 1;
+}
+
+.container.container--wide {
+    max-width: 1720px;
 }
 
 .campaign-item {
