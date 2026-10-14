@@ -40,6 +40,14 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUserID, _ := r.Context().Value("user_id").(string)
+	userSignups, err := db.GetCampaignSignupsByUser(currentUserID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, `{"error": "failed to retrieve sign-ups"}`)
+		return
+	}
+
 	// Create a map for O(1) user lookup
 	userMap := make(map[string]*models.User)
 	for i := range allUsers {
@@ -60,6 +68,7 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 			"sign_ups_open":        campaign.SignUpsOpen,
 			"desired_player_count": campaign.DesiredPlayerCount,
 		}
+		campaignObj["current_user_signup_status"] = string(userSignups[campaign.ID].Status)
 
 		// Add DM user display object if DM exists
 		if campaign.DM != "" {

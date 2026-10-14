@@ -8,10 +8,10 @@ This document describes what must-have features are to be implemented before pre
     - [x] DM can see who reacted how
     - [x] Dates can be cancelled
     - [ ] Calendar sync - the players & DM can import events into their google calendar
-- [ ] Signing up
-    - [ ] Users can sign up for campaigns if sign-ups are open
-    - [ ] DMs can accept or ignore signed-up players
-    - [ ] Ignored players do not show up for the DM anymore unless a special button is clicked
+- [x] Signing up
+    - [x] Users can sign up for campaigns if sign-ups are open
+    - [x] DMs can accept or ignore signed-up players
+    - [x] Ignored players do not show up for the DM anymore unless a special button is clicked
 - [ ] Following
     - [ ] Users can follow campaigns (to receive notifications)
     - [ ] Players are automatically following campaigns they're in
@@ -28,7 +28,7 @@ This document describes what must-have features are to be implemented before pre
         - [ ] Updating
         - [ ] Deleting
     - [ ] Switching states according to the state transition map
-    - [ ] Removing active players
+    - [x] Removing active players
     - [ ] Opening / Closing sign-ups
     - [ ] Toggling sign-up auto close and auto open
     - [ ] Campaign grid view

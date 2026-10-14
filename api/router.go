@@ -113,6 +113,19 @@ func HandleCampaignRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(parts) >= 2 && parts[1] == "signups" {
+		if len(parts) == 2 {
+			HandleCampaignSignups(w, r)
+		} else {
+			HandleCampaignSignupActions(w, r)
+		}
+		return
+	}
+	if len(parts) == 3 && parts[1] == "players" {
+		HandleCampaignPlayerActions(w, r)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusNotFound)
 	fmt.Fprintf(w, `{"error": "not found"}`)
