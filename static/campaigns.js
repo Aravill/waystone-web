@@ -1,3 +1,10 @@
+// Campaign types: single source for labels and tooltip/form descriptions.
+const CAMPAIGN_TYPES = [
+    { value: 'One-shot', label: 'One-shot', description: 'A single, self-contained story told in 1–2 sessions. Low commitment, ideal for trying a new system, a new DM, or just dropping in.' },
+    { value: 'Adventure', label: 'Adventure', description: 'A short campaign of 3+ sessions with one self-contained plot and a clear ending. A few weeks to a few months of commitment.' },
+    { value: 'Campaign', label: 'Campaign', description: 'A long, overarching story with no set number of sessions. Characters grow over many months; expect a regular, ongoing commitment.' }
+];
+
 // Campaigns Alpine component
 window.campaignsPage = function () {
     return {
@@ -15,8 +22,11 @@ window.campaignsPage = function () {
             title: '',
             summary: '',
             description: '',
-            desired_player_count: 1
+            type: 'Campaign',
+            desired_player_count: ''
         },
+        campaignTypes: CAMPAIGN_TYPES,
+        editingCampaignId: '',
         currentCalendarDate: new Date(),
         currentCampaignId: null,
         currentCampaignTitle: '',
@@ -55,6 +65,10 @@ window.campaignsPage = function () {
             users: [],
             loading: false,
             error: ''
+        },
+
+        get editingCampaign() {
+            return this.campaigns.find((c) => c.id === this.editingCampaignId) || null;
         },
 
         async init() {
@@ -99,6 +113,12 @@ window.campaignsPage = function () {
                         if (manageBtn) {
                             event.preventDefault();
                             this.openSignupsModal(manageBtn.dataset.campaignId || '', manageBtn.dataset.campaignTitle || '');
+                            return;
+                        }
+                        const editBtn = event.target.closest('.campaign-edit-btn');
+                        if (editBtn) {
+                            event.preventDefault();
+                            this.openEditModal(editBtn.dataset.campaignId || '');
                         }
                     };
                     document.addEventListener('click', this._signupButtonHandler);
@@ -124,7 +144,24 @@ window.campaignsPage = function () {
         },
 
         openModal() {
-            this.formData = { title: '', summary: '', description: '', desired_player_count: 1 };
+            this.editingCampaignId = '';
+            this.formData = { title: '', summary: '', description: '', type: 'Campaign', desired_player_count: '' };
+            this.modalOpen = true;
+        },
+
+        openEditModal(campaignId) {
+            const c = this.campaigns.find((x) => x.id === campaignId);
+            if (!c) {
+                return;
+            }
+            this.editingCampaignId = c.id;
+            this.formData = {
+                title: c.title || '',
+                summary: c.summary || '',
+                description: c.description || '',
+                type: c.type || 'Campaign',
+                desired_player_count: parseInt(c.desired_player_count, 10) || ''
+            };
             this.modalOpen = true;
         },
 
@@ -139,17 +176,22 @@ window.campaignsPage = function () {
         },
 
         async handleCreateCampaign() {
-            const { title, summary, description, desired_player_count } = this.formData;
-            if (!title || !summary || !description || !desired_player_count || desired_player_count <= 0) {
-                this.showMessage('All fields are required', 'error');
+            const { title, summary, description, type, desired_player_count } = this.formData;
+            if (!title || !summary || !description) {
+                this.showMessage('Title, summary and description are required', 'error');
+                return;
+            }
+            if (desired_player_count !== '' && desired_player_count < 1) {
+                this.showMessage('Desired player count must be at least 1', 'error');
                 return;
             }
 
+            const editing = !!this.editingCampaignId;
             try {
-                const response = await fetch('/api/campaigns', {
-                    method: 'POST',
+                const response = await fetch(editing ? `/api/campaigns/${encodeURIComponent(this.editingCampaignId)}` : '/api/campaigns', {
+                    method: editing ? 'PUT' : 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, summary, description, desired_player_count })
+                    body: JSON.stringify({ title, summary, description, type, desired_player_count: Number(desired_player_count) || 0 })
                 });
                 if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
                     window.location.href = '/login.html';
@@ -157,15 +199,57 @@ window.campaignsPage = function () {
                 }
                 const data = await response.json();
                 if (!response.ok) {
-                    this.showMessage(data.error || 'Failed to create campaign', 'error');
+                    this.showMessage(data.error || (editing ? 'Failed to update campaign' : 'Failed to create campaign'), 'error');
                     return;
                 }
 
-                this.showMessage('Campaign created successfully!', 'success');
+                this.showMessage(editing ? 'Campaign updated' : 'Campaign created successfully!', 'success');
                 this.closeModal();
                 await this.loadCampaigns();
             } catch (error) {
-                this.showMessage('Error creating campaign: ' + error.message, 'error');
+                this.showMessage((editing ? 'Error updating campaign: ' : 'Error creating campaign: ') + error.message, 'error');
+            }
+        },
+
+        async setCampaignStatus(status) {
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.editingCampaignId)}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to change status', 'error');
+                } else {
+                    this.showMessage(data.message, 'success');
+                }
+                await this.loadCampaigns();
+            } catch (error) {
+                this.showMessage('Error changing status: ' + error.message, 'error');
+            }
+        },
+
+        async deleteCampaign() {
+            const campaign = this.editingCampaign;
+            if (!campaign) {
+                return;
+            }
+            if (!confirm(`Delete campaign "${campaign.title}"? This also deletes its sessions and sign-ups and cannot be undone.`)) {
+                return;
+            }
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(campaign.id)}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to delete campaign', 'error');
+                    return;
+                }
+                this.closeModal();
+                this.showMessage(data.message || 'Campaign deleted', 'success');
+                await this.loadCampaigns();
+            } catch (error) {
+                this.showMessage('Error deleting campaign: ' + error.message, 'error');
             }
         },
 
@@ -227,6 +311,9 @@ window.campaignsPage = function () {
             };
             const statusClass = statusMap[status] || String(status).toLowerCase().replace(/\s+/g, '-');
 
+            const typeInfo = CAMPAIGN_TYPES.find((t) => t.value === campaign?.type) || CAMPAIGN_TYPES.find((t) => t.value === 'Campaign');
+            const typeBadgeHtml = `<span class="campaign-type-badge type-${escapeHtml(typeInfo.value.toLowerCase())}">${escapeHtml(typeInfo.label)} <span class="info-icon" tabindex="0" role="img" aria-label="${escapeHtml(typeInfo.description)}" data-tooltip="${escapeHtml(typeInfo.description)}">i</span></span>`;
+
             const dmUser = campaign?.dm_user;
             const dmHtml = dmUser
                 ? `<a href="${escapeHtml(dmUser.profile_url || `/profile?user_id=${encodeURIComponent(dmUser.id)}`)}" class="user-button user-button--dm">${escapeHtml(dmUser.display_name || dmUser.name || 'Unknown')}</a>`
@@ -252,7 +339,10 @@ window.campaignsPage = function () {
                     <section class="campaign-row campaign-row-top">
                         <div class="campaign-title-container">
                             <h3 class="campaign-title">${escapeHtml(title)}</h3>
-                            <span class="campaign-status-badge">${escapeHtml(status)}</span>
+                            <div class="campaign-badges">
+                                <span class="campaign-status-badge">${escapeHtml(status)}</span>
+                                ${typeBadgeHtml}
+                            </div>
                         </div>
                         <div class="campaign-summary-row">
                             <p class="campaign-summary-text">${escapeHtml(summary)}</p>
@@ -288,6 +378,7 @@ window.campaignsPage = function () {
                         <button type="button" class="campaign-action-btn" disabled aria-disabled="true">Codex</button>
                         <button type="button" class="campaign-action-btn campaign-calendar-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-campaign-title="${escapeHtml(campaign?.title || '')}" data-dm-id="${escapeHtml(campaign?.dm || '')}">Calendar</button>
                         ${signupBtnHtml}
+                        ${campaign?.can_manage ? `<button type="button" class="campaign-action-btn campaign-edit-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}">Edit</button>` : ''}
                     </section>
                 </article>
             `;

@@ -220,6 +220,90 @@ h2 {
     outline-offset: 2px;
 }
 
+/* Campaign Type Badge */
+.campaign-badges {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+}
+
+.campaign-type-badge {
+    display: inline-block;
+    position: relative;
+    padding: 3px 9px;
+    border: 1px solid currentColor;
+    font-size: 0.75em;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.campaign-type-badge.type-one-shot {
+    color: #c6ff00;
+}
+
+.campaign-type-badge.type-adventure {
+    color: #b388ff;
+}
+
+.campaign-type-badge.type-campaign {
+    color: #5c7cff;
+}
+
+.info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-left: 4px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    font-size: 0.85em;
+    font-style: italic;
+    text-transform: none;
+    cursor: help;
+    vertical-align: middle;
+}
+
+.info-icon::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    background: #0a0a0a;
+    color: #e0e0e0;
+    border: 1px solid currentColor;
+    padding: 6px 10px;
+    border-radius: 2px;
+    font-size: 1.1em;
+    font-style: normal;
+    letter-spacing: normal;
+    line-height: 1.4;
+    text-align: left;
+    text-transform: none;
+    white-space: normal;
+    width: 260px;
+    max-width: calc(100vw - 32px);
+    bottom: 120%;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 1000;
+}
+
+.info-icon:hover::before,
+.info-icon:focus::before,
+.info-icon:focus-visible::before {
+    opacity: 1;
+}
+
+.info-icon:focus-visible {
+    outline: 2px solid #00d9ff;
+    outline-offset: 2px;
+}
+
 /* Status-specific styles */
 .campaign-item.status-pitch {
     border-left: 4px solid #ffd700;
@@ -392,7 +476,9 @@ h2 {
 
 .campaign-row-bottom {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
     gap: 0;
     padding: 0;
 }
@@ -1841,4 +1927,11 @@ select:focus {
         flex: 1;
         min-width: 0;
     }
+}
+
+.form-hint {
+    display: block;
+    margin-top: 4px;
+    color: #555555;
+    font-size: 0.75em;
 }
