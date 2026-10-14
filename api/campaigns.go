@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 	"waystone-web/db"
 	"waystone-web/models"
 )
@@ -49,6 +50,13 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	knownSystems, err := systemsByName()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, `{"error": "failed to retrieve systems"}`)
+		return
+	}
+
 	// Create a map for O(1) user lookup
 	userMap := make(map[string]*models.User)
 	for i := range allUsers {
@@ -74,6 +82,8 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 			"players":                    campaign.Players,
 			"sign_ups_open":              campaign.SignUpsOpen,
 			"desired_player_count":       campaign.DesiredPlayerCount,
+			"system":                     campaign.System,
+			"system_logo_url":            knownSystems[strings.ToLower(campaign.System)].LogoURL(),
 			"can_manage":                 isAdmin || (currentUserID != "" && campaign.DM == currentUserID),
 			"allowed_status_transitions": campaign.Status.AllowedTransitions(),
 		}
@@ -145,6 +155,13 @@ func HandleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	system, err := canonicalSystemName(req.System)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, `{"error": "failed to retrieve systems"}`)
+		return
+	}
+
 	// Create campaign with DM set to authenticated user
 	campaign := models.Campaign{
 		ID:                 db.GetNextCampaignID(),
@@ -156,6 +173,7 @@ func HandleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 		Players:            []string{},
 		Status:             models.Pitch,
 		Type:               req.Type,
+		System:             system,
 		SignUpsOpen:        true,
 	}
 
@@ -182,6 +200,7 @@ type campaignRequest struct {
 	Description        string              `json:"description"`
 	Type               models.CampaignType `json:"type"`
 	DesiredPlayerCount int                 `json:"desired_player_count"`
+	System             string              `json:"system"`
 }
 
 // normalize trims the text fields and returns a validation error message, or "" if valid.
@@ -189,6 +208,7 @@ func (req *campaignRequest) normalize() string {
 	req.Title = strings.TrimSpace(req.Title)
 	req.Summary = strings.TrimSpace(req.Summary)
 	req.Description = strings.TrimSpace(req.Description)
+	req.System = strings.TrimSpace(req.System)
 	if req.Type == "" {
 		req.Type = models.LongCampaign
 	}
@@ -203,6 +223,8 @@ func (req *campaignRequest) normalize() string {
 		return "invalid campaign type"
 	case req.DesiredPlayerCount < 0:
 		return "desired player count cannot be negative"
+	case utf8.RuneCountInString(req.System) > 64:
+		return "system must be at most 64 characters"
 	}
 	return ""
 }
@@ -274,7 +296,13 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 		return
 	}
 
-	if err := db.UpdateCampaignDetails(campaignID, req.Title, req.Summary, req.Description, req.Type, playerCountString(req.DesiredPlayerCount)); err != nil {
+	system, err := canonicalSystemName(req.System)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve systems")
+		return
+	}
+
+	if err := db.UpdateCampaignDetails(campaignID, req.Title, req.Summary, req.Description, req.Type, system, playerCountString(req.DesiredPlayerCount)); err != nil {
 		if errors.Is(err, db.ErrCampaignNotFound) {
 			writeJSONError(w, http.StatusNotFound, err.Error())
 			return

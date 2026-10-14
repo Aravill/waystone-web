@@ -11,12 +11,19 @@ const (
 	DefaultPort = "8080"
 )
 
+var InitialSystems = []models.System{
+	{ID: "3f1c5a52-6b0e-4f0b-9a57-1d2e8c7a0b11", Name: "D&D 5e"},
+	{ID: "8a2d4e90-7c3b-4d1e-b6f4-5e9a1c0d2f22", Name: "D&D 2024"},
+	{ID: "c4b7e1d3-2a98-4f65-8e0c-9b3d6a1f7e33", Name: "Cyberpunk Red"},
+}
+
 var InitialCampaigns = []models.Campaign{
 	{
 		ID:          "ea213cb4-9ab9-49ff-a29f-3fafb7b4799c",
 		Title:       "Age of Sojourn",
 		Status:      models.Ongoing,
 		Type:        models.LongCampaign,
+		System:      "D&D 5e",
 		Summary:     "An epic campaign of discovery and adventure",
 		Description: "A long-running D&D campaign where players explore a mysterious world filled with ancient ruins and untold secrets.",
 		Players:     []string{"7609bdaf-cc43-4131-b188-098aa07ba6dc"},
