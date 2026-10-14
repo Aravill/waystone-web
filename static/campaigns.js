@@ -23,8 +23,10 @@ window.campaignsPage = function () {
             summary: '',
             description: '',
             type: 'Campaign',
+            system: '',
             desired_player_count: ''
         },
+        systems: [],
         campaignTypes: CAMPAIGN_TYPES,
         editingCampaignId: '',
         currentCalendarDate: new Date(),
@@ -130,6 +132,20 @@ window.campaignsPage = function () {
             }
 
             await this.loadCampaigns();
+            await this.loadSystems();
+        },
+
+        async loadSystems() {
+            try {
+                const response = await fetch('/api/systems');
+                if (!response.ok) {
+                    throw new Error('request failed');
+                }
+                this.systems = await response.json();
+            } catch (error) {
+                this.systems = [];
+                this.showMessage('Failed to load systems', 'error');
+            }
         },
 
         async handleLogout() {
@@ -145,7 +161,7 @@ window.campaignsPage = function () {
 
         openModal() {
             this.editingCampaignId = '';
-            this.formData = { title: '', summary: '', description: '', type: 'Campaign', desired_player_count: '' };
+            this.formData = { title: '', summary: '', description: '', type: 'Campaign', system: '', desired_player_count: '' };
             this.modalOpen = true;
         },
 
@@ -160,6 +176,7 @@ window.campaignsPage = function () {
                 summary: c.summary || '',
                 description: c.description || '',
                 type: c.type || 'Campaign',
+                system: c.system || '',
                 desired_player_count: parseInt(c.desired_player_count, 10) || ''
             };
             this.modalOpen = true;
@@ -176,7 +193,7 @@ window.campaignsPage = function () {
         },
 
         async handleCreateCampaign() {
-            const { title, summary, description, type, desired_player_count } = this.formData;
+            const { title, summary, description, type, system, desired_player_count } = this.formData;
             if (!title || !summary || !description) {
                 this.showMessage('Title, summary and description are required', 'error');
                 return;
@@ -191,7 +208,7 @@ window.campaignsPage = function () {
                 const response = await fetch(editing ? `/api/campaigns/${encodeURIComponent(this.editingCampaignId)}` : '/api/campaigns', {
                     method: editing ? 'PUT' : 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, summary, description, type, desired_player_count: Number(desired_player_count) || 0 })
+                    body: JSON.stringify({ title, summary, description, type, system: (system || '').trim(), desired_player_count: Number(desired_player_count) || 0 })
                 });
                 if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
                     window.location.href = '/login.html';
@@ -314,6 +331,11 @@ window.campaignsPage = function () {
             const typeInfo = CAMPAIGN_TYPES.find((t) => t.value === campaign?.type) || CAMPAIGN_TYPES.find((t) => t.value === 'Campaign');
             const typeBadgeHtml = `<span class="campaign-type-badge type-${escapeHtml(typeInfo.value.toLowerCase())}">${escapeHtml(typeInfo.label)} <span class="info-icon" tabindex="0" role="img" aria-label="${escapeHtml(typeInfo.description)}" data-tooltip="${escapeHtml(typeInfo.description)}">i</span></span>`;
 
+            const systemName = campaign?.system || '';
+            const systemHtml = campaign?.system_logo_url
+                ? `<img class="campaign-system-logo" src="${escapeHtml(campaign.system_logo_url)}" alt="${escapeHtml(systemName)}" title="${escapeHtml(systemName)}">`
+                : (systemName ? `<span class="campaign-system-badge">${escapeHtml(systemName)}</span>` : '');
+
             const dmUser = campaign?.dm_user;
             const dmHtml = dmUser
                 ? `<a href="${escapeHtml(dmUser.profile_url || `/profile?user_id=${encodeURIComponent(dmUser.id)}`)}" class="user-button user-button--dm">${escapeHtml(dmUser.display_name || dmUser.name || 'Unknown')}</a>`
@@ -342,6 +364,7 @@ window.campaignsPage = function () {
                             <div class="campaign-badges">
                                 <span class="campaign-status-badge">${escapeHtml(status)}</span>
                                 ${typeBadgeHtml}
+                                ${systemHtml}
                             </div>
                         </div>
                         <div class="campaign-summary-row">
