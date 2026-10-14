@@ -1491,3 +1491,337 @@ select:focus {
     background: rgba(241, 196, 15, 0.2);
     color: #f1c40f;
 }
+/* Sign-ups Modal (DM) */
+#signupsModal .modal-content {
+    max-width: 640px;
+}
+
+#signupsModal .modal-header {
+    padding: 20px 30px;
+}
+
+#signupsModal .signups-body {
+    padding: 30px;
+    gap: 30px;
+}
+
+/* Capacity summary */
+#signupsModal .signups-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    padding: 15px 20px;
+    background: #000000;
+    border: 1px solid #2a2a2a;
+}
+
+#signupsModal .signups-capacity {
+    color: #888888;
+    font-size: 0.85em;
+    letter-spacing: 0.5px;
+}
+
+#signupsModal .signups-capacity-value {
+    color: #ffffff;
+    font-size: 1.4em;
+    font-weight: 500;
+    letter-spacing: 1px;
+    margin-right: 5px;
+}
+
+#signupsModal .signups-capacity.is-full .signups-capacity-value {
+    color: #ffd700;
+}
+
+#signupsModal .signups-pills {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+}
+
+#signupsModal .signups-pill {
+    display: inline-block;
+    padding: 4px 10px;
+    font-size: 0.75em;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+#signupsModal .signups-pill-open {
+    background: rgba(0, 255, 127, 0.1);
+    color: #00ff7f;
+}
+
+#signupsModal .signups-pill-closed {
+    background: rgba(136, 136, 136, 0.12);
+    color: #888888;
+}
+
+#signupsModal .signups-pill-full {
+    background: rgba(255, 215, 0, 0.1);
+    color: #ffd700;
+}
+
+/* Status groups */
+#signupsModal .signups-group {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+#signupsModal .signups-group-pending {
+    --signups-color: #ffd700;
+    --signups-tint: rgba(255, 215, 0, 0.1);
+    --signups-edge: #ffd700;
+}
+
+#signupsModal .signups-group-accepted {
+    --signups-color: #00ff7f;
+    --signups-tint: rgba(0, 255, 127, 0.1);
+    --signups-edge: #00ff7f;
+}
+
+#signupsModal .signups-group-declined {
+    --signups-color: #888888;
+    --signups-tint: rgba(136, 136, 136, 0.12);
+    --signups-edge: #555555;
+}
+
+#signupsModal .signups-group-kicked {
+    --signups-color: #ff006e;
+    --signups-tint: rgba(255, 0, 110, 0.1);
+    --signups-edge: rgba(255, 0, 110, 0.45);
+}
+
+#signupsModal .signups-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #333333;
+}
+
+#signupsModal .signups-group-title,
+#signupsModal .signups-archive-title {
+    margin: 0;
+    color: var(--signups-color);
+    font-size: 0.8em;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+#signupsModal .signups-count {
+    min-width: 24px;
+    padding: 2px 8px;
+    text-align: center;
+    background: var(--signups-tint);
+    color: var(--signups-color);
+    font-size: 0.75em;
+    font-weight: 600;
+}
+
+#signupsModal .signups-empty {
+    padding-left: 10px;
+    color: #555555;
+    font-size: 0.8em;
+    font-style: italic;
+}
+
+/* Items */
+#signupsModal .signups-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-left: 10px;
+}
+
+#signupsModal .signups-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 15px 20px;
+    background: #111111;
+    border: 1px solid #2a2a2a;
+    border-left: 3px solid var(--signups-edge);
+}
+
+#signupsModal .signups-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+#signupsModal .signups-item-name {
+    color: #ffffff;
+    font-size: 0.95em;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+#signupsModal .signups-item-time {
+    color: #888888;
+    font-size: 0.75em;
+}
+
+#signupsModal .signups-item-actions {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+#signupsModal .signups-item-actions .btn-action {
+    min-width: 90px;
+    padding: 8px 14px;
+    font-size: 0.75em;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+#signupsModal .signups-btn-accept {
+    border-color: #00d9ff;
+    color: #00d9ff;
+}
+
+#signupsModal .signups-btn-accept:hover:enabled {
+    background: #00d9ff;
+    color: #000000;
+}
+
+#signupsModal .signups-btn-decline {
+    border-color: #555555;
+    color: #b0b0b0;
+}
+
+#signupsModal .signups-btn-decline:hover:enabled {
+    border-color: #ff006e;
+    color: #ff006e;
+}
+
+#signupsModal .signups-btn-kick {
+    border-color: #ff006e;
+    color: #ff006e;
+}
+
+#signupsModal .signups-btn-kick:hover:enabled {
+    background: #ff006e;
+    color: #000000;
+}
+
+#signupsModal .signups-item-actions .btn-action:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Archive (declined & kicked) */
+#signupsModal .signups-archive {
+    --signups-color: #888888;
+    --signups-tint: rgba(136, 136, 136, 0.12);
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    padding-top: 25px;
+    border-top: 1px dashed #333333;
+}
+
+#signupsModal .signups-archive-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#signupsModal .signups-archive-hint {
+    color: #555555;
+    font-size: 0.75em;
+}
+
+#signupsModal .signups-toggle {
+    margin-left: auto;
+    padding: 5px 0;
+    background: none;
+    border: none;
+    color: #00d9ff;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.75em;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.3s;
+}
+
+#signupsModal .signups-toggle:hover {
+    color: #ffffff;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+#signupsModal .signups-toggle:focus-visible {
+    outline: 2px solid #00d9ff;
+    outline-offset: 2px;
+}
+
+#signupsModal .signups-archive-body {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+#signupsModal .signups-archive .signups-item {
+    background: #0a0a0a;
+    border-color: #1f1f1f;
+    border-left-color: var(--signups-edge);
+}
+
+#signupsModal .signups-archive .signups-item-name {
+    color: #888888;
+    font-weight: 400;
+}
+
+#signupsModal .signups-archive .signups-item-time {
+    color: #555555;
+}
+
+@media (max-width: 768px) {
+    #signupsModal .modal-content {
+        width: 95%;
+    }
+
+    #signupsModal .modal-header {
+        padding: 15px 20px;
+    }
+
+    #signupsModal .signups-body {
+        padding: 20px;
+        gap: 25px;
+    }
+
+    #signupsModal .signups-pills {
+        margin-left: 0;
+    }
+
+    #signupsModal .signups-list,
+    #signupsModal .signups-empty {
+        padding-left: 0;
+    }
+
+    #signupsModal .signups-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 15px;
+        padding: 15px;
+    }
+
+    #signupsModal .signups-item-actions {
+        width: 100%;
+    }
+
+    #signupsModal .signups-item-actions .btn-action {
+        flex: 1;
+        min-width: 0;
+    }
+}
