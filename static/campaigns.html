@@ -300,6 +300,85 @@
             </div>
         </div>
     </div>
-    <script src="campaigns.js?v=1"></script>
+    <!-- Sign-ups Modal (DM only) -->
+    <div id="signupsModal" class="modal" :class="{ 'modal-open': signupsModalOpen }" @click="handleSignupsBackdropClick($event)">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 x-text="`Sign-ups: ${signupsCampaignTitle}`"></h2>
+                <button type="button" class="modal-close" @click="closeSignupsModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <p x-text="`Players: ${signupsAcceptedCount} / ${signupsDesiredCount > 0 ? signupsDesiredCount : '∞'} · Sign-ups ${signupsOpen ? 'open' : 'closed'}`"></p>
+                <h3 class="signups-group-title">Pending (<span x-text="signupsByStatus('Pending').length"></span>)</h3>
+                <div class="response-list">
+                    <p x-show="signupsByStatus('Pending').length === 0">None</p>
+                    <template x-for="signup in signupsByStatus('Pending')" :key="signup.user_id">
+                        <div class="response-item">
+                            <div class="response-user-info">
+                                <span class="response-name" x-text="signup.signup_user ? signup.signup_user.display_name : signup.user_id"></span>
+                                <span class="response-status" x-text="formatSignupTime(signup.created_at)"></span>
+                            </div>
+                            <div class="session-actions">
+                                <button type="button" class="btn-action" @click="setSignupStatus(signup.user_id, 'Accepted')" :disabled="isCampaignFull()">Accept</button>
+                                <button type="button" class="btn-action" @click="setSignupStatus(signup.user_id, 'Declined')">Decline</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <h3 class="signups-group-title">Accepted (<span x-text="signupsByStatus('Accepted').length"></span>)</h3>
+                <div class="response-list">
+                    <p x-show="signupsByStatus('Accepted').length === 0">None</p>
+                    <template x-for="signup in signupsByStatus('Accepted')" :key="signup.user_id">
+                        <div class="response-item">
+                            <div class="response-user-info">
+                                <span class="response-name" x-text="signup.signup_user ? signup.signup_user.display_name : signup.user_id"></span>
+                                <span class="response-status" x-text="formatSignupTime(signup.created_at)"></span>
+                            </div>
+                            <div class="session-actions">
+                                <button type="button" class="btn-action btn-danger" @click="kickPlayer(signup.user_id)">Kick</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <button type="button" class="btn-close" @click="showDeclinedSignups = !showDeclinedSignups" x-text="showDeclinedSignups ? 'Hide declined' : 'Show declined'"></button>
+                <div x-show="showDeclinedSignups">
+                <h3 class="signups-group-title">Declined (<span x-text="signupsByStatus('Declined').length"></span>)</h3>
+                <div class="response-list">
+                    <p x-show="signupsByStatus('Declined').length === 0">None</p>
+                    <template x-for="signup in signupsByStatus('Declined')" :key="signup.user_id">
+                        <div class="response-item">
+                            <div class="response-user-info">
+                                <span class="response-name" x-text="signup.signup_user ? signup.signup_user.display_name : signup.user_id"></span>
+                                <span class="response-status" x-text="formatSignupTime(signup.created_at)"></span>
+                            </div>
+                            <div class="session-actions">
+                                <button type="button" class="btn-action" @click="setSignupStatus(signup.user_id, 'Accepted')" :disabled="isCampaignFull()">Accept</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <h3 class="signups-group-title">Kicked (<span x-text="signupsByStatus('Kicked').length"></span>)</h3>
+                <div class="response-list">
+                    <p x-show="signupsByStatus('Kicked').length === 0">None</p>
+                    <template x-for="signup in signupsByStatus('Kicked')" :key="signup.user_id">
+                        <div class="response-item">
+                            <div class="response-user-info">
+                                <span class="response-name" x-text="signup.signup_user ? signup.signup_user.display_name : signup.user_id"></span>
+                                <span class="response-status" x-text="formatSignupTime(signup.created_at)"></span>
+                            </div>
+                            <div class="session-actions">
+                                <button type="button" class="btn-action" @click="setSignupStatus(signup.user_id, 'Accepted')" :disabled="isCampaignFull()">Accept</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" @click="closeSignupsModal()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="campaigns.js?v=2"></script>
 </body>
 </html>

@@ -40,6 +40,14 @@ window.campaignsPage = function () {
         showResponses: false,
         playerResponse: '',
         sessionResponseCache: {},
+        signupsModalOpen: false,
+        signupsCampaignId: '',
+        signupsCampaignTitle: '',
+        signups: [],
+        signupsAcceptedCount: 0,
+        signupsDesiredCount: 0,
+        signupsOpen: false,
+        showDeclinedSignups: false,
         hoverResponsePanel: {
             visible: false,
             sessionId: '',
@@ -77,6 +85,23 @@ window.campaignsPage = function () {
                         );
                     };
                     document.addEventListener('click', this._calendarButtonHandler);
+                }
+
+                if (!this._signupButtonHandler) {
+                    this._signupButtonHandler = (event) => {
+                        const signupBtn = event.target.closest('.campaign-signup-btn:not([disabled])');
+                        if (signupBtn) {
+                            event.preventDefault();
+                            this.signUp(signupBtn.dataset.campaignId || '');
+                            return;
+                        }
+                        const manageBtn = event.target.closest('.campaign-signups-btn');
+                        if (manageBtn) {
+                            event.preventDefault();
+                            this.openSignupsModal(manageBtn.dataset.campaignId || '', manageBtn.dataset.campaignTitle || '');
+                        }
+                    };
+                    document.addEventListener('click', this._signupButtonHandler);
                 }
             } catch (error) {
                 console.error('Auth check failed:', error);
@@ -168,6 +193,30 @@ window.campaignsPage = function () {
             const status = campaign?.status || 'Unknown';
             const signUpsOpen = campaign?.sign_ups_open === true;
             const nextSession = 'N/A';
+            const isDM = !!this.currentUserId && campaign?.dm === this.currentUserId;
+            const campaignPlayers = Array.isArray(campaign?.players) ? campaign.players : [];
+            const isPlayer = campaignPlayers.includes(this.currentUserId);
+            const signupStatus = campaign?.current_user_signup_status || '';
+            const maxPlayers = parseInt(campaign?.desired_player_count, 10) || 0;
+            const signUpsLabel = (signUpsOpen ? 'Open' : 'Closed') + (maxPlayers > 0 ? ` (${campaignPlayers.length}/${maxPlayers})` : '');
+
+            let signupBtnHtml;
+            if (isDM) {
+                signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-signups-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-campaign-title="${escapeHtml(campaign?.title || '')}">Sign-ups</button>`;
+            } else {
+                let label = 'Sign-up';
+                let disabled = !signUpsOpen;
+                if (isPlayer) {
+                    label = 'Joined'; disabled = true;
+                } else if (signupStatus === 'Pending') {
+                    label = 'Signed up'; disabled = true;
+                } else if (signupStatus === 'Declined') {
+                    label = 'Declined'; disabled = true;
+                } else if (signupStatus === 'Kicked') {
+                    label = 'Removed'; disabled = true;
+                }
+                signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-signup-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" ${disabled ? 'disabled aria-disabled="true"' : ''}>${label}</button>`;
+            }
 
             const statusMap = {
                 Pitch: 'pitch',
@@ -220,7 +269,7 @@ window.campaignsPage = function () {
                             </div>
                             <div class="campaign-field">
                                 <h4 class="campaign-label">Sign-ups</h4>
-                                <p class="campaign-value">${signUpsOpen ? 'Open' : 'Closed'}</p>
+                                <p class="campaign-value">${escapeHtml(signUpsLabel)}</p>
                             </div>
                         </div>
                         <div class="campaign-column campaign-column-right">
@@ -238,10 +287,112 @@ window.campaignsPage = function () {
                     <section class="campaign-row campaign-row-bottom">
                         <button type="button" class="campaign-action-btn" disabled aria-disabled="true">Codex</button>
                         <button type="button" class="campaign-action-btn campaign-calendar-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-campaign-title="${escapeHtml(campaign?.title || '')}" data-dm-id="${escapeHtml(campaign?.dm || '')}">Calendar</button>
-                        <button type="button" class="campaign-action-btn" ${!signUpsOpen ? 'disabled' : ''}>Sign-up</button>
+                        ${signupBtnHtml}
                     </section>
                 </article>
             `;
+        },
+
+        async signUp(campaignId) {
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/signups`, { method: 'POST' });
+                if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to sign up', 'error');
+                    await this.loadCampaigns();
+                    return;
+                }
+                this.showMessage(data.message || 'Signed up successfully', 'success');
+                await this.loadCampaigns();
+            } catch (error) {
+                this.showMessage('Error signing up: ' + error.message, 'error');
+            }
+        },
+
+        async openSignupsModal(campaignId, campaignTitle) {
+            this.signupsCampaignId = campaignId;
+            this.signupsCampaignTitle = campaignTitle;
+            this.signups = [];
+            this.showDeclinedSignups = false;
+            this.signupsModalOpen = true;
+            await this.loadSignups();
+        },
+
+        closeSignupsModal() {
+            this.signupsModalOpen = false;
+        },
+
+        handleSignupsBackdropClick(event) {
+            if (event.target.id === 'signupsModal') {
+                this.closeSignupsModal();
+            }
+        },
+
+        async loadSignups() {
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.signupsCampaignId)}/signups`);
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to load sign-ups', 'error');
+                    return;
+                }
+                this.signups = Array.isArray(data.signups) ? data.signups : [];
+                this.signupsAcceptedCount = data.accepted_count || 0;
+                this.signupsDesiredCount = parseInt(data.desired_player_count, 10) || 0;
+                this.signupsOpen = data.sign_ups_open === true;
+            } catch (error) {
+                this.showMessage('Error loading sign-ups: ' + error.message, 'error');
+            }
+        },
+
+        signupsByStatus(status) {
+            return this.signups.filter((signup) => signup.status === status);
+        },
+
+        isCampaignFull() {
+            return this.signupsDesiredCount > 0 && this.signupsAcceptedCount >= this.signupsDesiredCount;
+        },
+
+        formatSignupTime(ts) {
+            return ts ? new Date(ts).toLocaleString() : '—';
+        },
+
+        async setSignupStatus(userId, status) {
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.signupsCampaignId)}/signups/${encodeURIComponent(userId)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to update sign-up', 'error');
+                }
+                await this.loadSignups();
+                await this.loadCampaigns();
+            } catch (error) {
+                this.showMessage('Error updating sign-up: ' + error.message, 'error');
+            }
+        },
+
+        async kickPlayer(userId) {
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.signupsCampaignId)}/players/${encodeURIComponent(userId)}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to remove player', 'error');
+                }
+                await this.loadSignups();
+                await this.loadCampaigns();
+            } catch (error) {
+                this.showMessage('Error removing player: ' + error.message, 'error');
+            }
         },
 
         openCalendar(campaignId, campaignTitle, isDM) {
