@@ -115,149 +115,138 @@
         <div class="modal-content calendar-modal-content">
             <div class="modal-header">
                 <h2 x-text="`Calendar: ${currentCampaignTitle}`"></h2>
-                <button type="button" class="modal-close" @click="closeCalendarModal()">&times;</button>
+                <div class="calendar-header-actions">
+                    <a href="/profile#calendar-sync" class="calendar-sync-link">Sync to calendar</a>
+                    <button type="button" class="modal-close" @click="closeCalendarModal()">&times;</button>
+                </div>
             </div>
-            <div class="calendar-container">
-                <!-- Month Navigation -->
-                <div class="calendar-nav">
-                    <button type="button" class="nav-btn" @click="previousMonth()"><<</button>
-                    <span class="current-month" x-text="formatMonthYear()"></span>
-                    <button type="button" class="nav-btn" @click="nextMonth()">>></button>
+            <div class="calendar-layout">
+                <div class="calendar-main">
+                    <!-- Month Navigation -->
+                    <div class="calendar-nav">
+                        <button type="button" class="nav-btn" @click="previousMonth()"><<</button>
+                        <span class="current-month" x-text="formatMonthYear()"></span>
+                        <button type="button" class="nav-btn" @click="nextMonth()">>></button>
+                        <div class="calendar-message message" :class="messageType" x-show="messageVisible" x-text="messageText"></div>
+                    </div>
+
+                    <!-- Calendar Grid -->
+                    <div class="calendar-grid">
+                        <!-- Day headers -->
+                        <div class="calendar-day-header">Mon</div>
+                        <div class="calendar-day-header">Tue</div>
+                        <div class="calendar-day-header">Wed</div>
+                        <div class="calendar-day-header">Thu</div>
+                        <div class="calendar-day-header">Fri</div>
+                        <div class="calendar-day-header">Sat</div>
+                        <div class="calendar-day-header">Sun</div>
+
+                        <!-- Calendar days -->
+                        <template x-for="(day, idx) in calendarDays" :key="idx">
+                            <div class="calendar-day"
+                                 :class="{
+                                     'other-month': !isCurrentMonth(day),
+                                     'has-session': hasSession(day),
+                                     'is-selected': isSelectedDay(day),
+                                     'is-today': isToday(day),
+                                     'day-suggested': getDayStatusClass(day) === 'day-suggested',
+                                     'day-confirmed': getDayStatusClass(day) === 'day-confirmed',
+                                     'day-cancelled': getDayStatusClass(day) === 'day-cancelled'
+                                 }"
+                                 :title="getDayTitle(day)"
+                                 :aria-label="getDayAriaLabel(day)"
+                                 role="button"
+                                 tabindex="0"
+                                 @click="selectDay(day)"
+                                 @keydown.enter.prevent="selectDay(day)"
+                                 @keydown.space.prevent="selectDay(day)">
+                                <span class="day-pending-total"
+                                      x-show="hasPlannedSession(day)"
+                                      x-text="getPendingResponsesForDay(day)"></span>
+                                <div class="day-number" x-text="day.getDate()"></div>
+                                <template x-for="s in getCellSessions(day)" :key="s.id">
+                                    <div class="day-chip" :class="`chip-${s.status}`">
+                                        <div class="day-chip-time" x-text="getSessionTimeRange(s)"></div>
+                                        <div class="day-chip-counts" x-show="s.status !== 'Cancelled'">
+                                            <span class="count-accepted" x-text="getAcceptedReaction(s)"></span>
+                                            <span class="count-tentative" x-text="getTentativeReaction(s)"></span>
+                                            <span class="count-declined" x-text="getDeclinedReaction(s)"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                                <div class="day-overflow" x-show="getCellOverflow(day) > 0" x-text="`+${getCellOverflow(day)} more`"></div>
+                            </div>
+                        </template>
+                    </div>
                 </div>
 
-                <!-- Calendar Grid -->
-                <div class="calendar-grid">
-                    <!-- Day headers -->
-                    <div class="calendar-day-header">Mon</div>
-                    <div class="calendar-day-header">Tue</div>
-                    <div class="calendar-day-header">Wed</div>
-                    <div class="calendar-day-header">Thu</div>
-                    <div class="calendar-day-header">Fri</div>
-                    <div class="calendar-day-header">Sat</div>
-                    <div class="calendar-day-header">Sun</div>
-
-                    <!-- Calendar days -->
-                    <template x-for="(day, idx) in calendarDays" :key="idx">
-                        <div class="calendar-day" 
-                             :class="{
-                                 'other-month': !isCurrentMonth(day),
-                                 'has-session': hasSession(day),
-                                 'day-suggested': getDayStatusClass(day) === 'day-suggested',
-                                 'day-confirmed': getDayStatusClass(day) === 'day-confirmed',
-                                 'day-historical': getDayStatusClass(day) === 'day-historical',
-                                 'day-cancelled': getDayStatusClass(day) === 'day-cancelled'
-                             }"
-                             :title="getDayTitle(day)"
-                             :aria-label="getDayAriaLabel(day)"
-                             role="button"
-                             tabindex="0"
-                             @click="selectDay(day)"
-                             @keydown.enter.prevent="selectDay(day)"
-                             @keydown.space.prevent="selectDay(day)">
-                            <span class="day-pending-total"
-                                  x-show="hasPlannedSession(day)"
-                                  x-text="getPendingResponsesForDay(day)"
-                                  @mouseenter.stop="handleDayReactionHover(day, 'pending')"
-                                  @mouseleave.stop="clearDayHoverPanel()"></span>
-                            <div class="day-number" x-text="day.getDate()"></div>
-                            <template x-if="hasPlannedSession(day)">
-                                <div class="day-session-summary">
-                                    <div class="day-session-time" x-text="(getPrimarySessionForDay(day).time || '') + ' - ' + getSessionEndTime(getPrimarySessionForDay(day))"></div>
-                                    <div class="day-reactions-row">
-                                        <span class="day-reaction-badge day-reaction-accept"
-                                              x-text="getAcceptedReaction(getPrimarySessionForDay(day))"
-                                              @mouseenter.stop="handleDayReactionHover(day, 'accepted')"
-                                              @mouseleave.stop="clearDayHoverPanel()"></span>
-                                        <span class="day-reaction-badge day-reaction-decline"
-                                              x-text="getDeclinedReaction(getPrimarySessionForDay(day))"
-                                              @mouseenter.stop="handleDayReactionHover(day, 'declined')"
-                                              @mouseleave.stop="clearDayHoverPanel()"></span>
-                                        <span class="day-reaction-badge day-reaction-tentative"
-                                              x-text="getTentativeReaction(getPrimarySessionForDay(day))"
-                                              @mouseenter.stop="handleDayReactionHover(day, 'tentative')"
-                                              @mouseleave.stop="clearDayHoverPanel()"></span>
+                <!-- Day / agenda panel -->
+                <aside class="calendar-panel" x-ref="dayPanel">
+                    <template x-if="selectedDay">
+                        <div>
+                            <h3 x-text="formatDayHeading(selectedDay)"></h3>
+                            <p class="panel-empty" x-show="getSelectedDaySessions().length === 0">No sessions on this day.</p>
+                            <template x-for="s in getSelectedDaySessions()" :key="s.id">
+                                <div class="panel-session">
+                                    <div class="panel-session-head">
+                                        <span class="panel-session-time" x-text="getSessionTimeRange(s)"></span>
+                                        <span class="panel-status-tag" :class="`chip-${s.status}`" x-text="s.status"></span>
                                     </div>
-                                </div>
-                            </template>
-                            <template x-if="isHistoricalDay(day)">
-                                <div class="day-session-summary">
-                                    <div class="day-history-indicator">Was planned</div>
-                                    <div class="day-session-time day-session-time--historical" x-text="(getPrimarySessionForDay(day).time || '') + ' - ' + getSessionEndTime(getPrimarySessionForDay(day))"></div>
-                                </div>
-                            </template>
-                            <template x-if="isHoverPanelVisibleForDay(day)">
-                                <div class="day-hover-panel">
-                                    <p class="day-hover-title" x-text="getHoverPanelTitle(hoverResponsePanel.type)"></p>
-                                    <template x-if="hoverResponsePanel.loading">
-                                        <p class="day-hover-empty">Loading...</p>
-                                    </template>
-                                    <template x-if="!hoverResponsePanel.loading && hoverResponsePanel.error">
-                                        <p class="day-hover-empty" x-text="hoverResponsePanel.error"></p>
-                                    </template>
-                                    <template x-if="!hoverResponsePanel.loading && !hoverResponsePanel.error && hoverResponsePanel.users.length === 0">
-                                        <p class="day-hover-empty">No users</p>
-                                    </template>
-                                    <template x-for="user in hoverResponsePanel.users" :key="`hover-${hoverResponsePanel.type}-${user.id || user.user_id || getUserDisplayName(user)}`">
-                                        <div class="day-hover-user">
-                                            <span class="day-hover-name" x-text="getUserDisplayName(user)"></span>
+                                    <div class="panel-session-meta" x-text="getSessionMeta(s)"></div>
+
+                                    <template x-for="group in getResponseGroups(s)" :key="group.label">
+                                        <div class="panel-response-group" x-show="group.users.length > 0">
+                                            <span class="panel-response-label" :class="group.cls" x-text="`${group.label} (${group.users.length})`"></span>
+                                            <span class="panel-response-names" x-text="group.users.map((u) => getUserDisplayName(u)).join(', ')"></span>
                                         </div>
                                     </template>
+
+                                    <div class="player-responses" x-show="!isCurrentUserDM && s.status !== 'Cancelled'">
+                                        <p>Your response:</p>
+                                        <div class="session-actions">
+                                            <button type="button" class="btn-response"
+                                                    :class="{ 'selected': s.current_user_participation === 'Accepted' }"
+                                                    @click="submitResponse('Accepted', s)">Accept</button>
+                                            <button type="button" class="btn-response"
+                                                    :class="{ 'selected': s.current_user_participation === 'Declined' }"
+                                                    @click="submitResponse('Declined', s)">Decline</button>
+                                            <button type="button" class="btn-response"
+                                                    :class="{ 'selected': s.current_user_participation === 'Tentative' }"
+                                                    @click="submitResponse('Tentative', s)">Tentative</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="panel-dm-actions" x-show="isCurrentUserDM && s.status !== 'Cancelled'">
+                                        <div class="session-actions">
+                                            <button type="button" class="btn-action btn-action-confirm"
+                                                    x-show="s.status === 'Suggested'"
+                                                    @click="requestSessionStatusChange('Confirmed', s)">Confirm</button>
+                                            <button type="button" class="btn-action btn-action-cancel"
+                                                    @click="requestSessionStatusChange('Cancelled', s)">Cancel</button>
+                                        </div>
+                                        <p class="session-status-warning" x-show="selectedSession && selectedSession.id === s.id && pendingSessionAction" x-text="getSessionStatusWarning()"></p>
+                                    </div>
                                 </div>
                             </template>
+                            <button type="button" class="btn-action panel-suggest" x-show="isCurrentUserDM" @click="openCreateSession(selectedDay)">+ Suggest session</button>
+                            <button type="button" class="btn-close" @click="clearSelectedDay()">Show month agenda</button>
                         </div>
                     </template>
-                </div>
-
-                <!-- Session interaction menu (visible when session selected) -->
-                <template x-if="selectedSession !== null && !isCurrentUserDM">
-                    <div class="session-menu">
-                        <h3>Session: <span x-text="selectedSession.time"></span></h3>
-                        <div class="player-responses">
-                            <p>Your response:</p>
-                            <button type="button" class="btn-response" 
-                                    :class="{ 'selected': playerResponse === 'Accepted' }"
-                                    @click="submitResponse('Accepted')">Accept</button>
-                            <button type="button" class="btn-response" 
-                                    :class="{ 'selected': playerResponse === 'Declined' }"
-                                    @click="submitResponse('Declined')">Decline</button>
-                            <button type="button" class="btn-response" 
-                                    :class="{ 'selected': playerResponse === 'Tentative' }"
-                                    @click="submitResponse('Tentative')">Tentative</button>
-                        </div>
-                        <button type="button" class="btn-view-responses" @click="showResponseBreakdown(selectedSession)">View Responses</button>
-                        <button type="button" class="btn-close" @click="clearSelectedSession()">Close</button>
-                    </div>
-                </template>
-
-                <!-- Response breakdown modal -->
-                <template x-if="showResponses">
-                    <div class="response-breakdown">
-                        <h3>Response Breakdown</h3>
-                        <div class="response-list">
-                            <template x-for="response in sessionResponses" :key="response.id">
-                                <div class="response-item">
-                                    <div class="response-user-info">
-                                        <span class="response-name" x-text="response.user ? response.user.display_name : 'Unknown'"></span>
-                                    </div>
-                                    <span class="response-status" :class="getParticipationClass(response.participation)" x-text="response.participation"></span>
-                                </div>
+                    <template x-if="!selectedDay">
+                        <div>
+                            <h3 x-text="`Sessions in ${formatMonthYear()}`"></h3>
+                            <p class="panel-empty" x-show="sessions.length === 0">No sessions this month.</p>
+                            <template x-for="s in sessions" :key="s.id">
+                                <button type="button" class="agenda-row" :class="`chip-${s.status}`" @click="selectDay(parseDateLocal(s.date))">
+                                    <span class="agenda-date" x-text="formatAgendaDate(s)"></span>
+                                    <span class="agenda-time" x-text="getSessionTimeRange(s)"></span>
+                                    <span class="agenda-status" x-text="s.status"></span>
+                                </button>
                             </template>
-                            <template x-for="pendingUser in pendingResponses" :key="`pending-${pendingUser.id}`">
-                                <div class="response-item">
-                                    <div class="response-user-info">
-                                        <span class="response-name" x-text="pendingUser.display_name"></span>
-                                    </div>
-                                    <span class="response-status">Pending</span>
-                                </div>
-                            </template>
+                            <p class="panel-empty" x-show="isCurrentUserDM">Select a day to suggest a session.</p>
                         </div>
-                        <button type="button" class="btn-close" @click="showResponses = false">Close</button>
-                    </div>
-                </template>
-            </div>
-
-            <div class="modal-actions">
-                <button type="button" class="btn-cancel" @click="closeCalendarModal()">Close Calendar</button>
+                    </template>
+                </aside>
             </div>
         </div>
     </div>
@@ -267,7 +256,7 @@
         <div class="modal-content create-session-modal-content compact-modal-content">
             <div class="modal-header">
                 <h2>Create Session</h2>
-                <button type="button" class="modal-close" @click="clearSelectedDay()">&times;</button>
+                <button type="button" class="modal-close" @click="closeCreateSessionModal()">&times;</button>
             </div>
             <form @submit.prevent="createSession()" class="modal-form compact-modal-form">
                 <div class="form-group">
@@ -303,32 +292,22 @@
                         </div>
                     </div>
                 </div>
+                <div class="form-group">
+                    <label for="sessionTimezone">Timezone *</label>
+                    <select id="sessionTimezone" x-model="sessionFormData.timezone" required>
+                        <template x-for="tz in timezoneOptions" :key="tz">
+                            <option :value="tz" x-text="tz" :selected="tz === sessionFormData.timezone"></option>
+                        </template>
+                    </select>
+                </div>
                 <div class="modal-actions">
                     <button type="submit" class="btn-create">Create</button>
-                    <button type="button" class="btn-cancel" @click="clearSelectedDay()">Cancel</button>
+                    <button type="button" class="btn-cancel" @click="closeCreateSessionModal()">Cancel</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Session Status Modal (DM only) -->
-    <div id="sessionStatusModal" class="modal session-status-modal" :class="{ 'modal-open': showSessionStatusModal }" @click="handleSessionStatusBackdropClick($event)">
-        <div class="modal-content session-status-modal-content compact-modal-content">
-            <div class="modal-header">
-                <h2>Manage Session</h2>
-            </div>
-            <div class="modal-form compact-modal-form">
-                <div class="session-actions session-status-actions">
-                    <button type="button" class="btn-action btn-action-confirm" @click="confirmSession()" :disabled="!selectedSession || selectedSession.status !== 'Suggested'">Confirm</button>
-                    <button type="button" class="btn-action btn-action-cancel" @click="cancelSession()" :disabled="!selectedSession">Cancel</button>
-                </div>
-                <p class="session-status-warning" x-show="pendingSessionAction" x-text="getSessionStatusWarning()"></p>
-                <div class="modal-actions">
-                    <button type="button" class="btn-cancel" @click="clearSelectedSession()">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
     <!-- Sign-ups Modal (DM only) -->
     <div id="signupsModal" class="modal" :class="{ 'modal-open': signupsModalOpen }" @click="handleSignupsBackdropClick($event)">
         <div class="modal-content">

@@ -9,6 +9,7 @@ window.profilePage = function() {
         playingCampaigns: [],
         isSelf: false,
         isEnvAdmin: false,
+        calendarToken: '',
         messageVisible: false,
         messageText: '',
         messageType: '',
@@ -32,6 +33,65 @@ window.profilePage = function() {
             }
             
             await this.loadProfile();
+            if (this.isSelf) {
+                await this.loadCalendarToken();
+            }
+        },
+
+        get calendarUrl() {
+            return this.calendarToken ? `${window.location.origin}/calendar/${this.calendarToken}.ics` : '';
+        },
+
+        get googleCalendarUrl() {
+            if (!this.calendarToken) return '';
+            return 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(this.calendarUrl.replace(/^https?:/, 'webcal:'));
+        },
+
+        async loadCalendarToken() {
+            try {
+                const response = await fetch('/api/profile/calendar');
+                if (!response.ok) {
+                    throw new Error('Failed to load calendar link');
+                }
+                const data = await response.json();
+                this.calendarToken = data.token || '';
+            } catch (error) {
+                this.showMessage('Error loading calendar link: ' + error.message, 'error');
+            }
+        },
+
+        async enableOrRegenerateCalendar() {
+            if (this.calendarToken && !confirm('Regenerate the link? The old link will stop working and you will need to re-subscribe.')) {
+                return;
+            }
+            try {
+                const response = await fetch('/api/profile/calendar', { method: 'POST' });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to create calendar link');
+                }
+                this.calendarToken = data.token || '';
+                this.showMessage('Calendar link ready.', 'success');
+            } catch (error) {
+                this.showMessage('Error creating calendar link: ' + error.message, 'error');
+            }
+        },
+
+        async copyCalendarUrl() {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(this.calendarUrl);
+                } else {
+                    const input = document.getElementById('calendarUrl');
+                    input.select();
+                    if (!document.execCommand('copy')) {
+                        throw new Error('copy not supported');
+                    }
+                }
+                this.showMessage('Link copied.', 'success');
+            } catch (error) {
+                this.showMessage('Could not copy, select the link manually.', 'error');
+            }
         },
         
         async handleLogout() {

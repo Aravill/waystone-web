@@ -7,7 +7,7 @@ This document describes what must-have features are to be implemented before pre
     - [x] Players can react with confirm / reject / tentative the dates
     - [x] DM can see who reacted how
     - [x] Dates can be cancelled
-    - [ ] Calendar sync - the players & DM can import events into their google calendar
+    - [x] Calendar sync - the players & DM can import events into their google calendar
 - [x] Signing up
     - [x] Users can sign up for campaigns if sign-ups are open
     - [x] DMs can accept or ignore signed-up players

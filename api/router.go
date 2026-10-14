@@ -34,12 +34,16 @@ func RegisterRoutes() {
 	http.HandleFunc("/auth/logout", HandleLogout)
 	http.HandleFunc("/auth/current-user", HandleGetCurrentUser)
 
+	// Public calendar feed (authenticated by the unguessable token in the URL)
+	http.HandleFunc("/calendar/", HandleCalendarFeed)
+
 	// Protected API endpoints (wrapped with auth middleware)
 	http.Handle("/api/campaigns", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaigns)))
 	http.Handle("/api/campaigns/", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaignRoutes)))
 	http.Handle("/api/systems", middleware.AuthMiddleware(http.HandlerFunc(HandleSystems)))
 	http.Handle("/api/systems/", middleware.AuthMiddleware(http.HandlerFunc(HandleSystemRoutes)))
 	http.Handle("/api/profile", middleware.AuthMiddleware(http.HandlerFunc(HandleProfile)))
+	http.Handle("/api/profile/calendar", middleware.AuthMiddleware(http.HandlerFunc(HandleCalendarToken)))
 
 	// Static files - MUST be registered BEFORE "/" handler to take precedence
 	fs := http.FileServer(http.Dir("./static"))

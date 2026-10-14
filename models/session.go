@@ -15,6 +15,7 @@ type CampaignSession struct {
 	Time                     string              `json:"time"`     // HH:MM format
 	Duration                 int                 `json:"duration"` // minutes
 	Status                   SessionStatus       `json:"status"`
+	Timezone                 string              `json:"timezone"` // IANA name; empty for legacy sessions
 	AcceptedCount            int                 `json:"accepted_count,omitempty"`
 	DeclinedCount            int                 `json:"declined_count,omitempty"`
 	TentativeCount           int                 `json:"tentative_count,omitempty"`
