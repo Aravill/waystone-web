@@ -29,6 +29,7 @@
             unread: 0,
             loading: false,
             _timer: null,
+            _counted: false,
 
             init() {
                 if (this._timer) return;
@@ -46,6 +47,11 @@
                     const response = await fetch('/api/notifications/unread-count');
                     if (!response.ok) return;
                     const data = await response.json();
+                    // Let the page refresh its own data when new notifications arrive.
+                    if (this._counted && data.unread_count > this.unread) {
+                        window.dispatchEvent(new CustomEvent('notifications:new'));
+                    }
+                    this._counted = true;
                     this.unread = data.unread_count;
                 } catch (error) {
                     // Polling must stay quiet (e.g. expired session redirects to HTML).

@@ -115,6 +115,11 @@ window.campaignsPage = function () {
                     };
                     document.addEventListener('click', this._signupButtonHandler);
                 }
+                if (!this._notificationsHandler) {
+                    // New notifications may change the cards' pending-action highlights.
+                    this._notificationsHandler = () => this.loadCampaigns(true);
+                    window.addEventListener('notifications:new', this._notificationsHandler);
+                }
             } catch (error) {
                 console.error('Auth check failed:', error);
                 window.location.href = '/login.html';
@@ -264,8 +269,9 @@ window.campaignsPage = function () {
             }
         },
 
-        async loadCampaigns() {
-            this.loading = true;
+        // quiet: background refresh without the loading state; keeps the list on failure.
+        async loadCampaigns(quiet = false) {
+            if (!quiet) this.loading = true;
             try {
                 const response = await fetch('/api/campaigns');
                 if (!response.ok) {
@@ -274,10 +280,14 @@ window.campaignsPage = function () {
                 const data = await response.json();
                 this.campaigns = Array.isArray(data) ? data : [];
             } catch (error) {
+                if (quiet) {
+                    console.error('Failed to refresh campaigns:', error);
+                    return;
+                }
                 this.showMessage('Error loading campaigns: ' + error.message, 'error');
                 this.campaigns = [];
             } finally {
-                this.loading = false;
+                if (!quiet) this.loading = false;
             }
         },
 
