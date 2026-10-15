@@ -119,9 +119,6 @@ func AuthMiddleware(next http.Handler) http.Handler {
 				http.Redirect(w, r, "/change-password", http.StatusSeeOther)
 				return
 			}
-		} else if dbUser.NeedsProfileSetup && !strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/welcome" {
-			http.Redirect(w, r, "/welcome", http.StatusSeeOther)
-			return
 		}
 
 		ctx := context.WithValue(r.Context(), "user_id", session["user_id"])

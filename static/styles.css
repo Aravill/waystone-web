@@ -581,6 +581,44 @@ h2 {
     gap: 14px;
 }
 
+.profile-setup-banner {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border: 1px solid #00d9ff;
+    background: #0a1a1a;
+    color: #e0e0e0;
+    font-size: 0.9em;
+}
+
+.profile-setup-banner p {
+    margin: 0;
+}
+
+.profile-setup-banner strong {
+    color: #00d9ff;
+}
+
+.profile-setup-done {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    background: #000000;
+    color: #00d9ff;
+    border: 1px solid #00d9ff;
+    font-family: 'Fira Code', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+}
+
+.profile-setup-done:hover {
+    background: #00d9ff;
+    color: #000000;
+}
+
 .profile-card {
     background: #0a0a0a;
     border: 1px solid #2a2a2a;

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile</title>
-    <link rel="stylesheet" href="styles.css?v=12">
+    <link rel="stylesheet" href="styles.css?v=13">
     <link rel="stylesheet" href="/static/notifications.css?v=2">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -31,6 +31,10 @@
 
     <div class="container">
         <div class="profile-page">
+            <div class="profile-setup-banner" x-show="isSelf && needsProfileSetup" x-cloak>
+                <p><strong>Welcome to Waystone!</strong> Set up your profile: use the pencils to pick a nickname and an avatar so other players can recognise you.</p>
+                <button type="button" class="profile-setup-done" @click="finishSetup()">Done</button>
+            </div>
             <div class="profile-card" id="profileCard">
                 <p x-show="loading">Loading profile...</p>
                 <template x-if="!loading && profile">
@@ -201,6 +205,6 @@
     </div>
 
     <script src="/static/notifications.js?v=5"></script>
-    <script src="profile.js?v=6"></script>
+    <script src="profile.js?v=7"></script>
 </body>
 </html>
