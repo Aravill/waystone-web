@@ -95,6 +95,12 @@ window.campaignsPage = function () {
 
                 if (!this._signupButtonHandler) {
                     this._signupButtonHandler = (event) => {
+                        const withdrawBtn = event.target.closest('.campaign-withdraw-btn');
+                        if (withdrawBtn) {
+                            event.preventDefault();
+                            this.withdrawSignup(withdrawBtn.dataset.campaignId || '', withdrawBtn.dataset.campaignTitle || '', withdrawBtn.dataset.withdrawKind || '');
+                            return;
+                        }
                         const signupBtn = event.target.closest('.campaign-signup-btn:not([disabled])');
                         if (signupBtn) {
                             event.preventDefault();
@@ -315,16 +321,20 @@ window.campaignsPage = function () {
             } else {
                 let label = 'Sign-up';
                 let disabled = !signUpsOpen;
+                let withdrawKind = '';
                 if (isPlayer) {
-                    label = 'Joined'; disabled = true;
+                    label = 'Leave'; disabled = false; withdrawKind = 'leave';
                 } else if (signupStatus === 'Pending') {
-                    label = 'Signed up'; disabled = true;
+                    label = 'Withdraw'; disabled = false; withdrawKind = 'withdraw';
                 } else if (signupStatus === 'Declined') {
                     label = 'Declined'; disabled = true;
                 } else if (signupStatus === 'Kicked') {
                     label = 'Removed'; disabled = true;
                 }
-                signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-signup-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" ${disabled ? 'disabled aria-disabled="true"' : ''}>${label}</button>`;
+                if (withdrawKind) {
+                    const hint = withdrawKind === 'leave' ? 'Leave this campaign' : 'Withdraw your sign-up';
+                    signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-withdraw-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-campaign-title="${escapeHtml(campaign?.title || '')}" data-withdraw-kind="${withdrawKind}" title="${hint}">${label}</button>`;
+                } else signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-signup-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" ${disabled ? 'disabled aria-disabled="true"' : ''}>${label}</button>`;
             }
 
             const statusMap = {
@@ -432,6 +442,30 @@ window.campaignsPage = function () {
                 await this.loadCampaigns();
             } catch (error) {
                 this.showMessage('Error signing up: ' + error.message, 'error');
+            }
+        },
+
+        async withdrawSignup(campaignId, title, kind) {
+            const prompt = kind === 'leave'
+                ? `Leave "${title}"? You'll stop being a player; you can sign up again if sign-ups are open.`
+                : `Withdraw your sign-up for "${title}"?`;
+            if (!confirm(prompt)) return;
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/signups/${encodeURIComponent(this.currentUserId)}`, { method: 'DELETE' });
+                if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to withdraw', 'error');
+                    await this.loadCampaigns();
+                    return;
+                }
+                this.showMessage(data.message || 'Sign-up withdrawn', 'success');
+                await this.loadCampaigns();
+            } catch (error) {
+                this.showMessage('Error withdrawing: ' + error.message, 'error');
             }
         },
 

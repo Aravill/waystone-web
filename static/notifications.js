@@ -149,6 +149,10 @@
                             : `${actor} cancelled the session for "${title}" on ${when}`;
                     case 'signup_created':
                         return `${actor} signed up for "${title}"`;
+                    case 'player_left':
+                        return `${actor} left "${title}"`;
+                    case 'signup_withdrawn':
+                        return `${actor} withdrew their sign-up for "${title}"`;
                     case 'campaign_full':
                         return `"${title}" reached ${d.player_count} ${d.player_count === '1' ? 'player' : 'players'} - sign-ups closed automatically`;
                     case 'session_confirmed':
