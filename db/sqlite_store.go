@@ -134,6 +134,20 @@ func (s *SQLiteStore) initSchema() error {
 		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
 
+	CREATE TABLE IF NOT EXISTS notifications (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		type TEXT NOT NULL,
+		campaign_id TEXT NOT NULL DEFAULT '',
+		session_id TEXT NOT NULL DEFAULT '',
+		actor_id TEXT NOT NULL DEFAULT '',
+		data TEXT NOT NULL DEFAULT '{}',
+		created_at TEXT NOT NULL,
+		read_at TEXT NOT NULL DEFAULT ''
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at);
+	CREATE INDEX IF NOT EXISTS idx_notifications_campaign_id ON notifications(campaign_id);
 	CREATE INDEX IF NOT EXISTS idx_campaign_signups_campaign_id ON campaign_signups(campaign_id);
 	CREATE INDEX IF NOT EXISTS idx_campaign_signups_user_id ON campaign_signups(user_id);
 	CREATE INDEX IF NOT EXISTS idx_campaign_sessions_campaign_id ON campaign_sessions(campaign_id);
@@ -596,6 +610,10 @@ func (s *SQLiteStore) DeleteUser(id string) error {
 		return err
 	}
 
+	if _, err := s.db.Exec(`DELETE FROM notifications WHERE user_id = ?`, id); err != nil {
+		return err
+	}
+
 	query := `DELETE FROM users WHERE id = ?`
 	result, err := s.db.Exec(query, id)
 	if err != nil {
@@ -1036,10 +1054,11 @@ func (s *SQLiteStore) DeleteSession(sessionID string) error {
 }
 
 var (
-	ErrSignupNotFound   = errors.New("sign-up not found")
-	ErrCampaignFull     = errors.New("campaign is full")
-	ErrCampaignNotFound = errors.New("campaign not found")
-	ErrSystemNotFound   = errors.New("system not found")
+	ErrSignupNotFound       = errors.New("sign-up not found")
+	ErrCampaignFull         = errors.New("campaign is full")
+	ErrCampaignNotFound     = errors.New("campaign not found")
+	ErrSystemNotFound       = errors.New("system not found")
+	ErrNotificationNotFound = errors.New("notification not found")
 )
 
 func (s *SQLiteStore) CreateCampaignSignup(signup models.CampaignSignup) error {
@@ -1183,7 +1202,7 @@ func (s *SQLiteStore) SetCampaignStatus(id string, status models.CampaignStatus)
 	return nil
 }
 
-// DeleteCampaign removes a campaign with its sessions, session responses and sign-ups.
+// DeleteCampaign removes a campaign with its sessions, session responses, sign-ups and notifications.
 // The foreign_keys pragma is not enabled, so ON DELETE CASCADE does not fire and the
 // cascade is done by hand.
 func (s *SQLiteStore) DeleteCampaign(id string) error {
@@ -1203,6 +1222,9 @@ func (s *SQLiteStore) DeleteCampaign(id string) error {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM campaign_signups WHERE campaign_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM notifications WHERE campaign_id = ?`, id); err != nil {
 		return err
 	}
 	res, err := tx.Exec(`DELETE FROM campaigns WHERE id = ?`, id)
@@ -1435,4 +1457,107 @@ func (s *SQLiteStore) GetSystemLogo(id string) ([]byte, string, error) {
 		return nil, "", ErrSystemNotFound
 	}
 	return data, contentType, err
+}
+
+// notificationRetention is how long read notifications are kept.
+const notificationRetention = 90 * 24 * time.Hour
+
+// CreateNotifications inserts the notifications in one transaction and prunes old read ones.
+func (s *SQLiteStore) CreateNotifications(notifications []models.Notification) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`INSERT INTO notifications (id, user_id, type, campaign_id, session_id, actor_id, data, created_at, read_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, n := range notifications {
+		data, err := json.Marshal(n.Data)
+		if err != nil {
+			return err
+		}
+		if _, err := stmt.Exec(n.ID, n.UserID, n.Type, n.CampaignID, n.SessionID, n.ActorID, string(data), n.CreatedAt, n.ReadAt); err != nil {
+			return err
+		}
+	}
+
+	cutoff := time.Now().UTC().Add(-notificationRetention).Format(time.RFC3339)
+	if _, err := tx.Exec(`DELETE FROM notifications WHERE read_at != '' AND read_at < ?`, cutoff); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// GetNotifications returns a user's newest notifications first.
+func (s *SQLiteStore) GetNotifications(userID string, limit int) ([]models.Notification, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	rows, err := s.db.Query(`SELECT id, user_id, type, campaign_id, session_id, actor_id, data, created_at, read_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	notifications := []models.Notification{}
+	for rows.Next() {
+		var n models.Notification
+		var data string
+		if err := rows.Scan(&n.ID, &n.UserID, &n.Type, &n.CampaignID, &n.SessionID, &n.ActorID, &data, &n.CreatedAt, &n.ReadAt); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(data), &n.Data); err != nil || n.Data == nil {
+			n.Data = map[string]string{}
+		}
+		notifications = append(notifications, n)
+	}
+	return notifications, rows.Err()
+}
+
+// CountUnreadNotifications returns how many notifications a user has not read.
+func (s *SQLiteStore) CountUnreadNotifications(userID string) (int, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	var count int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at = ''`, userID).Scan(&count)
+	return count, err
+}
+
+// MarkNotificationRead marks one of the user's notifications read (idempotent).
+func (s *SQLiteStore) MarkNotificationRead(userID, id string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	res, err := s.db.Exec(`UPDATE notifications SET read_at = CASE WHEN read_at = '' THEN ? ELSE read_at END WHERE id = ? AND user_id = ?`, now, id, userID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotificationNotFound
+	}
+	return nil
+}
+
+// MarkAllNotificationsRead marks all of the user's unread notifications read.
+func (s *SQLiteStore) MarkAllNotificationsRead(userID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.db.Exec(`UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at = ''`, now, userID)
+	return err
 }
