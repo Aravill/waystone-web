@@ -40,7 +40,7 @@ func HandleCampaignSignups(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleCampaignSignupActions handles /api/campaigns/{id}/signups/{userID} (PUT accept/decline).
+// HandleCampaignSignupActions handles /api/campaigns/{id}/signups/{userID} (PUT accept/decline, DELETE withdraw own sign-up / leave).
 func HandleCampaignSignupActions(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/campaigns/"), "/")
 	if len(parts) != 3 || parts[1] != "signups" {
@@ -48,11 +48,14 @@ func HandleCampaignSignupActions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.Method != http.MethodPut {
+	switch r.Method {
+	case http.MethodPut:
+		handleUpdateSignup(w, r, parts[0], parts[2])
+	case http.MethodDelete:
+		handleWithdrawSignup(w, r, parts[0], parts[2])
+	default:
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
 	}
-	handleUpdateSignup(w, r, parts[0], parts[2])
 }
 
 // HandleCampaignPlayerActions handles /api/campaigns/{id}/players/{userID} (DELETE kick).
@@ -323,6 +326,41 @@ func handleUpdateSignup(w http.ResponseWriter, r *http.Request, campaignID, targ
 			"player_count": strconv.Itoa(len(updated.Players)),
 		})
 	}
+}
+
+func handleWithdrawSignup(w http.ResponseWriter, r *http.Request, campaignID, targetUserID string) {
+	campaign, userID, ok := loadCampaignAndUser(w, r, campaignID)
+	if !ok {
+		return
+	}
+	if targetUserID != userID {
+		writeJSONError(w, http.StatusForbidden, "you can only withdraw your own sign-up")
+		return
+	}
+
+	wasPlayer, err := db.WithdrawCampaignSignup(campaignID, userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, db.ErrSignupNotFound):
+			writeJSONError(w, http.StatusNotFound, "no sign-up to withdraw")
+		case errors.Is(err, db.ErrCampaignNotFound):
+			writeJSONError(w, http.StatusNotFound, err.Error())
+		default:
+			writeJSONError(w, http.StatusInternalServerError, "failed to withdraw sign-up")
+		}
+		return
+	}
+
+	notifType, message := models.NotificationSignupWithdrawn, "sign-up withdrawn"
+	if wasPlayer {
+		notifType, message = models.NotificationPlayerLeft, "left the campaign"
+	}
+	notify(userID, []string{campaign.DM}, notifType, campaign, "", nil)
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"message": message,
+	})
 }
 
 func handleKickPlayer(w http.ResponseWriter, r *http.Request, campaignID, targetUserID string) {

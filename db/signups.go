@@ -26,6 +26,10 @@ func SetCampaignSignupStatus(campaignID, userID string, status models.SignupStat
 	return GetStore().SetCampaignSignupStatus(campaignID, userID, status)
 }
 
+func WithdrawCampaignSignup(campaignID, userID string) (bool, error) {
+	return GetStore().WithdrawCampaignSignup(campaignID, userID)
+}
+
 func SetCampaignSignUpsOpen(campaignID string, open bool) error {
 	return GetStore().SetCampaignSignUpsOpen(campaignID, open)
 }
