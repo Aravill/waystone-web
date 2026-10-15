@@ -60,6 +60,23 @@
                 </div>
             </div>
 
+            <div class="profile-section" x-show="isSelf">
+                <h2 class="section-header">Edit Profile</h2>
+                <div class="calendar-sync-box">
+                    <label for="nicknameInput">Nickname</label>
+                    <input type="text" id="nicknameInput" x-model="nicknameInput" maxlength="32" @keydown.enter="saveNickname()">
+                    <div class="campaigns-list">
+                        <button type="button" class="campaign-link-button" @click="saveNickname()">Save</button>
+                    </div>
+                    <label>Avatar</label>
+                    <input type="file" hidden x-ref="avatarInput" accept="image/png,image/jpeg,image/webp,image/gif" @change="uploadAvatar($event)">
+                    <div class="campaigns-list">
+                        <button type="button" class="campaign-link-button" @click="$refs.avatarInput.click()">Upload Avatar</button>
+                        <button type="button" class="danger-btn" x-show="profile && profile.avatar && profile.avatar.url" @click="removeAvatar()">Remove Avatar</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="profile-section" id="calendar-sync" x-show="isSelf">
                 <h2 class="section-header">Calendar Sync</h2>
                 <p class="form-hint">Subscribe in Google Calendar or any calendar app. Google refreshes subscriptions every few hours (up to ~24h). Anyone with this link can see your sessions.</p>
@@ -84,7 +101,7 @@
 
             <div class="profile-section danger-zone" x-show="isSelf">
                 <h2 class="section-header">Account Management</h2>
-                <p>Delete your account and all associated data.</p>
+                <p>Delete your account. Your personal data is erased and you are removed from all campaigns.</p>
                 <button @click="deleteProfile()" class="danger-btn">Delete Account</button>
             </div>
 
@@ -110,6 +127,6 @@
     </div>
 
     <script src="/static/notifications.js?v=4"></script>
-    <script src="profile.js?v=3"></script>
+    <script src="profile.js?v=4"></script>
 </body>
 </html>

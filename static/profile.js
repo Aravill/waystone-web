@@ -10,6 +10,7 @@ window.profilePage = function() {
         isSelf: false,
         isEnvAdmin: false,
         calendarToken: '',
+        nicknameInput: '',
         messageVisible: false,
         messageText: '',
         messageType: '',
@@ -136,6 +137,7 @@ window.profilePage = function() {
                 this.isSelf = profile.is_self || false;
                 this.dmCampaigns = Array.isArray(profile.campaigns?.dm) ? profile.campaigns.dm : [];
                 this.playingCampaigns = Array.isArray(profile.campaigns?.playing) ? profile.campaigns.playing : [];
+                this.nicknameInput = (profile.user && profile.user.nickname) || '';
             } catch (error) {
                 this.showMessage('Error loading profile: ' + error.message, 'error');
             } finally {
@@ -150,7 +152,10 @@ window.profilePage = function() {
             const displayName = profile.display_name || 'Unknown User';
             
             const initials = (profile.avatar && profile.avatar.initials) || '?';
-            const avatarHtml = `<div class="profile-avatar-initials">${escapeHtml(initials)}</div>`;
+            const avatarUrl = profile.avatar && profile.avatar.url;
+            const avatarHtml = avatarUrl
+                ? `<img src="${escapeHtml(avatarUrl)}" alt="">`
+                : `<div class="profile-avatar-initials">${escapeHtml(initials)}</div>`;
             
             let metaHtml = '';
             if (profile.user && profile.user.name) {
@@ -176,6 +181,72 @@ window.profilePage = function() {
             `;
         },
         
+        async saveNickname() {
+            try {
+                const response = await fetch('/api/profile', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nickname: this.nicknameInput })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to update nickname');
+                }
+                this.displayName = data.display_name || this.displayName;
+                this.showMessage(data.message || 'Nickname updated', 'success');
+                await this.loadProfile();
+            } catch (error) {
+                this.showMessage('Error updating nickname: ' + error.message, 'error');
+            }
+        },
+
+        async uploadAvatar(event) {
+            const input = event.target;
+            const file = input.files && input.files[0];
+            if (!file) return;
+            try {
+                if (file.size > 1024 * 1024) {
+                    throw new Error('avatar must be 1 MB or smaller');
+                }
+                const response = await fetch('/api/profile/avatar', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': file.type },
+                    body: file
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to upload avatar');
+                }
+                this.showMessage(data.message || 'Avatar updated', 'success');
+                await this.loadProfile();
+            } catch (error) {
+                this.showMessage('Error uploading avatar: ' + error.message, 'error');
+            } finally {
+                input.value = '';
+            }
+        },
+
+        async removeAvatar() {
+            if (!(await this.askConfirm({
+                title: 'Remove avatar',
+                message: 'Remove your avatar? Your initials will be shown instead.',
+                confirmLabel: 'Remove'
+            }))) {
+                return;
+            }
+            try {
+                const response = await fetch('/api/profile/avatar', { method: 'DELETE' });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to remove avatar');
+                }
+                this.showMessage(data.message || 'Avatar removed', 'success');
+                await this.loadProfile();
+            } catch (error) {
+                this.showMessage('Error removing avatar: ' + error.message, 'error');
+            }
+        },
+
         // askConfirm opens the confirm modal and resolves to true on confirm, false on cancel.
         askConfirm({ title, message, confirmLabel }) {
             if (this.confirmDialog.resolve) this.confirmDialog.resolve(false);
@@ -194,7 +265,7 @@ window.profilePage = function() {
         async deleteProfile() {
             const confirmed = await this.askConfirm({
                 title: 'Delete account',
-                message: 'Are you sure? This will permanently delete your account and remove you from all campaigns.',
+                message: "Are you sure? Your account will be anonymised: you'll be removed from all campaigns, your name and avatar will be erased, and you won't be able to log in again. Past session history is kept as 'Deleted user'.",
                 confirmLabel: 'Delete'
             });
             
@@ -207,7 +278,7 @@ window.profilePage = function() {
                 
                 if (!response.ok) {
                     const data = await response.json();
-                    throw new Error(data.message || 'Failed to delete account');
+                    throw new Error(data.error || data.message || 'Failed to delete account');
                 }
                 
                 const data = await response.json();
