@@ -171,6 +171,7 @@ func userDisplayObject(user *models.User) map[string]interface{} {
 		"nickname":     user.Nickname,
 		"display_name": user.DisplayName(),
 		"profile_url":  fmt.Sprintf("/profile?user_id=%s", user.ID),
+		"avatar_url":   user.AvatarURL(),
 	}
 }
 

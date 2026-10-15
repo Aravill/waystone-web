@@ -93,7 +93,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		if dbErr != nil {
 			log.Printf("AuthMiddleware: DB error for user %s: %v", userID, dbErr)
 			// fail open on transient DB errors
-		} else if dbUser == nil {
+		} else if dbUser == nil || dbUser.Deleted {
 			// stale cookie — user deleted
 			ClearSession(w, r)
 			http.Redirect(w, r, "/login.html", http.StatusSeeOther)
