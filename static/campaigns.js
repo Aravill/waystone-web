@@ -57,6 +57,7 @@ window.campaignsPage = function () {
         signupsDesiredCount: 0,
         signupsOpen: false,
         showDeclinedSignups: false,
+        confirmDialog: { open: false, title: '', message: '', confirmLabel: '', resolve: null },
 
         get editingCampaign() {
             return this.campaigns.find((c) => c.id === this.editingCampaignId) || null;
@@ -257,7 +258,12 @@ window.campaignsPage = function () {
             if (!campaign) {
                 return;
             }
-            if (!confirm(`Delete campaign "${campaign.title}"? This also deletes its sessions and sign-ups and cannot be undone.`)) {
+            const ok = await this.askConfirm({
+                title: 'Delete campaign',
+                message: `Delete "${campaign.title}"? This also deletes its sessions and sign-ups and cannot be undone.`,
+                confirmLabel: 'Delete'
+            });
+            if (!ok) {
                 return;
             }
             try {
@@ -446,10 +452,18 @@ window.campaignsPage = function () {
         },
 
         async withdrawSignup(campaignId, title, kind) {
-            const prompt = kind === 'leave'
-                ? `Leave "${title}"? You'll stop being a player; you can sign up again if sign-ups are open.`
-                : `Withdraw your sign-up for "${title}"?`;
-            if (!confirm(prompt)) return;
+            const ok = await this.askConfirm(kind === 'leave'
+                ? {
+                    title: 'Leave campaign',
+                    message: `Leave "${title}"? You'll stop being a player; you can sign up again if sign-ups are open.`,
+                    confirmLabel: 'Leave'
+                }
+                : {
+                    title: 'Withdraw sign-up',
+                    message: `Withdraw your sign-up for "${title}"?`,
+                    confirmLabel: 'Withdraw'
+                });
+            if (!ok) return;
             try {
                 const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/signups/${encodeURIComponent(this.currentUserId)}`, { method: 'DELETE' });
                 if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
@@ -467,6 +481,21 @@ window.campaignsPage = function () {
             } catch (error) {
                 this.showMessage('Error withdrawing: ' + error.message, 'error');
             }
+        },
+
+        // askConfirm opens the confirm modal and resolves to true on confirm, false on cancel.
+        askConfirm({ title, message, confirmLabel }) {
+            if (this.confirmDialog.resolve) this.confirmDialog.resolve(false);
+            return new Promise((resolve) => {
+                this.confirmDialog = { open: true, title, message, confirmLabel: confirmLabel || 'Confirm', resolve };
+                this.$nextTick(() => this.$refs.confirmCancelBtn?.focus());
+            });
+        },
+
+        closeConfirm(result) {
+            const resolve = this.confirmDialog.resolve;
+            this.confirmDialog = { open: false, title: '', message: '', confirmLabel: '', resolve: null };
+            if (resolve) resolve(result);
         },
 
         async openSignupsModal(campaignId, campaignTitle) {

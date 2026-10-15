@@ -1000,7 +1000,8 @@ select:focus {
 }
 
 .btn-create,
-.btn-cancel {
+.btn-cancel,
+.btn-confirm-danger {
     padding: 10px 20px;
     border: 1px solid #00d9ff;
     font-family: 'Fira Code', monospace;
@@ -1031,6 +1032,17 @@ select:focus {
     background: transparent;
     color: #ffffff;
     border-color: #ffffff;
+}
+
+.btn-confirm-danger {
+    background: #000000;
+    color: #e74c3c;
+    border-color: #e74c3c;
+}
+
+.btn-confirm-danger:hover {
+    background: #e74c3c;
+    color: #000000;
 }
 
 /* Calendar Modal Styles */
@@ -1110,6 +1122,21 @@ select:focus {
 .compact-modal-form .modal-actions {
     padding-top: 8px;
     gap: 8px;
+}
+
+.confirm-modal {
+    z-index: 1200;
+}
+
+.confirm-modal-content {
+    max-width: 420px;
+}
+
+.confirm-modal-message {
+    margin: 0;
+    color: #b0b0b0;
+    font-size: 0.9em;
+    line-height: 1.5;
 }
 
 .duration-row {
