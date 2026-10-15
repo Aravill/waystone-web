@@ -47,6 +47,7 @@ func RegisterRoutes() {
 	http.Handle("/api/notifications", middleware.AuthMiddleware(http.HandlerFunc(HandleNotifications)))
 	http.Handle("/api/notifications/", middleware.AuthMiddleware(http.HandlerFunc(HandleNotificationRoutes)))
 	http.Handle("/api/profile", middleware.AuthMiddleware(http.HandlerFunc(HandleProfile)))
+	http.Handle("/api/profile/setup-complete", middleware.AuthMiddleware(http.HandlerFunc(HandleProfileSetupComplete)))
 	http.Handle("/api/profile/calendar", middleware.AuthMiddleware(http.HandlerFunc(HandleCalendarToken)))
 
 	// Static files - MUST be registered BEFORE "/" handler to take precedence
@@ -81,6 +82,10 @@ func RegisterRoutes() {
 		http.ServeFile(w, r, "./static/change-password.js")
 	})
 
+	http.HandleFunc("/welcome.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/welcome.js")
+	})
+
 	// /static/ prefix for any other static assets
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
@@ -89,6 +94,8 @@ func RegisterRoutes() {
 	http.Handle("/campaigns", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("campaigns.html"))))
 	http.Handle("/profile", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("profile.html"))))
 	http.Handle("/change-password", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("change-password.html"))))
+
+	http.Handle("/welcome", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("welcome.html"))))
 
 	// Admin page
 	http.Handle("/admin/users", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminUsersPage)))

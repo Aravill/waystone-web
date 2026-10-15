@@ -276,6 +276,28 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// HandleProfileSetupComplete clears the session user's first-login profile setup flag.
+func HandleProfileSetupComplete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	userID, ok := sessionUserID(w, r)
+	if !ok {
+		return
+	}
+	if err := db.CompleteProfileSetup(userID); err != nil {
+		if errors.Is(err, db.ErrUserNotFound) {
+			writeJSONError(w, http.StatusNotFound, "user not found")
+			return
+		}
+		log.Printf("error completing profile setup: %v", err)
+		writeJSONError(w, http.StatusInternalServerError, "failed to complete profile setup")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "profile setup complete"})
+}
+
 // sessionUserID returns the session user's ID, or writes a 401 and returns false.
 func sessionUserID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	session, err := middleware.GetSession(r)

@@ -76,6 +76,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":               "ok",
 		"must_change_password": user.MustChangePassword,
+		"needs_profile_setup":  user.NeedsProfileSetup,
 	})
 }
 
@@ -208,6 +209,7 @@ func HandleGetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		"display_name":         user.DisplayName(),
 		"roles":                user.Roles,
 		"must_change_password": user.MustChangePassword,
+		"needs_profile_setup":  user.NeedsProfileSetup,
 		"is_env_admin":         auth.IsEnvAdmin(user),
 	})
 }
