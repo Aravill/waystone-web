@@ -188,6 +188,7 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 					"nickname":     dmUser.Nickname,
 					"display_name": dmUser.DisplayName(),
 					"profile_url":  fmt.Sprintf("/profile?user_id=%s", dmUser.ID),
+					"avatar_url":   dmUser.AvatarURL(),
 				}
 			}
 		}
@@ -202,6 +203,7 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 					"nickname":     playerUser.Nickname,
 					"display_name": playerUser.DisplayName(),
 					"profile_url":  fmt.Sprintf("/profile?user_id=%s", playerUser.ID),
+					"avatar_url":   playerUser.AvatarURL(),
 				})
 			}
 		}

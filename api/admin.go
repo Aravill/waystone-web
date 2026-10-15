@@ -108,9 +108,12 @@ func HandleAdminUsers(w http.ResponseWriter, r *http.Request) {
 			adminError(w, http.StatusInternalServerError, "failed to fetch users")
 			return
 		}
-		result := make([]adminUserJSON, len(users))
-		for i, u := range users {
-			result[i] = toAdminUserJSON(u)
+		result := make([]adminUserJSON, 0, len(users))
+		for _, u := range users {
+			if u.Deleted {
+				continue
+			}
+			result = append(result, toAdminUserJSON(u))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
@@ -195,7 +198,7 @@ func HandleAdminUserActions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	target, err := db.GetUserByID(targetID)
-	if err != nil || target == nil {
+	if err != nil || target == nil || target.Deleted {
 		adminError(w, http.StatusNotFound, "user not found")
 		return
 	}
@@ -219,7 +222,7 @@ func HandleAdminUserActions(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if _, _, err := db.DeleteUserAndCleanupCampaigns(targetID); err != nil {
+		if _, err := db.AnonymizeUserAndCleanupCampaigns(targetID); err != nil {
 			adminError(w, http.StatusInternalServerError, "failed to delete user")
 			return
 		}

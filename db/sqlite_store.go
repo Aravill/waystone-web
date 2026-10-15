@@ -62,6 +62,10 @@ func (s *SQLiteStore) initSchema() error {
 		nickname TEXT,
 		roles TEXT NOT NULL DEFAULT '[]',
 		blocked INTEGER NOT NULL DEFAULT 0,
+		deleted INTEGER NOT NULL DEFAULT 0,
+		avatar BLOB,
+		avatar_type TEXT NOT NULL DEFAULT '',
+		avatar_version INTEGER NOT NULL DEFAULT 0,
 		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
@@ -193,6 +197,36 @@ func (s *SQLiteStore) initSchema() error {
 	if !cols["system"] {
 		if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN system TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("failed to add campaigns.system column: %w", err)
+		}
+	}
+
+	// Add users.deleted and avatar columns to older databases.
+	rows, err = s.db.Query(`PRAGMA table_info(users)`)
+	if err != nil {
+		return fmt.Errorf("failed to inspect users table: %w", err)
+	}
+	userCols := map[string]bool{}
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, ctype string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			rows.Close()
+			return fmt.Errorf("failed to inspect users table: %w", err)
+		}
+		userCols[name] = true
+	}
+	rows.Close()
+	for _, col := range []struct{ name, def string }{
+		{"deleted", "INTEGER NOT NULL DEFAULT 0"},
+		{"avatar", "BLOB"},
+		{"avatar_type", "TEXT NOT NULL DEFAULT ''"},
+		{"avatar_version", "INTEGER NOT NULL DEFAULT 0"},
+	} {
+		if !userCols[col.name] {
+			if _, err := s.db.Exec(`ALTER TABLE users ADD COLUMN ` + col.name + ` ` + col.def); err != nil {
+				return fmt.Errorf("failed to add users.%s column: %w", col.name, err)
+			}
 		}
 	}
 
@@ -392,9 +426,14 @@ func (s *SQLiteStore) SaveUser(user models.User) error {
 		mustChangeInt = 1
 	}
 
+	deletedInt := 0
+	if user.Deleted {
+		deletedInt = 1
+	}
+
 	query := `
-	INSERT INTO users (id, username, password_hash, must_change_password, name, nickname, roles, blocked, created_at, updated_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO users (id, username, password_hash, must_change_password, name, nickname, roles, blocked, deleted, created_at, updated_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
 		username = excluded.username,
 		password_hash = excluded.password_hash,
@@ -403,6 +442,7 @@ func (s *SQLiteStore) SaveUser(user models.User) error {
 		nickname = excluded.nickname,
 		roles = excluded.roles,
 		blocked = excluded.blocked,
+		deleted = excluded.deleted,
 		updated_at = excluded.updated_at
 	`
 
@@ -416,6 +456,7 @@ func (s *SQLiteStore) SaveUser(user models.User) error {
 		user.Nickname,
 		string(rolesJSON),
 		blockedInt,
+		deletedInt,
 		user.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		user.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	)
@@ -427,7 +468,7 @@ func (s *SQLiteStore) GetAllUsers() ([]models.User, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	rows, err := s.db.Query("SELECT id, username, password_hash, must_change_password, name, nickname, roles, blocked, created_at, updated_at FROM users ORDER BY id")
+	rows, err := s.db.Query("SELECT id, username, password_hash, must_change_password, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, created_at, updated_at FROM users ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -437,7 +478,7 @@ func (s *SQLiteStore) GetAllUsers() ([]models.User, error) {
 	for rows.Next() {
 		var user models.User
 		var rolesJSON string
-		var blockedInt, mustChangeInt int
+		var blockedInt, mustChangeInt, deletedInt int
 		var createdAtStr, updatedAtStr string
 
 		err := rows.Scan(
@@ -449,6 +490,9 @@ func (s *SQLiteStore) GetAllUsers() ([]models.User, error) {
 			&user.Nickname,
 			&rolesJSON,
 			&blockedInt,
+			&deletedInt,
+			&user.AvatarType,
+			&user.AvatarVersion,
 			&createdAtStr,
 			&updatedAtStr,
 		)
@@ -461,6 +505,7 @@ func (s *SQLiteStore) GetAllUsers() ([]models.User, error) {
 		}
 
 		user.Blocked = blockedInt != 0
+		user.Deleted = deletedInt != 0
 		user.MustChangePassword = mustChangeInt != 0
 
 		// Parse timestamps
@@ -495,10 +540,10 @@ func (s *SQLiteStore) GetUserByUsername(username string) (*models.User, error) {
 
 	var user models.User
 	var rolesJSON string
-	var blockedInt, mustChangeInt int
+	var blockedInt, mustChangeInt, deletedInt int
 	var createdAtStr, updatedAtStr string
 
-	query := `SELECT id, username, password_hash, must_change_password, name, nickname, roles, blocked, created_at, updated_at FROM users WHERE username = ?`
+	query := `SELECT id, username, password_hash, must_change_password, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, created_at, updated_at FROM users WHERE username = ?`
 	err := s.db.QueryRow(query, username).Scan(
 		&user.ID,
 		&user.Username,
@@ -508,6 +553,9 @@ func (s *SQLiteStore) GetUserByUsername(username string) (*models.User, error) {
 		&user.Nickname,
 		&rolesJSON,
 		&blockedInt,
+		&deletedInt,
+		&user.AvatarType,
+		&user.AvatarVersion,
 		&createdAtStr,
 		&updatedAtStr,
 	)
@@ -524,6 +572,7 @@ func (s *SQLiteStore) GetUserByUsername(username string) (*models.User, error) {
 	}
 
 	user.Blocked = blockedInt != 0
+	user.Deleted = deletedInt != 0
 	user.MustChangePassword = mustChangeInt != 0
 
 	// Parse timestamps
@@ -551,10 +600,10 @@ func (s *SQLiteStore) GetUserByID(id string) (*models.User, error) {
 
 	var user models.User
 	var rolesJSON string
-	var blockedInt, mustChangeInt int
+	var blockedInt, mustChangeInt, deletedInt int
 	var createdAtStr, updatedAtStr string
 
-	query := `SELECT id, username, password_hash, must_change_password, name, nickname, roles, blocked, created_at, updated_at FROM users WHERE id = ?`
+	query := `SELECT id, username, password_hash, must_change_password, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, created_at, updated_at FROM users WHERE id = ?`
 	err := s.db.QueryRow(query, id).Scan(
 		&user.ID,
 		&user.Username,
@@ -564,6 +613,9 @@ func (s *SQLiteStore) GetUserByID(id string) (*models.User, error) {
 		&user.Nickname,
 		&rolesJSON,
 		&blockedInt,
+		&deletedInt,
+		&user.AvatarType,
+		&user.AvatarVersion,
 		&createdAtStr,
 		&updatedAtStr,
 	)
@@ -580,6 +632,7 @@ func (s *SQLiteStore) GetUserByID(id string) (*models.User, error) {
 	}
 
 	user.Blocked = blockedInt != 0
+	user.Deleted = deletedInt != 0
 	user.MustChangePassword = mustChangeInt != 0
 
 	// Parse timestamps
@@ -597,7 +650,79 @@ func (s *SQLiteStore) GetUserByID(id string) (*models.User, error) {
 	return &user, nil
 }
 
-func (s *SQLiteStore) DeleteUser(id string) error {
+// SetUserProfile updates the provided name and/or nickname; nil fields are left unchanged.
+func (s *SQLiteStore) SetUserProfile(id string, name, nickname *string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	sets := []string{}
+	args := []interface{}{}
+	if name != nil {
+		sets = append(sets, "name = ?")
+		args = append(args, *name)
+	}
+	if nickname != nil {
+		sets = append(sets, "nickname = ?")
+		args = append(args, *nickname)
+	}
+	sets = append(sets, "updated_at = ?")
+	args = append(args, time.Now().UTC().Format(time.RFC3339), id)
+	res, err := s.db.Exec(`UPDATE users SET `+strings.Join(sets, ", ")+` WHERE id = ? AND deleted = 0`, args...)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+// SetUserAvatar stores an avatar and bumps its version; empty data removes the avatar.
+func (s *SQLiteStore) SetUserAvatar(id string, data []byte, contentType string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	var avatar interface{}
+	if len(data) > 0 {
+		avatar = data
+	} else {
+		contentType = ""
+	}
+	res, err := s.db.Exec(`UPDATE users SET avatar = ?, avatar_type = ?, avatar_version = avatar_version + 1 WHERE id = ? AND deleted = 0`, avatar, contentType, id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+// GetUserAvatar returns the avatar bytes and content type; empty data means no avatar.
+func (s *SQLiteStore) GetUserAvatar(id string) ([]byte, string, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	var data []byte
+	var contentType string
+	err := s.db.QueryRow(`SELECT avatar, avatar_type FROM users WHERE id = ? AND deleted = 0`, id).Scan(&data, &contentType)
+	if err == sql.ErrNoRows {
+		return nil, "", ErrUserNotFound
+	}
+	return data, contentType, err
+}
+
+// AnonymizeUser erases a user's personal data and per-user rows but keeps the user row
+// (marked deleted) so session responses and DM references stay intact.
+func (s *SQLiteStore) AnonymizeUser(id string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -605,43 +730,34 @@ func (s *SQLiteStore) DeleteUser(id string) error {
 		return fmt.Errorf("user id cannot be empty")
 	}
 
-	// Keep session response data consistent when users are removed.
-	if _, err := s.db.Exec(`DELETE FROM session_responses WHERE user_id = ?`, id); err != nil {
-		return err
-	}
-
-	if _, err := s.db.Exec(`DELETE FROM campaign_signups WHERE user_id = ?`, id); err != nil {
-		return err
-	}
-
-	if _, err := s.db.Exec(`DELETE FROM campaign_follows WHERE user_id = ?`, id); err != nil {
-		return err
-	}
-
-	if _, err := s.db.Exec(`DELETE FROM calendar_tokens WHERE user_id = ?`, id); err != nil {
-		return err
-	}
-
-	if _, err := s.db.Exec(`DELETE FROM notifications WHERE user_id = ?`, id); err != nil {
-		return err
-	}
-
-	query := `DELETE FROM users WHERE id = ?`
-	result, err := s.db.Exec(query, id)
+	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback()
 
-	rowsAffected, err := result.RowsAffected()
+	res, err := tx.Exec(`UPDATE users SET deleted = 1, username = ?, name = '', nickname = '', password_hash = '',
+		must_change_password = 0, roles = '["user"]', blocked = 0, avatar = NULL, avatar_type = '',
+		avatar_version = avatar_version + 1, updated_at = ? WHERE id = ? AND deleted = 0`,
+		"deleted-"+id, time.Now().UTC().Format(time.RFC3339), id)
 	if err != nil {
 		return err
 	}
-
-	if rowsAffected == 0 {
-		return fmt.Errorf("user not found")
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrUserNotFound
 	}
 
-	return nil
+	for _, table := range []string{"campaign_signups", "campaign_follows", "calendar_tokens", "notifications"} {
+		if _, err := tx.Exec(`DELETE FROM `+table+` WHERE user_id = ?`, id); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (s *SQLiteStore) SetUserBlocked(id string, blocked bool) error {
@@ -821,6 +937,33 @@ func (s *SQLiteStore) GetSessionsByCampaignIDs(campaignIDs []string, fromDate st
 		sessions = append(sessions, session)
 	}
 
+	return sessions, rows.Err()
+}
+
+// GetAcceptedConfirmedSessions returns confirmed sessions the user responded Accepted to.
+func (s *SQLiteStore) GetAcceptedConfirmedSessions(userID string) ([]models.CampaignSession, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(`
+		SELECT s.id, s.campaign_id, s.date, s.time, s.duration, s.status, s.timezone, s.created_at, s.updated_at
+		FROM campaign_sessions s JOIN session_responses r ON r.session_id = s.id
+		WHERE r.user_id = ? AND r.participation = ? AND s.status = ?
+	`, userID, models.Accepted, models.SessionConfirmed)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []models.CampaignSession
+	for rows.Next() {
+		var session models.CampaignSession
+		if err := rows.Scan(&session.ID, &session.CampaignID, &session.Date, &session.Time, &session.Duration,
+			&session.Status, &session.Timezone, &session.CreatedAt, &session.UpdatedAt); err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, session)
+	}
 	return sessions, rows.Err()
 }
 
@@ -1070,6 +1213,7 @@ var (
 	ErrCampaignFull         = errors.New("campaign is full")
 	ErrCampaignNotFound     = errors.New("campaign not found")
 	ErrSystemNotFound       = errors.New("system not found")
+	ErrUserNotFound         = errors.New("user not found")
 	ErrNotificationNotFound = errors.New("notification not found")
 )
 

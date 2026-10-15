@@ -20,13 +20,17 @@ type Store interface {
 	GetUserByUsername(username string) (*models.User, error)
 	GetUserByID(id string) (*models.User, error)
 	GetAllUsers() ([]models.User, error)
-	DeleteUser(id string) error
+	SetUserProfile(id string, name, nickname *string) error
+	SetUserAvatar(id string, data []byte, contentType string) error
+	GetUserAvatar(id string) ([]byte, string, error)
+	AnonymizeUser(id string) error
 	SetUserBlocked(id string, blocked bool) error
 	SetUserPassword(id, hash string, mustChange bool) error
 	GetSessionsByMonth(campaignID string, year int, month int) ([]models.CampaignSession, error)
 	GetSessionByID(sessionID string) (*models.CampaignSession, error)
 	SaveSession(session models.CampaignSession) error
 	GetSessionsByCampaignIDs(campaignIDs []string, fromDate string) ([]models.CampaignSession, error)
+	GetAcceptedConfirmedSessions(userID string) ([]models.CampaignSession, error)
 	GetCalendarToken(userID string) (string, error)
 	SetCalendarToken(userID, token string) error
 	GetUserIDByCalendarToken(token string) (string, error)

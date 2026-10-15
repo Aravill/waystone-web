@@ -44,13 +44,13 @@ This document describes what must-have features are to be implemented before pre
     - [x] Visually distinct campaign statuses
     - [x] Campaign types (and their visual distinction) - Campaign, Adventure, One-shot
     - [x] Game systems - admins manage known systems (optional logo); campaigns pick one or type a custom one; shown on the campaign card
-- [ ] Profile
-    - [ ] Standard operations
-        - [ ] Changing nicknames
-        - [ ] Updating avatars
-        - [ ] Deleting account (anonymizes them)
+- [x] Profile
+    - [x] Standard operations
+        - [x] Changing nicknames
+        - [x] Updating avatars
+        - [x] Deleting account (anonymizes them)
     - [x] List of campaigns playing in and dungeon mastering
-    - [ ] Visually distinct campaign statuses
+    - [x] Visually distinct campaign statuses
 - [ ] Initial log-in
     - [ ] Profile creation process (set nickname and avatar)
 - [x] Technological

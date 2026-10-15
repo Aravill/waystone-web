@@ -6,6 +6,11 @@ func GetSessionsByMonth(campaignID string, year int, month int) ([]models.Campai
 	return GetStore().GetSessionsByMonth(campaignID, year, month)
 }
 
+// GetAcceptedConfirmedSessions returns confirmed sessions the user accepted.
+func GetAcceptedConfirmedSessions(userID string) ([]models.CampaignSession, error) {
+	return GetStore().GetAcceptedConfirmedSessions(userID)
+}
+
 func SaveSession(session models.CampaignSession) error {
 	return GetStore().SaveSession(session)
 }
