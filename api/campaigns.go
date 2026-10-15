@@ -357,6 +357,8 @@ func HandleCampaignStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID, _ := r.Context().Value("user_id").(string)
+	oldStatus := campaign.Status
 	if err := db.SetCampaignStatus(parts[0], req.Status); err != nil {
 		if errors.Is(err, db.ErrCampaignNotFound) {
 			writeJSONError(w, http.StatusNotFound, err.Error())
@@ -364,6 +366,12 @@ func HandleCampaignStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSONError(w, http.StatusInternalServerError, "failed to update status")
 		return
+	}
+	if oldStatus != req.Status {
+		notify(userID, append(campaignFollowerIDs(campaign), campaign.DM), models.NotificationCampaignStatus, campaign, "", map[string]string{
+			"from_status": string(oldStatus),
+			"to_status":   string(req.Status),
+		})
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":                     "success",
