@@ -261,6 +261,7 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "failed to update profile")
 		return
 	}
+	completeProfileSetup(userID)
 
 	user, err := db.GetUserByID(userID)
 	if err != nil || user == nil {
@@ -274,6 +275,36 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		"nickname":     user.Nickname,
 		"display_name": user.DisplayName(),
 	})
+}
+
+// HandleProfileSetupComplete clears the session user's first-login profile setup flag.
+func HandleProfileSetupComplete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	userID, ok := sessionUserID(w, r)
+	if !ok {
+		return
+	}
+	if err := db.CompleteProfileSetup(userID); err != nil {
+		if errors.Is(err, db.ErrUserNotFound) {
+			writeJSONError(w, http.StatusNotFound, "user not found")
+			return
+		}
+		log.Printf("error completing profile setup: %v", err)
+		writeJSONError(w, http.StatusInternalServerError, "failed to complete profile setup")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "profile setup complete"})
+}
+
+// completeProfileSetup clears the first-login setup flag after the user edits their profile.
+// Errors are logged, never returned: the edit itself already succeeded.
+func completeProfileSetup(userID string) {
+	if err := db.CompleteProfileSetup(userID); err != nil && !errors.Is(err, db.ErrUserNotFound) {
+		log.Printf("error completing profile setup: %v", err)
+	}
 }
 
 // sessionUserID returns the session user's ID, or writes a 401 and returns false.
@@ -341,6 +372,9 @@ func HandleProfileAvatar(w http.ResponseWriter, r *http.Request) {
 		log.Printf("error saving avatar: %v", err)
 		writeJSONError(w, http.StatusInternalServerError, "failed to save avatar")
 		return
+	}
+	if len(data) > 0 {
+		completeProfileSetup(userID)
 	}
 
 	avatarURL := ""

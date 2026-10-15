@@ -51,8 +51,8 @@ This document describes what must-have features are to be implemented before pre
         - [x] Deleting account (anonymizes them)
     - [x] List of campaigns playing in and dungeon mastering
     - [x] Visually distinct campaign statuses
-- [ ] Initial log-in
-    - [ ] Profile creation process (set nickname and avatar)
+- [x] Initial log-in
+    - [x] Profile creation process (set nickname and avatar)
 - [x] Technological
     - [x] SQLite
     - [x] Alpine.js

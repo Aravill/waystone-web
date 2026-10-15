@@ -2,6 +2,7 @@
 window.changePasswordPage = function() {
     return {
         mustChange: false,
+        needsProfileSetup: false,
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
@@ -18,6 +19,7 @@ window.changePasswordPage = function() {
                     return;
                 }
                 const user = await response.json();
+                this.needsProfileSetup = !!user.needs_profile_setup;
                 if (user.is_env_admin) {
                     window.location.href = '/';
                     return;
@@ -49,7 +51,7 @@ window.changePasswordPage = function() {
                     this.showMessage(data.error || 'Failed to change password', 'error');
                     return;
                 }
-                window.location.href = '/';
+                window.location.href = this.needsProfileSetup ? '/profile' : '/';
             } catch (error) {
                 this.showMessage('Failed to change password: ' + error.message, 'error');
             } finally {

@@ -21,6 +21,7 @@ type Store interface {
 	GetUserByID(id string) (*models.User, error)
 	GetAllUsers() ([]models.User, error)
 	SetUserProfile(id string, name, nickname *string) error
+	CompleteProfileSetup(id string) error
 	SetUserAvatar(id string, data []byte, contentType string) error
 	GetUserAvatar(id string) ([]byte, string, error)
 	AnonymizeUser(id string) error

@@ -156,6 +156,7 @@ func HandleAdminUsers(w http.ResponseWriter, r *http.Request) {
 			Username:           username,
 			PasswordHash:       hash,
 			MustChangePassword: true,
+			NeedsProfileSetup:  true,
 			Name:               strings.TrimSpace(body.Name),
 			Roles:              []string{models.RoleUser},
 		}

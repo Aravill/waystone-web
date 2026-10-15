@@ -9,6 +9,7 @@ window.profilePage = function() {
         playingCampaigns: [],
         isSelf: false,
         isEnvAdmin: false,
+        needsProfileSetup: false,
         calendarToken: '',
         editing: null,
         editValue: '',
@@ -34,6 +35,7 @@ window.profilePage = function() {
                 this.displayName = user.display_name || user.username;
                 this.isAdmin = (user.roles || []).includes('admin');
                 this.isEnvAdmin = !!user.is_env_admin;
+                this.needsProfileSetup = !!user.needs_profile_setup;
             } catch (error) {
                 console.error('Auth check failed:', error);
                 window.location.href = '/login.html';
@@ -201,11 +203,25 @@ window.profilePage = function() {
                 this.profile.display_name = data.display_name;
                 this.displayName = data.display_name || this.displayName;
                 this.editing = null;
+                this.needsProfileSetup = false;
                 this.showMessage('Profile updated', 'success');
             } catch (error) {
                 this.showMessage(error.message, 'error');
             } finally {
                 this.saving = false;
+            }
+        },
+
+        async finishSetup() {
+            try {
+                const response = await fetch('/api/profile/setup-complete', { method: 'POST' });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to finish profile setup');
+                }
+                this.needsProfileSetup = false;
+            } catch (error) {
+                this.showMessage(error.message, 'error');
             }
         },
 
@@ -226,6 +242,7 @@ window.profilePage = function() {
                 if (!response.ok) {
                     throw new Error(data.error || 'Failed to upload avatar');
                 }
+                this.needsProfileSetup = false;
                 this.showMessage(data.message || 'Avatar updated', 'success');
                 await this.loadProfile();
             } catch (error) {
