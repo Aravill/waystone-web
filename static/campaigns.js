@@ -96,6 +96,12 @@ window.campaignsPage = function () {
 
                 if (!this._signupButtonHandler) {
                     this._signupButtonHandler = (event) => {
+                        const followBtn = event.target.closest('.campaign-follow-btn');
+                        if (followBtn) {
+                            event.preventDefault();
+                            this.toggleFollow(followBtn.dataset.campaignId || '', followBtn.dataset.following === 'true');
+                            return;
+                        }
                         const withdrawBtn = event.target.closest('.campaign-withdraw-btn');
                         if (withdrawBtn) {
                             event.preventDefault();
@@ -321,6 +327,11 @@ window.campaignsPage = function () {
             const maxPlayers = parseInt(campaign?.desired_player_count, 10) || 0;
             const signUpsLabel = (signUpsOpen ? 'Open' : 'Closed') + (maxPlayers > 0 ? ` (${campaignPlayers.length}/${maxPlayers})` : '');
 
+            const isFollowing = !!campaign?.is_following;
+            const followBtnHtml = (!isDM && !isPlayer && this.currentUserId)
+                ? `<button type="button" class="campaign-action-btn campaign-follow-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-following="${isFollowing}" title="${isFollowing ? 'Stop getting notifications for this campaign' : 'Get notified about status changes, sign-ups and sessions'}">${isFollowing ? 'Unfollow' : 'Follow'}</button>`
+                : '';
+
             let signupBtnHtml;
             if (isDM) {
                 signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-signups-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-campaign-title="${escapeHtml(campaign?.title || '')}"${pendingSignupsCount > 0 ? ` title="${pendingSignupsCount} pending sign-up${pendingSignupsCount === 1 ? '' : 's'} awaiting your decision" aria-label="Sign-ups, ${pendingSignupsCount} pending"` : ''}>Sign-ups${pendingSignupsCount > 0 ? `<span class="campaign-action-count">${pendingSignupsCount}</span>` : ''}</button>`;
@@ -425,6 +436,7 @@ window.campaignsPage = function () {
                         <button type="button" class="campaign-action-btn" disabled aria-disabled="true">Codex</button>
                         <button type="button" class="campaign-action-btn campaign-calendar-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-campaign-title="${escapeHtml(campaign?.title || '')}" data-dm-id="${escapeHtml(campaign?.dm || '')}"${unansweredCount > 0 ? ` title="${unansweredCount} suggested session${unansweredCount === 1 ? '' : 's'} awaiting your response" aria-label="Calendar, ${unansweredCount} awaiting your response"` : ''}${unansweredCount > 0 && focusDate ? ` data-focus-date="${escapeHtml(focusDate)}"` : ''}>Calendar${unansweredCount > 0 ? `<span class="campaign-action-count">${unansweredCount}</span>` : ''}</button>
                         ${signupBtnHtml}
+                        ${followBtnHtml}
                         ${campaign?.can_manage ? `<button type="button" class="campaign-action-btn campaign-edit-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}">Edit</button>` : ''}
                     </section>
                 </article>
@@ -448,6 +460,26 @@ window.campaignsPage = function () {
                 await this.loadCampaigns();
             } catch (error) {
                 this.showMessage('Error signing up: ' + error.message, 'error');
+            }
+        },
+
+        async toggleFollow(campaignId, following) {
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/follow`, { method: following ? 'DELETE' : 'PUT' });
+                if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to update follow', 'error');
+                    await this.loadCampaigns();
+                    return;
+                }
+                this.showMessage(data.message || (following ? 'Unfollowed' : 'Following'), 'success');
+                await this.loadCampaigns();
+            } catch (error) {
+                this.showMessage('Error updating follow: ' + error.message, 'error');
             }
         },
 
