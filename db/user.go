@@ -100,6 +100,11 @@ func SetUserProfile(id string, name, nickname *string) error {
 	return GetStore().SetUserProfile(id, name, nickname)
 }
 
+// CompleteProfileSetup clears the first-login profile setup flag
+func CompleteProfileSetup(id string) error {
+	return GetStore().CompleteProfileSetup(id)
+}
+
 // SetUserAvatar stores a user's avatar; empty data removes it
 func SetUserAvatar(id string, data []byte, contentType string) error {
 	return GetStore().SetUserAvatar(id, data, contentType)

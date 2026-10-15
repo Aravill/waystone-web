@@ -10,6 +10,7 @@ type User struct {
 	Username           string    `json:"username"`
 	PasswordHash       string    `json:"-"`
 	MustChangePassword bool      `json:"must_change_password"`
+	NeedsProfileSetup  bool      `json:"needs_profile_setup"`
 	Name               string    `json:"name"`
 	Nickname           string    `json:"nickname"`
 	Roles              []string  `json:"roles"`

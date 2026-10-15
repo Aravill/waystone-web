@@ -58,6 +58,7 @@ func (s *SQLiteStore) initSchema() error {
 		username TEXT NOT NULL COLLATE NOCASE UNIQUE,
 		password_hash TEXT NOT NULL DEFAULT '',
 		must_change_password INTEGER NOT NULL DEFAULT 0,
+		needs_profile_setup INTEGER NOT NULL DEFAULT 0,
 		name TEXT,
 		nickname TEXT,
 		roles TEXT NOT NULL DEFAULT '[]',
@@ -222,6 +223,7 @@ func (s *SQLiteStore) initSchema() error {
 		{"avatar", "BLOB"},
 		{"avatar_type", "TEXT NOT NULL DEFAULT ''"},
 		{"avatar_version", "INTEGER NOT NULL DEFAULT 0"},
+		{"needs_profile_setup", "INTEGER NOT NULL DEFAULT 0"},
 	} {
 		if !userCols[col.name] {
 			if _, err := s.db.Exec(`ALTER TABLE users ADD COLUMN ` + col.name + ` ` + col.def); err != nil {
@@ -426,18 +428,24 @@ func (s *SQLiteStore) SaveUser(user models.User) error {
 		mustChangeInt = 1
 	}
 
+	needsSetupInt := 0
+	if user.NeedsProfileSetup {
+		needsSetupInt = 1
+	}
+
 	deletedInt := 0
 	if user.Deleted {
 		deletedInt = 1
 	}
 
 	query := `
-	INSERT INTO users (id, username, password_hash, must_change_password, name, nickname, roles, blocked, deleted, created_at, updated_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO users (id, username, password_hash, must_change_password, needs_profile_setup, name, nickname, roles, blocked, deleted, created_at, updated_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
 		username = excluded.username,
 		password_hash = excluded.password_hash,
 		must_change_password = excluded.must_change_password,
+		needs_profile_setup = excluded.needs_profile_setup,
 		name = excluded.name,
 		nickname = excluded.nickname,
 		roles = excluded.roles,
@@ -452,6 +460,7 @@ func (s *SQLiteStore) SaveUser(user models.User) error {
 		user.Username,
 		user.PasswordHash,
 		mustChangeInt,
+		needsSetupInt,
 		user.Name,
 		user.Nickname,
 		string(rolesJSON),
@@ -468,7 +477,7 @@ func (s *SQLiteStore) GetAllUsers() ([]models.User, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	rows, err := s.db.Query("SELECT id, username, password_hash, must_change_password, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, created_at, updated_at FROM users ORDER BY id")
+	rows, err := s.db.Query("SELECT id, username, password_hash, must_change_password, needs_profile_setup, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, created_at, updated_at FROM users ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -478,7 +487,7 @@ func (s *SQLiteStore) GetAllUsers() ([]models.User, error) {
 	for rows.Next() {
 		var user models.User
 		var rolesJSON string
-		var blockedInt, mustChangeInt, deletedInt int
+		var blockedInt, mustChangeInt, needsSetupInt, deletedInt int
 		var createdAtStr, updatedAtStr string
 
 		err := rows.Scan(
@@ -486,6 +495,7 @@ func (s *SQLiteStore) GetAllUsers() ([]models.User, error) {
 			&user.Username,
 			&user.PasswordHash,
 			&mustChangeInt,
+			&needsSetupInt,
 			&user.Name,
 			&user.Nickname,
 			&rolesJSON,
@@ -507,6 +517,7 @@ func (s *SQLiteStore) GetAllUsers() ([]models.User, error) {
 		user.Blocked = blockedInt != 0
 		user.Deleted = deletedInt != 0
 		user.MustChangePassword = mustChangeInt != 0
+		user.NeedsProfileSetup = needsSetupInt != 0
 
 		// Parse timestamps
 		if createdAtStr != "" {
@@ -540,15 +551,16 @@ func (s *SQLiteStore) GetUserByUsername(username string) (*models.User, error) {
 
 	var user models.User
 	var rolesJSON string
-	var blockedInt, mustChangeInt, deletedInt int
+	var blockedInt, mustChangeInt, needsSetupInt, deletedInt int
 	var createdAtStr, updatedAtStr string
 
-	query := `SELECT id, username, password_hash, must_change_password, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, created_at, updated_at FROM users WHERE username = ?`
+	query := `SELECT id, username, password_hash, must_change_password, needs_profile_setup, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, created_at, updated_at FROM users WHERE username = ?`
 	err := s.db.QueryRow(query, username).Scan(
 		&user.ID,
 		&user.Username,
 		&user.PasswordHash,
 		&mustChangeInt,
+		&needsSetupInt,
 		&user.Name,
 		&user.Nickname,
 		&rolesJSON,
@@ -574,6 +586,7 @@ func (s *SQLiteStore) GetUserByUsername(username string) (*models.User, error) {
 	user.Blocked = blockedInt != 0
 	user.Deleted = deletedInt != 0
 	user.MustChangePassword = mustChangeInt != 0
+	user.NeedsProfileSetup = needsSetupInt != 0
 
 	// Parse timestamps
 	if createdAtStr != "" {
@@ -600,15 +613,16 @@ func (s *SQLiteStore) GetUserByID(id string) (*models.User, error) {
 
 	var user models.User
 	var rolesJSON string
-	var blockedInt, mustChangeInt, deletedInt int
+	var blockedInt, mustChangeInt, needsSetupInt, deletedInt int
 	var createdAtStr, updatedAtStr string
 
-	query := `SELECT id, username, password_hash, must_change_password, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, created_at, updated_at FROM users WHERE id = ?`
+	query := `SELECT id, username, password_hash, must_change_password, needs_profile_setup, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, created_at, updated_at FROM users WHERE id = ?`
 	err := s.db.QueryRow(query, id).Scan(
 		&user.ID,
 		&user.Username,
 		&user.PasswordHash,
 		&mustChangeInt,
+		&needsSetupInt,
 		&user.Name,
 		&user.Nickname,
 		&rolesJSON,
@@ -634,6 +648,7 @@ func (s *SQLiteStore) GetUserByID(id string) (*models.User, error) {
 	user.Blocked = blockedInt != 0
 	user.Deleted = deletedInt != 0
 	user.MustChangePassword = mustChangeInt != 0
+	user.NeedsProfileSetup = needsSetupInt != 0
 
 	// Parse timestamps
 	if createdAtStr != "" {
@@ -682,6 +697,25 @@ func (s *SQLiteStore) SetUserProfile(id string, name, nickname *string) error {
 }
 
 // SetUserAvatar stores an avatar and bumps its version; empty data removes the avatar.
+func (s *SQLiteStore) CompleteProfileSetup(id string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	res, err := s.db.Exec(`UPDATE users SET needs_profile_setup = 0, updated_at = ? WHERE id = ? AND deleted = 0`,
+		time.Now().UTC().Format(time.RFC3339), id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
 func (s *SQLiteStore) SetUserAvatar(id string, data []byte, contentType string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -737,7 +771,7 @@ func (s *SQLiteStore) AnonymizeUser(id string) error {
 	defer tx.Rollback()
 
 	res, err := tx.Exec(`UPDATE users SET deleted = 1, username = ?, name = '', nickname = '', password_hash = '',
-		must_change_password = 0, roles = '["user"]', blocked = 0, avatar = NULL, avatar_type = '',
+		must_change_password = 0, needs_profile_setup = 0, roles = '["user"]', blocked = 0, avatar = NULL, avatar_type = '',
 		avatar_version = avatar_version + 1, updated_at = ? WHERE id = ? AND deleted = 0`,
 		"deleted-"+id, time.Now().UTC().Format(time.RFC3339), id)
 	if err != nil {
