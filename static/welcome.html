@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome - Waystone</title>
+    <link rel="stylesheet" href="styles.css?v=12">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
+</head>
+<body x-data="welcomePage()" x-init="init()">
+    <div class="header">
+        <div class="header-left">
+            <span class="logo" style="color: #ffffff; font-size: 1.3em; letter-spacing: 2px;">Waystone</span>
+        </div>
+        <div class="header-center">
+            <h1>Welcome to Waystone</h1>
+        </div>
+        <div class="header-right">
+            <button @click="handleLogout()" class="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <p style="color: #b0b0b0; font-size: 0.9em; margin-bottom: 25px;">
+            Set up your profile. Pick a nickname and, if you like, an avatar.
+        </p>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 25px;">
+            <div class="profile-avatar">
+                <img x-show="avatarUrl" :src="avatarUrl" alt="">
+                <div class="profile-avatar-initials" x-show="!avatarUrl" x-text="initials || '?'"></div>
+            </div>
+            <input type="file" hidden x-ref="avatarInput" accept="image/png,image/jpeg,image/webp,image/gif" @change="uploadAvatar($event)">
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="logout-btn" @click="$refs.avatarInput.click()" :disabled="busy">Upload avatar</button>
+                <button type="button" class="logout-btn" x-show="avatarUrl" @click="removeAvatar()" :disabled="busy">Remove</button>
+            </div>
+        </div>
+        <form @submit.prevent="submit()">
+            <div class="form-group">
+                <label for="nickname">Nickname</label>
+                <input id="nickname" type="text" x-model="nickname" maxlength="32" autocomplete="nickname">
+                <p style="color: #777; font-size: 0.8em; margin-top: 8px;">This is how other players will see you. You can change it later on your profile.</p>
+            </div>
+            <button type="submit" class="submit-btn" :disabled="busy">Continue</button>
+        </form>
+        <p style="text-align: center; margin-top: 18px;">
+            <button type="button" @click="skip()" :disabled="busy" style="background: none; border: none; color: #777; font-family: inherit; font-size: 0.85em; cursor: pointer; text-decoration: underline;">Skip for now</button>
+        </p>
+        <div class="message" :class="messageType" x-show="messageVisible" x-text="messageText"></div>
+    </div>
+
+    <script src="welcome.js"></script>
+</body>
+</html>

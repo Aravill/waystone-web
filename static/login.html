@@ -92,7 +92,7 @@
                     showMessage(data.error || 'Login failed', 'error');
                     return;
                 }
-                window.location.href = data.must_change_password ? '/change-password' : '/';
+                window.location.href = data.must_change_password ? '/change-password' : (data.needs_profile_setup ? '/welcome' : '/');
             } catch (error) {
                 showMessage('Login failed: ' + error.message, 'error');
             } finally {
