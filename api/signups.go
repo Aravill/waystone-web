@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"waystone-web/db"
@@ -268,6 +269,7 @@ func handleCreateSignup(w http.ResponseWriter, r *http.Request, campaignID strin
 		writeJSONError(w, http.StatusConflict, "could not sign up")
 		return
 	}
+	notify(userID, []string{campaign.DM}, models.NotificationSignupCreated, campaign, "", nil)
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"status":  "success",
@@ -298,7 +300,29 @@ func handleUpdateSignup(w http.ResponseWriter, r *http.Request, campaignID, targ
 		return
 	}
 
-	applySignupStatus(w, campaignID, targetUserID, req.Status, "sign-up updated")
+	wasPlayer := false
+	for _, playerID := range campaign.Players {
+		if playerID == targetUserID {
+			wasPlayer = true
+			break
+		}
+	}
+	updated := applySignupStatus(w, campaignID, targetUserID, req.Status, "sign-up updated")
+	if updated == nil {
+		return
+	}
+	if req.Status == models.SignupAccepted && !wasPlayer {
+		notify(userID, []string{targetUserID}, models.NotificationSignupAccepted, campaign, "", nil)
+	}
+	if req.Status == models.SignupDeclined {
+		notify(userID, []string{targetUserID}, models.NotificationSignupDeclined, campaign, "", nil)
+	}
+	// Accepting the last open seat closes sign-ups automatically; tell the DM.
+	if req.Status == models.SignupAccepted && campaign.SignUpsOpen && !updated.SignUpsOpen {
+		notify("", []string{campaign.DM}, models.NotificationCampaignFull, campaign, "", map[string]string{
+			"player_count": strconv.Itoa(len(updated.Players)),
+		})
+	}
 }
 
 func handleKickPlayer(w http.ResponseWriter, r *http.Request, campaignID, targetUserID string) {
@@ -323,10 +347,13 @@ func handleKickPlayer(w http.ResponseWriter, r *http.Request, campaignID, target
 		return
 	}
 
-	applySignupStatus(w, campaignID, targetUserID, models.SignupKicked, "player removed")
+	if applySignupStatus(w, campaignID, targetUserID, models.SignupKicked, "player removed") != nil {
+		notify(userID, []string{targetUserID}, models.NotificationPlayerKicked, campaign, "", nil)
+	}
 }
 
-func applySignupStatus(w http.ResponseWriter, campaignID, targetUserID string, status models.SignupStatus, message string) {
+// applySignupStatus writes the response and returns the reloaded campaign, or nil on failure.
+func applySignupStatus(w http.ResponseWriter, campaignID, targetUserID string, status models.SignupStatus, message string) *models.Campaign {
 	if err := db.SetCampaignSignupStatus(campaignID, targetUserID, status); err != nil {
 		switch {
 		case errors.Is(err, db.ErrSignupNotFound), errors.Is(err, db.ErrCampaignNotFound):
@@ -336,13 +363,13 @@ func applySignupStatus(w http.ResponseWriter, campaignID, targetUserID string, s
 		default:
 			writeJSONError(w, http.StatusInternalServerError, "failed to update sign-up")
 		}
-		return
+		return nil
 	}
 
 	campaign, err := db.GetCampaignByID(campaignID)
 	if err != nil || campaign == nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve campaign")
-		return
+		return nil
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -351,4 +378,5 @@ func applySignupStatus(w http.ResponseWriter, campaignID, targetUserID string, s
 		"players":       campaign.Players,
 		"sign_ups_open": campaign.SignUpsOpen,
 	})
+	return campaign
 }

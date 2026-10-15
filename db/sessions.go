@@ -29,3 +29,7 @@ func GetSessionResponsesBySessionIDs(sessionIDs []string) (map[string][]models.S
 func DeleteSession(sessionID string) error {
 	return GetStore().DeleteSession(sessionID)
 }
+
+func GetUnansweredSessions(userID, fromDate string) (map[string]models.UnansweredSessions, error) {
+	return GetStore().GetUnansweredSessions(userID, fromDate)
+}

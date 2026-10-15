@@ -239,6 +239,7 @@ func handleCreateSession(w http.ResponseWriter, r *http.Request, campaignID stri
 		writeJSONError(w, http.StatusInternalServerError, "failed to create session")
 		return
 	}
+	notifySessionChange(userID, campaign, session, models.NotificationSessionSuggested, "")
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -286,10 +287,14 @@ func handleUpdateSessionStatus(w http.ResponseWriter, r *http.Request, campaignI
 
 	switch req.Status {
 	case models.SessionConfirmed:
+		prev := session.Status
 		session.Status = models.SessionConfirmed
 		if err := db.SaveSession(*session); err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "failed to update session")
 			return
+		}
+		if prev != models.SessionConfirmed {
+			notifySessionChange(userID, campaign, *session, models.NotificationSessionConfirmed, string(prev))
 		}
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"status":  "success",
@@ -302,16 +307,21 @@ func handleUpdateSessionStatus(w http.ResponseWriter, r *http.Request, campaignI
 				writeJSONError(w, http.StatusInternalServerError, "failed to cancel session")
 				return
 			}
+			notifySessionChange(userID, campaign, *session, models.NotificationSessionCancelled, string(models.SessionSuggested))
 			writeJSON(w, http.StatusOK, map[string]interface{}{
 				"status":  "success",
 				"message": "session cancelled and removed successfully",
 			})
 			return
 		}
+		prev := session.Status
 		session.Status = models.SessionCancelled
 		if err := db.SaveSession(*session); err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "failed to cancel session")
 			return
+		}
+		if prev == models.SessionConfirmed {
+			notifySessionChange(userID, campaign, *session, models.NotificationSessionCancelled, string(prev))
 		}
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"status":  "success",
@@ -353,6 +363,7 @@ func handleDeleteSession(w http.ResponseWriter, r *http.Request, campaignID, ses
 			writeJSONError(w, http.StatusInternalServerError, "failed to delete session")
 			return
 		}
+		notifySessionChange(userID, campaign, *session, models.NotificationSessionCancelled, string(models.SessionSuggested))
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"status":  "success",
 			"message": "session deleted successfully",
@@ -360,10 +371,14 @@ func handleDeleteSession(w http.ResponseWriter, r *http.Request, campaignID, ses
 		return
 	}
 
+	prev := session.Status
 	session.Status = models.SessionCancelled
 	if err := db.SaveSession(*session); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to delete session")
 		return
+	}
+	if prev == models.SessionConfirmed {
+		notifySessionChange(userID, campaign, *session, models.NotificationSessionCancelled, string(prev))
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":  "success",

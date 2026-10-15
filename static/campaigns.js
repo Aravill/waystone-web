@@ -86,7 +86,8 @@ window.campaignsPage = function () {
                         this.openCalendar(
                             button.dataset.campaignId || '',
                             button.dataset.campaignTitle || '',
-                            (button.dataset.dmId || '') === this.currentUserId
+                            (button.dataset.dmId || '') === this.currentUserId,
+                            button.dataset.focusDate || ''
                         );
                     };
                     document.addEventListener('click', this._calendarButtonHandler);
@@ -114,6 +115,11 @@ window.campaignsPage = function () {
                     };
                     document.addEventListener('click', this._signupButtonHandler);
                 }
+                if (!this._notificationsHandler) {
+                    // New notifications may change the cards' pending-action highlights.
+                    this._notificationsHandler = () => this.loadCampaigns(true);
+                    window.addEventListener('notifications:new', this._notificationsHandler);
+                }
             } catch (error) {
                 console.error('Auth check failed:', error);
                 window.location.href = '/login.html';
@@ -121,6 +127,10 @@ window.campaignsPage = function () {
             }
 
             await this.loadCampaigns();
+            if (location.hash) {
+                await this.$nextTick();
+                document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: 'start' });
+            }
             await this.loadSystems();
         },
 
@@ -259,8 +269,9 @@ window.campaignsPage = function () {
             }
         },
 
-        async loadCampaigns() {
-            this.loading = true;
+        // quiet: background refresh without the loading state; keeps the list on failure.
+        async loadCampaigns(quiet = false) {
+            if (!quiet) this.loading = true;
             try {
                 const response = await fetch('/api/campaigns');
                 if (!response.ok) {
@@ -269,10 +280,14 @@ window.campaignsPage = function () {
                 const data = await response.json();
                 this.campaigns = Array.isArray(data) ? data : [];
             } catch (error) {
+                if (quiet) {
+                    console.error('Failed to refresh campaigns:', error);
+                    return;
+                }
                 this.showMessage('Error loading campaigns: ' + error.message, 'error');
                 this.campaigns = [];
             } finally {
-                this.loading = false;
+                if (!quiet) this.loading = false;
             }
         },
 
@@ -287,12 +302,16 @@ window.campaignsPage = function () {
             const campaignPlayers = Array.isArray(campaign?.players) ? campaign.players : [];
             const isPlayer = campaignPlayers.includes(this.currentUserId);
             const signupStatus = campaign?.current_user_signup_status || '';
+            const unansweredCount = isPlayer ? (parseInt(campaign?.unanswered_sessions_count, 10) || 0) : 0;
+            const pendingSignupsCount = isDM ? (parseInt(campaign?.pending_signups_count, 10) || 0) : 0;
+            const needsAction = unansweredCount > 0 || pendingSignupsCount > 0;
+            const focusDate = campaign?.first_unanswered_session_date || '';
             const maxPlayers = parseInt(campaign?.desired_player_count, 10) || 0;
             const signUpsLabel = (signUpsOpen ? 'Open' : 'Closed') + (maxPlayers > 0 ? ` (${campaignPlayers.length}/${maxPlayers})` : '');
 
             let signupBtnHtml;
             if (isDM) {
-                signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-signups-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-campaign-title="${escapeHtml(campaign?.title || '')}">Sign-ups</button>`;
+                signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-signups-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-campaign-title="${escapeHtml(campaign?.title || '')}"${pendingSignupsCount > 0 ? ` title="${pendingSignupsCount} pending sign-up${pendingSignupsCount === 1 ? '' : 's'} awaiting your decision" aria-label="Sign-ups, ${pendingSignupsCount} pending"` : ''}>Sign-ups${pendingSignupsCount > 0 ? `<span class="campaign-action-count">${pendingSignupsCount}</span>` : ''}</button>`;
             } else {
                 let label = 'Sign-up';
                 let disabled = !signUpsOpen;
@@ -346,7 +365,7 @@ window.campaignsPage = function () {
             }
 
             return `
-                <article class="campaign-item status-${escapeHtml(statusClass)}" id="campaign-${escapeHtml(campaign?.id ?? 'unknown')}">
+                <article class="campaign-item status-${escapeHtml(statusClass)}${needsAction ? ' needs-action' : ''}" id="campaign-${escapeHtml(campaign?.id ?? 'unknown')}">
                     <section class="campaign-row campaign-row-top">
                         <div class="campaign-title-container">
                             <h3 class="campaign-title">${escapeHtml(title)}</h3>
@@ -388,7 +407,7 @@ window.campaignsPage = function () {
 
                     <section class="campaign-row campaign-row-bottom">
                         <button type="button" class="campaign-action-btn" disabled aria-disabled="true">Codex</button>
-                        <button type="button" class="campaign-action-btn campaign-calendar-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-campaign-title="${escapeHtml(campaign?.title || '')}" data-dm-id="${escapeHtml(campaign?.dm || '')}">Calendar</button>
+                        <button type="button" class="campaign-action-btn campaign-calendar-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-campaign-title="${escapeHtml(campaign?.title || '')}" data-dm-id="${escapeHtml(campaign?.dm || '')}"${unansweredCount > 0 ? ` title="${unansweredCount} suggested session${unansweredCount === 1 ? '' : 's'} awaiting your response" aria-label="Calendar, ${unansweredCount} awaiting your response"` : ''}${unansweredCount > 0 && focusDate ? ` data-focus-date="${escapeHtml(focusDate)}"` : ''}>Calendar${unansweredCount > 0 ? `<span class="campaign-action-count">${unansweredCount}</span>` : ''}</button>
                         ${signupBtnHtml}
                         ${campaign?.can_manage ? `<button type="button" class="campaign-action-btn campaign-edit-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}">Edit</button>` : ''}
                     </section>
@@ -518,11 +537,12 @@ window.campaignsPage = function () {
             }
         },
 
-        openCalendar(campaignId, campaignTitle, isDM) {
+        async openCalendar(campaignId, campaignTitle, isDM, focusDate = '') {
             this.currentCampaignId = campaignId;
             this.currentCampaignTitle = campaignTitle;
             this.isCurrentUserDM = !!isDM;
-            this.currentCalendarDate = new Date();
+            const focus = /^\d{4}-\d{2}-\d{2}$/.test(focusDate) ? this.parseDateLocal(focusDate) : null;
+            this.currentCalendarDate = focus ? new Date(focus.getFullYear(), focus.getMonth(), 1) : new Date();
             this.calendarModalOpen = true;
             this.selectedDay = null;
             this.showCreateSessionModal = false;
@@ -530,7 +550,10 @@ window.campaignsPage = function () {
             this.pendingSessionAction = '';
             this.sessionResponseCache = {};
             this.generateCalendarDays();
-            this.loadSessions();
+            await this.loadSessions();
+            if (focus) {
+                await this.selectDay(focus);
+            }
         },
 
         closeCalendarModal() {
@@ -998,6 +1021,7 @@ window.campaignsPage = function () {
                 this.invalidateSessionCache(session.id);
                 await this.loadSessions();
                 await this.loadDayResponses();
+                await this.loadCampaigns();
                 this.showMessage('Response submitted!', 'success');
             } catch (error) {
                 this.showMessage('Error submitting response: ' + error.message, 'error');

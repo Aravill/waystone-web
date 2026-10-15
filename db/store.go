@@ -36,6 +36,8 @@ type Store interface {
 	GetCampaignSignup(campaignID, userID string) (*models.CampaignSignup, error)
 	GetCampaignSignups(campaignID string) ([]models.CampaignSignup, error)
 	GetCampaignSignupsByUser(userID string) (map[string]models.CampaignSignup, error)
+	CountPendingSignupsForDM(dmID string) (map[string]int, error)
+	GetUnansweredSessions(userID, fromDate string) (map[string]models.UnansweredSessions, error)
 	SetCampaignSignupStatus(campaignID, userID string, status models.SignupStatus) error
 	SetCampaignSignUpsOpen(campaignID string, open bool) error
 	UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, system, desiredPlayerCount string) error
@@ -47,6 +49,11 @@ type Store interface {
 	DeleteSystem(id string) error
 	SetSystemLogo(id string, data []byte, contentType string) error
 	GetSystemLogo(id string) ([]byte, string, error)
+	CreateNotifications(notifications []models.Notification) error
+	GetNotifications(userID string, limit int) ([]models.Notification, error)
+	CountUnreadNotifications(userID string) (int, error)
+	MarkNotificationRead(userID, id string) error
+	MarkAllNotificationsRead(userID string) error
 	Close() error
 }
 
