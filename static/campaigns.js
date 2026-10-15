@@ -121,6 +121,10 @@ window.campaignsPage = function () {
             }
 
             await this.loadCampaigns();
+            if (location.hash) {
+                await this.$nextTick();
+                document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: 'start' });
+            }
             await this.loadSystems();
         },
 
