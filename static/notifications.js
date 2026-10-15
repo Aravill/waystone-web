@@ -155,6 +155,8 @@
                         return `${actor} withdrew their sign-up for "${title}"`;
                     case 'campaign_full':
                         return `"${title}" reached ${d.player_count} ${d.player_count === '1' ? 'player' : 'players'} - sign-ups closed automatically`;
+                    case 'signups_opened':
+                        return `Sign-ups opened for "${title}"`;
                     case 'session_confirmed':
                         return `${actor} confirmed the session for "${title}" on ${when}`;
                     default:

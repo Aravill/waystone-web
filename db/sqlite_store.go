@@ -134,6 +134,13 @@ func (s *SQLiteStore) initSchema() error {
 		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
 
+	CREATE TABLE IF NOT EXISTS campaign_follows (
+		campaign_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (campaign_id, user_id)
+	);
+
 	CREATE TABLE IF NOT EXISTS notifications (
 		id TEXT PRIMARY KEY,
 		user_id TEXT NOT NULL,
@@ -148,6 +155,7 @@ func (s *SQLiteStore) initSchema() error {
 
 	CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at);
 	CREATE INDEX IF NOT EXISTS idx_notifications_campaign_id ON notifications(campaign_id);
+	CREATE INDEX IF NOT EXISTS idx_campaign_follows_user_id ON campaign_follows(user_id);
 	CREATE INDEX IF NOT EXISTS idx_campaign_signups_campaign_id ON campaign_signups(campaign_id);
 	CREATE INDEX IF NOT EXISTS idx_campaign_signups_user_id ON campaign_signups(user_id);
 	CREATE INDEX IF NOT EXISTS idx_campaign_sessions_campaign_id ON campaign_sessions(campaign_id);
@@ -603,6 +611,10 @@ func (s *SQLiteStore) DeleteUser(id string) error {
 	}
 
 	if _, err := s.db.Exec(`DELETE FROM campaign_signups WHERE user_id = ?`, id); err != nil {
+		return err
+	}
+
+	if _, err := s.db.Exec(`DELETE FROM campaign_follows WHERE user_id = ?`, id); err != nil {
 		return err
 	}
 
@@ -1120,6 +1132,67 @@ func (s *SQLiteStore) GetCampaignSignups(campaignID string) ([]models.CampaignSi
 	return signups, rows.Err()
 }
 
+func (s *SQLiteStore) FollowCampaign(campaignID, userID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	_, err := s.db.Exec(
+		`INSERT OR IGNORE INTO campaign_follows (campaign_id, user_id, created_at) VALUES (?, ?, ?)`,
+		campaignID, userID, time.Now().UTC().Format(time.RFC3339),
+	)
+	return err
+}
+
+func (s *SQLiteStore) UnfollowCampaign(campaignID, userID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	_, err := s.db.Exec(`DELETE FROM campaign_follows WHERE campaign_id = ? AND user_id = ?`, campaignID, userID)
+	return err
+}
+
+func (s *SQLiteStore) GetCampaignFollowerIDs(campaignID string) ([]string, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(`SELECT user_id FROM campaign_follows WHERE campaign_id = ?`, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func (s *SQLiteStore) GetFollowedCampaignIDs(userID string) (map[string]bool, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(`SELECT campaign_id FROM campaign_follows WHERE user_id = ?`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	followed := map[string]bool{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		followed[id] = true
+	}
+	return followed, rows.Err()
+}
+
 func (s *SQLiteStore) GetCampaignSignupsByUser(userID string) (map[string]models.CampaignSignup, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -1279,6 +1352,9 @@ func (s *SQLiteStore) DeleteCampaign(id string) error {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM campaign_signups WHERE campaign_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM campaign_follows WHERE campaign_id = ?`, id); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM notifications WHERE campaign_id = ?`, id); err != nil {

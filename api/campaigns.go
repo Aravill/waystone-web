@@ -51,6 +51,13 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	followed, err := db.GetFollowedCampaignIDs(currentUserID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, `{"error": "failed to retrieve follows"}`)
+		return
+	}
+
 	pendingSignups, err := db.CountPendingSignupsForDM(currentUserID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -102,6 +109,7 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 			"allowed_status_transitions": campaign.Status.AllowedTransitions(),
 		}
 		campaignObj["current_user_signup_status"] = string(userSignups[campaign.ID].Status)
+		campaignObj["is_following"] = followed[campaign.ID]
 
 		isPlayer := false
 		for _, p := range campaign.Players {
