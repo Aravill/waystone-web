@@ -13,6 +13,7 @@ window.profilePage = function() {
         messageVisible: false,
         messageText: '',
         messageType: '',
+        confirmDialog: { open: false, title: '', message: '', confirmLabel: '', resolve: null },
         
         async init() {
             try {
@@ -61,7 +62,11 @@ window.profilePage = function() {
         },
 
         async enableOrRegenerateCalendar() {
-            if (this.calendarToken && !confirm('Regenerate the link? The old link will stop working and you will need to re-subscribe.')) {
+            if (this.calendarToken && !(await this.askConfirm({
+                title: 'Regenerate link',
+                message: 'Regenerate the link? The old link will stop working and you will need to re-subscribe.',
+                confirmLabel: 'Regenerate'
+            }))) {
                 return;
             }
             try {
@@ -171,10 +176,27 @@ window.profilePage = function() {
             `;
         },
         
+        // askConfirm opens the confirm modal and resolves to true on confirm, false on cancel.
+        askConfirm({ title, message, confirmLabel }) {
+            if (this.confirmDialog.resolve) this.confirmDialog.resolve(false);
+            return new Promise((resolve) => {
+                this.confirmDialog = { open: true, title, message, confirmLabel: confirmLabel || 'Confirm', resolve };
+                this.$nextTick(() => this.$refs.confirmCancelBtn?.focus());
+            });
+        },
+
+        closeConfirm(result) {
+            const resolve = this.confirmDialog.resolve;
+            this.confirmDialog = { open: false, title: '', message: '', confirmLabel: '', resolve: null };
+            if (resolve) resolve(result);
+        },
+
         async deleteProfile() {
-            const confirmed = confirm(
-                'Are you sure? This will permanently delete your account and remove you from all campaigns.'
-            );
+            const confirmed = await this.askConfirm({
+                title: 'Delete account',
+                message: 'Are you sure? This will permanently delete your account and remove you from all campaigns.',
+                confirmLabel: 'Delete'
+            });
             
             if (!confirmed) {
                 return;

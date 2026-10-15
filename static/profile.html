@@ -92,7 +92,24 @@
         </div>
     </div>
 
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal confirm-modal" :class="{ 'modal-open': confirmDialog.open }" @click.self="closeConfirm(false)" @keydown.escape.window="confirmDialog.open && closeConfirm(false)" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+        <div class="modal-content confirm-modal-content">
+            <div class="modal-header">
+                <h2 id="confirmModalTitle" x-text="confirmDialog.title"></h2>
+                <button type="button" class="modal-close" @click="closeConfirm(false)" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-form">
+                <p class="confirm-modal-message" x-text="confirmDialog.message"></p>
+                <div class="modal-actions">
+                    <button type="button" class="btn-confirm-danger" @click="closeConfirm(true)" x-text="confirmDialog.confirmLabel"></button>
+                    <button type="button" class="btn-cancel" x-ref="confirmCancelBtn" @click="closeConfirm(false)">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/notifications.js?v=3"></script>
-    <script src="profile.js?v=2"></script>
+    <script src="profile.js?v=3"></script>
 </body>
 </html>
