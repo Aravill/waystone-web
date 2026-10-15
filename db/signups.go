@@ -18,6 +18,10 @@ func GetCampaignSignupsByUser(userID string) (map[string]models.CampaignSignup, 
 	return GetStore().GetCampaignSignupsByUser(userID)
 }
 
+func CountPendingSignupsForDM(dmID string) (map[string]int, error) {
+	return GetStore().CountPendingSignupsForDM(dmID)
+}
+
 func SetCampaignSignupStatus(campaignID, userID string, status models.SignupStatus) error {
 	return GetStore().SetCampaignSignupStatus(campaignID, userID, status)
 }

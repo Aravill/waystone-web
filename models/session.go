@@ -8,6 +8,12 @@ const (
 	SessionCancelled SessionStatus = "Cancelled"
 )
 
+// UnansweredSessions summarises upcoming suggested sessions a user has not responded to in one campaign.
+type UnansweredSessions struct {
+	Count     int
+	FirstDate string
+}
+
 type CampaignSession struct {
 	ID                       string              `json:"id"`
 	CampaignID               string              `json:"campaign_id"`

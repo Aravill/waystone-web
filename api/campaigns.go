@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 	"waystone-web/db"
 	"waystone-web/models"
@@ -50,6 +51,19 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	pendingSignups, err := db.CountPendingSignupsForDM(currentUserID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, `{"error": "failed to retrieve campaign counts"}`)
+		return
+	}
+	unanswered, err := db.GetUnansweredSessions(currentUserID, time.Now().UTC().Format("2006-01-02"))
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, `{"error": "failed to retrieve campaign counts"}`)
+		return
+	}
+
 	knownSystems, err := systemsByName()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -88,6 +102,25 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 			"allowed_status_transitions": campaign.Status.AllowedTransitions(),
 		}
 		campaignObj["current_user_signup_status"] = string(userSignups[campaign.ID].Status)
+
+		isPlayer := false
+		for _, p := range campaign.Players {
+			if p == currentUserID {
+				isPlayer = true
+				break
+			}
+		}
+		unansweredCount, firstUnanswered, pendingCount := 0, "", 0
+		if isPlayer {
+			u := unanswered[campaign.ID]
+			unansweredCount, firstUnanswered = u.Count, u.FirstDate
+		}
+		if currentUserID != "" && campaign.DM == currentUserID {
+			pendingCount = pendingSignups[campaign.ID]
+		}
+		campaignObj["unanswered_sessions_count"] = unansweredCount
+		campaignObj["first_unanswered_session_date"] = firstUnanswered
+		campaignObj["pending_signups_count"] = pendingCount
 
 		// Add DM user display object if DM exists
 		if campaign.DM != "" {

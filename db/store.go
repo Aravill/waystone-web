@@ -36,6 +36,8 @@ type Store interface {
 	GetCampaignSignup(campaignID, userID string) (*models.CampaignSignup, error)
 	GetCampaignSignups(campaignID string) ([]models.CampaignSignup, error)
 	GetCampaignSignupsByUser(userID string) (map[string]models.CampaignSignup, error)
+	CountPendingSignupsForDM(dmID string) (map[string]int, error)
+	GetUnansweredSessions(userID, fromDate string) (map[string]models.UnansweredSessions, error)
 	SetCampaignSignupStatus(campaignID, userID string, status models.SignupStatus) error
 	SetCampaignSignUpsOpen(campaignID string, open bool) error
 	UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, system, desiredPlayerCount string) error

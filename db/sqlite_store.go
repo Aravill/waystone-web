@@ -1144,6 +1144,63 @@ func (s *SQLiteStore) GetCampaignSignupsByUser(userID string) (map[string]models
 	return signups, rows.Err()
 }
 
+// CountPendingSignupsForDM returns pending sign-up counts per campaign run by the given DM.
+func (s *SQLiteStore) CountPendingSignupsForDM(dmID string) (map[string]int, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(
+		`SELECT campaign_id, COUNT(*) FROM campaign_signups
+		WHERE status = ? AND campaign_id IN (SELECT id FROM campaigns WHERE dm = ?)
+		GROUP BY campaign_id`,
+		models.SignupPending, dmID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	counts := map[string]int{}
+	for rows.Next() {
+		var campaignID string
+		var n int
+		if err := rows.Scan(&campaignID, &n); err != nil {
+			return nil, err
+		}
+		counts[campaignID] = n
+	}
+	return counts, rows.Err()
+}
+
+// GetUnansweredSessions returns, per campaign, upcoming suggested sessions the user has not responded to.
+func (s *SQLiteStore) GetUnansweredSessions(userID, fromDate string) (map[string]models.UnansweredSessions, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(
+		`SELECT s.campaign_id, COUNT(*), MIN(s.date) FROM campaign_sessions s
+		WHERE s.status = ? AND s.date >= ?
+		AND NOT EXISTS (SELECT 1 FROM session_responses r WHERE r.session_id = s.id AND r.user_id = ?)
+		GROUP BY s.campaign_id`,
+		models.SessionSuggested, fromDate, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := map[string]models.UnansweredSessions{}
+	for rows.Next() {
+		var campaignID string
+		var u models.UnansweredSessions
+		if err := rows.Scan(&campaignID, &u.Count, &u.FirstDate); err != nil {
+			return nil, err
+		}
+		result[campaignID] = u
+	}
+	return result, rows.Err()
+}
+
 // SetCampaignSignUpsOpen manually opens or closes a campaign's sign-ups.
 func (s *SQLiteStore) SetCampaignSignUpsOpen(campaignID string, open bool) error {
 	s.mutex.Lock()
