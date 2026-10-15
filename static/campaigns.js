@@ -315,7 +315,11 @@ window.campaignsPage = function () {
             const description = campaign?.description || '';
             const status = campaign?.status || 'Unknown';
             const signUpsOpen = campaign?.sign_ups_open === true;
-            const nextSession = 'N/A';
+            const next = campaign?.next_session;
+            const nextSession = next
+                ? `${this.formatAgendaDate(next)} · ${next.time}` + (next.timezone ? ` (${next.timezone})` : '')
+                : 'None scheduled';
+            const playedCount = parseInt(campaign?.played_sessions_count, 10) || 0;
             const isDM = !!this.currentUserId && campaign?.dm === this.currentUserId;
             const campaignPlayers = Array.isArray(campaign?.players) ? campaign.players : [];
             const isPlayer = campaignPlayers.includes(this.currentUserId);
@@ -418,6 +422,10 @@ window.campaignsPage = function () {
                             <div class="campaign-field">
                                 <h4 class="campaign-label">Sign-ups</h4>
                                 <p class="campaign-value">${escapeHtml(signUpsLabel)}</p>
+                            </div>
+                            <div class="campaign-field">
+                                <h4 class="campaign-label">Sessions Played</h4>
+                                <p class="campaign-value">${playedCount}</p>
                             </div>
                         </div>
                         <div class="campaign-column campaign-column-right">

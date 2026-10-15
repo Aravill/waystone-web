@@ -202,16 +202,8 @@ func buildCalendarFeed(sessions []models.CampaignSession, campaignByID map[strin
 // sessionTimes returns DTSTART/DTEND values: UTC (with Z) when the session has
 // a timezone, floating local time for legacy sessions without one.
 func sessionTimes(session models.CampaignSession) (string, string, bool) {
-	loc := time.UTC
-	if session.Timezone != "" {
-		l, err := time.LoadLocation(session.Timezone)
-		if err != nil {
-			return "", "", false
-		}
-		loc = l
-	}
-	start, err := time.ParseInLocation("2006-01-02 15:04", session.Date+" "+session.Time, loc)
-	if err != nil {
+	start, ok := sessionStart(session)
+	if !ok {
 		return "", "", false
 	}
 	end := start.Add(time.Duration(session.Duration) * time.Minute)
@@ -219,6 +211,24 @@ func sessionTimes(session models.CampaignSession) (string, string, bool) {
 		return start.Format("20060102T150405"), end.Format("20060102T150405"), true
 	}
 	return start.UTC().Format("20060102T150405Z"), end.UTC().Format("20060102T150405Z"), true
+}
+
+// sessionStart returns when a session begins; legacy sessions without a
+// timezone are read as UTC.
+func sessionStart(session models.CampaignSession) (time.Time, bool) {
+	loc := time.UTC
+	if session.Timezone != "" {
+		l, err := time.LoadLocation(session.Timezone)
+		if err != nil {
+			return time.Time{}, false
+		}
+		loc = l
+	}
+	start, err := time.ParseInLocation("2006-01-02 15:04", session.Date+" "+session.Time, loc)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return start, true
 }
 
 func icsEscape(s string) string {

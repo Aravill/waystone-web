@@ -25,6 +25,46 @@ func HandleCampaigns(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type campaignSessionSummary struct {
+	next      *models.CampaignSession // closest confirmed session that hasn't ended
+	nextStart time.Time
+	played    int // confirmed sessions that have ended
+}
+
+// campaignSessionSummaries summarises each campaign's confirmed sessions.
+func campaignSessionSummaries(campaigns []models.Campaign) (map[string]campaignSessionSummary, error) {
+	ids := make([]string, 0, len(campaigns))
+	for _, c := range campaigns {
+		ids = append(ids, c.ID)
+	}
+	sessions, err := db.GetSessionsByCampaignIDs(ids, "")
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	result := map[string]campaignSessionSummary{}
+	for i := range sessions {
+		session := sessions[i]
+		if session.Status != models.SessionConfirmed {
+			continue
+		}
+		start, ok := sessionStart(session)
+		if !ok {
+			continue
+		}
+		summary := result[session.CampaignID]
+		if start.Add(time.Duration(session.Duration) * time.Minute).After(now) {
+			if summary.next == nil || start.Before(summary.nextStart) {
+				summary.next, summary.nextStart = &session, start
+			}
+		} else {
+			summary.played++
+		}
+		result[session.CampaignID] = summary
+	}
+	return result, nil
+}
+
 func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -68,6 +108,13 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, `{"error": "failed to retrieve campaign counts"}`)
+		return
+	}
+
+	sessionInfo, err := campaignSessionSummaries(campaigns)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, `{"error": "failed to retrieve sessions"}`)
 		return
 	}
 
@@ -129,6 +176,8 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 		campaignObj["unanswered_sessions_count"] = unansweredCount
 		campaignObj["first_unanswered_session_date"] = firstUnanswered
 		campaignObj["pending_signups_count"] = pendingCount
+		campaignObj["next_session"] = sessionInfo[campaign.ID].next
+		campaignObj["played_sessions_count"] = sessionInfo[campaign.ID].played
 
 		// Add DM user display object if DM exists
 		if campaign.DM != "" {

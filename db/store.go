@@ -2,6 +2,8 @@ package db
 
 import (
 	"fmt"
+	"time"
+	"waystone-web/auth"
 	"waystone-web/config"
 	"waystone-web/models"
 )
@@ -125,11 +127,39 @@ func seedIfEmpty() error {
 				return fmt.Errorf("failed to seed campaign: %w", err)
 			}
 		}
+		now := time.Now().UTC().Format(time.RFC3339)
+		for _, seeded := range config.InitialSessions() {
+			session := seeded.Session
+			session.ID = GenerateUUID()
+			session.CreatedAt, session.UpdatedAt = now, now
+			if err := store.SaveSession(session); err != nil {
+				return fmt.Errorf("failed to seed session: %w", err)
+			}
+			for userID, participation := range seeded.Responses {
+				if err := store.UpsertSessionResponse(models.SessionResponse{
+					ID:            GenerateUUID(),
+					SessionID:     session.ID,
+					UserID:        userID,
+					Participation: participation,
+					CreatedAt:     now,
+					UpdatedAt:     now,
+				}); err != nil {
+					return fmt.Errorf("failed to seed session response: %w", err)
+				}
+			}
+		}
 	}
 
 	// Seed users if empty
 	if len(users) == 0 {
 		for _, user := range config.InitialUsers {
+			if password, ok := config.InitialPasswords[user.ID]; ok {
+				hash, err := auth.HashPassword(password)
+				if err != nil {
+					return fmt.Errorf("failed to hash seed password: %w", err)
+				}
+				user.PasswordHash = hash
+			}
 			if err := SaveUser(user); err != nil {
 				return fmt.Errorf("failed to seed user: %w", err)
 			}
