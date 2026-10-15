@@ -1401,6 +1401,72 @@ func (s *SQLiteStore) SetCampaignSignupStatus(campaignID, userID string, status 
 	return tx.Commit()
 }
 
+// WithdrawCampaignSignup deletes the user's pending sign-up, or removes a player
+// from the campaign (and deletes their sign-up row). Declined/Kicked rows are kept.
+func (s *SQLiteStore) WithdrawCampaignSignup(campaignID, userID string) (bool, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	var playersJSON string
+	err = tx.QueryRow(`SELECT players FROM campaigns WHERE id = ?`, campaignID).Scan(&playersJSON)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, ErrCampaignNotFound
+		}
+		return false, err
+	}
+
+	var players []string
+	if err := json.Unmarshal([]byte(playersJSON), &players); err != nil {
+		players = []string{}
+	}
+	isPlayer := false
+	remaining := make([]string, 0, len(players))
+	for _, p := range players {
+		if p == userID {
+			isPlayer = true
+		} else {
+			remaining = append(remaining, p)
+		}
+	}
+
+	if !isPlayer {
+		var status string
+		err = tx.QueryRow(`SELECT status FROM campaign_signups WHERE campaign_id = ? AND user_id = ?`, campaignID, userID).Scan(&status)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return false, ErrSignupNotFound
+			}
+			return false, err
+		}
+		if models.SignupStatus(status) != models.SignupPending {
+			return false, ErrSignupNotFound
+		}
+	} else {
+		newPlayersJSON, err := json.Marshal(remaining)
+		if err != nil {
+			return false, err
+		}
+		if _, err := tx.Exec(`UPDATE campaigns SET players = ? WHERE id = ?`, string(newPlayersJSON), campaignID); err != nil {
+			return false, err
+		}
+	}
+
+	if _, err := tx.Exec(`DELETE FROM campaign_signups WHERE campaign_id = ? AND user_id = ?`, campaignID, userID); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return isPlayer, nil
+}
+
 // GetAllSystems returns all known systems (without logo data), sorted by name.
 func (s *SQLiteStore) GetAllSystems() ([]models.System, error) {
 	s.mutex.RLock()

@@ -12,6 +12,8 @@ const (
 	NotificationSessionCancelled NotificationType = "session_cancelled"
 	NotificationSignupCreated    NotificationType = "signup_created"
 	NotificationCampaignFull     NotificationType = "campaign_full"
+	NotificationPlayerLeft       NotificationType = "player_left"
+	NotificationSignupWithdrawn  NotificationType = "signup_withdrawn"
 )
 
 type Notification struct {
