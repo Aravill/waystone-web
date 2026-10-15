@@ -33,10 +33,6 @@ func GetUserByID(id string) (*models.User, error) {
 	return GetStore().GetUserByID(id)
 }
 
-func DeleteUser(id string) error {
-	return GetStore().DeleteUser(id)
-}
-
 func GetAllUsers() ([]models.User, error) {
 	return GetStore().GetAllUsers()
 }
@@ -63,27 +59,18 @@ func GetUserByUsername(username string) (*models.User, error) {
 	return GetStore().GetUserByUsername(username)
 }
 
-// DeleteUserAndCleanupCampaigns removes a user from all campaigns and then deletes the user
-func DeleteUserAndCleanupCampaigns(userID string) (removedAsDM int, removedAsPlayer int, err error) {
-	// Load all campaigns
+// AnonymizeUserAndCleanupCampaigns removes a user from all campaigns' player lists
+// (DM references are kept) and then anonymizes the user record.
+func AnonymizeUserAndCleanupCampaigns(userID string) (removedAsPlayer int, err error) {
 	campaigns, err := GetAllCampaigns()
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to load campaigns: %w", err)
+		return 0, fmt.Errorf("failed to load campaigns: %w", err)
 	}
 
-	// Clean up campaign references
 	for i := range campaigns {
 		campaign := &campaigns[i]
-		changed := false
-
-		if campaign.DM == userID {
-			campaign.DM = ""
-			removedAsDM++
-			changed = true
-		}
-
-		// Remove from players list
 		newPlayers := []string{}
+		changed := false
 		for _, playerID := range campaign.Players {
 			if playerID != userID {
 				newPlayers = append(newPlayers, playerID)
@@ -92,22 +79,35 @@ func DeleteUserAndCleanupCampaigns(userID string) (removedAsDM int, removedAsPla
 				changed = true
 			}
 		}
+		if !changed {
+			continue
+		}
 		campaign.Players = newPlayers
-
-		// Save updated campaign only if it changed
-		if changed {
-			if err := SaveCampaign(*campaign); err != nil {
-				return removedAsDM, removedAsPlayer, fmt.Errorf("failed to save campaign: %w", err)
-			}
+		if err := SaveCampaign(*campaign); err != nil {
+			return removedAsPlayer, fmt.Errorf("failed to save campaign: %w", err)
 		}
 	}
 
-	// Delete the user record
-	if err := DeleteUser(userID); err != nil {
-		return removedAsDM, removedAsPlayer, fmt.Errorf("failed to delete user: %w", err)
+	if err := GetStore().AnonymizeUser(userID); err != nil {
+		return removedAsPlayer, fmt.Errorf("failed to anonymize user: %w", err)
 	}
 
-	return removedAsDM, removedAsPlayer, nil
+	return removedAsPlayer, nil
+}
+
+// SetUserNickname updates a user's nickname
+func SetUserNickname(id, nickname string) error {
+	return GetStore().SetUserNickname(id, nickname)
+}
+
+// SetUserAvatar stores a user's avatar; empty data removes it
+func SetUserAvatar(id string, data []byte, contentType string) error {
+	return GetStore().SetUserAvatar(id, data, contentType)
+}
+
+// GetUserAvatar returns avatar bytes and content type; empty data means no avatar
+func GetUserAvatar(id string) ([]byte, string, error) {
+	return GetStore().GetUserAvatar(id)
 }
 
 // SetUserBlocked updates the blocked status of a user
