@@ -8,21 +8,27 @@
 }
 
 .notif-btn {
-    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 12px;
     background: #000000;
-    color: #00d9ff;
-    border: 1px solid #00d9ff;
+    color: #888888;
+    border: 1px solid #555555;
     cursor: pointer;
     font-family: 'Fira Code', monospace;
     font-size: 0.85em;
     transition: all 0.3s;
-    text-transform: uppercase;
     letter-spacing: 1px;
 }
 
+.notif-btn.has-unread {
+    color: #00d9ff;
+    border-color: #00d9ff;
+}
+
 .notif-btn:hover {
-    background: #00d9ff;
-    color: #000000;
+    color: #00d9ff;
+    border-color: #00d9ff;
 }
 
 .notif-badge {
@@ -33,11 +39,6 @@
     color: #000000;
     font-size: 0.75em;
     letter-spacing: 0;
-}
-
-.notif-btn:hover .notif-badge {
-    background: #000000;
-    color: #00d9ff;
 }
 
 .notif-panel {
@@ -141,7 +142,7 @@
     }
 
     .notif-btn {
-        padding: 6px 12px;
+        padding: 4px 10px;
         font-size: 0.75em;
     }
 }
