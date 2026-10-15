@@ -535,6 +535,37 @@ h2 {
     color: #000000;
 }
 
+.campaign-item.needs-action {
+    animation: campaign-needs-action 2.4s ease-in-out infinite;
+}
+
+@keyframes campaign-needs-action {
+    0%, 100% { box-shadow: 0 0 6px 0 rgba(0, 217, 255, 0.2); }
+    50% { box-shadow: 0 0 24px 3px rgba(0, 217, 255, 0.6); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .campaign-item.needs-action {
+        animation: none;
+        box-shadow: 0 0 12px rgba(0, 217, 255, 0.3);
+    }
+}
+
+.campaign-action-count {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 5px;
+    background: #00d9ff;
+    color: #000000;
+    font-size: 0.75em;
+    letter-spacing: 0;
+}
+
+.campaign-action-btn:hover:enabled .campaign-action-count {
+    background: #000000;
+    color: #00d9ff;
+}
+
 .campaign-action-btn:disabled {
     color: #666666;
     cursor: not-allowed;

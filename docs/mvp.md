@@ -20,6 +20,7 @@ This document describes what must-have features are to be implemented before pre
     - [x] Followers notified of campaign status changes and suggested / confirmed / cancelled sessions
     - [x] Players notified of accepted / declined sign-ups and removal
     - [x] DMs notified of new sign-ups and auto-closed sign-ups
+    - [x] Campaign cards highlight pending actions (unanswered suggested sessions for players, pending sign-ups for the DM)
     - [ ] Discord bot DMs - users link their Discord account (OAuth2) on the profile page and receive their notifications as DMs from a Waystone bot (opt-in, sent in the background)
 - [x] Administration
     - [x] Always one super admin role
