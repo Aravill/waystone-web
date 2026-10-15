@@ -13,8 +13,8 @@ This document describes what must-have features are to be implemented before pre
     - [x] DMs can accept or ignore signed-up players
     - [x] Ignored players do not show up for the DM anymore unless a special button is clicked
     - [x] Users can withdraw a pending sign-up or leave a campaign they're playing in (the DM is notified)
-- [ ] Following
-    - [ ] Users can follow campaigns (to receive notifications)
+- [x] Following
+    - [x] Users can follow campaigns (to receive notifications)
     - [x] Players are automatically following campaigns they're in
 - [ ] Notifications
     - [x] Inbox in the header with unread badge, mark read / mark all read
