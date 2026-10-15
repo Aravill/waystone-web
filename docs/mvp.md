@@ -14,7 +14,13 @@ This document describes what must-have features are to be implemented before pre
     - [x] Ignored players do not show up for the DM anymore unless a special button is clicked
 - [ ] Following
     - [ ] Users can follow campaigns (to receive notifications)
-    - [ ] Players are automatically following campaigns they're in
+    - [x] Players are automatically following campaigns they're in
+- [ ] Notifications
+    - [x] Inbox in the header with unread badge, mark read / mark all read
+    - [x] Followers notified of campaign status changes and suggested / confirmed / cancelled sessions
+    - [x] Players notified of accepted / declined sign-ups and removal
+    - [x] DMs notified of new sign-ups and auto-closed sign-ups
+    - [ ] Discord bot DMs - users link their Discord account (OAuth2) on the profile page and receive their notifications as DMs from a Waystone bot (opt-in, sent in the background)
 - [x] Administration
     - [x] Always one super admin role
     - [x] An admin / super admin can add or remove people from the access whitelist
