@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile</title>
-    <link rel="stylesheet" href="styles.css?v=11">
-    <link rel="stylesheet" href="/static/notifications.css?v=1">
+    <link rel="stylesheet" href="styles.css?v=12">
+    <link rel="stylesheet" href="/static/notifications.css?v=2">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body x-data="profilePage()" x-init="init()">
@@ -33,76 +33,150 @@
         <div class="profile-page">
             <div class="profile-card" id="profileCard">
                 <p x-show="loading">Loading profile...</p>
-                <div x-show="!loading" x-html="renderProfileHtml()"></div>
-            </div>
-
-            <div class="profile-section">
-                <h2 class="section-header">Dungeon Mastering</h2>
-                <div id="dmCampaignsList" class="campaigns-list">
-                    <template x-if="dmCampaigns.length === 0">
-                        <p>No campaigns as DM.</p>
-                    </template>
-                    <template x-for="campaign in dmCampaigns" :key="campaign.id">
-                        <a :href="`/campaigns#campaign-${campaign.id}`" class="campaign-link-button" x-text="campaign.title || 'Untitled'"></a>
-                    </template>
-                </div>
-            </div>
-
-            <div class="profile-section">
-                <h2 class="section-header">Playing In</h2>
-                <div id="playingCampaignsList" class="campaigns-list">
-                    <template x-if="playingCampaigns.length === 0">
-                        <p>Not playing in any campaigns.</p>
-                    </template>
-                    <template x-for="campaign in playingCampaigns" :key="campaign.id">
-                        <a :href="`/campaigns#campaign-${campaign.id}`" class="campaign-link-button" x-text="campaign.title || 'Untitled'"></a>
-                    </template>
-                </div>
-            </div>
-
-            <div class="profile-section" x-show="isSelf">
-                <h2 class="section-header">Edit Profile</h2>
-                <div class="calendar-sync-box">
-                    <label for="nicknameInput">Nickname</label>
-                    <input type="text" id="nicknameInput" x-model="nicknameInput" maxlength="32" @keydown.enter="saveNickname()">
-                    <div class="campaigns-list">
-                        <button type="button" class="campaign-link-button" @click="saveNickname()">Save</button>
-                    </div>
-                    <label>Avatar</label>
-                    <input type="file" hidden x-ref="avatarInput" accept="image/png,image/jpeg,image/webp,image/gif" @change="uploadAvatar($event)">
-                    <div class="campaigns-list">
-                        <button type="button" class="campaign-link-button" @click="$refs.avatarInput.click()">Upload Avatar</button>
-                        <button type="button" class="danger-btn" x-show="profile && profile.avatar && profile.avatar.url" @click="removeAvatar()">Remove Avatar</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="profile-section" id="calendar-sync" x-show="isSelf">
-                <h2 class="section-header">Calendar Sync</h2>
-                <p class="form-hint">Subscribe in Google Calendar or any calendar app. Google refreshes subscriptions every few hours (up to ~24h). Anyone with this link can see your sessions.</p>
-                <template x-if="!calendarToken">
-                    <button type="button" class="campaign-link-button" @click="enableOrRegenerateCalendar()">Enable Calendar Sync</button>
-                </template>
-                <template x-if="calendarToken">
-                    <div class="calendar-sync-box">
-                        <input type="text" id="calendarUrl" readonly :value="calendarUrl" @focus="$event.target.select()">
-                        <div class="campaigns-list">
-                            <button type="button" class="campaign-link-button" @click="copyCalendarUrl()">Copy</button>
-                            <a :href="googleCalendarUrl" target="_blank" rel="noopener" class="campaign-link-button">Add to Google Calendar</a>
-                            <button type="button" class="danger-btn" @click="enableOrRegenerateCalendar()">Regenerate Link</button>
+                <template x-if="!loading && profile">
+                    <div class="profile-content">
+                        <div class="profile-avatar-section">
+                            <div class="profile-avatar-wrap" @click.outside="avatarMenuOpen = false" @keydown.escape="avatarMenuOpen = false">
+                                <template x-if="isSelf">
+                                    <button type="button" class="profile-avatar profile-avatar-btn" @click="avatarClick()" aria-label="Change avatar" :aria-expanded="avatarMenuOpen">
+                                        <img x-show="profile.avatar.url" :src="profile.avatar.url" alt="">
+                                        <div class="profile-avatar-initials" x-show="!profile.avatar.url" x-text="profile.avatar.initials || '?'"></div>
+                                        <span class="profile-avatar-overlay"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></span>
+                                    </button>
+                                </template>
+                                <template x-if="!isSelf">
+                                    <div class="profile-avatar">
+                                        <img x-show="profile.avatar.url" :src="profile.avatar.url" alt="">
+                                        <div class="profile-avatar-initials" x-show="!profile.avatar.url" x-text="profile.avatar.initials || '?'"></div>
+                                    </div>
+                                </template>
+                                <input type="file" hidden x-ref="avatarInput" accept="image/png,image/jpeg,image/webp,image/gif" @change="uploadAvatar($event)">
+                                <div class="profile-avatar-menu" x-show="avatarMenuOpen" x-cloak>
+                                    <button type="button" @click="avatarMenuOpen = false; $refs.avatarInput.click()">Upload new</button>
+                                    <button type="button" x-show="profile.avatar.url" @click="avatarMenuOpen = false; removeAvatar()">Remove</button>
+                                </div>
+                            </div>
+                            <div class="profile-info">
+                                <h2 class="profile-display-name" x-text="profile.user.deleted ? 'Deleted user' : (profile.display_name || 'Unknown User')"></h2>
+                                <template x-if="!profile.user.deleted">
+                                    <div>
+                            <p class="profile-meta" x-show="isSelf || profile.user.name">
+                                <strong><span>Name:</span></strong>
+                                <template x-if="editing !== 'name'">
+                                    <span class="profile-meta-value">
+                                        <span x-text="profile.user.name || '—'" :class="{ 'is-empty': !profile.user.name }"></span>
+                                        <button type="button" class="pencil-btn" x-show="isSelf" @click="startEdit('name')" aria-label="Edit name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></button>
+                                    </span>
+                                </template>
+                                <template x-if="editing === 'name'">
+                                    <input type="text" class="profile-edit-input" x-model="editValue" :maxlength="64" x-init="$nextTick(() => $el.focus())" @keydown.enter.prevent="saveEdit()" @keydown.escape.prevent="cancelEdit()" @blur="saveEdit()">
+                                </template>
+                            </p>
+                            <p class="profile-meta" x-show="isSelf || profile.user.nickname">
+                                <strong><span>Nickname:</span></strong>
+                                <template x-if="editing !== 'nickname'">
+                                    <span class="profile-meta-value">
+                                        <span x-text="profile.user.nickname || '—'" :class="{ 'is-empty': !profile.user.nickname }"></span>
+                                        <button type="button" class="pencil-btn" x-show="isSelf" @click="startEdit('nickname')" aria-label="Edit nickname"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></button>
+                                    </span>
+                                </template>
+                                <template x-if="editing === 'nickname'">
+                                    <input type="text" class="profile-edit-input" x-model="editValue" :maxlength="32" x-init="$nextTick(() => $el.focus())" @keydown.enter.prevent="saveEdit()" @keydown.escape.prevent="cancelEdit()" @blur="saveEdit()">
+                                </template>
+                            </p>
+                            <p class="profile-meta" x-show="profile.user.username"><strong>Username:</strong> <span x-text="profile.user.username"></span></p>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="profile-stats" x-show="!profile.user.deleted && profile.stats">
+                            <div class="profile-stat"><span class="profile-stat-value" x-text="profile.stats.campaigns_played"></span><span class="profile-stat-label">Campaigns played</span></div>
+                            <div class="profile-stat"><span class="profile-stat-value" x-text="profile.stats.sessions_played"></span><span class="profile-stat-label">Sessions played</span></div>
+                            <div class="profile-stat"><span class="profile-stat-value" x-text="memberSince"></span><span class="profile-stat-label">Member since</span></div>
                         </div>
                     </div>
                 </template>
             </div>
 
-            <div class="profile-section" x-show="isSelf && !isEnvAdmin">
-                <a href="/change-password" class="campaign-link-button">Change Password</a>
+            <div class="profile-section">
+                <h2 class="section-header">
+                    <button type="button" class="profile-toggle" @click="gamesOpen = !gamesOpen" :aria-expanded="gamesOpen" aria-controls="gamesPanel">
+                        Games <span class="profile-toggle-caret" :class="{ 'is-open': gamesOpen }" aria-hidden="true">&#9656;</span>
+                    </button>
+                </h2>
+                <div id="gamesPanel" class="profile-columns" x-show="gamesOpen" x-cloak>
+                    <div class="profile-subblock">
+                        <h3 class="profile-subheader">Dungeon Mastering</h3>
+                        <div class="profile-campaigns">
+                            <p class="profile-empty" x-show="dmCampaigns.length === 0">No campaigns as DM.</p>
+                            <template x-for="campaign in dmCampaigns" :key="campaign.id">
+                                <a :href="`/campaigns#campaign-${campaign.id}`" class="profile-campaign-row">
+                                    <span class="profile-campaign-title" x-text="campaign.title || 'Untitled'"></span>
+                                    <span class="profile-status" :class="'status-' + statusClass(campaign.status)" x-text="campaign.status"></span>
+                                </a>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="profile-subblock">
+                        <h3 class="profile-subheader">Playing In</h3>
+                        <div class="profile-campaigns">
+                            <p class="profile-empty" x-show="playingCampaigns.length === 0">Not playing in any campaigns.</p>
+                            <template x-for="campaign in playingCampaigns" :key="campaign.id">
+                                <a :href="`/campaigns#campaign-${campaign.id}`" class="profile-campaign-row">
+                                    <span class="profile-campaign-title" x-text="campaign.title || 'Untitled'"></span>
+                                    <span class="profile-status" :class="'status-' + statusClass(campaign.status)" x-text="campaign.status"></span>
+                                </a>
+                            </template>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="profile-section danger-zone" x-show="isSelf">
-                <h2 class="section-header">Account Management</h2>
-                <p>Delete your account. Your personal data is erased and you are removed from all campaigns.</p>
-                <button @click="deleteProfile()" class="danger-btn">Delete Account</button>
+            <div class="profile-section" id="integrations" x-show="isSelf">
+                <h2 class="section-header">
+                    <button type="button" class="profile-toggle" @click="integrationsOpen = !integrationsOpen" :aria-expanded="integrationsOpen" aria-controls="integrationsPanel">
+                        Integrations <span class="profile-toggle-caret" :class="{ 'is-open': integrationsOpen }" aria-hidden="true">&#9656;</span>
+                    </button>
+                </h2>
+                <div id="integrationsPanel" x-show="integrationsOpen" x-cloak>
+                    <div class="profile-subblock" id="calendar-sync">
+                        <h3 class="profile-subheader">Calendar Sync</h3>
+                        <p class="form-hint">Subscribe in Google Calendar or any calendar app. Google refreshes subscriptions every few hours (up to ~24h). Anyone with this link can see your sessions.</p>
+                        <template x-if="!calendarToken">
+                            <div class="profile-actions">
+                                <button type="button" class="campaign-link-button" @click="enableOrRegenerateCalendar()">Enable Calendar Sync</button>
+                            </div>
+                        </template>
+                        <template x-if="calendarToken">
+                            <div class="calendar-sync-box">
+                                <input type="text" id="calendarUrl" readonly :value="calendarUrl" @focus="$event.target.select()">
+                                <div class="profile-actions">
+                                    <button type="button" class="campaign-link-button" @click="copyCalendarUrl()">Copy</button>
+                                    <a :href="googleCalendarUrl" target="_blank" rel="noopener" class="campaign-link-button">Add to Google Calendar</a>
+                                    <button type="button" class="danger-btn" @click="enableOrRegenerateCalendar()">Regenerate Link</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-section" x-show="isSelf">
+                <h2 class="section-header">
+                    <button type="button" class="profile-toggle" @click="accountOpen = !accountOpen" :aria-expanded="accountOpen" aria-controls="accountPanel">
+                        Account Management <span class="profile-toggle-caret" :class="{ 'is-open': accountOpen }" aria-hidden="true">&#9656;</span>
+                    </button>
+                </h2>
+                <div id="accountPanel" x-show="accountOpen" x-cloak>
+                    <div class="profile-actions" x-show="!isEnvAdmin">
+                        <a href="/change-password" class="campaign-link-button">Change Password</a>
+                    </div>
+                    <div class="danger-zone">
+                        <p>Delete your account. Your personal data is erased and you are removed from all campaigns.</p>
+                        <button @click="deleteProfile()" class="danger-btn">Delete Account</button>
+                    </div>
+                </div>
             </div>
 
             <div id="message" class="message" :class="messageType" x-show="messageVisible" x-text="messageText"></div>
@@ -126,7 +200,7 @@
         </div>
     </div>
 
-    <script src="/static/notifications.js?v=4"></script>
-    <script src="profile.js?v=4"></script>
+    <script src="/static/notifications.js?v=5"></script>
+    <script src="profile.js?v=6"></script>
 </body>
 </html>

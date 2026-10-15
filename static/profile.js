@@ -10,7 +10,13 @@ window.profilePage = function() {
         isSelf: false,
         isEnvAdmin: false,
         calendarToken: '',
-        nicknameInput: '',
+        editing: null,
+        editValue: '',
+        saving: false,
+        avatarMenuOpen: false,
+        accountOpen: false,
+        gamesOpen: true,
+        integrationsOpen: false,
         messageVisible: false,
         messageText: '',
         messageType: '',
@@ -137,7 +143,6 @@ window.profilePage = function() {
                 this.isSelf = profile.is_self || false;
                 this.dmCampaigns = Array.isArray(profile.campaigns?.dm) ? profile.campaigns.dm : [];
                 this.playingCampaigns = Array.isArray(profile.campaigns?.playing) ? profile.campaigns.playing : [];
-                this.nicknameInput = (profile.user && profile.user.nickname) || '';
             } catch (error) {
                 this.showMessage('Error loading profile: ' + error.message, 'error');
             } finally {
@@ -145,58 +150,62 @@ window.profilePage = function() {
             }
         },
         
-        renderProfileHtml() {
-            if (!this.profile) return '';
-            
-            const profile = this.profile;
-            const displayName = profile.display_name || 'Unknown User';
-            
-            const initials = (profile.avatar && profile.avatar.initials) || '?';
-            const avatarUrl = profile.avatar && profile.avatar.url;
-            const avatarHtml = avatarUrl
-                ? `<img src="${escapeHtml(avatarUrl)}" alt="">`
-                : `<div class="profile-avatar-initials">${escapeHtml(initials)}</div>`;
-            
-            let metaHtml = '';
-            if (profile.user && profile.user.name) {
-                metaHtml += `<p class="profile-meta"><strong>Name:</strong> ${escapeHtml(profile.user.name)}</p>`;
-            }
-            if (profile.user && profile.user.nickname) {
-                metaHtml += `<p class="profile-meta"><strong>Nickname:</strong> ${escapeHtml(profile.user.nickname)}</p>`;
-            }
-            if (profile.user && profile.user.username) {
-                metaHtml += `<p class="profile-meta"><strong>Username:</strong> ${escapeHtml(profile.user.username)}</p>`;
-            }
-            
-            return `
-                <div class="profile-content">
-                    <div class="profile-avatar-section">
-                        <div class="profile-avatar">${avatarHtml}</div>
-                        <div class="profile-info">
-                            <h2 class="profile-display-name">${escapeHtml(displayName)}</h2>
-                            ${metaHtml}
-                        </div>
-                    </div>
-                </div>
-            `;
+        get memberSince() {
+            const ms = this.profile && this.profile.stats && this.profile.stats.member_since;
+            if (!ms) return '\u2014';
+            return new Date(ms).toLocaleDateString('default', { month: 'short', year: 'numeric' });
         },
-        
-        async saveNickname() {
+
+        statusClass(status) {
+            return String(status || '').toLowerCase().replace(/[^a-z]/g, '');
+        },
+
+        avatarClick() {
+            if (this.profile && this.profile.avatar && this.profile.avatar.url) {
+                this.avatarMenuOpen = !this.avatarMenuOpen;
+            } else {
+                this.$refs.avatarInput.click();
+            }
+        },
+
+        startEdit(field) {
+            this.editing = field;
+            this.editValue = (this.profile.user && this.profile.user[field]) || '';
+        },
+
+        cancelEdit() {
+            this.editing = null;
+        },
+
+        async saveEdit() {
+            const field = this.editing;
+            if (!field || this.saving) return;
+            const value = this.editValue.trim();
+            if (value === ((this.profile.user && this.profile.user[field]) || '')) {
+                this.editing = null;
+                return;
+            }
+            this.saving = true;
             try {
                 const response = await fetch('/api/profile', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ nickname: this.nicknameInput })
+                    body: JSON.stringify({ [field]: value })
                 });
                 const data = await response.json();
                 if (!response.ok) {
-                    throw new Error(data.error || 'Failed to update nickname');
+                    throw new Error(data.error || 'Failed to update profile');
                 }
+                this.profile.user.name = data.name;
+                this.profile.user.nickname = data.nickname;
+                this.profile.display_name = data.display_name;
                 this.displayName = data.display_name || this.displayName;
-                this.showMessage(data.message || 'Nickname updated', 'success');
-                await this.loadProfile();
+                this.editing = null;
+                this.showMessage('Profile updated', 'success');
             } catch (error) {
-                this.showMessage('Error updating nickname: ' + error.message, 'error');
+                this.showMessage(error.message, 'error');
+            } finally {
+                this.saving = false;
             }
         },
 
@@ -304,15 +313,3 @@ window.profilePage = function() {
         }
     };
 };
-
-function escapeHtml(text) {
-    if (!text) return '';
-    const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-    };
-    return String(text).replace(/[&<>"']/g, m => map[m]);
-}
