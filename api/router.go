@@ -131,6 +131,10 @@ func HandleCampaignRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	if len(parts) == 2 && parts[1] == "follow" {
+		HandleCampaignFollow(w, r)
+		return
+	}
 	if len(parts) == 2 && parts[1] == "signups-open" {
 		HandleCampaignSignupsOpen(w, r)
 		return

@@ -10,10 +10,16 @@ import (
 	"waystone-web/models"
 )
 
-// campaignFollowerIDs returns who follows a campaign. For now: its players.
-// Real follows later only change this function.
+// campaignFollowerIDs returns who follows a campaign: its players (implicit)
+// plus explicit followers. On a lookup error it logs and returns players only.
 func campaignFollowerIDs(c *models.Campaign) []string {
-	return append([]string(nil), c.Players...)
+	ids := append([]string(nil), c.Players...)
+	followers, err := db.GetCampaignFollowerIDs(c.ID)
+	if err != nil {
+		log.Printf("campaign followers %s: %v", c.ID, err)
+		return ids
+	}
+	return append(ids, followers...)
 }
 
 // notify stores one notification per recipient, skipping "", duplicates and the actor.
@@ -54,7 +60,12 @@ func notify(actorID string, recipients []string, typ models.NotificationType, ca
 // notifySessionChange notifies the campaign's followers about a session event.
 // was is the session's previous status, when relevant.
 func notifySessionChange(actorID string, campaign *models.Campaign, session models.CampaignSession, typ models.NotificationType, was string) {
-	notify(actorID, campaignFollowerIDs(campaign), typ, campaign, session.ID, map[string]string{
+	// Suggestions are availability requests: only players ever saw them.
+	recipients := campaignFollowerIDs(campaign)
+	if typ == models.NotificationSessionSuggested || (typ == models.NotificationSessionCancelled && was == string(models.SessionSuggested)) {
+		recipients = campaign.Players
+	}
+	notify(actorID, recipients, typ, campaign, session.ID, map[string]string{
 		"date":     session.Date,
 		"time":     session.Time,
 		"timezone": session.Timezone,

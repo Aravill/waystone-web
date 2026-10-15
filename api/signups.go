@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -103,6 +104,7 @@ func HandleCampaignSignupsOpen(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	wasOpen := campaign.SignUpsOpen
 	if err := db.SetCampaignSignUpsOpen(parts[0], *req.Open); err != nil {
 		if errors.Is(err, db.ErrCampaignNotFound) {
 			writeJSONError(w, http.StatusNotFound, err.Error())
@@ -110,6 +112,24 @@ func HandleCampaignSignupsOpen(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSONError(w, http.StatusInternalServerError, "failed to update sign-ups")
 		return
+	}
+
+	if *req.Open && !wasOpen {
+		followers, err := db.GetCampaignFollowerIDs(campaign.ID)
+		if err != nil {
+			log.Printf("campaign followers %s: %v", campaign.ID, err)
+		}
+		isPlayer := map[string]bool{}
+		for _, p := range campaign.Players {
+			isPlayer[p] = true
+		}
+		var recipients []string
+		for _, id := range followers {
+			if !isPlayer[id] {
+				recipients = append(recipients, id)
+			}
+		}
+		notify(userID, recipients, models.NotificationSignupsOpened, campaign, "", nil)
 	}
 
 	message := "sign-ups closed"
