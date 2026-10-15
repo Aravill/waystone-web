@@ -95,9 +95,9 @@ func AnonymizeUserAndCleanupCampaigns(userID string) (removedAsPlayer int, err e
 	return removedAsPlayer, nil
 }
 
-// SetUserNickname updates a user's nickname
-func SetUserNickname(id, nickname string) error {
-	return GetStore().SetUserNickname(id, nickname)
+// SetUserProfile updates the provided name and/or nickname (nil fields are left unchanged)
+func SetUserProfile(id string, name, nickname *string) error {
+	return GetStore().SetUserProfile(id, name, nickname)
 }
 
 // SetUserAvatar stores a user's avatar; empty data removes it

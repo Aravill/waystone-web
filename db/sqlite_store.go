@@ -650,13 +650,24 @@ func (s *SQLiteStore) GetUserByID(id string) (*models.User, error) {
 	return &user, nil
 }
 
-// SetUserNickname updates a user's nickname.
-func (s *SQLiteStore) SetUserNickname(id, nickname string) error {
+// SetUserProfile updates the provided name and/or nickname; nil fields are left unchanged.
+func (s *SQLiteStore) SetUserProfile(id string, name, nickname *string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	res, err := s.db.Exec(`UPDATE users SET nickname = ?, updated_at = ? WHERE id = ? AND deleted = 0`,
-		nickname, time.Now().UTC().Format(time.RFC3339), id)
+	sets := []string{}
+	args := []interface{}{}
+	if name != nil {
+		sets = append(sets, "name = ?")
+		args = append(args, *name)
+	}
+	if nickname != nil {
+		sets = append(sets, "nickname = ?")
+		args = append(args, *nickname)
+	}
+	sets = append(sets, "updated_at = ?")
+	args = append(args, time.Now().UTC().Format(time.RFC3339), id)
+	res, err := s.db.Exec(`UPDATE users SET `+strings.Join(sets, ", ")+` WHERE id = ? AND deleted = 0`, args...)
 	if err != nil {
 		return err
 	}
@@ -926,6 +937,33 @@ func (s *SQLiteStore) GetSessionsByCampaignIDs(campaignIDs []string, fromDate st
 		sessions = append(sessions, session)
 	}
 
+	return sessions, rows.Err()
+}
+
+// GetAcceptedConfirmedSessions returns confirmed sessions the user responded Accepted to.
+func (s *SQLiteStore) GetAcceptedConfirmedSessions(userID string) ([]models.CampaignSession, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(`
+		SELECT s.id, s.campaign_id, s.date, s.time, s.duration, s.status, s.timezone, s.created_at, s.updated_at
+		FROM campaign_sessions s JOIN session_responses r ON r.session_id = s.id
+		WHERE r.user_id = ? AND r.participation = ? AND s.status = ?
+	`, userID, models.Accepted, models.SessionConfirmed)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []models.CampaignSession
+	for rows.Next() {
+		var session models.CampaignSession
+		if err := rows.Scan(&session.ID, &session.CampaignID, &session.Date, &session.Time, &session.Duration,
+			&session.Status, &session.Timezone, &session.CreatedAt, &session.UpdatedAt); err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, session)
+	}
 	return sessions, rows.Err()
 }
 

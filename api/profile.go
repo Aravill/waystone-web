@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 	"unicode/utf8"
 	"waystone-web/db"
 	"waystone-web/middleware"
@@ -122,10 +123,40 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 		initials = "?"
 	}
 
+	stats := map[string]interface{}{}
+	if !user.Deleted {
+		playedCampaigns := map[string]bool{}
+		for _, c := range playingCampaigns {
+			playedCampaigns[c["id"].(string)] = true
+		}
+		sessionsPlayed := 0
+		accepted, err := db.GetAcceptedConfirmedSessions(user.ID)
+		if err != nil {
+			log.Printf("error fetching played sessions: %v", err)
+			writeJSONError(w, http.StatusInternalServerError, "failed to fetch sessions")
+			return
+		}
+		now := time.Now()
+		for _, session := range accepted {
+			start, ok := sessionStart(session)
+			if !ok || start.Add(time.Duration(session.Duration)*time.Minute).After(now) {
+				continue
+			}
+			sessionsPlayed++
+			playedCampaigns[session.CampaignID] = true
+		}
+		stats = map[string]interface{}{
+			"campaigns_played": len(playedCampaigns),
+			"sessions_played":  sessionsPlayed,
+			"member_since":     user.CreatedAt.Format(time.RFC3339),
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"user": userObj,
+		"stats": stats,
+		"user":  userObj,
 		"avatar": map[string]interface{}{
 			"initials": initials,
 			"url":      avatarURL,
@@ -193,25 +224,41 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Nickname string `json:"nickname"`
+		Name     *string `json:"name"`
+		Nickname *string `json:"nickname"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	nickname := strings.TrimSpace(body.Nickname)
-	if utf8.RuneCountInString(nickname) > 32 {
-		writeJSONError(w, http.StatusBadRequest, "nickname must be 32 characters or fewer")
+	if body.Name == nil && body.Nickname == nil {
+		writeJSONError(w, http.StatusBadRequest, "nothing to update")
 		return
 	}
+	if body.Name != nil {
+		trimmed := strings.TrimSpace(*body.Name)
+		if utf8.RuneCountInString(trimmed) > 64 {
+			writeJSONError(w, http.StatusBadRequest, "name must be 64 characters or fewer")
+			return
+		}
+		body.Name = &trimmed
+	}
+	if body.Nickname != nil {
+		trimmed := strings.TrimSpace(*body.Nickname)
+		if utf8.RuneCountInString(trimmed) > 32 {
+			writeJSONError(w, http.StatusBadRequest, "nickname must be 32 characters or fewer")
+			return
+		}
+		body.Nickname = &trimmed
+	}
 
-	if err := db.SetUserNickname(userID, nickname); err != nil {
+	if err := db.SetUserProfile(userID, body.Name, body.Nickname); err != nil {
 		if errors.Is(err, db.ErrUserNotFound) {
 			writeJSONError(w, http.StatusNotFound, "user not found")
 			return
 		}
-		log.Printf("error updating nickname: %v", err)
-		writeJSONError(w, http.StatusInternalServerError, "failed to update nickname")
+		log.Printf("error updating profile: %v", err)
+		writeJSONError(w, http.StatusInternalServerError, "failed to update profile")
 		return
 	}
 
@@ -222,7 +269,8 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status":       "success",
-		"message":      "nickname updated",
+		"message":      "profile updated",
+		"name":         user.Name,
 		"nickname":     user.Nickname,
 		"display_name": user.DisplayName(),
 	})
