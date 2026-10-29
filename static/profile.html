@@ -3,9 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profile</title>
-    <link rel="stylesheet" href="styles.css?v=13">
-    <link rel="stylesheet" href="/static/notifications.css?v=2">
+    <title>Waystone - Profile</title>
+    <script src="/static/theme.js?v=4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
+    <link rel="stylesheet" href="/static/styles.css?v=34">
+    <link rel="stylesheet" href="/static/notifications.css?v=7">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body x-data="profilePage()">
@@ -13,23 +17,20 @@
         <div class="header-left">
             <a href="/" class="logo">Waystone</a>
         </div>
-        <div class="header-center">
-            <h1>Profile</h1>
-        </div>
+        <nav class="nav-bar" aria-label="Main">
+            <a href="/" class="nav-item" data-page="dashboard">Dashboard</a>
+            <a href="/campaigns" class="nav-item" data-page="campaigns">Games</a>
+            <a href="/profile" class="nav-item active" aria-current="page" data-page="profile">Profile</a>
+            <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
+        </nav>
         <div class="header-right">
             <span class="user-name" x-text="displayName"></span>
             <button @click="handleLogout()" class="logout-btn">Logout</button>
         </div>
     </div>
 
-    <div class="nav-bar">
-        <a href="/" class="nav-item" data-page="dashboard">Dashboard</a>
-        <a href="/campaigns" class="nav-item" data-page="campaigns">Campaigns</a>
-        <a href="/profile" class="nav-item active" data-page="profile">Profile</a>
-        <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
-    </div>
-
     <div class="container">
+        <h1 class="page-title"><span class="drop-cap">P</span>rofile</h1>
         <div class="profile-page">
             <div class="profile-setup-banner" x-show="isSelf && needsProfileSetup" x-cloak>
                 <p><strong>Welcome to Waystone!</strong> Set up your profile: use the pencils to pick a nickname and an avatar so other players can recognise you.</p>
@@ -45,7 +46,7 @@
                                     <button type="button" class="profile-avatar profile-avatar-btn" @click="avatarClick()" aria-label="Change avatar" :aria-expanded="avatarMenuOpen">
                                         <img x-show="profile.avatar.url" :src="profile.avatar.url" alt="">
                                         <div class="profile-avatar-initials" x-show="!profile.avatar.url" x-text="profile.avatar.initials || '?'"></div>
-                                        <span class="profile-avatar-overlay"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></span>
+                                        <span class="profile-avatar-overlay"><svg viewBox="0 0 24 24" width="1rem" height="1rem" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></span>
                                     </button>
                                 </template>
                                 <template x-if="!isSelf">
@@ -69,7 +70,7 @@
                                 <template x-if="editing !== 'name'">
                                     <span class="profile-meta-value">
                                         <span x-text="profile.user.name || '—'" :class="{ 'is-empty': !profile.user.name }"></span>
-                                        <button type="button" class="pencil-btn" x-show="isSelf" @click="startEdit('name')" aria-label="Edit name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></button>
+                                        <button type="button" class="pencil-btn" x-show="isSelf" @click="startEdit('name')" aria-label="Edit name"><svg viewBox="0 0 24 24" width="0.8125rem" height="0.8125rem" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></button>
                                     </span>
                                 </template>
                                 <template x-if="editing === 'name'">
@@ -81,7 +82,7 @@
                                 <template x-if="editing !== 'nickname'">
                                     <span class="profile-meta-value">
                                         <span x-text="profile.user.nickname || '—'" :class="{ 'is-empty': !profile.user.nickname }"></span>
-                                        <button type="button" class="pencil-btn" x-show="isSelf" @click="startEdit('nickname')" aria-label="Edit nickname"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></button>
+                                        <button type="button" class="pencil-btn" x-show="isSelf" @click="startEdit('nickname')" aria-label="Edit nickname"><svg viewBox="0 0 24 24" width="0.8125rem" height="0.8125rem" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></button>
                                     </span>
                                 </template>
                                 <template x-if="editing === 'nickname'">
@@ -94,7 +95,7 @@
                             </div>
                         </div>
                         <div class="profile-stats" x-show="!profile.user.deleted && profile.stats">
-                            <div class="profile-stat"><span class="profile-stat-value" x-text="profile.stats.campaigns_played"></span><span class="profile-stat-label">Campaigns played</span></div>
+                            <div class="profile-stat"><span class="profile-stat-value" x-text="profile.stats.campaigns_played"></span><span class="profile-stat-label">Games played</span></div>
                             <div class="profile-stat"><span class="profile-stat-value" x-text="profile.stats.sessions_played"></span><span class="profile-stat-label">Sessions played</span></div>
                             <div class="profile-stat"><span class="profile-stat-value" x-text="memberSince"></span><span class="profile-stat-label">Member since</span></div>
                         </div>
@@ -105,14 +106,14 @@
             <div class="profile-section">
                 <h2 class="section-header">
                     <button type="button" class="profile-toggle" @click="gamesOpen = !gamesOpen" :aria-expanded="gamesOpen" aria-controls="gamesPanel">
-                        Games <span class="profile-toggle-caret" :class="{ 'is-open': gamesOpen }" aria-hidden="true">&#9656;</span>
+                        Games <span class="profile-toggle-caret" :class="{ 'is-open': gamesOpen }" aria-hidden="true">▸</span>
                     </button>
                 </h2>
                 <div id="gamesPanel" class="profile-columns" x-show="gamesOpen" x-cloak>
                     <div class="profile-subblock">
                         <h3 class="profile-subheader">Dungeon Mastering</h3>
                         <div class="profile-campaigns">
-                            <p class="profile-empty" x-show="dmCampaigns.length === 0">No campaigns as DM.</p>
+                            <p class="profile-empty" x-show="dmCampaigns.length === 0">No games as DM.</p>
                             <template x-for="campaign in dmCampaigns" :key="campaign.id">
                                 <a :href="`/campaigns#campaign-${campaign.id}`" class="profile-campaign-row">
                                     <span class="profile-campaign-title" x-text="campaign.title || 'Untitled'"></span>
@@ -125,7 +126,7 @@
                     <div class="profile-subblock">
                         <h3 class="profile-subheader">Playing In</h3>
                         <div class="profile-campaigns">
-                            <p class="profile-empty" x-show="playingCampaigns.length === 0">Not playing in any campaigns.</p>
+                            <p class="profile-empty" x-show="playingCampaigns.length === 0">Not playing in any games.</p>
                             <template x-for="campaign in playingCampaigns" :key="campaign.id">
                                 <a :href="`/campaigns#campaign-${campaign.id}`" class="profile-campaign-row">
                                     <span class="profile-campaign-title" x-text="campaign.title || 'Untitled'"></span>
@@ -140,7 +141,7 @@
             <div class="profile-section" id="integrations" x-show="isSelf">
                 <h2 class="section-header">
                     <button type="button" class="profile-toggle" @click="integrationsOpen = !integrationsOpen" :aria-expanded="integrationsOpen" aria-controls="integrationsPanel">
-                        Integrations <span class="profile-toggle-caret" :class="{ 'is-open': integrationsOpen }" aria-hidden="true">&#9656;</span>
+                        Integrations <span class="profile-toggle-caret" :class="{ 'is-open': integrationsOpen }" aria-hidden="true">▸</span>
                     </button>
                 </h2>
                 <div id="integrationsPanel" x-show="integrationsOpen" x-cloak>
@@ -169,7 +170,7 @@
             <div class="profile-section" x-show="isSelf">
                 <h2 class="section-header">
                     <button type="button" class="profile-toggle" @click="accountOpen = !accountOpen" :aria-expanded="accountOpen" aria-controls="accountPanel">
-                        Account Management <span class="profile-toggle-caret" :class="{ 'is-open': accountOpen }" aria-hidden="true">&#9656;</span>
+                        Account Management <span class="profile-toggle-caret" :class="{ 'is-open': accountOpen }" aria-hidden="true">▸</span>
                     </button>
                 </h2>
                 <div id="accountPanel" x-show="accountOpen" x-cloak>
@@ -177,7 +178,7 @@
                         <a href="/change-password" class="campaign-link-button">Change Password</a>
                     </div>
                     <div class="danger-zone">
-                        <p>Delete your account. Your personal data is erased and you are removed from all campaigns.</p>
+                        <p>Delete your account. Your personal data is erased and you are removed from all games.</p>
                         <button @click="deleteProfile()" class="danger-btn">Delete Account</button>
                     </div>
                 </div>
@@ -204,7 +205,7 @@
         </div>
     </div>
 
-    <script src="/static/notifications.js?v=5"></script>
-    <script src="profile.js?v=7"></script>
+    <script src="/static/notifications.js?v=8"></script>
+    <script src="profile.js?v=9"></script>
 </body>
 </html>

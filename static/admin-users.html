@@ -4,63 +4,60 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Users - Waystone</title>
-    <link rel="stylesheet" href="/dashboard.css?v=1">
-    <link rel="stylesheet" href="/static/notifications.css?v=2">
+    <script src="/static/theme.js?v=4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
+    <link rel="stylesheet" href="/static/styles.css?v=34">
+    <link rel="stylesheet" href="/static/notifications.css?v=7">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
     <style>
-        /* Action buttons — style-guide compliant */
+        [x-cloak] { display: none !important; }
+        /* Action buttons: secondary by default (label.action-btn is hit by the global label rule) */
         .action-btn {
-            padding: 6px 14px;
-            background: #000;
-            color: #00d9ff;
-            border: 1px solid #00d9ff;
+            display: inline-block;
+            margin: 0;
+            padding: 0.375rem 0.875rem;
+            min-height: 2.25rem;
+            background: none;
+            color: var(--ink);
+            border: 1px solid var(--line);
             cursor: pointer;
-            font-family: 'Fira Code', monospace;
-            font-size: 0.8em;
+            font-family: inherit;
+            font-size: 0.75rem;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.2s;
+            letter-spacing: 0.125rem;
+            transition: color 0.15s, background-color 0.15s, border-color 0.15s;
             white-space: nowrap;
         }
-        .action-btn:hover { background: #00d9ff; color: #000; }
+        .action-btn:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
         .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .action-btn.danger { color: #ff006e; border-color: #ff006e; }
-        .action-btn.danger:hover { background: #ff006e; color: #000; }
-        /* Submit button for add-user form */
-        .submit-btn {
-            padding: 10px 20px;
-            background: #000;
-            color: #00d9ff;
-            border: 1px solid #00d9ff;
-            cursor: pointer;
-            font-family: 'Fira Code', monospace;
-            font-size: 0.85em;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.2s;
-        }
-        .submit-btn:hover { background: #00d9ff; color: #000; }
-        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        /* Messages */
-        .message { padding: 12px 16px; margin-bottom: 16px; font-size: 0.9rem; border: 1px solid; }
-        .message.success { background: #0a1a0a; color: #00ff7f; border-color: #00ff7f; }
-        .message.error { background: #1a0a0a; color: #ff006e; border-color: #ff006e; }
-        /* Confirm modal overlay — display:flex here so x-show toggling display:none doesn't revert to block */
+        .action-btn.danger { color: var(--rubric); border-color: var(--rubric); }
+        .action-btn.danger:hover { background: var(--rubric); color: var(--bg); }
+        /* Add buttons sit beside inputs, so they must not stretch */
+        .submit-btn { width: auto; padding: 0.625rem 1.25rem; }
+        /* Confirm modal overlay: display:flex here so x-show toggling display:none doesn't revert to block */
         .modal-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.8);
+            background: var(--backdrop);
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 100;
         }
+        .modal-overlay .card { background: var(--bg); border: 1px solid var(--ink); outline: 1px solid var(--ink); outline-offset: 0.3125rem; }
         /* Table */
-        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        th, td { text-align: left; padding: 10px 8px; }
-        th { color: #888; border-bottom: 1px solid #333; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; }
-        tbody tr { border-bottom: 1px solid #1a1a1a; }
-        tbody tr:hover { background: #0a0a0a; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        th, td { text-align: left; padding: 0.625rem 0.5rem; }
+        th { color: var(--muted); border-bottom: 1px solid var(--ink); font-size: 0.75rem; font-weight: 400; text-transform: uppercase; letter-spacing: 0.125rem; }
+        tbody tr { border-bottom: 1px solid var(--line); }
+        tbody tr:hover { background: var(--folio); }
+        .admin-tag { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.125rem; }
+        .admin-tag--danger { color: var(--rubric); }
+        .admin-tag--ok { color: var(--verdigris); }
+        .admin-tag--muted { color: var(--muted); }
+        .admin-empty { padding: 1.25rem 0.5rem; color: var(--muted); text-align: center; }
     </style>
 </head>
 <body x-data="adminUsersPage()">
@@ -68,45 +65,38 @@
         <div class="header-left">
             <a href="/" class="logo">Waystone</a>
         </div>
-        <div class="header-center">
-            <h1>Admin - User Management</h1>
-        </div>
+        <nav class="nav-bar" aria-label="Main">
+            <a href="/" class="nav-item" data-page="dashboard">Dashboard</a>
+            <a href="/campaigns" class="nav-item" data-page="campaigns">Games</a>
+            <a href="/profile" class="nav-item" data-page="profile">Profile</a>
+            <a href="/admin/users" class="nav-item active" aria-current="page" data-page="admin-users" x-show="isAdmin">Admin</a>
+        </nav>
         <div class="header-right">
             <span class="user-name" x-text="displayName"></span>
             <button @click="logout()" class="logout-btn">Logout</button>
         </div>
     </div>
 
-    <div class="nav-bar">
-        <a href="/" class="nav-item" data-page="dashboard">Dashboard</a>
-        <a href="/campaigns" class="nav-item" data-page="campaigns">Campaigns</a>
-        <a href="/profile" class="nav-item" data-page="profile">Profile</a>
-        <a href="/admin/users" class="nav-item active" data-page="admin-users" x-show="isAdmin">Admin</a>
-    </div>
-
-    <main class="container" style="max-width: 1100px; margin: 0 auto; padding: 20px; flex-direction: column; align-items: stretch; justify-content: flex-start;">
+    <main class="container">
+        <h1 class="page-title"><span class="drop-cap">U</span>ser Management</h1>
         <!-- Add user form -->
-        <section class="card" style="margin-bottom: 16px;">
-            <h2 style="margin-bottom: 16px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; color: #888;">Add User</h2>
-            <form @submit.prevent="addUser()" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <input type="text" x-model="newUsername" placeholder="username" required pattern="[A-Za-z0-9_\-]{2,32}" autocapitalize="none"
-                    style="flex: 1; background: #0a0a0a; border: 1px solid #333; color: #e0e0e0; padding: 10px 14px; font-family: 'Fira Code', monospace; font-size: 0.9rem; transition: border-color 0.2s;"
-                    onfocus="this.style.borderColor='#00d9ff'" onblur="this.style.borderColor='#333'">
-                <input type="text" x-model="newName" placeholder="name (optional)"
-                    style="flex: 1; background: #0a0a0a; border: 1px solid #333; color: #e0e0e0; padding: 10px 14px; font-family: 'Fira Code', monospace; font-size: 0.9rem; transition: border-color 0.2s;"
-                    onfocus="this.style.borderColor='#00d9ff'" onblur="this.style.borderColor='#333'">
+        <section class="card" style="margin-bottom: 1rem;">
+            <h2 class="section-header">Add User</h2>
+            <form @submit.prevent="addUser()" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <input type="text" x-model="newUsername" placeholder="username" required pattern="[A-Za-z0-9_\-]{2,32}" autocapitalize="none" style="flex: 1;">
+                <input type="text" x-model="newName" placeholder="name (optional)" style="flex: 1;">
                 <button type="submit" :disabled="loading" class="submit-btn">Add</button>
             </form>
         </section>
 
         <!-- Temporary password banner -->
-        <div x-cloak x-show="tempPassword" class="card" style="margin-bottom: 16px; border-color: #00d9ff; background: #0a1a1a;">
-            <p style="color: #b0b0b0; font-size: 0.85rem; margin-bottom: 10px;">
-                Temporary password for <strong x-text="tempPassword && tempPassword.username" style="color: #fff;"></strong>.
+        <div x-cloak x-show="tempPassword" class="card" style="margin-bottom: 1rem; border-color: var(--ink);">
+            <p class="form-hint" style="margin-bottom: 0.625rem;">
+                Temporary password for <strong x-text="tempPassword && tempPassword.username"></strong>.
                 Give this to the user; they must change it at first login. It will not be shown again.
             </p>
-            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                <code x-text="tempPassword && tempPassword.password" style="font-size: 1.1rem; color: #00d9ff; letter-spacing: 1px; user-select: all;"></code>
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                <code x-text="tempPassword && tempPassword.password" style="font-size: 1.125rem; letter-spacing: 0.0625rem; user-select: all;"></code>
                 <button @click="copyTempPassword()" class="action-btn">copy</button>
                 <button @click="tempPassword = null" class="action-btn">dismiss</button>
             </div>
@@ -118,10 +108,8 @@
             style="display: none;"></div>
 
         <!-- Search -->
-        <div style="margin-bottom: 16px;">
-            <input type="text" x-model="searchQuery" placeholder="search by username or name..."
-                style="width: 100%; background: #0a0a0a; border: 1px solid #333; color: #e0e0e0; padding: 10px 14px; font-family: 'Fira Code', monospace; font-size: 0.9rem; transition: border-color 0.2s;"
-                onfocus="this.style.borderColor='#00d9ff'" onblur="this.style.borderColor='#333'">
+        <div style="margin-bottom: 1rem;">
+            <input type="text" x-model="searchQuery" placeholder="search by username or name...">
         </div>
 
         <!-- Users table -->
@@ -142,16 +130,16 @@
                             <td x-text="user.username"></td>
                             <td x-text="user.nickname || user.name || '—'"></td>
                             <td>
-                                <span x-show="user.blocked" style="color: #ff006e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">blocked</span>
-                                <span x-show="!user.blocked && !user.must_change_password" style="color: #00d9ff; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">active</span>
-                                <span x-show="!user.blocked && user.must_change_password" style="color: #555; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">pending first login</span>
+                                <span x-show="user.blocked" class="admin-tag admin-tag--danger">✗ blocked</span>
+                                <span x-show="!user.blocked && !user.must_change_password" class="admin-tag admin-tag--ok">● active</span>
+                                <span x-show="!user.blocked && user.must_change_password" class="admin-tag admin-tag--muted">… pending first login</span>
                             </td>
                             <td>
-                                <span x-show="user.roles && user.roles.includes('admin')" style="color: #00d9ff; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">admin</span>
-                                <span x-show="!user.roles || !user.roles.includes('admin')" style="color: #555; font-size: 0.75rem;">—</span>
+                                <span x-show="user.roles && user.roles.includes('admin')" class="admin-tag">♛ admin</span>
+                                <span x-show="!user.roles || !user.roles.includes('admin')" class="admin-tag admin-tag--muted">—</span>
                             </td>
                             <td>
-                                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                <div style="display: flex; gap: 0.375rem; flex-wrap: wrap;">
                                     <button x-show="!user.is_env_admin" @click="confirmAction('reset password', 'reset password for ' + user.username + '? their current password will stop working.', () => resetPassword(user))" class="action-btn">reset password</button>
                                     <button x-show="!user.blocked && !user.is_env_admin" @click="confirmAction('block user', 'block ' + user.username + '?', () => blockUser(user.id))" class="action-btn danger">block</button>
                                     <button x-show="user.blocked" @click="unblockUser(user.id)" class="action-btn">unblock</button>
@@ -163,20 +151,18 @@
                         </tr>
                     </template>
                     <tr x-show="filteredUsers.length === 0">
-                        <td colspan="5" style="padding: 20px 8px; color: #555; text-align: center;">no users found</td>
+                        <td colspan="5" class="admin-empty">no users found</td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
         <!-- Systems -->
-        <section class="card" style="margin-top: 16px; overflow-x: auto;">
-            <h2 style="margin-bottom: 16px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; color: #888;">Systems</h2>
-            <form @submit.prevent="addSystem()" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px;">
-                <input type="text" x-model="newSystemName" placeholder="system name" required maxlength="64"
-                    style="flex: 1; background: #0a0a0a; border: 1px solid #333; color: #e0e0e0; padding: 10px 14px; font-family: 'Fira Code', monospace; font-size: 0.9rem; transition: border-color 0.2s;"
-                    onfocus="this.style.borderColor='#00d9ff'" onblur="this.style.borderColor='#333'">
-                <input type="file" x-ref="newSystemLogo" accept="image/png,image/jpeg,image/webp,image/gif" style="color: #888; font-size: 0.8rem;">
+        <section class="card" style="margin-top: 1rem; overflow-x: auto;">
+            <h2 class="section-header">Systems</h2>
+            <form @submit.prevent="addSystem()" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem;">
+                <input type="text" x-model="newSystemName" placeholder="system name" required maxlength="64" style="flex: 1;">
+                <input type="file" x-ref="newSystemLogo" accept="image/png,image/jpeg,image/webp,image/gif">
                 <button type="submit" :disabled="loading" class="submit-btn">Add</button>
             </form>
             <table>
@@ -191,22 +177,22 @@
                     <template x-for="s in systems" :key="s.id">
                         <tr>
                             <td>
-                                <img x-show="s.logo_url" :src="s.logo_url || ''" :alt="s.name" style="height: 32px; max-width: 96px; object-fit: contain;">
-                                <span x-show="!s.logo_url" style="color: #555;">—</span>
+                                <img x-show="s.logo_url" :src="s.logo_url || ''" :alt="s.name" style="height: 2rem; max-width: 6rem; object-fit: contain;">
+                                <span x-show="!s.logo_url" class="admin-tag admin-tag--muted">—</span>
                             </td>
                             <td x-text="s.name"></td>
                             <td>
-                                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                <div style="display: flex; gap: 0.375rem; flex-wrap: wrap;">
                                     <button @click="renameSystem(s)" class="action-btn">rename</button>
                                     <label class="action-btn" style="cursor: pointer;">logo<input type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif" @change="uploadLogo(s.id, $event.target.files[0]); $event.target.value = ''"></label>
                                     <button x-show="s.logo_url" @click="removeLogo(s.id)" class="action-btn danger">remove logo</button>
-                                    <button @click="confirmAction('delete system', 'delete ' + s.name + '? campaigns using it keep the name as plain text.', () => deleteSystem(s.id))" class="action-btn danger">delete</button>
+                                    <button @click="confirmAction('delete system', 'delete ' + s.name + '? games using it keep the name as plain text.', () => deleteSystem(s.id))" class="action-btn danger">delete</button>
                                 </div>
                             </td>
                         </tr>
                     </template>
                     <tr x-show="systems.length === 0">
-                        <td colspan="3" style="padding: 20px 8px; color: #555; text-align: center;">no systems yet</td>
+                        <td colspan="3" class="admin-empty">no systems yet</td>
                     </tr>
                 </tbody>
             </table>
@@ -214,10 +200,10 @@
 
         <!-- Confirm modal -->
         <div x-cloak x-show="confirmModal.visible" class="modal-overlay">
-            <div class="card" style="max-width: 400px; width: 90%; text-align: center;">
-                <h3 x-text="confirmModal.title" style="margin-bottom: 12px; font-size: 1rem;"></h3>
-                <p x-text="confirmModal.message" style="color: #888; margin-bottom: 24px; font-size: 0.9rem;"></p>
-                <div style="display: flex; gap: 12px; justify-content: center;">
+            <div class="card" style="max-width: 25rem; width: 90%; text-align: center;">
+                <h3 x-text="confirmModal.title" style="margin-bottom: 0.75rem;"></h3>
+                <p x-text="confirmModal.message" class="form-hint" style="margin-bottom: 1.5rem;"></p>
+                <div style="display: flex; gap: 0.75rem; justify-content: center;">
                     <button @click="confirmModal.onConfirm(); confirmModal.visible = false" class="action-btn danger">Confirm</button>
                     <button @click="confirmModal.visible = false" class="action-btn">Cancel</button>
                 </div>
@@ -225,7 +211,7 @@
         </div>
     </main>
 
-    <script src="/static/notifications.js?v=5"></script>
+    <script src="/static/notifications.js?v=8"></script>
     <script src="/admin-users.js?v=3"></script>
 </body>
 </html>

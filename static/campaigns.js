@@ -1,9 +1,71 @@
 // Campaign types: single source for labels and tooltip/form descriptions.
 const CAMPAIGN_TYPES = [
     { value: 'One-shot', label: 'One-shot', description: 'A single, self-contained story told in 1–2 sessions. Low commitment, ideal for trying a new system, a new DM, or just dropping in.' },
-    { value: 'Adventure', label: 'Adventure', description: 'A short campaign of 3+ sessions with one self-contained plot and a clear ending. A few weeks to a few months of commitment.' },
+    { value: 'Adventure', label: 'Adventure', description: 'A short run of 3+ sessions with one self-contained plot and a clear ending. A few weeks to a few months of commitment.' },
     { value: 'Campaign', label: 'Campaign', description: 'A long, overarching story with no set number of sessions. Characters grow over many months; expect a regular, ongoing commitment.' }
 ];
+
+// Game-type marks (24px grid, 1.5 stroke, currentColor). See STYLE_GUIDE.md "Campaign type badge".
+const TYPE_ICON_PATHS = {
+    'One-shot': '<path d="M12 1.5 L13.6 4 V15 H10.4 V4 Z"/><path d="M7 15 H17"/><path d="M12 15 V19.5"/><circle cx="12" cy="21" r="1.4"/>',
+    'Adventure': '<path d="M21.5 2.5 L7 17"/><path d="M5 15 L9 19"/><path d="M7 17 L4 20"/><circle cx="3.2" cy="20.8" r="1.1"/><path d="M2.5 2.5 L17 17"/><path d="M15 19 L19 15"/><path d="M17 17 L20 20"/><circle cx="20.8" cy="20.8" r="1.1"/><path class="type-icon__fill" d="M12 6 L15.5 7.5 V11.5 Q15.5 15 12 17 Q8.5 15 8.5 11.5 V7.5 Z"/><path d="M12 8 V15"/>',
+    'Campaign': '<circle cx="12" cy="1.8" r="0.9"/><path d="M12 2.7 V4"/><path d="M8 4 H16"/><path d="M9 4 V14.5 L12 12 L15 14.5 V4"/><path d="M12 12 V22.5"/><path d="M2.5 3 V15"/><path d="M0.8 15 H4.2"/><path d="M2.5 15 V18.6"/><circle cx="2.5" cy="19.7" r="1"/><path d="M21.5 3 V15"/><path d="M19.8 15 H23.2"/><path d="M21.5 15 V18.6"/><circle cx="21.5" cy="19.7" r="1"/>'
+};
+
+// Banner variants: each game gets one (stable, from its id) - a shape in styles.css
+// (.banner-N) and a headpiece. A headpiece is end · rule · centre · rule · end, so it
+// stretches to the card width without distorting the curls. Ends are drawn for the left
+// side (outer edge at x=0) and mirrored for the right.
+const HEADPIECES = [
+    {   // 1: scrollwork around a diamond
+        end: { w: 24, d: '<circle cx="2" cy="9" r="1"/><path d="M24 9 C18 9 14 13 10 10.5 C7.5 8.5 9.5 5 12 7"/>' },
+        centre: { w: 84, d: '<path d="M42 3.5 L46.5 9 L42 14.5 L37.5 9 Z"/><circle cx="42" cy="9" r="1"/><path d="M48 9 C53 3 59 3 64 9 C69 15 75 15 80 9 L84 9"/><path d="M36 9 C31 3 25 3 20 9 C15 15 9 15 4 9 L0 9"/>' }
+    },
+    {   // 2: leaf trefoil
+        end: { w: 18, d: '<path d="M18 9 H9"/><path d="M9 9 C7 5.5 3.5 5.5 1 9 C3.5 12.5 7 12.5 9 9 Z"/>' },
+        centre: { w: 56, d: '<path d="M28 2 C32 5.5 32 9.5 28 13 C24 9.5 24 5.5 28 2 Z"/><path d="M28 13 C23 15.5 17 14.5 14 10.5 C19 9.5 24 10.5 28 13"/><path d="M28 13 C33 15.5 39 14.5 42 10.5 C37 9.5 32 10.5 28 13"/><path d="M28 13 V16.5"/><path d="M0 9 H12 M44 9 H56"/>' }
+    },
+    {   // 3: interlaced rings
+        end: { w: 16, d: '<path d="M16 9 H4"/><path d="M8 5 L3 9 L8 13"/>' },
+        centre: { w: 52, d: '<circle cx="20" cy="9" r="6.5"/><circle cx="32" cy="9" r="6.5"/><path d="M0 9 H11 M41 9 H52"/><circle cx="26" cy="9" r="1"/>' }
+    }
+];
+
+// Top-corner ornaments per variant, drawn for the top-left (corner at 0,0) and mirrored right.
+const BANNER_CORNERS = [
+    '<path d="M3 21 V9 C3 5.5 5.5 3 9 3 H21"/><path d="M9 9 C12.5 8.5 14 11 12.5 13.5 C11 15 8.5 14 9.5 12"/><circle cx="3" cy="22.5" r="0.9"/><circle cx="22.5" cy="3" r="0.9"/>',
+    '<path d="M3 21 V3 H21"/><path d="M5.5 5.5 C10.5 5.5 14 9 14 14 C9 14 5.5 10.5 5.5 5.5 Z"/><path d="M5.5 5.5 L12 12"/>',
+    '<path d="M3 21 V3 H21"/><path d="M7 17 V7 H17"/><path d="M3 0.5 L5.5 3 L3 5.5 L0.5 3 Z"/><circle cx="21" cy="3" r="0.9"/><circle cx="3" cy="21" r="0.9"/>'
+];
+
+function bannerCornersHtml(variant) {
+    const svg = (cls) => `<svg class="banner-corner ${cls}" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round">${BANNER_CORNERS[variant - 1]}</svg>`;
+    return svg('banner-corner--left') + svg('banner-corner--right');
+}
+
+function bannerVariant(id) {
+    let sum = 0;
+    for (const ch of String(id || '')) sum = (sum + ch.charCodeAt(0)) % 9973;
+    return (sum % HEADPIECES.length) + 1;
+}
+
+function headpieceHtml(variant) {
+    const hp = HEADPIECES[variant - 1];
+    const svg = (part, cls) => `<svg class="${cls}" viewBox="0 0 ${part.w} 18" width="${part.w}" height="18" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round">${part.d}</svg>`;
+    return `<div class="card-headpiece" aria-hidden="true">${svg(hp.end, 'hp-end')}<span class="hp-rule"></span>${svg(hp.centre, 'hp-centre')}<span class="hp-rule"></span>${svg(hp.end, 'hp-end hp-end--right')}</div>`;
+}
+
+// Small square avatar: uploaded picture, or the default letter. Linked to the profile unless link is false.
+function userAvatarHtml(user, link = true) {
+    if (!user) return '';
+    const name = user.display_name || user.name || 'Unknown';
+    const inner = user.avatar_url
+        ? `<img class="user-avatar" src="${escapeHtml(user.avatar_url)}" alt="">`
+        : `<span class="user-avatar user-avatar--letter" aria-hidden="true">${escapeHtml(user.avatar_letter || '?')}</span>`;
+    if (!link) return inner;
+    const href = user.profile_url || `/profile?user_id=${encodeURIComponent(user.id || '')}`;
+    return `<a href="${escapeHtml(href)}" class="user-avatar-link" title="${escapeHtml(name)}" aria-label="${escapeHtml(name)}">${inner}</a>`;
+}
 
 // Campaigns Alpine component
 window.campaignsPage = function () {
@@ -228,15 +290,15 @@ window.campaignsPage = function () {
                 }
                 const data = await response.json();
                 if (!response.ok) {
-                    this.showMessage(data.error || (editing ? 'Failed to update campaign' : 'Failed to create campaign'), 'error');
+                    this.showMessage(data.error || (editing ? 'Failed to update game' : 'Failed to create game'), 'error');
                     return;
                 }
 
-                this.showMessage(editing ? 'Campaign updated' : 'Campaign created successfully!', 'success');
+                this.showMessage(editing ? 'Game updated' : 'Game created successfully!', 'success');
                 this.closeModal();
                 await this.loadCampaigns();
             } catch (error) {
-                this.showMessage((editing ? 'Error updating campaign: ' : 'Error creating campaign: ') + error.message, 'error');
+                this.showMessage((editing ? 'Error updating game: ' : 'Error creating game: ') + error.message, 'error');
             }
         },
 
@@ -265,7 +327,7 @@ window.campaignsPage = function () {
                 return;
             }
             const ok = await this.askConfirm({
-                title: 'Delete campaign',
+                title: 'Delete game',
                 message: `Delete "${campaign.title}"? This also deletes its sessions and sign-ups and cannot be undone.`,
                 confirmLabel: 'Delete'
             });
@@ -276,14 +338,14 @@ window.campaignsPage = function () {
                 const response = await fetch(`/api/campaigns/${encodeURIComponent(campaign.id)}`, { method: 'DELETE' });
                 const data = await response.json();
                 if (!response.ok) {
-                    this.showMessage(data.error || 'Failed to delete campaign', 'error');
+                    this.showMessage(data.error || 'Failed to delete game', 'error');
                     return;
                 }
                 this.closeModal();
-                this.showMessage(data.message || 'Campaign deleted', 'success');
+                this.showMessage(data.message || 'Game deleted', 'success');
                 await this.loadCampaigns();
             } catch (error) {
-                this.showMessage('Error deleting campaign: ' + error.message, 'error');
+                this.showMessage('Error deleting game: ' + error.message, 'error');
             }
         },
 
@@ -293,7 +355,7 @@ window.campaignsPage = function () {
             try {
                 const response = await fetch('/api/campaigns');
                 if (!response.ok) {
-                    throw new Error('Failed to load campaigns');
+                    throw new Error('Failed to load games');
                 }
                 const data = await response.json();
                 this.campaigns = Array.isArray(data) ? data : [];
@@ -302,7 +364,7 @@ window.campaignsPage = function () {
                     console.error('Failed to refresh campaigns:', error);
                     return;
                 }
-                this.showMessage('Error loading campaigns: ' + error.message, 'error');
+                this.showMessage('Error loading games: ' + error.message, 'error');
                 this.campaigns = [];
             } finally {
                 if (!quiet) this.loading = false;
@@ -310,16 +372,21 @@ window.campaignsPage = function () {
         },
 
         renderCampaignHtml(campaign) {
-            const title = campaign?.title || 'Untitled Campaign';
+            const title = campaign?.title || 'Untitled Game';
             const summary = campaign?.summary || 'No summary available.';
-            const description = campaign?.description || '';
             const status = campaign?.status || 'Unknown';
             const signUpsOpen = campaign?.sign_ups_open === true;
             const next = campaign?.next_session;
-            const nextSession = next
-                ? `${this.formatAgendaDate(next)} · ${next.time}` + (next.timezone ? ` (${next.timezone})` : '')
-                : 'None scheduled';
             const playedCount = parseInt(campaign?.played_sessions_count, 10) || 0;
+            let nextSession;
+            if (next) {
+                nextSession = `${playedCount > 0 ? `Session ${playedCount + 1}` : 'First session'} · ${this.formatAgendaDate(next)} · ${next.time}`;
+            } else {
+                nextSession = playedCount > 0
+                    ? `${playedCount} session${playedCount === 1 ? '' : 's'} played · none scheduled`
+                    : 'No session scheduled';
+            }
+            const nextTimezone = next?.timezone || '';
             const isDM = !!this.currentUserId && campaign?.dm === this.currentUserId;
             const campaignPlayers = Array.isArray(campaign?.players) ? campaign.players : [];
             const isPlayer = campaignPlayers.includes(this.currentUserId);
@@ -329,11 +396,12 @@ window.campaignsPage = function () {
             const needsAction = unansweredCount > 0 || pendingSignupsCount > 0;
             const focusDate = campaign?.first_unanswered_session_date || '';
             const maxPlayers = parseInt(campaign?.desired_player_count, 10) || 0;
-            const signUpsLabel = (signUpsOpen ? 'Open' : 'Closed') + (maxPlayers > 0 ? ` (${campaignPlayers.length}/${maxPlayers})` : '');
+            const seatsLabel = `${campaignPlayers.length} / ${maxPlayers > 0 ? maxPlayers : '∞'} seats`;
+            const factsLine = `${seatsLabel} · sign-ups ${signUpsOpen ? 'open' : 'closed'}`;
 
             const isFollowing = !!campaign?.is_following;
             const followBtnHtml = (!isDM && !isPlayer && this.currentUserId)
-                ? `<button type="button" class="campaign-action-btn campaign-follow-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-following="${isFollowing}" title="${isFollowing ? 'Stop getting notifications for this campaign' : 'Get notified about status changes, sign-ups and sessions'}">${isFollowing ? 'Unfollow' : 'Follow'}</button>`
+                ? `<button type="button" class="campaign-action-btn campaign-follow-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-following="${isFollowing}" title="${isFollowing ? 'Stop getting notifications for this game' : 'Get notified about status changes, sign-ups and sessions'}">${isFollowing ? 'Unfollow' : 'Follow'}</button>`
                 : '';
 
             let signupBtnHtml;
@@ -353,7 +421,7 @@ window.campaignsPage = function () {
                     label = 'Removed'; disabled = true;
                 }
                 if (withdrawKind) {
-                    const hint = withdrawKind === 'leave' ? 'Leave this campaign' : 'Withdraw your sign-up';
+                    const hint = withdrawKind === 'leave' ? 'Leave this game' : 'Withdraw your sign-up';
                     signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-withdraw-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-campaign-title="${escapeHtml(campaign?.title || '')}" data-withdraw-kind="${withdrawKind}" title="${hint}">${label}</button>`;
                 } else signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-signup-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" ${disabled ? 'disabled aria-disabled="true"' : ''}>${label}</button>`;
             }
@@ -368,7 +436,8 @@ window.campaignsPage = function () {
             const statusClass = statusMap[status] || String(status).toLowerCase().replace(/\s+/g, '-');
 
             const typeInfo = CAMPAIGN_TYPES.find((t) => t.value === campaign?.type) || CAMPAIGN_TYPES.find((t) => t.value === 'Campaign');
-            const typeBadgeHtml = `<span class="campaign-type-badge type-${escapeHtml(typeInfo.value.toLowerCase())}">${escapeHtml(typeInfo.label)} <span class="info-icon" tabindex="0" role="img" aria-label="${escapeHtml(typeInfo.description)}" data-tooltip="${escapeHtml(typeInfo.description)}">i</span></span>`;
+            const typeIconHtml = `<svg class="type-icon" viewBox="0 0 24 24" width="1.75rem" height="1.75rem" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">${TYPE_ICON_PATHS[typeInfo.value] || ''}</svg>`;
+            const typeBadgeHtml = `<span class="campaign-type-badge type-${escapeHtml(typeInfo.value.toLowerCase())}">${typeIconHtml}${escapeHtml(typeInfo.label)} <span class="info-icon" tabindex="0" role="img" aria-label="${escapeHtml(typeInfo.description)}" data-tooltip="${escapeHtml(typeInfo.description)}">i</span></span>`;
 
             const systemName = campaign?.system || '';
             const systemHtml = campaign?.system_logo_url
@@ -378,70 +447,52 @@ window.campaignsPage = function () {
             const dmUser = campaign?.dm_user;
             const dmHtml = dmUser
                 ? `<a href="${escapeHtml(dmUser.profile_url || `/profile?user_id=${encodeURIComponent(dmUser.id)}`)}" class="user-button user-button--dm">${escapeHtml(dmUser.display_name || dmUser.name || 'Unknown')}</a>`
-                : (campaign?.dm ? `<p class="campaign-value campaign-nameplate">${escapeHtml(campaign.dm)}</p>` : '<p class="campaign-value campaign-nameplate">Unassigned</p>');
+                : `<span class="campaign-nameplate">${escapeHtml(campaign?.dm || 'Unassigned')}</span>`;
 
             const playerUsers = Array.isArray(campaign?.player_users) ? campaign.player_users : [];
             const players = Array.isArray(campaign?.players) ? campaign.players : [];
             let playersHtml = '';
             if (playerUsers.length === 0 && players.length === 0) {
-                playersHtml = '<p class="campaign-value">No players yet</p>';
+                playersHtml = '<span class="campaign-meta">No players yet</span>';
             } else if (playerUsers.length > 0) {
-                playersHtml = playerUsers.map((player) =>
-                    `<a href="${escapeHtml(player.profile_url || `/profile?user_id=${encodeURIComponent(player.id)}`)}" class="user-button">${escapeHtml(player.display_name || player.name || 'Unknown')}</a>`
-                ).join('');
+                playersHtml = playerUsers.map((player) => userAvatarHtml(player)).join('');
             } else {
                 playersHtml = players.map((player) =>
                     `<span class="campaign-nameplate">${escapeHtml(player)}</span>`
                 ).join('');
             }
 
+            let pendingNoticeHtml = '';
+            if (unansweredCount > 0) {
+                pendingNoticeHtml = `<p class="pending-notice"><span aria-hidden="true">✦</span> ${unansweredCount === 1 ? 'A session awaits thy reply' : `${unansweredCount} sessions await thy reply`}</p>`;
+            } else if (pendingSignupsCount > 0) {
+                pendingNoticeHtml = `<p class="pending-notice"><span aria-hidden="true">✦</span> ${pendingSignupsCount} sign-up${pendingSignupsCount === 1 ? '' : 's'} to review</p>`;
+            }
+
             return `
                 <article class="campaign-item status-${escapeHtml(statusClass)}${needsAction ? ' needs-action' : ''}" id="campaign-${escapeHtml(campaign?.id ?? 'unknown')}">
+                    ${bannerCornersHtml(bannerVariant(campaign?.id))}
+                    <div class="campaign-notice">${pendingNoticeHtml || headpieceHtml(bannerVariant(campaign?.id))}</div>
                     <section class="campaign-row campaign-row-top">
+                        <div class="campaign-badges">
+                            ${typeBadgeHtml}
+                            <span class="campaign-status-badge">${escapeHtml(status)}</span>
+                        </div>
                         <div class="campaign-title-container">
                             <h3 class="campaign-title">${escapeHtml(title)}</h3>
-                            <div class="campaign-badges">
-                                <span class="campaign-status-badge">${escapeHtml(status)}</span>
-                                ${typeBadgeHtml}
-                                ${systemHtml}
-                            </div>
+                            ${systemHtml}
                         </div>
-                        <div class="campaign-summary-row">
-                            <p class="campaign-summary-text">${escapeHtml(summary)}</p>
-                            <button type="button" class="campaign-summary-arrow" aria-expanded="false" aria-label="Expand campaign description" onclick="const expanded = this.getAttribute('aria-expanded') !== 'true'; this.classList.toggle('campaign-summary-arrow-expanded', expanded); this.parentElement.nextElementSibling.classList.toggle('campaign-description-expanded', expanded); this.setAttribute('aria-expanded', expanded ? 'true' : 'false'); this.setAttribute('aria-label', expanded ? 'Collapse campaign description' : 'Expand campaign description');">▼</button>
-                        </div>
-                        <p class="campaign-description">${escapeHtml(description || 'No additional description.')}</p>
+                        <p class="campaign-summary-text">${escapeHtml(summary)}</p>
                     </section>
 
-                    <section class="campaign-row campaign-row-middle">
-                        <div class="campaign-column campaign-column-left">
-                            <div class="campaign-field">
-                                <h4 class="campaign-label">Dungeon Master</h4>
-                                ${dmHtml}
-                            </div>
-                            <div class="campaign-field">
-                                <h4 class="campaign-label">Sign-ups</h4>
-                                <p class="campaign-value">${escapeHtml(signUpsLabel)}</p>
-                            </div>
-                            <div class="campaign-field">
-                                <h4 class="campaign-label">Sessions Played</h4>
-                                <p class="campaign-value">${playedCount}</p>
-                            </div>
-                        </div>
-                        <div class="campaign-column campaign-column-right">
-                            <div class="campaign-field">
-                                <h4 class="campaign-label">Next Session</h4>
-                                <p class="campaign-value">${escapeHtml(nextSession)}</p>
-                            </div>
-                            <div class="campaign-field">
-                                <h4 class="campaign-label">Players</h4>
-                                <div class="campaign-players">${playersHtml}</div>
-                            </div>
-                        </div>
+                    <section class="campaign-row campaign-row-middle" aria-label="Game details">
+                        <div class="campaign-dm"><span class="visually-hidden">Dungeon master: </span>${dmHtml}</div>
+                        <div class="campaign-players"><span class="visually-hidden">Players: </span>${playersHtml}</div>
+                        <p class="campaign-meta">${escapeHtml(factsLine)}</p>
+                        <p class="campaign-meta"${nextTimezone ? ` title="${escapeHtml(nextTimezone)}"` : ''}>${escapeHtml(nextSession)}</p>
                     </section>
 
                     <section class="campaign-row campaign-row-bottom">
-                        <button type="button" class="campaign-action-btn" disabled aria-disabled="true">Codex</button>
                         <button type="button" class="campaign-action-btn campaign-calendar-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-campaign-title="${escapeHtml(campaign?.title || '')}" data-dm-id="${escapeHtml(campaign?.dm || '')}"${unansweredCount > 0 ? ` title="${unansweredCount} suggested session${unansweredCount === 1 ? '' : 's'} awaiting your response" aria-label="Calendar, ${unansweredCount} awaiting your response"` : ''}${unansweredCount > 0 && focusDate ? ` data-focus-date="${escapeHtml(focusDate)}"` : ''}>Calendar${unansweredCount > 0 ? `<span class="campaign-action-count">${unansweredCount}</span>` : ''}</button>
                         ${signupBtnHtml}
                         ${followBtnHtml}
@@ -494,7 +545,7 @@ window.campaignsPage = function () {
         async withdrawSignup(campaignId, title, kind) {
             const ok = await this.askConfirm(kind === 'leave'
                 ? {
-                    title: 'Leave campaign',
+                    title: 'Leave game',
                     message: `Leave "${title}"? You'll stop being a player; you can sign up again if sign-ups are open.`,
                     confirmLabel: 'Leave'
                 }
@@ -849,15 +900,36 @@ window.campaignsPage = function () {
         },
 
         getAcceptedReaction(session) {
-            return `${session?.accepted_count || 0}✓`;
+            return `✓${session?.accepted_count || 0}`;
         },
 
         getDeclinedReaction(session) {
-            return `${session?.declined_count || 0}✗`;
+            return `✗${session?.declined_count || 0}`;
         },
 
         getTentativeReaction(session) {
-            return `${session?.tentative_count || 0}?`;
+            return `?${session?.tentative_count || 0}`;
+        },
+
+        // "6 games on the roll · 2 await thee": the page subtitle under the h1.
+        gamesSubtitle() {
+            const total = this.campaigns.length;
+            const awaiting = this.campaigns.filter((c) => {
+                const isDM = !!this.currentUserId && c?.dm === this.currentUserId;
+                const isPlayer = Array.isArray(c?.players) && c.players.includes(this.currentUserId);
+                return (isPlayer && (parseInt(c?.unanswered_sessions_count, 10) || 0) > 0)
+                    || (isDM && (parseInt(c?.pending_signups_count, 10) || 0) > 0);
+            }).length;
+            const roll = `${total} game${total === 1 ? '' : 's'} on the roll`;
+            return awaiting > 0 ? `${roll} · ${awaiting} await${awaiting === 1 ? 's' : ''} thee` : roll;
+        },
+
+        bannerClass(campaign) {
+            return `banner-${bannerVariant(campaign?.id)}`;
+        },
+
+        avatarHtml(user, link = true) {
+            return userAvatarHtml(user, link);
         },
 
         getUserDisplayName(user) {
@@ -995,7 +1067,7 @@ window.campaignsPage = function () {
                 { label: 'Accepted', cls: 'participation-accepted', users: byStatus('Accepted') },
                 { label: 'Tentative', cls: 'participation-tentative', users: byStatus('Tentative') },
                 { label: 'Declined', cls: 'participation-declined', users: byStatus('Declined') },
-                { label: 'Pending', cls: 'participation-pending', users: details.pending }
+                { label: 'Awaiting', cls: 'participation-pending', users: details.pending }
             ];
         },
 
@@ -1027,7 +1099,7 @@ window.campaignsPage = function () {
 
         async createSession() {
             if (!this.isCurrentUserDM) {
-                this.showMessage('Only the campaign DM can create sessions', 'error');
+                this.showMessage('Only the game DM can create sessions', 'error');
                 return;
             }
             const durationHours = Math.max(0, Math.floor(Number(this.sessionFormData.durationHours) || 0));

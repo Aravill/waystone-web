@@ -6,7 +6,8 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 |---------|-------|
 | `style-sheet.png` | Inks, letters, seals, instruments: the source for this guide |
 | `login.png` | Narrow framed form |
-| `campaigns-parchment.png` | Header, nav, page title, campaign card grid (light) |
+| `campaigns-parchment.png` | Header, nav, page title, game card grid (light) |
+| `type-icons.png` | The three game-type marks, light and dark |
 | `campaigns-candlelight.png` | The same page in the dark theme |
 | `calendar.png` | Modal sheet, calendar grid, session chips, reply buttons |
 
@@ -42,7 +43,7 @@ All colours are CSS custom properties on `:root`. Never hard-code a hex value in
 
 ### Candlelight (dark)
 
-The same tokens redefined. Applied with `[data-theme="dark"]` on `<html>`, and by default under `@media (prefers-color-scheme: dark)` unless the user picked light.
+The same tokens redefined. Applied with `[data-theme="dark"]` on `<html>`, and by default under `@media (prefers-color-scheme: dark)`. A sun/moon button in the header (`static/theme.js`, loaded non-deferred in `<head>` so it applies before paint) flips the theme and stores the choice in `localStorage` under `waystone-theme`; until the user picks one, the system preference wins.
 
 | Token | Hex |
 |-------|-----|
@@ -75,7 +76,7 @@ The same tokens redefined. Applied with `[data-theme="dark"]` on `<html>`, and b
 
 - One accent. `--rubric` is the only "look here" colour. Verdigris and ochre are only for state (success / tentative), never decoration.
 - Every token pair used for text meets 4.5:1 contrast on `--bg` in both themes. Check any new pairing.
-- Inverse elements (primary buttons, the Campaign type badge) use `background: var(--ink); color: var(--bg)`, which flips correctly in dark mode.
+- Inverse elements (primary buttons) use `background: var(--ink); color: var(--bg)`, which flips correctly in dark mode.
 - State is never shown by colour alone: pair it with a glyph (`✓ ? ✗ ✦ ● ◐`), a border style (solid / dashed / dotted) or strikethrough.
 
 ---
@@ -131,7 +132,7 @@ Keep the existing class names (`.header`, `.nav-item`, `.message`, `.campaign-st
 
 ### Header & navigation
 
-Wordmark left, nav centre, inbox + user + logout right, all on one row closed by a double rule. Flex-wrap so it stacks on phones. The page title moves out of the header into the page body as an h1 (see `campaigns-parchment.png`).
+Wordmark left, nav centre, theme toggle + inbox + user + logout right, all on one row closed by a double rule. Flex-wrap so it stacks on phones. The page title moves out of the header into the page body as an h1 (see `campaigns-parchment.png`).
 
 ```css
 .header {
@@ -149,16 +150,16 @@ Wordmark left, nav centre, inbox + user + logout right, all on one row closed by
 .nav-item.active { color: var(--ink); border-bottom-color: var(--rubric); }
 ```
 
-The logo mark is the standing-stone SVG from the mock-ups (stroke `currentColor`) next to the wordmark. Unread inbox count: a 16px `--rubric` circle with `--bg` text.
+The logo mark is the standing-stone from the mock-ups: a tapered stone with a downward rune, on a ground line. It is the `--stone-mark` mask in `styles.css`, coloured by `currentColor`, next to the wordmark (and above it on the login page). Unread inbox count: a 16px `--rubric` circle with `--bg` text.
 
 ### Page title
 
 ```html
-<h1 class="page-title"><span class="drop-cap">C</span>ampaigns</h1>
-<p class="page-subtitle">Six tales on the roll · two await thee</p>
+<h1 class="page-title"><span class="drop-cap">G</span>ames</h1>
+<p class="page-subtitle">6 games on the roll · 2 await thee</p>
 ```
 
-The drop cap is optional, at most one per page, and only on the h1.
+The drop cap is optional and goes on the page h1. The one other place for it is a heading inside a modal that names a single thing, like the calendar's selected day (34px there). The subtitle summarises the list, and counts what awaits the viewer when that's above zero.
 
 ### Buttons
 
@@ -166,7 +167,7 @@ Square, uppercase, 2px tracking, min-height 40px (44px for primary actions on to
 
 | Variant | Style | Use |
 |---------|-------|-----|
-| Primary | `background: var(--ink); color: var(--bg); border: 1px solid var(--ink)` | One main action per view: Sign up, Register campaign, Enter, Save |
+| Primary | `background: var(--ink); color: var(--bg); border: 1px solid var(--ink)` | One main action per view: Sign up, Register game, Enter, Save |
 | Secondary | `background: none; color: var(--ink); border: 1px solid var(--line)` | Follow, Calendar, Edit, Leave, Cancel |
 | Danger | `background: none; color: var(--rubric); border: 1px solid var(--rubric)` | Delete campaign, Delete account, Remove player |
 | Text link | `color: var(--rubric); text-decoration: underline; text-underline-offset: 4px` | "Sync to calendar →" |
@@ -195,6 +196,22 @@ input::placeholder { color: var(--muted); }
 Textareas and multi-line fields may use a full `1px solid var(--line)` box.
 
 ### Cards
+
+**Game cards are banners.** Each one stands on its own: no rod, so cards never read as one strip. A game gets one of three variants, picked from its id so it never changes. Each variant has its own shape, headpiece and decorated top corners:
+
+| Variant | Shape (`.banner-N`) | Headpiece | Top corners |
+|---------|--------------------|-----------|-------------|
+| 1 | Swallowtail: a V-notch cut into the bottom | Scrollwork curls around a diamond | Rounded bracket with an inward curl |
+| 2 | Pointed: the bottom tapers to a point | A leaf trefoil with leaf tips | Bracket with a corner leaf |
+| 3 | Torn: ragged bottom edge, a side rip, a nicked corner | Interlaced rings with arrowhead tips | Double bracket with a diamond |
+
+- **Outline:** the shape is drawn with clipped layers, not a border: a `--line` layer in the shape, then a `--bg` fill inset 1px (`--shape-0` / `--shape-1`). Shapes are `clip-path` polygons in `styles.css`, generated for insets 0, 1, 4 and 5px. Bottom padding clears the 24px notch or point.
+- **Needs action:** the same layers in `--rubric` make the double frame, so it follows the shape too.
+- **Corners:** 22px ornaments in `--muted` (`--rubric` when the card needs action), mirrored left and right. They sit inside the outline, and the top padding keeps them clear of the headpiece.
+- **Headpiece:** it fills the notice slot when the card has no alert. It's 90% of the card's width and exactly as tall as the notice line, built as end · rule · centrepiece · rule · end so the curls never stretch.
+- **Alignment:** cards share row tracks through subgrid (notice, header, people, buttons), so within a row of cards the hairline, players and buttons line up.
+
+Other cards (`.card`, profile, admin) stay plain rectangles:
 
 ```css
 .card, .campaign-item {
@@ -246,13 +263,15 @@ Outlined, uppercase, a glyph before the label. Not clickable. Keep the existing 
 
 ### Campaign type badge
 
-Told apart by fill and border style, all in `--ink`:
+An inline SVG mark plus an uppercase label, no box, fill or border. Flex row, `gap: 10px`, label 12px with 2px tracking, mark 28px (24px viewBox, `fill: none`, `stroke: currentColor`, `stroke-width: 1.5`, `aria-hidden="true"`, class `type-icon`). The info tooltip dot follows the label. See `type-icons.png`.
 
-| Type | Style |
-|------|-------|
-| Campaign | filled: `background: var(--ink); color: var(--bg)` |
-| Adventure | `border: 1px solid var(--ink)` |
-| One-shot | `border: 1px dotted var(--ink)` |
+| Type | Mark |
+|------|------|
+| One-shot | A single sword |
+| Adventure | Crossed swords behind a shield |
+| Campaign | A banner flanked by swords |
+
+The paths live in `TYPE_ICON_PATHS` in `campaigns.js`. The Adventure shield path carries `.type-icon__fill { fill: var(--bg) }` so it hides the swords behind it.
 
 ### People
 
@@ -280,7 +299,11 @@ Calendar session chips (11px text, `padding: 3px 5px`):
 | Suggested | `1px dashed var(--ink)` |
 | Cancelled | `1px solid var(--muted)`, muted text, struck through, no counts |
 
-Calendar grid: hairline cells, out-of-month days at 35% ink, selected day `background: var(--folio)` with a `2px solid var(--rubric)` inset outline.
+Calendar grid: hairline cells, out-of-month days at 35% ink, selected day `background: var(--folio)` with a `2px solid var(--rubric)` inset outline. Days are square, and the month is sized to fit the modal's height. A legend (■ confirmed · ▢ suggested · ~~cancelled~~) sits right of the month name. A day's "awaiting a reply" count shows only when it is above zero, as a small rubric box in the corner.
+
+The day panel heading has an eyebrow ("Selected day" / "Month agenda") over a display-face heading. A suggestion the viewer hasn't answered gets a `--rubric` frame, like a card that needs action.
+
+Counts on buttons (pending sign-ups, unanswered sessions) are a small rubric tab on the button's top-right corner, so the label keeps its single line.
 
 ### Modals
 
@@ -306,7 +329,12 @@ Standard cards with a display-face title, a muted description and a status badge
 
 ### Avatars
 
-Square (no radius), `1px solid var(--line)` frame, `object-fit: cover`. Initials fallback: blackletter or display face in `--rubric` on `--folio`.
+Square (no radius), `1px solid var(--line)` frame, `object-fit: cover`. Everyone has one: without an upload the avatar is the first letter of the display name (nickname → name → username), in the display face in `--rubric` on `--folio`. The API sends it as `avatar_letter` next to `avatar_url` on every user object.
+
+- **In lists** (game-card players, calendar replies): 30px avatars in place of names, linked to the profile, with the name as `title` and `aria-label`. Built by `userAvatarHtml()` in `campaigns.js`.
+- **Next to a name** (sign-ups dialog): same 30px avatar, not linked.
+- **Calendar replies**: a 2px border shows the reply. Accepted is solid `--verdigris`, Tentative dashed `--ochre`, Declined solid `--rubric` at 60% opacity, Awaiting dotted `--muted`.
+- **Profile**: the large avatar keeps its own size.
 
 ### Ornaments
 
@@ -362,7 +390,7 @@ Square (no radius), `1px solid var(--line)` frame, `object-fit: cover`. Initials
         <a href="/" class="logo">Waystone</a>
         <nav class="nav-bar" aria-label="Main">
             <a href="/" class="nav-item">Dashboard</a>
-            <a href="/campaigns" class="nav-item active" aria-current="page">Campaigns</a>
+            <a href="/campaigns" class="nav-item active" aria-current="page">Games</a>
             <a href="/profile" class="nav-item">Profile</a>
             <a href="/admin/users" class="nav-item" x-show="isAdmin">Admin</a>
         </nav>

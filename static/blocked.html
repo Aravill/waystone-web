@@ -4,55 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blocked — Waystone</title>
+    <script src="/static/theme.js?v=4"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
+    <link rel="stylesheet" href="/static/styles.css?v=34">
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            background: #000000;
-            color: #ffffff;
-            font-family: 'Fira Code', monospace;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        .card {
-            border: 1px solid #333333;
-            padding: 40px;
-            max-width: 500px;
-            width: 100%;
-            text-align: center;
-        }
-        .status {
-            color: #ff006e;
-            font-size: 0.85rem;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            margin-bottom: 24px;
-        }
-        h1 { font-size: 1.5rem; margin-bottom: 16px; }
-        p { color: #aaaaaa; line-height: 1.6; margin-bottom: 24px; }
-        a {
-            display: inline-block;
-            padding: 10px 24px;
-            border: 1px solid #00d9ff;
-            color: #00d9ff;
-            text-decoration: none;
-            font-family: 'Fira Code', monospace;
-            font-size: 0.9rem;
-            transition: background 0.2s, color 0.2s;
-        }
-        a:hover { background: #00d9ff; color: #000000; }
+        body { align-items: center; justify-content: center; padding: 1.5rem; text-align: center; }
+        .card { max-width: 26.25rem; width: 100%; padding: 2.5rem 2rem; }
+        .card h1 { font-family: var(--font-display); font-weight: 400; font-size: 2rem; margin-bottom: 1rem; }
+        .card p { margin-bottom: 1.5rem; }
     </style>
 </head>
 <body>
     <div class="card">
-        <p class="status">access denied</p>
-        <h1>you've been blocked</h1>
-        <p>you've been misbehaving and have been blocked from waystone. contact an administrator if you think this is a mistake.</p>
-        <a href="/login.html">back to login</a>
+        <p class="pending-notice">✦ Access denied</p>
+        <h1>You've been blocked</h1>
+        <p>You've been misbehaving and have been blocked from Waystone. Contact an administrator if you think this is a mistake.</p>
+        <a href="/login.html" class="btn-action">Back to login</a>
     </div>
 </body>
 </html>

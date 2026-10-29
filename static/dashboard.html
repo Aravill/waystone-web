@@ -4,8 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Waystone - Dashboard</title>
-    <link rel="stylesheet" href="dashboard.css?v=1">
-    <link rel="stylesheet" href="/static/notifications.css?v=2">
+    <script src="/static/theme.js?v=4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
+    <link rel="stylesheet" href="/static/styles.css?v=34">
+    <link rel="stylesheet" href="dashboard.css?v=5">
+    <link rel="stylesheet" href="/static/notifications.css?v=7">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body x-data="dashboardPage()">
@@ -13,32 +18,29 @@
         <div class="header-left">
             <a href="/" class="logo">Waystone</a>
         </div>
-        <div class="header-center">
-            <h1>Dashboard</h1>
-        </div>
+        <nav class="nav-bar" aria-label="Main">
+            <a href="/" class="nav-item active" aria-current="page" data-page="dashboard">Dashboard</a>
+            <a href="/campaigns" class="nav-item" data-page="campaigns">Games</a>
+            <a href="/profile" class="nav-item" data-page="profile">Profile</a>
+            <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
+        </nav>
         <div class="header-right">
             <span class="user-name" x-text="displayName"></span>
             <button @click="handleLogout()" class="logout-btn">Logout</button>
         </div>
     </div>
 
-    <div class="nav-bar">
-        <a href="/" class="nav-item active" data-page="dashboard">Dashboard</a>
-        <a href="/campaigns" class="nav-item" data-page="campaigns">Campaigns</a>
-        <a href="/profile" class="nav-item" data-page="profile">Profile</a>
-        <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
-    </div>
-
     <div class="container">
+        <h1 class="page-title"><span class="drop-cap">D</span>ashboard</h1>
         <div class="dashboard">
-            <h2>Select a Module</h2>
+            <h2 class="section-header">Select a Module</h2>
             
             <div class="modules-grid">
-                <!-- Campaigns (Active) -->
+                <!-- Games (Active) -->
                 <a href="/campaigns" class="module-card active">
                     <div class="card-inner">
-                        <h3>Campaigns</h3>
-                        <p class="description">Event Scheduling & Sign-ups</p>
+                        <h3>Games</h3>
+                        <p class="description">Session scheduling &amp; sign-ups</p>
                         <span class="status-badge">Active</span>
                     </div>
                 </a>
@@ -64,7 +66,7 @@
         </div>
     </div>
 
-    <script src="/static/notifications.js?v=5"></script>
+    <script src="/static/notifications.js?v=8"></script>
     <script src="dashboard.js?v=1"></script>
 </body>
 </html>
