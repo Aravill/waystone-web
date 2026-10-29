@@ -83,11 +83,7 @@ The same tokens redefined. Applied with `[data-theme="dark"]` on `<html>`, and b
 
 ## Typography
 
-Three families, loaded from Google Fonts:
-
-```html
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
-```
+Three families, vendored as woff2 under `static/vendor/fonts/` (SIL Open Font License, latin and latin-ext subsets) and declared with `@font-face` at the top of `styles.css`. Pages need no font link, and nothing loads from a third party at runtime.
 
 | Role | Family | Use for |
 |------|--------|---------|
@@ -381,7 +377,7 @@ Square (no radius), `1px solid var(--line)` frame, `object-fit: cover`. Everyone
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Waystone - Page</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
+    <script src="/static/theme.js?v=N"></script> <!-- not deferred: applies the saved theme before paint -->
     <link rel="stylesheet" href="/static/styles.css?v=N">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
