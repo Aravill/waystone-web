@@ -74,6 +74,9 @@
 }
 
 .notif-markall {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
     background: none;
     border: none;
     padding: 0;

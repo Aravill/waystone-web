@@ -246,10 +246,6 @@ a {
     padding: 0 1.5rem 4rem;
 }
 
-.container--wide {
-    max-width: 72.5rem;
-}
-
 .container--narrow {
     max-width: 26.25rem;
 }
@@ -453,6 +449,9 @@ button.campaign-link-button {
 /* Text link buttons */
 .calendar-sync-link,
 #signupsModal .signups-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
     background: none;
     border: none;
     color: var(--rubric);
@@ -755,7 +754,7 @@ select option {
     gap: 0.875rem;
 }
 
-.campaign-notice:not(:empty) {
+.campaign-notice {
     padding-bottom: 0.875rem;
 }
 
@@ -899,6 +898,8 @@ select option {
     height: 0.875rem;
     border: 1px solid currentColor;
     font-size: 0.625rem;
+    /* 40px hit area around the 14px mark */
+    outline: 0.8125rem solid transparent;
     font-style: italic;
     letter-spacing: 0;
     text-transform: none;
@@ -979,15 +980,12 @@ select option {
     padding-top: 0.875rem;
 }
 
+/* position: relative so a count can sit as a tab on the button's corner */
 .campaign-row-bottom .campaign-action-btn {
+    position: relative;
     min-width: 0;
     padding: 0.5rem 0.25rem;
     letter-spacing: 0.0625rem;
-}
-
-/* Count as a tab on the button's corner, so the label keeps its one line */
-.campaign-row-bottom .campaign-action-btn {
-    position: relative;
 }
 
 /* A sign-up that isn't possible (closed, declined) reads as unavailable, not as a grey slab */
@@ -1188,8 +1186,8 @@ select option {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 1.75rem;
-    min-height: 1.75rem;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
     padding: 0;
     background: none;
     border: none;
@@ -1530,11 +1528,6 @@ select option {
     font-size: 1.5rem;
 }
 
-.compact-modal-content .modal-close {
-    width: 2.5rem;
-    height: 2.5rem;
-}
-
 .compact-modal-form {
     padding: 1rem;
     gap: 0.75rem;
@@ -1566,6 +1559,7 @@ select option {
 
 .duration-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
 }
@@ -1609,8 +1603,8 @@ select option {
 }
 
 .duration-arrow-btn {
-    width: 2rem;
-    height: 2rem;
+    width: 2.5rem;
+    height: 2.5rem;
     min-height: 0;
     padding: 0;
     font-size: 1rem;
@@ -1632,7 +1626,7 @@ select option {
 .calendar-main {
     display: flex;
     flex-direction: column;
-    flex: 0 1 calc((92vh - 16rem) * 7 / 6);
+    flex: 0 1 max(28rem, calc((92vh - 16rem) * 7 / 6));
     min-width: 0;
     min-height: 0;
     overflow-y: auto;
@@ -1736,6 +1730,11 @@ select option {
     border-bottom: 1px solid var(--line);
     cursor: pointer;
     transition: background-color 0.15s;
+}
+
+/* Keep the focus ring inside the cell: neighbours and the scroll box would hide it */
+.calendar-day:focus-visible {
+    outline-offset: -2px;
 }
 
 .calendar-day:hover {
@@ -1941,6 +1940,8 @@ select option {
     display: flex;
     gap: 0.625rem;
     width: 100%;
+    background: none;
+    border: 1px solid transparent;
     margin-bottom: 0.5rem;
     padding: 0.5rem;
     color: var(--ink);
@@ -2122,7 +2123,7 @@ select option {
 #signupsModal .signups-pill-full::before { content: '■ '; }
 
 #signupsModal .signups-open-toggle {
-    min-height: 2rem;
+    min-height: 2.5rem;
     padding: 0.25rem 0.75rem;
     font-size: 0.6875rem;
     white-space: nowrap;
@@ -2217,10 +2218,6 @@ select option {
 #signupsModal .signups-item-actions .btn-action {
     min-width: 5.625rem;
     padding: 0.5rem 0.875rem;
-}
-
-#signupsModal .signups-btn-accept:hover:not(:disabled) {
-    opacity: 0.85;
 }
 
 /* Archive (declined & kicked) */
@@ -2339,7 +2336,7 @@ select option {
 }
 
 /* Calendar modal on small screens (kept last so it overrides the base rules above) */
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-height: 600px) {
     .calendar-modal-content {
         width: 100%;
         height: 100vh;
@@ -2361,6 +2358,8 @@ select option {
 
     .calendar-main {
         margin-bottom: 1rem;
+        max-width: 40rem;
+        margin-inline: auto;
     }
 
     .calendar-day {
