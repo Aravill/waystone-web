@@ -12,8 +12,7 @@ const TYPE_ICON_PATHS = {
     'Campaign': '<circle cx="12" cy="1.8" r="0.9"/><path d="M12 2.7 V4"/><path d="M8 4 H16"/><path d="M9 4 V14.5 L12 12 L15 14.5 V4"/><path d="M12 12 V22.5"/><path d="M2.5 3 V15"/><path d="M0.8 15 H4.2"/><path d="M2.5 15 V18.6"/><circle cx="2.5" cy="19.7" r="1"/><path d="M21.5 3 V15"/><path d="M19.8 15 H23.2"/><path d="M21.5 15 V18.6"/><circle cx="21.5" cy="19.7" r="1"/>'
 };
 
-// Banner variants: each game gets one (stable, from its id) - a shape in styles.css
-// (.banner-N) and a headpiece. A headpiece is end · rule · centre · rule · end, so it
+// Headpieces, one per banner variant. A headpiece is end · rule · centre · rule · end, so it
 // stretches to the card width without distorting the curls. Ends are drawn for the left
 // side (outer edge at x=0) and mirrored for the right.
 const HEADPIECES = [
@@ -31,28 +30,216 @@ const HEADPIECES = [
     }
 ];
 
-// Top-corner ornaments per variant, drawn for the top-left (corner at 0,0) and mirrored right.
-const BANNER_CORNERS = [
-    '<path d="M3 21 V9 C3 5.5 5.5 3 9 3 H21"/><path d="M9 9 C12.5 8.5 14 11 12.5 13.5 C11 15 8.5 14 9.5 12"/><circle cx="3" cy="22.5" r="0.9"/><circle cx="22.5" cy="3" r="0.9"/>',
-    '<path d="M3 21 V3 H21"/><path d="M5.5 5.5 C10.5 5.5 14 9 14 14 C9 14 5.5 10.5 5.5 5.5 Z"/><path d="M5.5 5.5 L12 12"/>',
-    '<path d="M3 21 V3 H21"/><path d="M7 17 V7 H17"/><path d="M3 0.5 L5.5 3 L3 5.5 L0.5 3 Z"/><circle cx="21" cy="3" r="0.9"/><circle cx="3" cy="21" r="0.9"/>'
+// Banner geometry: each game gets one variant (stable, from its id) - a banner shape
+// (BANNERS below, drawn as SVG and animated by bannerFrame) and a headpiece.
+const BANNER_W = 360, BANNER_H = 598, BANNER_JOIN = 470, BANNER_SPLIT_L = 120, BANNER_SPLIT_R = 300;
+const BANNER_PAD = 48, BANNER_PAD_B = 160;
+const BANNER_BEND = 0.45, BANNER_SWAY_PX = 7;
+const BANNER_ARGS = { M: 2, L: 2, H: 1, V: 1, C: 6, S: 4, A: 7, Z: 0 };
+
+// Authored for a 360x598 card. Points above BANNER_JOIN only stretch sideways; points below
+// follow the card's height and flutter. Hanging pieces (hang) follow their anchor `at`; swing
+// ones also sway on their own. Variant order matches HEADPIECES.
+const BANNERS = [
+    {   // 1: gonfalon
+        period: 3.3, phase: 0,
+        outline: 'M0.5 26 H329.5 A30 30 0 0 0 359.5 56 V470 V506 L346 530 C310 514 268 502 230 494 C160 510 82 536 20 560 L0.5 542 L0.5 470 Z',
+        inner: 'M38 33 H7 V470 V524 C7 532 13 535 17 530',
+        orn: [],
+        hang: [{ at: [20, 560], swing: true, html: '<path d="M20 560 V570 M20 570 L24 575 L20 580 L16 575 Z M17.5 580 V591 M20 580 V594 M22.5 580 V591"/>' }]
+    },
+    {   // 2: torn standard
+        period: 3.8, phase: 2.1,
+        outline: 'M12 26 H359.5 V470 V480 L340 492 L332 486 L318 502 L306 496 L290 512 L276 507 L262 522 L248 516 L232 532 L218 527 L200 544 L186 539 L170 554 L156 551 L130 566 L0.5 510 L0.5 470 V316 L16 299 L0.5 282 V38 Z',
+        inner: 'M302 41 C298 39 300 33 306 33 H353 V470 V474 C353 481 348 483 344 479',
+        orn: ['M16 299 L22 297 M2 284 L4 312 L7 289 L10 305.5 L13 296'],
+        hang: [
+            { at: [318, 502], html: '<path d="M318 502 L316 511"/>' },
+            { at: [290, 512], html: '<path d="M290 512 L291 519"/>' },
+            { at: [262, 522], html: '<path d="M262 522 L260 531"/>' },
+            { at: [200, 544], html: '<path d="M200 544 L199 552"/>' },
+            { at: [130, 566], swing: true, html: '<path d="M130 566 V574 M130 581 C125 585 125 591 130 595 C135 591 135 585 130 581 Z"/><circle cx="130" cy="577.5" r="3.5"/>' }
+        ]
+    },
+    {   // 3: dagged, with a dog-ear
+        period: 3.0, phase: 4.0, stitch: true,
+        outline: 'M0.5 26 H330 L359.5 55.5 V196 L352 201 L356 207 L350 212 L359.5 216 V470 V488 L336 548 L300 500 L246 530 L196 496 L70 572 L0.5 530 V520 L14 514 L0.5 510 V470 Z',
+        inner: 'M7 40 V470 V500',
+        orn: ['M330 26 V55.5 H359.5', 'M7 33 H38 M90 33 H324'],
+        hang: [
+            { at: [122, 541], html: '<path d="M96 518 L122 541 L99 523"/>' },
+            { at: [246, 530], html: '<path d="M246 530 L245 538 M250 527 L251 534"/>' },
+            { at: [70, 572], swing: true, html: '<path d="M70 572 V580 M70 580 L74 585 L70 590 L66 585 Z M67.5 590 V600 M70 590 V603 M72.5 590 V600"/>' },
+            { at: [336, 548], swing: true, html: '<path d="M336 548 V554 M331 572 C331 564 333 561 336 561 C339 561 341 564 341 572 Z M329 572 H343"/><circle cx="336" cy="557.5" r="3.5"/><circle cx="336" cy="575" r="1.2"/>' }
+        ]
+    }
 ];
 
-function bannerCornersHtml(variant) {
-    const svg = (cls) => `<svg class="banner-corner ${cls}" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round">${BANNER_CORNERS[variant - 1]}</svg>`;
-    return svg('banner-corner--left') + svg('banner-corner--right');
+function bannerSeed(id) {
+    let sum = 0;
+    for (const ch of String(id || '')) sum = (sum + ch.charCodeAt(0)) % 9973;
+    return sum;
 }
 
 function bannerVariant(id) {
-    let sum = 0;
-    for (const ch of String(id || '')) sum = (sum + ch.charCodeAt(0)) % 9973;
-    return (sum % HEADPIECES.length) + 1;
+    return (bannerSeed(id) % HEADPIECES.length) + 1;
 }
 
 function headpieceHtml(variant) {
     const hp = HEADPIECES[variant - 1];
     const svg = (part, cls) => `<svg class="${cls}" viewBox="0 0 ${part.w} 18" width="${part.w}" height="18" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round">${part.d}</svg>`;
     return `<div class="card-headpiece" aria-hidden="true">${svg(hp.end, 'hp-end')}<span class="hp-rule"></span>${svg(hp.centre, 'hp-centre')}<span class="hp-rule"></span>${svg(hp.end, 'hp-end hp-end--right')}</div>`;
+}
+
+// Rewrite an absolute path through map(x, y); H and V become L so they can bend.
+const bannerTokens = new Map();
+function mapBannerPath(d, map) {
+    let t = bannerTokens.get(d);
+    if (!t) { t = d.match(/[A-Za-z]|-?\d*\.?\d+/g); bannerTokens.set(d, t); }
+    const f = (v) => Math.round(v * 100) / 100;
+    const out = [];
+    let i = 0, cx = 0, cy = 0, cmd = 'M';
+    while (i < t.length) {
+        if (/[A-Za-z]/.test(t[i])) { cmd = t[i]; i++; if (cmd === 'Z') { out.push('Z'); continue; } }
+        const n = t.slice(i, i + BANNER_ARGS[cmd]).map(parseFloat);
+        i += BANNER_ARGS[cmd];
+        let p;
+        if (cmd === 'H') { p = map(n[0], cy); cx = n[0]; out.push('L' + f(p[0]) + ' ' + f(p[1])); }
+        else if (cmd === 'V') { p = map(cx, n[0]); cy = n[0]; out.push('L' + f(p[0]) + ' ' + f(p[1])); }
+        else if (cmd === 'A') { p = map(n[5], n[6]); cx = n[5]; cy = n[6]; out.push('A' + n.slice(0, 5).join(' ') + ' ' + f(p[0]) + ' ' + f(p[1])); }
+        else {
+            let s = cmd;
+            for (let k = 0; k < n.length; k += 2) { p = map(n[k], n[k + 1]); s += (k ? ' ' : '') + f(p[0]) + ' ' + f(p[1]); }
+            cx = n[n.length - 2]; cy = n[n.length - 1]; out.push(s);
+        }
+    }
+    return out.join(' ');
+}
+
+// dw: extra width (the middle band stretches, the sides keep their shape); dy: extra height;
+// below BANNER_JOIN points also skew and ripple.
+// sway: the sideways drift (px) at the bottom edge. The cloth bends rather than rotates: the top
+// and upper sides stay straight (a slightly tilted hairline shows pixel steps), and the drift
+// grows quadratically from BANNER_BEND of the height down, so the bend has no kink.
+function bannerMapper(dw, dy, skewDeg, ripple, wave, sway = 0) {
+    const k = Math.tan(skewDeg * Math.PI / 180), mid = BANNER_SPLIT_R - BANNER_SPLIT_L;
+    const mx = (x) => x <= BANNER_SPLIT_L ? x : x >= BANNER_SPLIT_R ? x + dw : BANNER_SPLIT_L + (x - BANNER_SPLIT_L) * (mid + dw) / mid;
+    const h = BANNER_H + dy, start = h * BANNER_BEND;
+    const bend = (p) => {
+        const t = (p[1] - start) / (h - start);
+        if (t > 0) p[0] += sway * t * t;
+        return p;
+    };
+    return (x, y) => {
+        if (y < BANNER_JOIN) return bend([mx(x), y]);
+        const d = y - BANNER_JOIN;
+        return bend([mx(x) + k * d, y + dy + ripple * Math.sin(wave - x * 0.035) * (d / 100)]);
+    };
+}
+
+// The cloth: one SVG frame (outline, inner line, ornaments, hanging pieces, medallion) that
+// bannerFrame reshapes to the card's size, plus the headpiece.
+function bannerClothHtml(variant, typeValue, withHeadpiece) {
+    const b = BANNERS[variant - 1];
+    const still = bannerMapper(0, 0, 0, 0, 0);
+    const path = (cls, d) => `<path class="${cls}" data-d="${d}" d="${mapBannerPath(d, still)}"/>`;
+    const hangs = b.hang.map((h) =>
+        `<g class="banner-orn${h.swing ? ' banner-hang' : ''}" data-at="${h.at[0]} ${h.at[1]}">${h.swing ? `<g class="banner-swing">${h.html}</g>` : h.html}</g>`
+    ).join('');
+    // The SVG box is padded by BANNER_PAD on all sides (plus BANNER_PAD_B below) so nothing it paints, shadows and
+    // swaying tails included, falls outside it and gets clipped.
+    return `<div class="banner-cloth" aria-hidden="true"><svg class="banner-frame" width="${BANNER_W + 2 * BANNER_PAD}" height="${BANNER_H + BANNER_PAD + BANNER_PAD_B}">`
+        + `<g transform="translate(${BANNER_PAD} ${BANNER_PAD})">`
+        + path('banner-outline', b.outline)
+        + path(`banner-orn${b.stitch ? ' banner-stitch' : ''}`, b.inner)
+        + b.orn.map((d) => path('banner-orn', d)).join('')
+        + hangs
+        + '<circle class="banner-ring-o" cx="64" cy="26" r="24"/><circle class="banner-ring-i" cx="64" cy="26" r="20"/>'
+        + `<svg class="type-icon" x="50" y="12" width="28" height="28" viewBox="0 0 24 24">${TYPE_ICON_PATHS[typeValue] || ''}</svg>`
+        + '</g></svg>'
+        + (withHeadpiece ? headpieceHtml(variant) : '')
+        + '</div>';
+}
+
+// Frame loop: reshape every visible banner each frame (read all layout first, then write).
+const bannerReduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+function bannerFrame(now) {
+    const moving = !bannerReduced.matches;
+    const t = now / 1000;
+    const cards = [];
+    for (const c of document.querySelectorAll('.campaign-item')) {
+        let s = c._banner;
+        if (!s) {
+            const cloth = c.querySelector('.banner-cloth');
+            if (!cloth) continue;
+            s = c._banner = {
+                gust: 0, key: '', cloth,
+                paths: [...cloth.querySelectorAll('path[data-d]')],
+                hangs: [...cloth.querySelectorAll('g[data-at]')].map((g) => ({ g, at: g.dataset.at.split(' ').map(Number) })),
+                period: Number(c.dataset.period) || 3.3,
+                phase: Number(c.dataset.phase) || 0,
+                swayPeriod: Number(c.dataset.swayPeriod) || 14,
+                swayPhase: Number(c.dataset.swayPhase) || 0
+            };
+        }
+        const r = c.getBoundingClientRect();
+        cards.push({
+            s,
+            w: s.cloth.offsetWidth, h: s.cloth.offsetHeight,
+            visible: r.bottom > -150 && r.top < window.innerHeight + 150,
+            hover: c.matches(':hover')
+        });
+    }
+    for (const { s, w, h, visible, hover } of cards) {
+        if (!w || !visible) continue;
+        s.gust += ((moving && hover ? 1 : 0) - s.gust) * 0.06;
+        const key = w + 'x' + h;
+        if (!moving && s.key === key) continue;
+        s.key = moving ? '' : key;
+        const wave = 2 * Math.PI * t / s.period + s.phase;
+        const map = bannerMapper(w - BANNER_W, h - BANNER_H,
+            moving ? 4 * (1 + s.gust) * Math.sin(wave) : 0, moving ? 3 * (1 + 1.3 * s.gust) : 0, wave * 1.7,
+            moving ? BANNER_SWAY_PX * Math.sin(2 * Math.PI * t / s.swayPeriod + s.swayPhase) : 0);
+        for (const p of s.paths) p.setAttribute('d', mapBannerPath(p.dataset.d, map));
+        for (const { g, at } of s.hangs) {
+            const p = map(at[0], at[1]);
+            g.setAttribute('transform', `translate(${(p[0] - at[0]).toFixed(2)} ${(p[1] - at[1]).toFixed(2)})`);
+        }
+    }
+    requestAnimationFrame(bannerFrame);
+}
+requestAnimationFrame(bannerFrame);
+
+// Banner order: those needing the user's action first, then by status. Array.sort is stable,
+// so ties keep the API's order.
+const BANNER_STATUS_ORDER = ['Pitch', 'Ongoing', 'On Hiatus', 'Finished', 'Cancelled'];
+function bannerStatusRank(status) {
+    const i = BANNER_STATUS_ORDER.indexOf(status);
+    return i === -1 ? BANNER_STATUS_ORDER.length : i;
+}
+
+// Reordering slides banners to their new place (FLIP): note each banner's position before the
+// list changes, then animate every moved banner from its old position to the new one.
+function bannerPositions() {
+    const pos = new Map();
+    for (const el of document.querySelectorAll('.campaign-item')) {
+        const r = el.getBoundingClientRect();
+        pos.set(el.id, [r.left, r.top]);
+    }
+    return pos;
+}
+
+function slideBanners(before) {
+    if (bannerReduced.matches) return;
+    for (const el of document.querySelectorAll('.campaign-item')) {
+        const old = before.get(el.id);
+        if (!old) continue;
+        const r = el.getBoundingClientRect();
+        const dx = old[0] - r.left, dy = old[1] - r.top;
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+        el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
+            { duration: 700, easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)' });
+    }
 }
 
 // Small square avatar: uploaded picture, or the default letter. Linked to the profile unless link is false.
@@ -358,7 +545,12 @@ window.campaignsPage = function () {
                     throw new Error('Failed to load games');
                 }
                 const data = await response.json();
-                this.campaigns = Array.isArray(data) ? data : [];
+                const before = bannerPositions();
+                this.campaigns = (Array.isArray(data) ? data : []).sort((a, b) =>
+                    (this.campaignNeedsAction(b) - this.campaignNeedsAction(a))
+                    || (bannerStatusRank(a?.status) - bannerStatusRank(b?.status)));
+                await this.$nextTick();
+                slideBanners(before);
             } catch (error) {
                 if (quiet) {
                     console.error('Failed to refresh campaigns:', error);
@@ -436,8 +628,11 @@ window.campaignsPage = function () {
             const statusClass = statusMap[status] || String(status).toLowerCase().replace(/\s+/g, '-');
 
             const typeInfo = CAMPAIGN_TYPES.find((t) => t.value === campaign?.type) || CAMPAIGN_TYPES.find((t) => t.value === 'Campaign');
-            const typeIconHtml = `<svg class="type-icon" viewBox="0 0 24 24" width="1.75rem" height="1.75rem" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">${TYPE_ICON_PATHS[typeInfo.value] || ''}</svg>`;
-            const typeBadgeHtml = `<span class="campaign-type-badge type-${escapeHtml(typeInfo.value.toLowerCase())}">${typeIconHtml}${escapeHtml(typeInfo.label)} <span class="info-icon" tabindex="0" role="img" aria-label="${escapeHtml(typeInfo.description)}" data-tooltip="${escapeHtml(typeInfo.description)}">i</span></span>`;
+            const typeTip = escapeHtml(`${typeInfo.label}: ${typeInfo.description}`);
+            const typeHotspotHtml = `<span class="banner-type" tabindex="0" role="img" aria-label="${typeTip}" data-tooltip="${typeTip}"></span>`;
+            const variant = bannerVariant(campaign?.id);
+            const seed = bannerSeed(campaign?.id);
+            const banner = BANNERS[variant - 1];
 
             const systemName = campaign?.system || '';
             const systemHtml = campaign?.system_logo_url
@@ -470,12 +665,12 @@ window.campaignsPage = function () {
             }
 
             return `
-                <article class="campaign-item status-${escapeHtml(statusClass)}${needsAction ? ' needs-action' : ''}" id="campaign-${escapeHtml(campaign?.id ?? 'unknown')}">
-                    ${bannerCornersHtml(bannerVariant(campaign?.id))}
-                    <div class="campaign-notice">${pendingNoticeHtml || headpieceHtml(bannerVariant(campaign?.id))}</div>
+                <article class="campaign-item status-${escapeHtml(statusClass)}${needsAction ? ' needs-action' : ''}" id="campaign-${escapeHtml(campaign?.id ?? 'unknown')}" data-period="${banner.period + (seed % 5) / 10}" data-phase="${banner.phase + seed % 7}" data-sway-period="${13 + (seed % 21) / 10}" data-sway-phase="${(seed % 63) / 10}" style="--swing-dur:${2.1 + (seed % 5) / 10}s;--swing-delay:-${(seed % 23) / 10}s">
+                    ${bannerClothHtml(variant, typeInfo.value, !pendingNoticeHtml)}
+                    ${typeHotspotHtml}
+                    ${pendingNoticeHtml ? `<div class="campaign-notice">${pendingNoticeHtml}</div>` : ''}
                     <section class="campaign-row campaign-row-top">
                         <div class="campaign-badges">
-                            ${typeBadgeHtml}
                             <span class="campaign-status-badge">${escapeHtml(status)}</span>
                         </div>
                         <div class="campaign-title-container">
@@ -486,6 +681,7 @@ window.campaignsPage = function () {
                     </section>
 
                     <section class="campaign-row campaign-row-middle" aria-label="Game details">
+                        <div class="banner-separator" aria-hidden="true"><span></span><svg width="14" height="10" viewBox="0 0 14 10"><path d="M7 1 L13 5 L7 9 L1 5 Z"/></svg><span></span></div>
                         <div class="campaign-dm"><span class="visually-hidden">Dungeon master: </span>${dmHtml}</div>
                         <div class="campaign-players"><span class="visually-hidden">Players: </span>${playersHtml}</div>
                         <p class="campaign-meta">${escapeHtml(factsLine)}</p>
@@ -911,21 +1107,20 @@ window.campaignsPage = function () {
             return `?${session?.tentative_count || 0}`;
         },
 
+        // True when the user owes this game a reply: unanswered sessions (player) or pending sign-ups (DM).
+        campaignNeedsAction(c) {
+            const isDM = !!this.currentUserId && c?.dm === this.currentUserId;
+            const isPlayer = Array.isArray(c?.players) && c.players.includes(this.currentUserId);
+            return (isPlayer && (parseInt(c?.unanswered_sessions_count, 10) || 0) > 0)
+                || (isDM && (parseInt(c?.pending_signups_count, 10) || 0) > 0);
+        },
+
         // "6 games on the roll · 2 await thee": the page subtitle under the h1.
         gamesSubtitle() {
             const total = this.campaigns.length;
-            const awaiting = this.campaigns.filter((c) => {
-                const isDM = !!this.currentUserId && c?.dm === this.currentUserId;
-                const isPlayer = Array.isArray(c?.players) && c.players.includes(this.currentUserId);
-                return (isPlayer && (parseInt(c?.unanswered_sessions_count, 10) || 0) > 0)
-                    || (isDM && (parseInt(c?.pending_signups_count, 10) || 0) > 0);
-            }).length;
+            const awaiting = this.campaigns.filter((c) => this.campaignNeedsAction(c)).length;
             const roll = `${total} game${total === 1 ? '' : 's'} on the roll`;
             return awaiting > 0 ? `${roll} · ${awaiting} await${awaiting === 1 ? 's' : ''} thee` : roll;
-        },
-
-        bannerClass(campaign) {
-            return `banner-${bannerVariant(campaign?.id)}`;
         },
 
         avatarHtml(user, link = true) {

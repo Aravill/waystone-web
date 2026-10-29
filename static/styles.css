@@ -78,6 +78,7 @@
     --line: rgba(43, 36, 28, 0.4);
     --rubric: #8E2A1E; --verdigris: #355E52; --ochre: #7A5A12;
     --backdrop: var(--folio);
+    --shadow: rgba(43, 36, 28, 0.24);
     color-scheme: light;
     --font-text: 'Courier Prime', 'Courier New', monospace;
     --font-display: 'IM Fell English SC', serif;
@@ -92,6 +93,7 @@
         --line: rgba(232, 220, 196, 0.3);
         --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
         --backdrop: rgba(0, 0, 0, 0.6);
+        --shadow: rgba(0, 0, 0, 0.7);
         color-scheme: dark;
     }
 }
@@ -101,6 +103,7 @@
     --line: rgba(232, 220, 196, 0.3);
     --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
     --backdrop: rgba(0, 0, 0, 0.6);
+    --shadow: rgba(0, 0, 0, 0.7);
     color-scheme: dark;
 }
 
@@ -248,6 +251,11 @@ a {
 
 .container--narrow {
     max-width: 26.25rem;
+}
+
+/* Campaign banners: 3 x 360px cards + 2 x 28px gaps + the container's side padding */
+.container--wide {
+    max-width: 74rem;
 }
 
 .page-title {
@@ -604,12 +612,18 @@ select option {
     width: 100%;
 }
 
-/* Cards share row tracks through subgrid (list → x-for wrapper → card), so within a
-   row of cards the notice, header hairline, people and buttons all line up. */
+/* Banners: each card is a hanging cloth (an SVG drawn in campaigns.js) behind its content.
+   Cards share row tracks through subgrid (list → x-for wrapper → card), so within a row of
+   cards the notice, header, people and buttons all line up. Row tracks, top to bottom:
+   top · head · people · spacer · buttons · bottom · gap. */
 .campaigns-list {
+    --banner-gap: 2rem;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
-    gap: 1.75rem;
+    grid-template-columns: repeat(auto-fill, min(100%, 360px));
+    grid-auto-rows: 92px auto auto auto auto 120px var(--banner-gap);
+    justify-content: center;
+    column-gap: 1.75rem;
+    row-gap: 0;
 }
 
 .campaigns-list > p {
@@ -617,123 +631,245 @@ select option {
 }
 
 .campaigns-list > div {
-    position: relative;
-    isolation: isolate;
-    display: grid;
-    grid-row: span 4;
-    grid-template-rows: subgrid;
-    row-gap: 0;
+    display: contents;
 }
 
-/* Banner cards: the outline is two clipped layers (hairline, then fill inset 1px) in the
-   variant's shape, so it follows notches, points and torn edges. Shapes: .banner-N below.
-   Bottom padding clears the deepest notch/point (24px). */
 .campaign-item {
     position: relative;
-    isolation: isolate;
     display: grid;
-    grid-row: span 4;
+    grid-row: span 7;
     grid-template-rows: subgrid;
-    row-gap: 0;
-    padding: 1.875rem 1.5rem 2.875rem;
 }
 
-.campaign-item::before,
-.campaign-item::after,
-.campaigns-list > div:has(> .needs-action)::before,
-.campaigns-list > div:has(> .needs-action)::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
+.campaign-item > .campaign-row {
+    grid-column: 1;
+    position: relative;
+    padding-inline: 28px 30px;
 }
 
-.campaign-item::before {
-    background: var(--line);
-    clip-path: var(--shape-0);
-}
-
-.campaign-item::after {
-    background: var(--bg);
-    clip-path: var(--shape-1);
-}
-
-/* Needs action: the rubric double frame, following the shape (outer ring on the wrapper) */
-.campaigns-list > div:has(> .needs-action)::before {
-    background: var(--rubric);
-    clip-path: var(--shape-0);
-}
-
-.campaigns-list > div:has(> .needs-action)::after {
-    background: var(--bg);
-    clip-path: var(--shape-1);
-}
-
-.campaign-item.needs-action::before {
-    background: var(--rubric);
-    clip-path: var(--shape-4);
-}
-
-.campaign-item.needs-action::after {
-    clip-path: var(--shape-5);
-}
-
-/* Decorated top corners (drawn in campaigns.js per variant), inside the outline */
-.banner-corner {
-    position: absolute;
-    top: 0.375rem;
-    width: 1.375rem;
-    height: 1.375rem;
-    color: var(--muted);
+/* The cloth spans the top..bottom tracks; content rows paint above it (later in the DOM,
+   positioned) */
+.banner-cloth {
+    grid-row: 1 / 7;
+    grid-column: 1;
+    position: relative;
+    min-height: 598px;
     pointer-events: none;
 }
 
-.banner-corner--left {
-    left: 0.375rem;
+/* Padded past the cloth by BANNER_PAD / BANNER_PAD_B (campaigns.js) so shadows and swaying tails fit */
+.banner-frame {
+    position: absolute;
+    left: -48px;
+    top: -48px;
+    width: calc(100% + 96px);
+    height: calc(100% + 208px);
+    overflow: hidden;
 }
 
-.banner-corner--right {
-    right: 0.375rem;
-    transform: scaleX(-1);
+.banner-outline {
+    fill: var(--bg);
+    stroke: var(--line);
+    stroke-width: 1;
+    stroke-linejoin: round;
+    filter: url(#banner-shadow);
+    transition: stroke 0.3s, stroke-width 0.3s;
 }
 
-.campaign-item.needs-action .banner-corner {
-    top: 0.625rem;
-    color: var(--rubric);
+.banner-orn {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke 0.3s;
 }
 
-.campaign-item.needs-action .banner-corner--left {
-    left: 0.625rem;
+.banner-stitch {
+    stroke-dasharray: 3 3;
 }
 
-.campaign-item.needs-action .banner-corner--right {
-    right: 0.625rem;
+.banner-hang {
+    filter: url(#banner-shadow-sm);
 }
 
-.banner-1 {
-    --shape-0: polygon(0px 0px, calc(100% - 0px) 0px, calc(100% - 0px) calc(100% - 0px), 50% calc(100% - 24px), 0px calc(100% - 0px));
-    --shape-1: polygon(1px 1px, calc(100% - 1px) 1px, calc(100% - 1px) calc(100% - 1px), 50% calc(100% - 25px), 1px calc(100% - 1px));
-    --shape-4: polygon(4px 4px, calc(100% - 4px) 4px, calc(100% - 4px) calc(100% - 4px), 50% calc(100% - 28px), 4px calc(100% - 4px));
-    --shape-5: polygon(5px 5px, calc(100% - 5px) 5px, calc(100% - 5px) calc(100% - 5px), 50% calc(100% - 29px), 5px calc(100% - 5px));
+.banner-swing {
+    transform-box: fill-box;
+    transform-origin: 50% 0;
+    animation: banner-swing var(--swing-dur, 2.3s) ease-in-out var(--swing-delay, 0s) infinite alternate;
 }
 
-.banner-2 {
-    --shape-0: polygon(0px 0px, calc(100% - 0px) 0px, calc(100% - 0px) calc(100% - 24px), 50% calc(100% - 0px), 0px calc(100% - 24px));
-    --shape-1: polygon(1px 1px, calc(100% - 1px) 1px, calc(100% - 1px) calc(100% - 24.4px), 50% calc(100% - 2px), 1px calc(100% - 24.4px));
-    --shape-4: polygon(4px 4px, calc(100% - 4px) 4px, calc(100% - 4px) calc(100% - 25.6px), 50% calc(100% - 8px), 4px calc(100% - 25.6px));
-    --shape-5: polygon(5px 5px, calc(100% - 5px) 5px, calc(100% - 5px) calc(100% - 26px), 50% calc(100% - 10px), 5px calc(100% - 26px));
+.banner-ring-o {
+    fill: var(--bg);
+    stroke: var(--ink);
 }
 
-.banner-3 {
-    --shape-0: polygon(0px 8px, 8px 0px, calc(100% - 0px) 0px, calc(100% - 0px) calc(38% + 0px), calc(100% - 10px) 42%, calc(100% - 0px) 46%, calc(100% - 0px) calc(100% - 3px), 93% calc(100% - 11px), 87% calc(100% - 4px), 81% calc(100% - 10px), 74% calc(100% - 3px), 68% calc(100% - 13px), 61% calc(100% - 5px), 55% calc(100% - 11px), 48% calc(100% - 2px), 41% calc(100% - 9px), 36% calc(100% - 5px), 30% calc(100% - 12px), 23% calc(100% - 4px), 17% calc(100% - 10px), 11% calc(100% - 2px), 6% calc(100% - 9px), 0px calc(100% - 3px));
-    --shape-1: polygon(1px 9px, 9px 1px, calc(100% - 1px) 1px, calc(100% - 1px) calc(38% + 0px), calc(100% - 11px) 42%, calc(100% - 1px) 46%, calc(100% - 1px) calc(100% - 4px), 93% calc(100% - 12px), 87% calc(100% - 5px), 81% calc(100% - 11px), 74% calc(100% - 4px), 68% calc(100% - 14px), 61% calc(100% - 6px), 55% calc(100% - 12px), 48% calc(100% - 3px), 41% calc(100% - 10px), 36% calc(100% - 6px), 30% calc(100% - 13px), 23% calc(100% - 5px), 17% calc(100% - 11px), 11% calc(100% - 3px), 6% calc(100% - 10px), 1px calc(100% - 4px));
-    --shape-4: polygon(4px 12px, 12px 4px, calc(100% - 4px) 4px, calc(100% - 4px) calc(38% + 0px), calc(100% - 14px) 42%, calc(100% - 4px) 46%, calc(100% - 4px) calc(100% - 7px), 93% calc(100% - 15px), 87% calc(100% - 8px), 81% calc(100% - 14px), 74% calc(100% - 7px), 68% calc(100% - 17px), 61% calc(100% - 9px), 55% calc(100% - 15px), 48% calc(100% - 6px), 41% calc(100% - 13px), 36% calc(100% - 9px), 30% calc(100% - 16px), 23% calc(100% - 8px), 17% calc(100% - 14px), 11% calc(100% - 6px), 6% calc(100% - 13px), 4px calc(100% - 7px));
-    --shape-5: polygon(5px 13px, 13px 5px, calc(100% - 5px) 5px, calc(100% - 5px) calc(38% + 0px), calc(100% - 15px) 42%, calc(100% - 5px) 46%, calc(100% - 5px) calc(100% - 8px), 93% calc(100% - 16px), 87% calc(100% - 9px), 81% calc(100% - 15px), 74% calc(100% - 8px), 68% calc(100% - 18px), 61% calc(100% - 10px), 55% calc(100% - 16px), 48% calc(100% - 7px), 41% calc(100% - 14px), 36% calc(100% - 10px), 30% calc(100% - 17px), 23% calc(100% - 9px), 17% calc(100% - 15px), 11% calc(100% - 7px), 6% calc(100% - 14px), 5px calc(100% - 8px));
+.banner-ring-i {
+    fill: none;
+    stroke: var(--line);
+    transition: stroke 0.3s, opacity 0.3s;
 }
 
+.banner-frame .type-icon {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Shared gradient and shadow defs (hidden svg) */
+.banner-defs {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
+.banner-drop {
+    flood-color: var(--shadow);
+}
+
+.banner-flash-base {
+    stop-color: var(--rubric);
+}
+
+.banner-flash-hi {
+    stop-color: color-mix(in srgb, var(--rubric) 25%, #fff);
+}
+
+.card-headpiece {
+    position: absolute;
+    top: 60px;
+    left: 5%;
+    right: 5%;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    color: var(--muted);
+    transition: color 0.3s;
+}
+
+.campaign-notice {
+    position: absolute;
+    top: 58px;
+    left: 28px;
+    right: 30px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    z-index: 1;
+}
+
+/* Invisible hotspot over the medallion's type icon; carries the tooltip */
+.banner-type {
+    position: absolute;
+    left: 40px;
+    top: 2px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    cursor: help;
+    z-index: 2; /* above .campaign-notice, so the tooltip isn't covered */
+}
+
+.banner-type:focus-visible {
+    outline: 2px solid var(--rubric);
+    outline-offset: 2px;
+}
+
+.banner-separator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+}
+
+.banner-separator span {
+    height: 1px;
+    background: var(--line);
+    flex: 1;
+}
+
+.banner-separator span + svg + span {
+    flex: 2.6;
+}
+
+.banner-separator svg {
+    fill: none;
+    stroke: currentColor;
+}
+
+.campaign-row-top {
+    grid-row: 2;
+    padding-bottom: 12px;
+}
+
+.campaign-row-middle {
+    grid-row: 3;
+}
+
+.campaign-row-bottom {
+    grid-row: 5;
+    align-self: start;
+}
+
+/* Hover: ink up the quiet lines; needs-action cards keep their rubric frame */
+.campaign-item:not(.needs-action):hover :is(.banner-outline, .banner-orn, .banner-ring-i) {
+    stroke: var(--ink);
+}
+
+.campaign-item:not(.needs-action):hover .card-headpiece {
+    color: var(--ink);
+}
+
+.needs-action .banner-outline {
+    stroke: url(#banner-flash);
+    stroke-width: 1.5;
+}
+
+.needs-action :is(.banner-orn, .banner-ring-o) {
+    stroke: var(--rubric);
+}
+
+.needs-action .banner-ring-i {
+    stroke: var(--rubric);
+    opacity: 0.55;
+}
+
+.needs-action:hover .banner-outline {
+    stroke-width: 2;
+}
+
+.needs-action:hover .banner-ring-i {
+    opacity: 1;
+}
 
 .campaign-item.status-finished {
     opacity: 0.72;
+    transition: opacity 0.3s;
+}
+
+.campaign-item.status-finished:hover {
+    opacity: 0.92;
+}
+
+@keyframes banner-swing {
+    from { transform: rotate(-12deg); }
+    to { transform: rotate(12deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .banner-swing {
+        animation: none;
+    }
+
+    .needs-action .banner-outline {
+        stroke: var(--rubric);
+    }
 }
 
 
@@ -754,22 +890,6 @@ select option {
     gap: 0.875rem;
 }
 
-.campaign-notice {
-    padding-bottom: 0.875rem;
-}
-
-/* Headpiece: end · rule · centre · rule · end, 90% of the card wide and as tall as the
-   notice line, so cards with and without an alert match */
-.card-headpiece {
-    --card-width: calc(100% + 3rem); /* content box + the card's 1.5rem side padding */
-    display: flex;
-    align-items: center;
-    width: calc(var(--card-width) * 0.9);
-    height: 1.125rem;
-    margin-left: calc((100% - var(--card-width) * 0.9) / 2);
-    color: var(--muted);
-}
-
 .card-headpiece svg {
     flex: none;
     height: 1.125rem;
@@ -785,16 +905,11 @@ select option {
     transform: scaleX(-1);
 }
 
-.campaign-row-top {
-    padding-bottom: 0.875rem;
-    border-bottom: 1px solid var(--line);
-}
-
 .campaign-badges {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 0.5rem 0.75rem;
 }
 
@@ -812,22 +927,8 @@ select option {
     color: var(--ink);
 }
 
-/* Type badge: icon + label, no box */
-.campaign-type-badge {
-    display: flex;
-    align-items: center;
-    gap: 0.625rem;
-    color: var(--ink);
-    font-size: 0.75rem;
-    letter-spacing: 0.125rem;
-    text-transform: uppercase;
-}
-
-.type-icon {
-    flex: 0 0 auto;
-}
-
-.type-icon__fill {
+.type-icon__fill,
+.banner-frame .type-icon .type-icon__fill {
     fill: var(--bg);
 }
 
@@ -889,29 +990,12 @@ select option {
     object-fit: contain;
 }
 
-.info-icon {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 0.875rem;
-    height: 0.875rem;
-    border: 1px solid currentColor;
-    font-size: 0.625rem;
-    /* 40px hit area around the 14px mark */
-    outline: 0.8125rem solid transparent;
-    font-style: italic;
-    letter-spacing: 0;
-    text-transform: none;
-    cursor: help;
-}
-
-.info-icon::before {
+.banner-type::before {
     content: attr(data-tooltip);
     position: absolute;
-    bottom: 120%;
-    left: 50%;
-    transform: translateX(-50%);
+    top: calc(100% + 6px);
+    left: 0;
+    transform: none;
     z-index: 1000;
     width: 16.25rem;
     max-width: calc(100vw - 2rem);
@@ -930,9 +1014,9 @@ select option {
     pointer-events: none;
 }
 
-.info-icon:hover::before,
-.info-icon:focus::before,
-.info-icon:focus-visible::before {
+.banner-type:hover::before,
+.banner-type:focus::before,
+.banner-type:focus-visible::before {
     opacity: 1;
 }
 
@@ -947,7 +1031,6 @@ select option {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    padding-top: 0.875rem;
     font-size: 0.875rem;
     line-height: 1.5;
 }

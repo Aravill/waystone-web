@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Waystone - Games</title>
     <script src="/static/theme.js?v=4"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=37">
+    <link rel="stylesheet" href="/static/styles.css?v=41">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -41,9 +41,14 @@
                     <p>No games available.</p>
                 </template>
                 <template x-for="campaign in campaigns" :key="campaign.id">
-                    <div :class="bannerClass(campaign)" x-html="renderCampaignHtml(campaign)"></div>
+                    <div x-html="renderCampaignHtml(campaign)"></div>
                 </template>
             </div>
+            <svg class="banner-defs" aria-hidden="true" focusable="false"><defs>
+                <linearGradient id="banner-flash" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="240" y2="240"><stop class="banner-flash-base" offset="0"/><stop class="banner-flash-base" offset="0.38"/><stop class="banner-flash-hi" offset="0.5"/><stop class="banner-flash-base" offset="0.62"/><stop class="banner-flash-base" offset="1"/><animateTransform attributeName="gradientTransform" type="translate" values="-260 -260; 520 520; 520 520" keyTimes="0; 0.55; 1" dur="4.5s" repeatCount="indefinite"/></linearGradient>
+                <filter id="banner-shadow" filterUnits="userSpaceOnUse" x="-40" y="-40" width="480" height="3000"><feDropShadow class="banner-drop" dx="4" dy="8" stdDeviation="6"/></filter>
+                <filter id="banner-shadow-sm" filterUnits="userSpaceOnUse" x="-40" y="-40" width="480" height="3000"><feDropShadow class="banner-drop" dx="2" dy="4" stdDeviation="1.5"/></filter>
+            </defs></svg>
             <p class="ornament" aria-hidden="true" x-show="campaigns.length > 0">❦ ❦ ❦</p>
             <div id="message" class="message" :class="messageType" x-show="messageVisible" x-text="messageText"></div>
         </div>
@@ -466,6 +471,6 @@
     </div>
 
     <script src="/static/notifications.js?v=8"></script>
-    <script src="campaigns.js?v=29"></script>
+    <script src="campaigns.js?v=34"></script>
 </body>
 </html>
