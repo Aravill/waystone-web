@@ -1244,8 +1244,8 @@ func (s *SQLiteStore) DeleteSession(sessionID string) error {
 
 var (
 	ErrSignupNotFound       = errors.New("sign-up not found")
-	ErrCampaignFull         = errors.New("campaign is full")
-	ErrCampaignNotFound     = errors.New("campaign not found")
+	ErrCampaignFull         = errors.New("game is full")
+	ErrCampaignNotFound     = errors.New("game not found")
 	ErrSystemNotFound       = errors.New("system not found")
 	ErrUserNotFound         = errors.New("user not found")
 	ErrNotificationNotFound = errors.New("notification not found")

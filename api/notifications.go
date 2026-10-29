@@ -119,7 +119,7 @@ func HandleNotifications(w http.ResponseWriter, r *http.Request) {
 	}
 	allCampaigns, err := db.GetAllCampaigns()
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve campaigns")
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve games")
 		return
 	}
 	titles := make(map[string]string, len(allCampaigns))

@@ -73,7 +73,7 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 		log.Printf("error fetching campaigns: %v", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "failed to fetch campaigns"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to fetch games"})
 		return
 	}
 

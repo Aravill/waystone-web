@@ -71,7 +71,7 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 	campaigns, err := db.GetAllCampaigns()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to retrieve campaigns"}`)
+		fmt.Fprintf(w, `{"error": "failed to retrieve games"}`)
 		return
 	}
 
@@ -101,13 +101,13 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 	pendingSignups, err := db.CountPendingSignupsForDM(currentUserID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to retrieve campaign counts"}`)
+		fmt.Fprintf(w, `{"error": "failed to retrieve game counts"}`)
 		return
 	}
 	unanswered, err := db.GetUnansweredSessions(currentUserID, time.Now().UTC().Format("2006-01-02"))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to retrieve campaign counts"}`)
+		fmt.Fprintf(w, `{"error": "failed to retrieve game counts"}`)
 		return
 	}
 
@@ -272,14 +272,14 @@ func HandleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 	// Save campaign to database
 	if err := db.SaveCampaign(campaign); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to create campaign"}`)
+		fmt.Fprintf(w, `{"error": "failed to create game"}`)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
 	data, _ := json.Marshal(map[string]interface{}{
 		"status":      "success",
-		"message":     "campaign created successfully",
+		"message":     "game created successfully",
 		"campaign_id": campaign.ID,
 	})
 	w.Write(data)
@@ -312,7 +312,7 @@ func (req *campaignRequest) normalize() string {
 	case req.Description == "":
 		return "description is required"
 	case !req.Type.IsValid():
-		return "invalid campaign type"
+		return "invalid game type"
 	case req.DesiredPlayerCount < 0:
 		return "desired player count cannot be negative"
 	case utf8.RuneCountInString(req.System) > 64:
@@ -344,7 +344,7 @@ func loadManagedCampaign(w http.ResponseWriter, r *http.Request, campaignID stri
 		return nil, false
 	}
 	if user == nil || !user.IsAdmin() {
-		writeJSONError(w, http.StatusForbidden, "only the campaign DM or an admin can manage this campaign")
+		writeJSONError(w, http.StatusForbidden, "only the game DM or an admin can manage this game")
 		return nil, false
 	}
 	return campaign, true
@@ -399,10 +399,10 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 			writeJSONError(w, http.StatusNotFound, err.Error())
 			return
 		}
-		writeJSONError(w, http.StatusInternalServerError, "failed to update campaign")
+		writeJSONError(w, http.StatusInternalServerError, "failed to update game")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "campaign updated"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "game updated"})
 }
 
 func handleDeleteCampaign(w http.ResponseWriter, r *http.Request, campaignID string) {
@@ -414,10 +414,10 @@ func handleDeleteCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 			writeJSONError(w, http.StatusNotFound, err.Error())
 			return
 		}
-		writeJSONError(w, http.StatusInternalServerError, "failed to delete campaign")
+		writeJSONError(w, http.StatusInternalServerError, "failed to delete game")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "campaign deleted"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "game deleted"})
 }
 
 // HandleCampaignStatus handles /api/campaigns/{id}/status (PUT change status).

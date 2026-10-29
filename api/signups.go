@@ -92,7 +92,7 @@ func HandleCampaignSignupsOpen(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if campaign.DM != userID {
-		writeJSONError(w, http.StatusForbidden, "only the campaign DM can open or close sign-ups")
+		writeJSONError(w, http.StatusForbidden, "only the game DM can open or close sign-ups")
 		return
 	}
 
@@ -154,11 +154,11 @@ func loadCampaignAndUser(w http.ResponseWriter, r *http.Request, campaignID stri
 
 	campaign, err := db.GetCampaignByID(campaignID)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve campaign")
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve game")
 		return nil, "", false
 	}
 	if campaign == nil {
-		writeJSONError(w, http.StatusNotFound, "campaign not found")
+		writeJSONError(w, http.StatusNotFound, "game not found")
 		return nil, "", false
 	}
 	return campaign, userID, true
@@ -181,7 +181,7 @@ func handleListSignups(w http.ResponseWriter, r *http.Request, campaignID string
 		return
 	}
 	if campaign.DM != userID {
-		writeJSONError(w, http.StatusForbidden, "only the campaign DM can view sign-ups")
+		writeJSONError(w, http.StatusForbidden, "only the game DM can view sign-ups")
 		return
 	}
 
@@ -249,7 +249,7 @@ func handleCreateSignup(w http.ResponseWriter, r *http.Request, campaignID strin
 		return
 	}
 	if campaign.DM == userID {
-		writeJSONError(w, http.StatusForbidden, "the campaign DM cannot sign up")
+		writeJSONError(w, http.StatusForbidden, "the game DM cannot sign up")
 		return
 	}
 	for _, playerID := range campaign.Players {
@@ -269,7 +269,7 @@ func handleCreateSignup(w http.ResponseWriter, r *http.Request, campaignID strin
 		case models.SignupDeclined:
 			writeJSONError(w, http.StatusForbidden, "your sign-up was declined")
 		case models.SignupKicked:
-			writeJSONError(w, http.StatusForbidden, "you were removed from this campaign")
+			writeJSONError(w, http.StatusForbidden, "you were removed from this game")
 		default:
 			writeJSONError(w, http.StatusConflict, "already signed up")
 		}
@@ -308,7 +308,7 @@ func handleUpdateSignup(w http.ResponseWriter, r *http.Request, campaignID, targ
 		return
 	}
 	if campaign.DM != userID {
-		writeJSONError(w, http.StatusForbidden, "only the campaign DM can manage sign-ups")
+		writeJSONError(w, http.StatusForbidden, "only the game DM can manage sign-ups")
 		return
 	}
 
@@ -374,7 +374,7 @@ func handleWithdrawSignup(w http.ResponseWriter, r *http.Request, campaignID, ta
 
 	notifType, message := models.NotificationSignupWithdrawn, "sign-up withdrawn"
 	if wasPlayer {
-		notifType, message = models.NotificationPlayerLeft, "left the campaign"
+		notifType, message = models.NotificationPlayerLeft, "left the game"
 	}
 	notify(userID, []string{campaign.DM}, notifType, campaign, "", nil)
 
@@ -390,7 +390,7 @@ func handleKickPlayer(w http.ResponseWriter, r *http.Request, campaignID, target
 		return
 	}
 	if campaign.DM != userID {
-		writeJSONError(w, http.StatusForbidden, "only the campaign DM can remove players")
+		writeJSONError(w, http.StatusForbidden, "only the game DM can remove players")
 		return
 	}
 
@@ -427,7 +427,7 @@ func applySignupStatus(w http.ResponseWriter, campaignID, targetUserID string, s
 
 	campaign, err := db.GetCampaignByID(campaignID)
 	if err != nil || campaign == nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve campaign")
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve game")
 		return nil
 	}
 

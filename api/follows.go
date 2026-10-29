@@ -26,7 +26,7 @@ func HandleCampaignFollow(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodPut {
 		if campaign.DM == userID {
-			writeJSONError(w, http.StatusConflict, "you run this campaign")
+			writeJSONError(w, http.StatusConflict, "you run this game")
 			return
 		}
 		if err := db.FollowCampaign(campaign.ID, userID); err != nil {
