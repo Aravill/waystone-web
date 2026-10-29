@@ -116,6 +116,7 @@ On screens ≤ 768px drop h1 to 34px and card titles to 23px. Keep tracking and 
 - **Narrow pages** (login, change password, forms): `max-width: 420px`.
 - **Spacing scale** (multiples of 4px): 4, 8, 12, 16, 24, 32, 48, 64. Card padding 22–24px, grid gap 28px, page sections 32–40px apart.
 - **Card grid**: `grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 28px;`. It goes to one column on its own on phones.
+- **Units**: sizes in this guide are given in px for readability. The CSS writes them in rem (px / 16), with hairline border and outline widths kept in px.
 - **Breakpoint**: `@media (max-width: 768px)` for header stacking and type scale-down.
 - **Rules**: a `3px double var(--ink)` rule closes the header and modal headers. Hairlines (`1px solid var(--line)`) divide content within cards. A plain `1px solid var(--ink)` separates major sections.
 - **Corners**: always square. `border-radius` only on the round unread-count dot.
@@ -124,7 +125,7 @@ On screens ≤ 768px drop h1 to 34px and card titles to 23px. Keep tracking and 
 
 ## Components
 
-Keep the existing class names (`.header`, `.nav-item`, `.message`, `.campaign-status-badge`, `.status-*`, `.module-card`, `.danger-zone`, …) and restyle them. The markup should not need to change for the redesign.
+Keep the existing class names (`.header`, `.nav-item`, `.message`, `.campaign-status-badge`, `.status-*`, `.module-card`, `.danger-zone`, …) and restyle them. Markup changes only where the design needs new structure: the shared header, page titles, and the banner game cards (shape layers, headpiece, corners and the notice slot are built in `campaigns.js`).
 
 ### Header & navigation
 
@@ -165,7 +166,7 @@ Square, uppercase, 2px tracking, min-height 40px (44px for primary actions on to
 |---------|-------|-----|
 | Primary | `background: var(--ink); color: var(--bg); border: 1px solid var(--ink)` | One main action per view: Sign up, Register game, Enter, Save |
 | Secondary | `background: none; color: var(--ink); border: 1px solid var(--line)` | Follow, Calendar, Edit, Leave, Cancel |
-| Danger | `background: none; color: var(--rubric); border: 1px solid var(--rubric)` | Delete campaign, Delete account, Remove player |
+| Danger | `background: none; color: var(--rubric); border: 1px solid var(--rubric)` | Delete game, Delete account, Remove player |
 | Text link | `color: var(--rubric); text-decoration: underline; text-underline-offset: 4px` | "Sync to calendar →" |
 
 Hover: primary goes to `opacity: 0.85`, secondary and danger fill with their border colour and switch text to `--bg`. Disabled: `opacity: 0.5; cursor: not-allowed`.
@@ -216,22 +217,18 @@ Other cards (`.card`, profile, admin) stay plain rectangles:
 }
 ```
 
-Order inside a campaign card: pending notice (if any) → type badge + status badge → title + game system → hairline → DM, players, seats · next session → actions pinned to the bottom (`margin-top: auto`).
+Order inside a game card: notice slot (the pending notice, or the variant's headpiece) → type icon and name + status badge → title + game system → summary → hairline → DM, player avatars, seats · sign-ups, next session → actions in a 3-column grid. Each part is one subgrid row (see the banner notes above).
 
-**Needs your action** (unanswered session for a player, pending sign-ups for the DM): rubric double frame plus a notice line.
+**Needs your action** (unanswered session for a player, pending sign-ups for the DM): the card gets `.needs-action`, which draws the rubric double frame in the banner's shape (the clipped layers described above), plus a notice line:
 
 ```css
-.campaign-item.has-pending {
-    border-color: var(--rubric);
-    outline: 1px solid var(--rubric); outline-offset: 4px;
-}
 .pending-notice {
     font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--rubric);
 }
 /* content: "✦ A session awaits thy reply" / "✦ 3 sign-ups to review" */
 ```
 
-Finished campaigns render at `opacity: 0.72`.
+Finished games render at `opacity: 0.72`.
 
 ### Campaign status badge
 

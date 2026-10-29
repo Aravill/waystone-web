@@ -7,8 +7,7 @@
     position: relative;
 }
 
-.notif-btn,
-.theme-toggle {
+.notif-btn {
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -25,8 +24,7 @@
     transition: color 0.15s;
 }
 
-.notif-btn:hover,
-.theme-toggle:hover {
+.notif-btn:hover {
     color: var(--rubric);
 }
 

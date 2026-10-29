@@ -62,8 +62,8 @@ function userAvatarHtml(user, link = true) {
     const inner = user.avatar_url
         ? `<img class="user-avatar" src="${escapeHtml(user.avatar_url)}" alt="">`
         : `<span class="user-avatar user-avatar--letter" aria-hidden="true">${escapeHtml(user.avatar_letter || '?')}</span>`;
-    if (!link) return inner;
-    const href = user.profile_url || `/profile?user_id=${encodeURIComponent(user.id || '')}`;
+    if (!link || !(user.profile_url || user.id)) return inner;
+    const href = user.profile_url || `/profile?user_id=${encodeURIComponent(user.id)}`;
     return `<a href="${escapeHtml(href)}" class="user-avatar-link" title="${escapeHtml(name)}" aria-label="${escapeHtml(name)}">${inner}</a>`;
 }
 
@@ -930,10 +930,6 @@ window.campaignsPage = function () {
 
         avatarHtml(user, link = true) {
             return userAvatarHtml(user, link);
-        },
-
-        getUserDisplayName(user) {
-            return user?.nickname || user?.display_name || user?.name || user?.username || 'Unknown';
         },
 
         async getSessionResponseDetails(sessionId) {

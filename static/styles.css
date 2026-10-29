@@ -186,6 +186,26 @@ a {
     gap: 0.75rem;
 }
 
+/* Theme toggle (injected by theme.js into .header-right on every page that has one).
+   The inbox button in notifications.css shares this look. */
+.theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--ink);
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.theme-toggle:hover {
+    color: var(--rubric);
+}
+
 .user-name {
     color: var(--ink);
     font-size: 0.875rem;
@@ -297,21 +317,6 @@ h2 {
     max-height: 12.5rem;
     overflow-y: auto;
     border: 1px solid var(--line);
-}
-
-.event-item {
-    padding: 0.625rem;
-    margin-bottom: 0.625rem;
-    border-left: 2px solid var(--rubric);
-}
-
-.event-item strong {
-    display: block;
-    margin-bottom: 0.25rem;
-}
-
-.event-item small {
-    color: var(--muted);
 }
 
 .signup-section {
