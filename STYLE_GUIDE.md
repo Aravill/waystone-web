@@ -41,6 +41,7 @@ All colours are CSS custom properties on `:root`. Never hard-code a hex value in
 | `--rubric` | Rubric | `#8E2A1E` | The accent: section marks, DMs, pending actions, errors, destructive actions, active nav underline, links |
 | `--verdigris` | Verdigris | `#355E52` | Success, Ongoing, accepted, confirmed sessions |
 | `--ochre` | Ochre | `#7A5A12` | Tentative, On Hiatus |
+| `--shadow` | Shadow | `rgba(43, 36, 28, 0.24)` | Banner drop-shadow colour |
 
 ### Candlelight (dark)
 
@@ -56,18 +57,21 @@ The same tokens redefined. Applied with `[data-theme="dark"]` on `<html>`, and b
 | `--rubric` | `#D9735C` |
 | `--verdigris` | `#7FB09E` |
 | `--ochre` | `#D4A94A` |
+| `--shadow` | `rgba(0, 0, 0, 0.7)` |
 
 ```css
 :root {
     --bg: #F2EAD8; --folio: #E6DBC2; --ink: #2B241C; --muted: #6B5E4B;
     --line: rgba(43, 36, 28, 0.4);
     --rubric: #8E2A1E; --verdigris: #355E52; --ochre: #7A5A12;
+    --shadow: rgba(43, 36, 28, 0.24);
 }
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
         --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
         --line: rgba(232, 220, 196, 0.3);
         --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
+        --shadow: rgba(0, 0, 0, 0.7);
     }
 }
 :root[data-theme="dark"] { /* same values as the media query block */ }
@@ -116,7 +120,7 @@ On screens ≤ 768px drop h1 to 34px and card titles to 23px. Keep tracking and 
 - **Page width**: content in a centred column, `max-width: 1160px`, `padding: 0 24px` (16px on phones).
 - **Narrow pages** (login, change password, forms): `max-width: 420px`.
 - **Spacing scale** (multiples of 4px): 4, 8, 12, 16, 24, 32, 48, 64. Card padding 22–24px, grid gap 28px, page sections 32–40px apart.
-- **Card grid**: `grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 28px;`. It goes to one column on its own on phones.
+- **Card grid**: `grid-template-columns: repeat(auto-fill, min(100%, 360px)); gap: 28px;` (1.75rem), centred. The Games page uses `.container--wide` (`max-width: 74rem`), which fits three per row. It goes to one column on its own on phones.
 - **Units**: sizes in this guide are given in px for readability. The CSS writes them in rem (px / 16), with hairline border and outline widths kept in px.
 - **Breakpoint**: `@media (max-width: 768px)` for header stacking and type scale-down.
 - **Rules**: a `3px double var(--ink)` rule closes the header and modal headers. Hairlines (`1px solid var(--line)`) divide content within cards. A plain `1px solid var(--ink)` separates major sections.
@@ -126,7 +130,7 @@ On screens ≤ 768px drop h1 to 34px and card titles to 23px. Keep tracking and 
 
 ## Components
 
-Keep the existing class names (`.header`, `.nav-item`, `.message`, `.campaign-status-badge`, `.status-*`, `.module-card`, `.danger-zone`, …) and restyle them. Markup changes only where the design needs new structure: the shared header, page titles, and the banner game cards (shape layers, headpiece, corners and the notice slot are built in `campaigns.js`).
+Keep the existing class names (`.header`, `.nav-item`, `.message`, `.campaign-status-badge`, `.status-*`, `.module-card`, `.danger-zone`, …) and restyle them. Markup changes only where the design needs new structure: the shared header, page titles, and the banner game cards (cloth, headpiece and the notice slot are built in `campaigns.js`).
 
 ### Header & navigation
 
@@ -195,21 +199,7 @@ Textareas and multi-line fields may use a full `1px solid var(--line)` box.
 
 ### Cards
 
-> **Banner redesign:** the decisions for the next iteration of the game banners (silhouettes, fixed type medallion, aligned tracks, two button rows, stretching construction) live in [`BANNER_DESIGN_GUIDE.md`](BANNER_DESIGN_GUIDE.md). It takes precedence over this section for anything banner-specific; the text below describes the banners as currently implemented.
-
-**Game cards are banners.** Each one stands on its own: no rod, so cards never read as one strip. A game gets one of three variants, picked from its id so it never changes. Each variant has its own shape, headpiece and decorated top corners:
-
-| Variant | Shape (`.banner-N`) | Headpiece | Top corners |
-|---------|--------------------|-----------|-------------|
-| 1 | Swallowtail: a V-notch cut into the bottom | Scrollwork curls around a diamond | Rounded bracket with an inward curl |
-| 2 | Pointed: the bottom tapers to a point | A leaf trefoil with leaf tips | Bracket with a corner leaf |
-| 3 | Torn: ragged bottom edge, a side rip, a nicked corner | Interlaced rings with arrowhead tips | Double bracket with a diamond |
-
-- **Outline:** the shape is drawn with clipped layers, not a border: a `--line` layer in the shape, then a `--bg` fill inset 1px (`--shape-0` / `--shape-1`). Shapes are `clip-path` polygons in `styles.css`, generated for insets 0, 1, 4 and 5px. Bottom padding clears the 24px notch or point.
-- **Needs action:** the same layers in `--rubric` make the double frame, so it follows the shape too.
-- **Corners:** 22px ornaments in `--muted` (`--rubric` when the card needs action), mirrored left and right. They sit inside the outline, and the top padding keeps them clear of the headpiece.
-- **Headpiece:** it fills the notice slot when the card has no alert. It's 90% of the card's width and exactly as tall as the notice line, built as end · rule · centrepiece · rule · end so the curls never stretch.
-- **Alignment:** cards share row tracks through subgrid (notice, header, people, buttons), so within a row of cards the hairline, players and buttons line up.
+**Game cards are banners.** Everything banner-specific (silhouettes, medallion, headpieces, aligned tracks, button rows, stretching construction, motion, states) lives in [`BANNER_DESIGN_GUIDE.md`](BANNER_DESIGN_GUIDE.md) and takes precedence over this section.
 
 Other cards (`.card`, profile, admin) stay plain rectangles:
 
@@ -220,9 +210,9 @@ Other cards (`.card`, profile, admin) stay plain rectangles:
 }
 ```
 
-Order inside a game card: notice slot (the pending notice, or the variant's headpiece) → type icon and name + status badge → title + game system → summary → hairline → DM, player avatars, seats · sign-ups, next session → actions in a 3-column grid. Each part is one subgrid row (see the banner notes above).
+Order inside a game card: notice slot (the pending notice, or the variant's headpiece) → status badge → title + game system → summary → hairline → DM, player avatars, seats · sign-ups, next session → actions in a 3-column grid. Each part is one subgrid row (see `BANNER_DESIGN_GUIDE.md`).
 
-**Needs your action** (unanswered session for a player, pending sign-ups for the DM): the card gets `.needs-action`, which draws the rubric double frame in the banner's shape (the clipped layers described above), plus a notice line:
+**Needs your action** (unanswered session for a player, pending sign-ups for the DM): the card gets `.needs-action`, which turns the banner's outline rubric (see `BANNER_DESIGN_GUIDE.md`), plus a notice line:
 
 ```css
 .pending-notice {
@@ -259,7 +249,7 @@ Outlined, uppercase, a glyph before the label. Not clickable. Keep the existing 
 
 ### Campaign type badge
 
-An inline SVG mark plus an uppercase label, no box, fill or border. Flex row, `gap: 10px`, label 12px with 2px tracking, mark 28px (24px viewBox, `fill: none`, `stroke: currentColor`, `stroke-width: 1.5`, `aria-hidden="true"`, class `type-icon`). The info tooltip dot follows the label. See `type-icons.png`.
+On game cards the type is shown only by the banner medallion: no text label and no info dot. The medallion has a focusable hotspot with the `aria-label` and tooltip. The mark is an inline SVG, 28px (24px viewBox, `fill: none`, `stroke: currentColor`, `stroke-width: 1.5`, `aria-hidden="true"`, class `type-icon`). See `type-icons.png`.
 
 | Type | Mark |
 |------|------|
@@ -343,7 +333,7 @@ Square (no radius), `1px solid var(--line)` frame, `object-fit: cover`. Everyone
 
 ## Interactions
 
-- Transitions: `0.15s` on colour, background and border only. No transforms, no shadows, no glow.
+- Transitions: `0.15s` on colour, background and border only. No transforms, no shadows, no glow (banners excepted, see `BANNER_DESIGN_GUIDE.md`).
 - Hover changes fill or colour (see Buttons). Links underline.
 - Focus: every focusable element shows `outline: 2px solid var(--rubric); outline-offset: 2px` on `:focus-visible`. Inputs use the rubric underline instead.
 - Touch targets ≥ 40px, ≥ 44px for primary and reply buttons.
@@ -359,7 +349,7 @@ Square (no radius), `1px solid var(--line)` frame, `object-fit: cover`. Everyone
 ✅ Square corners, hairlines, double rules
 ✅ Check both themes and phone width
 
-❌ No border-radius (except the unread dot), shadows, glows, gradients or textures
+❌ No border-radius (except the unread dot), shadows, glows, gradients or textures (banners excepted, see `BANNER_DESIGN_GUIDE.md`)
 ❌ No parchment/scroll images, wax seals or fake aging
 ❌ No blackletter for body text, labels or anything that must be read quickly
 ❌ No new colours outside the token set
