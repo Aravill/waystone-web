@@ -172,7 +172,7 @@ func userDisplayObject(user *models.User) map[string]interface{} {
 		"display_name":  user.DisplayName(),
 		"profile_url":   fmt.Sprintf("/profile?user_id=%s", user.ID),
 		"avatar_url":    user.AvatarURL(),
-		"avatar_letter": avatarLetter(user.DisplayName()),
+		"avatar_letter": userAvatarLetter(user),
 	}
 }
 

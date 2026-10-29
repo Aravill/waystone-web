@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 	"waystone-web/db"
 	"waystone-web/middleware"
+	"waystone-web/models"
 )
 
 func HandleProfile(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +104,7 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 	// Compute display_name
 	displayName := user.DisplayName()
 
-	// Compute initials from display name
+	// Default avatar: one letter of the display name ("?" for deleted users, below)
 	initials := avatarLetter(displayName)
 
 	// Check if this is the current user's profile
@@ -411,6 +412,14 @@ func HandleUserRoutes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Security-Policy", "default-src 'none'")
 	w.WriteHeader(http.StatusOK)
 	w.Write(data)
+}
+
+// userAvatarLetter is a user's default avatar letter; deleted accounts show "?".
+func userAvatarLetter(user *models.User) string {
+	if user.Deleted {
+		return "?"
+	}
+	return avatarLetter(user.DisplayName())
 }
 
 // avatarLetter is the default avatar: the first letter or digit of the display name.
