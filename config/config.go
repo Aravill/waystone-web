@@ -13,10 +13,11 @@ const (
 	DefaultPort = "8080"
 )
 
-// IsProduction reports whether ENVIRONMENT is "production" (case-insensitive).
-// Production skips the demo seed data below.
-func IsProduction() bool {
-	return strings.EqualFold(strings.TrimSpace(os.Getenv("ENVIRONMENT")), "production")
+// IsDevelopment reports whether ENVIRONMENT is "development" (case-insensitive).
+// Only development seeds the demo data below: its users share a known password,
+// so any other value - including unset - must never load it.
+func IsDevelopment() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("ENVIRONMENT")), "development")
 }
 
 const (

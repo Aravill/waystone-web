@@ -7,7 +7,7 @@ Waystone Web: Go (stdlib `net/http`, SQLite via `modernc.org/sqlite`, local user
 ## Commands
 
 - `.env.example` must list every env var the code reads (`os.Getenv`), with required/optional and defaults. Update it whenever you add, rename, or remove one, and keep `docker-compose.yml`'s `environment:` in sync.
-- Run locally: `go run main.go` → http://localhost:8080. Set `ADMIN_PASSWORD` (and `SESSION_SECRET`) per `.env.example`; without `ADMIN_PASSWORD` the server starts but the admin can't log in.
+- Run locally: `go run main.go` → http://localhost:8080. Set `ADMIN_PASSWORD` (and `SESSION_SECRET`) per `.env.example`; without `ADMIN_PASSWORD` the server starts but the admin can't log in. Demo seed data loads only with `ENVIRONMENT=development` (opt-in; `/deploy-local` sets it).
 - Verify changes: `go build ./... && go vet ./...`. There are no tests or linters; do not add tests unless explicitly asked.
 - `./deploy.sh` runs `docker-compose down -v`, which **wipes the SQLite data volume**. Never run it against data worth keeping.
 - For local Docker testing use `/deploy-local` (`up`/`down`/`status`), not `docker compose up`: plain compose names the project after the folder, so every worktree leaves its own image and volume behind.

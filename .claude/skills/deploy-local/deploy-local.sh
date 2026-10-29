@@ -32,6 +32,10 @@ cleanup() {
   docker image prune -f --filter "label=com.docker.compose.project=$PROJECT" >/dev/null
 }
 
+# Local test deploys always get the demo data (seeding is opt-in, see .env.example).
+# A shell variable takes precedence over the env file in compose interpolation.
+export ENVIRONMENT=development
+
 case "${1:-up}" in
   up)
     docker info >/dev/null 2>&1 || { echo "Docker is not running." >&2; exit 1; }

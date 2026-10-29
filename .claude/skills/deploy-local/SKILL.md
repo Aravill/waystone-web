@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Run `.claude/skills/deploy-local/deploy-local.sh $ARGUMENTS` from the checkout being tested (main repo or a `.claude/worktrees/...` worktree), with a timeout of at least 5 minutes for `up`.
 
-- `up` (default): wipes any previous `waystone-local` deployment, builds the current checkout, starts it with a **fresh database**, and waits until http://localhost:8080 responds. Uses the main repo's `.env` when running from a worktree.
+- `up` (default): wipes any previous `waystone-local` deployment, builds the current checkout, starts it with a **fresh database** seeded with demo data (`ENVIRONMENT=development`), and waits until http://localhost:8080 responds. Uses the main repo's `.env` when running from a worktree.
 - `down`: removes the container, data volume, and image. Nothing is left behind.
 - `status`: shows the running container.
 
