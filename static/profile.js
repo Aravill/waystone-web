@@ -255,7 +255,7 @@ window.profilePage = function() {
         async removeAvatar() {
             if (!(await this.askConfirm({
                 title: 'Remove avatar',
-                message: 'Remove your avatar? Your initials will be shown instead.',
+                message: 'Remove your avatar? The first letter of your nickname will be shown instead.',
                 confirmLabel: 'Remove'
             }))) {
                 return;
@@ -291,7 +291,7 @@ window.profilePage = function() {
         async deleteProfile() {
             const confirmed = await this.askConfirm({
                 title: 'Delete account',
-                message: "Are you sure? Your account will be anonymised: you'll be removed from all campaigns, your name and avatar will be erased, and you won't be able to log in again. Past session history is kept as 'Deleted user'.",
+                message: "Are you sure? Your account will be anonymised: you'll be removed from all games, your name and avatar will be erased, and you won't be able to log in again. Past session history is kept as 'Deleted user'.",
                 confirmLabel: 'Delete'
             });
             

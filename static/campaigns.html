@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Campaigns</title>
-    <link rel="stylesheet" href="styles.css?v=13">
-    <link rel="stylesheet" href="/static/notifications.css?v=2">
+    <title>Waystone - Games</title>
+    <script src="/static/theme.js?v=4"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=37">
+    <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body x-data="campaignsPage()">
@@ -13,39 +14,37 @@
         <div class="header-left">
             <a href="/" class="logo">Waystone</a>
         </div>
-        <div class="header-center">
-            <h1>Campaigns</h1>
-        </div>
+        <nav class="nav-bar" aria-label="Main">
+            <a href="/" class="nav-item" data-page="dashboard">Dashboard</a>
+            <a href="/campaigns" class="nav-item active" aria-current="page" data-page="campaigns">Games</a>
+            <a href="/profile" class="nav-item" data-page="profile">Profile</a>
+            <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
+        </nav>
         <div class="header-right">
             <span class="user-name" x-text="displayName"></span>
             <button @click="handleLogout()" class="logout-btn">Logout</button>
         </div>
     </div>
 
-    <div class="nav-bar">
-        <a href="/" class="nav-item" data-page="dashboard">Dashboard</a>
-        <a href="/campaigns" class="nav-item active" data-page="campaigns">Campaigns</a>
-        <a href="/profile" class="nav-item" data-page="profile">Profile</a>
-        <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
-    </div>
-
-    <!-- Campaigns Toolbar -->
-    <div class="campaigns-toolbar">
-        <button type="button" @click="openModal()" class="toolbar-button">Register campaign</button>
-    </div>
-
     <div class="container container--wide">
+        <div class="campaigns-toolbar">
+            <div class="page-head">
+                <h1 class="page-title"><span class="drop-cap">G</span>ames</h1>
+                <p class="page-subtitle" x-show="!loading && campaigns.length > 0" x-text="gamesSubtitle()"></p>
+            </div>
+            <button type="button" @click="openModal()" class="toolbar-button">+ Register game</button>
+        </div>
         <div class="campaigns-section">
-            <h2>Available Campaigns</h2>
             <div id="campaignsList" class="campaigns-list">
-                <p x-show="loading">Loading campaigns...</p>
+                <p x-show="loading">Loading games...</p>
                 <template x-if="campaigns.length === 0 && !loading">
-                    <p>No campaigns available.</p>
+                    <p>No games available.</p>
                 </template>
                 <template x-for="campaign in campaigns" :key="campaign.id">
-                    <div x-html="renderCampaignHtml(campaign)"></div>
+                    <div :class="bannerClass(campaign)" x-html="renderCampaignHtml(campaign)"></div>
                 </template>
             </div>
+            <p class="ornament" aria-hidden="true" x-show="campaigns.length > 0">❦ ❦ ❦</p>
             <div id="message" class="message" :class="messageType" x-show="messageVisible" x-text="messageText"></div>
         </div>
     </div>
@@ -54,8 +53,9 @@
     <div id="createCampaignModal" class="modal" :class="{ 'modal-open': modalOpen }" @click="handleModalBackdropClick($event)">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 x-text="editingCampaignId ? 'Edit Campaign' : 'Register a new Campaign'"></h2>
-                <button type="button" class="modal-close" @click="closeModal()">&times;</button>
+                <div class="modal-title-block"><p class="modal-eyebrow">The roll of games</p>
+                <h2 x-text="editingCampaignId ? 'Edit game' : 'Register game'"></h2></div>
+                <button type="button" class="modal-close" aria-label="Close" @click="closeModal()">&times;</button>
             </div>
             <form @submit.prevent="handleCreateCampaign()" class="modal-form">
                 <div class="form-group">
@@ -104,7 +104,7 @@
                 </template>
                 <div class="modal-actions">
                     <button type="submit" class="btn-create" x-text="editingCampaignId ? 'Save' : 'Create'"></button>
-                    <button type="button" class="btn-danger" x-show="editingCampaignId" @click="deleteCampaign()">Delete campaign</button>
+                    <button type="button" class="btn-danger" x-show="editingCampaignId" @click="deleteCampaign()">Delete game</button>
                     <button type="button" class="btn-cancel" @click="closeModal()">Cancel</button>
                 </div>
             </form>
@@ -115,19 +115,27 @@
     <div id="calendarModal" class="modal" :class="{ 'modal-open': calendarModalOpen }" @click="handleCalendarBackdropClick($event)">
         <div class="modal-content calendar-modal-content">
             <div class="modal-header">
-                <h2 x-text="`Calendar: ${currentCampaignTitle}`"></h2>
+                <div class="modal-title-block">
+                    <p class="modal-eyebrow">Calendar of sessions</p>
+                    <h2 x-text="currentCampaignTitle"></h2>
+                </div>
                 <div class="calendar-header-actions">
-                    <a href="/profile#calendar-sync" class="calendar-sync-link">Sync to calendar</a>
-                    <button type="button" class="modal-close" @click="closeCalendarModal()">&times;</button>
+                    <a href="/profile#calendar-sync" class="calendar-sync-link">Sync to calendar &rarr;</a>
+                    <button type="button" class="modal-close" aria-label="Close" @click="closeCalendarModal()">&times;</button>
                 </div>
             </div>
             <div class="calendar-layout">
                 <div class="calendar-main">
                     <!-- Month Navigation -->
                     <div class="calendar-nav">
-                        <button type="button" class="nav-btn" @click="previousMonth()"><<</button>
+                        <button type="button" class="nav-btn" @click="previousMonth()" aria-label="Previous month">&lsaquo;</button>
                         <span class="current-month" x-text="formatMonthYear()"></span>
-                        <button type="button" class="nav-btn" @click="nextMonth()">>></button>
+                        <button type="button" class="nav-btn" @click="nextMonth()" aria-label="Next month">&rsaquo;</button>
+                        <div class="calendar-legend">
+                            <span class="legend-item legend-confirmed">confirmed</span>
+                            <span class="legend-item legend-suggested">suggested</span>
+                            <span class="legend-item legend-cancelled">cancelled</span>
+                        </div>
                         <div class="calendar-message message" :class="messageType" x-show="messageVisible" x-text="messageText"></div>
                     </div>
 
@@ -162,11 +170,12 @@
                                  @keydown.enter.prevent="selectDay(day)"
                                  @keydown.space.prevent="selectDay(day)">
                                 <span class="day-pending-total"
-                                      x-show="hasPlannedSession(day)"
-                                      x-text="getPendingResponsesForDay(day)"></span>
+                                      x-show="hasPlannedSession(day) && getPendingResponsesForDay(day) > 0"
+                                      x-text="getPendingResponsesForDay(day)"
+                                      :title="`${getPendingResponsesForDay(day)} awaiting a reply`"></span>
                                 <div class="day-number" x-text="day.getDate()"></div>
                                 <template x-for="s in getCellSessions(day)" :key="s.id">
-                                    <div class="day-chip" :class="`chip-${s.status}`">
+                                    <div class="day-chip" :class="`chip-${s.status}`" :title="getSessionTimeRange(s)">
                                         <div class="day-chip-time" x-text="getSessionTimeRange(s)"></div>
                                         <div class="day-chip-counts" x-show="s.status !== 'Cancelled'">
                                             <span class="count-accepted" x-text="getAcceptedReaction(s)"></span>
@@ -185,10 +194,11 @@
                 <aside class="calendar-panel" x-ref="dayPanel">
                     <template x-if="selectedDay">
                         <div>
-                            <h3 x-text="formatDayHeading(selectedDay)"></h3>
+                            <p class="modal-eyebrow">Selected day</p>
+                            <h3 class="panel-heading"><span class="drop-cap" x-text="formatDayHeading(selectedDay).charAt(0)"></span><span x-text="formatDayHeading(selectedDay).slice(1)"></span></h3>
                             <p class="panel-empty" x-show="getSelectedDaySessions().length === 0">No sessions on this day.</p>
                             <template x-for="s in getSelectedDaySessions()" :key="s.id">
-                                <div class="panel-session">
+                                <div class="panel-session" :class="{ 'awaits-reply': !isCurrentUserDM && s.status === 'Suggested' && !s.current_user_participation }">
                                     <div class="panel-session-head">
                                         <span class="panel-session-time" x-text="getSessionTimeRange(s)"></span>
                                         <span class="panel-status-tag" :class="`chip-${s.status}`" x-text="s.status"></span>
@@ -198,22 +208,22 @@
                                     <template x-for="group in getResponseGroups(s)" :key="group.label">
                                         <div class="panel-response-group" x-show="group.users.length > 0">
                                             <span class="panel-response-label" :class="group.cls" x-text="`${group.label} (${group.users.length})`"></span>
-                                            <span class="panel-response-names" x-text="group.users.map((u) => getUserDisplayName(u)).join(', ')"></span>
+                                            <span class="panel-response-avatars" :class="`avatars-${group.cls}`" x-html="group.users.map((u) => avatarHtml(u)).join('')"></span>
                                         </div>
                                     </template>
 
                                     <div class="player-responses" x-show="!isCurrentUserDM && s.status !== 'Cancelled'">
-                                        <p>Your response:</p>
-                                        <div class="session-actions">
-                                            <button type="button" class="btn-response"
+                                        <p class="pending-notice"><span aria-hidden="true">✦</span> Thy reply</p>
+                                        <div class="session-actions session-replies">
+                                            <button type="button" class="btn-response btn-response--accepted"
                                                     :class="{ 'selected': s.current_user_participation === 'Accepted' }"
-                                                    @click="submitResponse('Accepted', s)">Accept</button>
-                                            <button type="button" class="btn-response"
-                                                    :class="{ 'selected': s.current_user_participation === 'Declined' }"
-                                                    @click="submitResponse('Declined', s)">Decline</button>
-                                            <button type="button" class="btn-response"
+                                                    @click="submitResponse('Accepted', s)">Aye</button>
+                                            <button type="button" class="btn-response btn-response--tentative"
                                                     :class="{ 'selected': s.current_user_participation === 'Tentative' }"
-                                                    @click="submitResponse('Tentative', s)">Tentative</button>
+                                                    @click="submitResponse('Tentative', s)">Perhaps</button>
+                                            <button type="button" class="btn-response btn-response--declined"
+                                                    :class="{ 'selected': s.current_user_participation === 'Declined' }"
+                                                    @click="submitResponse('Declined', s)">Nay</button>
                                         </div>
                                     </div>
 
@@ -235,7 +245,8 @@
                     </template>
                     <template x-if="!selectedDay">
                         <div>
-                            <h3 x-text="`Sessions in ${formatMonthYear()}`"></h3>
+                            <p class="modal-eyebrow">Month agenda</p>
+                            <h3 class="panel-heading" x-text="`Sessions in ${formatMonthYear()}`"></h3>
                             <p class="panel-empty" x-show="sessions.length === 0">No sessions this month.</p>
                             <template x-for="s in sessions" :key="s.id">
                                 <button type="button" class="agenda-row" :class="`chip-${s.status}`" @click="selectDay(parseDateLocal(s.date))">
@@ -256,8 +267,9 @@
     <div id="createSessionModal" class="modal create-session-modal" :class="{ 'modal-open': showCreateSessionModal }" @click="handleCreateSessionBackdropClick($event)">
         <div class="modal-content create-session-modal-content compact-modal-content">
             <div class="modal-header">
-                <h2>Create Session</h2>
-                <button type="button" class="modal-close" @click="closeCreateSessionModal()">&times;</button>
+                <div class="modal-title-block"><p class="modal-eyebrow" x-text="currentCampaignTitle"></p>
+                <h2>Suggest a session</h2></div>
+                <button type="button" class="modal-close" aria-label="Close" @click="closeCreateSessionModal()">&times;</button>
             </div>
             <form @submit.prevent="createSession()" class="modal-form compact-modal-form">
                 <div class="form-group">
@@ -276,8 +288,8 @@
                             <div class="duration-control">
                                 <input type="number" id="sessionDurationHours" class="duration-input" x-model.number="sessionFormData.durationHours" min="0" step="1" required>
                                 <div class="duration-arrows">
-                                    <button type="button" class="duration-arrow-btn" @click="adjustDurationPart('durationHours', 1)">▲</button>
-                                    <button type="button" class="duration-arrow-btn" @click="adjustDurationPart('durationHours', -1)">▼</button>
+                                    <button type="button" class="duration-arrow-btn" aria-label="One hour less" @click="adjustDurationPart('durationHours', -1)">−</button>
+                                    <button type="button" class="duration-arrow-btn" aria-label="One hour more" @click="adjustDurationPart('durationHours', 1)">+</button>
                                 </div>
                             </div>
                         </div>
@@ -286,8 +298,8 @@
                             <div class="duration-control">
                                 <input type="number" id="sessionDurationMinutes" class="duration-input" x-model.number="sessionFormData.durationMinutes" min="0" max="59" step="1" required>
                                 <div class="duration-arrows">
-                                    <button type="button" class="duration-arrow-btn" @click="adjustDurationPart('durationMinutes', 1)">▲</button>
-                                    <button type="button" class="duration-arrow-btn" @click="adjustDurationPart('durationMinutes', -1)">▼</button>
+                                    <button type="button" class="duration-arrow-btn" aria-label="One minute less" @click="adjustDurationPart('durationMinutes', -1)">−</button>
+                                    <button type="button" class="duration-arrow-btn" aria-label="One minute more" @click="adjustDurationPart('durationMinutes', 1)">+</button>
                                 </div>
                             </div>
                         </div>
@@ -313,8 +325,11 @@
     <div id="signupsModal" class="modal" :class="{ 'modal-open': signupsModalOpen }" @click="handleSignupsBackdropClick($event)">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 x-text="`Sign-ups: ${signupsCampaignTitle}`"></h2>
-                <button type="button" class="modal-close" @click="closeSignupsModal()">&times;</button>
+                <div class="modal-title-block">
+                    <p class="modal-eyebrow">Sign-ups</p>
+                    <h2 x-text="signupsCampaignTitle"></h2>
+                </div>
+                <button type="button" class="modal-close" aria-label="Close" @click="closeSignupsModal()">&times;</button>
             </div>
             <div class="modal-form signups-body">
                 <div class="signups-summary">
@@ -338,12 +353,13 @@
                     <ul class="signups-list" x-show="signupsByStatus('Pending').length > 0">
                         <template x-for="signup in signupsByStatus('Pending')" :key="signup.user_id">
                             <li class="signups-item">
+                                <span class="signups-item-avatar" x-html="avatarHtml(signup.signup_user, false)"></span>
                                 <div class="signups-item-info">
                                     <span class="signups-item-name" x-text="signup.signup_user ? signup.signup_user.display_name : signup.user_id"></span>
                                     <span class="signups-item-time" x-text="`signed up ${formatSignupTime(signup.created_at)}`"></span>
                                 </div>
                                 <div class="signups-item-actions">
-                                    <button type="button" class="btn-action signups-btn-accept" @click="setSignupStatus(signup.user_id, 'Accepted')" :disabled="isCampaignFull()" :title="isCampaignFull() ? 'Campaign is full' : ''">Accept</button>
+                                    <button type="button" class="btn-action signups-btn-accept" @click="setSignupStatus(signup.user_id, 'Accepted')" :disabled="isCampaignFull()" :title="isCampaignFull() ? 'Game is full' : ''">Accept</button>
                                     <button type="button" class="btn-action signups-btn-decline" @click="setSignupStatus(signup.user_id, 'Declined')">Decline</button>
                                 </div>
                             </li>
@@ -360,6 +376,7 @@
                     <ul class="signups-list" x-show="signupsByStatus('Accepted').length > 0">
                         <template x-for="signup in signupsByStatus('Accepted')" :key="signup.user_id">
                             <li class="signups-item">
+                                <span class="signups-item-avatar" x-html="avatarHtml(signup.signup_user, false)"></span>
                                 <div class="signups-item-info">
                                     <span class="signups-item-name" x-text="signup.signup_user ? signup.signup_user.display_name : signup.user_id"></span>
                                     <span class="signups-item-time" x-text="`signed up ${formatSignupTime(signup.created_at)}`"></span>
@@ -389,12 +406,13 @@
                             <ul class="signups-list" x-show="signupsByStatus('Declined').length > 0">
                                 <template x-for="signup in signupsByStatus('Declined')" :key="signup.user_id">
                                     <li class="signups-item">
+                                        <span class="signups-item-avatar" x-html="avatarHtml(signup.signup_user, false)"></span>
                                         <div class="signups-item-info">
                                             <span class="signups-item-name" x-text="signup.signup_user ? signup.signup_user.display_name : signup.user_id"></span>
                                             <span class="signups-item-time" x-text="`signed up ${formatSignupTime(signup.created_at)}`"></span>
                                         </div>
                                         <div class="signups-item-actions">
-                                            <button type="button" class="btn-action signups-btn-accept" @click="setSignupStatus(signup.user_id, 'Accepted')" :disabled="isCampaignFull()" :title="isCampaignFull() ? 'Campaign is full' : ''">Accept</button>
+                                            <button type="button" class="btn-action signups-btn-accept" @click="setSignupStatus(signup.user_id, 'Accepted')" :disabled="isCampaignFull()" :title="isCampaignFull() ? 'Game is full' : ''">Accept</button>
                                         </div>
                                     </li>
                                 </template>
@@ -409,12 +427,13 @@
                             <ul class="signups-list" x-show="signupsByStatus('Kicked').length > 0">
                                 <template x-for="signup in signupsByStatus('Kicked')" :key="signup.user_id">
                                     <li class="signups-item">
+                                        <span class="signups-item-avatar" x-html="avatarHtml(signup.signup_user, false)"></span>
                                         <div class="signups-item-info">
                                             <span class="signups-item-name" x-text="signup.signup_user ? signup.signup_user.display_name : signup.user_id"></span>
                                             <span class="signups-item-time" x-text="`signed up ${formatSignupTime(signup.created_at)}`"></span>
                                         </div>
                                         <div class="signups-item-actions">
-                                            <button type="button" class="btn-action signups-btn-accept" @click="setSignupStatus(signup.user_id, 'Accepted')" :disabled="isCampaignFull()" :title="isCampaignFull() ? 'Campaign is full' : ''">Accept</button>
+                                            <button type="button" class="btn-action signups-btn-accept" @click="setSignupStatus(signup.user_id, 'Accepted')" :disabled="isCampaignFull()" :title="isCampaignFull() ? 'Game is full' : ''">Accept</button>
                                         </div>
                                     </li>
                                 </template>
@@ -446,7 +465,7 @@
         </div>
     </div>
 
-    <script src="/static/notifications.js?v=5"></script>
-    <script src="campaigns.js?v=14"></script>
+    <script src="/static/notifications.js?v=8"></script>
+    <script src="campaigns.js?v=29"></script>
 </body>
 </html>

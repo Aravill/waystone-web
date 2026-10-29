@@ -71,7 +71,7 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 	campaigns, err := db.GetAllCampaigns()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to retrieve campaigns"}`)
+		fmt.Fprintf(w, `{"error": "failed to retrieve games"}`)
 		return
 	}
 
@@ -101,13 +101,13 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 	pendingSignups, err := db.CountPendingSignupsForDM(currentUserID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to retrieve campaign counts"}`)
+		fmt.Fprintf(w, `{"error": "failed to retrieve game counts"}`)
 		return
 	}
 	unanswered, err := db.GetUnansweredSessions(currentUserID, time.Now().UTC().Format("2006-01-02"))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to retrieve campaign counts"}`)
+		fmt.Fprintf(w, `{"error": "failed to retrieve game counts"}`)
 		return
 	}
 
@@ -182,14 +182,7 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 		// Add DM user display object if DM exists
 		if campaign.DM != "" {
 			if dmUser, ok := userMap[campaign.DM]; ok && dmUser != nil {
-				campaignObj["dm_user"] = map[string]interface{}{
-					"id":           dmUser.ID,
-					"name":         dmUser.Name,
-					"nickname":     dmUser.Nickname,
-					"display_name": dmUser.DisplayName(),
-					"profile_url":  fmt.Sprintf("/profile?user_id=%s", dmUser.ID),
-					"avatar_url":   dmUser.AvatarURL(),
-				}
+				campaignObj["dm_user"] = userDisplayObject(dmUser)
 			}
 		}
 
@@ -197,14 +190,7 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 		playerUsers := []map[string]interface{}{}
 		for _, playerID := range campaign.Players {
 			if playerUser, ok := userMap[playerID]; ok && playerUser != nil {
-				playerUsers = append(playerUsers, map[string]interface{}{
-					"id":           playerUser.ID,
-					"name":         playerUser.Name,
-					"nickname":     playerUser.Nickname,
-					"display_name": playerUser.DisplayName(),
-					"profile_url":  fmt.Sprintf("/profile?user_id=%s", playerUser.ID),
-					"avatar_url":   playerUser.AvatarURL(),
-				})
+				playerUsers = append(playerUsers, userDisplayObject(playerUser))
 			}
 		}
 		campaignObj["player_users"] = playerUsers
@@ -272,14 +258,14 @@ func HandleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 	// Save campaign to database
 	if err := db.SaveCampaign(campaign); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to create campaign"}`)
+		fmt.Fprintf(w, `{"error": "failed to create game"}`)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
 	data, _ := json.Marshal(map[string]interface{}{
 		"status":      "success",
-		"message":     "campaign created successfully",
+		"message":     "game created successfully",
 		"campaign_id": campaign.ID,
 	})
 	w.Write(data)
@@ -312,7 +298,7 @@ func (req *campaignRequest) normalize() string {
 	case req.Description == "":
 		return "description is required"
 	case !req.Type.IsValid():
-		return "invalid campaign type"
+		return "invalid game type"
 	case req.DesiredPlayerCount < 0:
 		return "desired player count cannot be negative"
 	case utf8.RuneCountInString(req.System) > 64:
@@ -344,7 +330,7 @@ func loadManagedCampaign(w http.ResponseWriter, r *http.Request, campaignID stri
 		return nil, false
 	}
 	if user == nil || !user.IsAdmin() {
-		writeJSONError(w, http.StatusForbidden, "only the campaign DM or an admin can manage this campaign")
+		writeJSONError(w, http.StatusForbidden, "only the game DM or an admin can manage this game")
 		return nil, false
 	}
 	return campaign, true
@@ -399,10 +385,10 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 			writeJSONError(w, http.StatusNotFound, err.Error())
 			return
 		}
-		writeJSONError(w, http.StatusInternalServerError, "failed to update campaign")
+		writeJSONError(w, http.StatusInternalServerError, "failed to update game")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "campaign updated"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "game updated"})
 }
 
 func handleDeleteCampaign(w http.ResponseWriter, r *http.Request, campaignID string) {
@@ -414,10 +400,10 @@ func handleDeleteCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 			writeJSONError(w, http.StatusNotFound, err.Error())
 			return
 		}
-		writeJSONError(w, http.StatusInternalServerError, "failed to delete campaign")
+		writeJSONError(w, http.StatusInternalServerError, "failed to delete game")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "campaign deleted"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "game deleted"})
 }
 
 // HandleCampaignStatus handles /api/campaigns/{id}/status (PUT change status).

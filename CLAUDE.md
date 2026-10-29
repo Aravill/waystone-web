@@ -7,7 +7,7 @@ Waystone Web: Go (stdlib `net/http`, SQLite via `modernc.org/sqlite`, local user
 ## Commands
 
 - `.env.example` must list every env var the code reads (`os.Getenv`), with required/optional and defaults. Update it whenever you add, rename, or remove one, and keep `docker-compose.yml`'s `environment:` in sync.
-- Run locally: `go run main.go` → http://localhost:8080. Set `ADMIN_PASSWORD` (and `SESSION_SECRET`) per `.env.example`; without `ADMIN_PASSWORD` the server starts but the admin can't log in.
+- Run locally: `go run main.go` → http://localhost:8080. Set `ADMIN_PASSWORD` (and `SESSION_SECRET`) per `.env.example`; without `ADMIN_PASSWORD` the server starts but the admin can't log in. Demo seed data loads only with `ENVIRONMENT=development` (opt-in; `/deploy-local` sets it).
 - Verify changes: `go build ./... && go vet ./...`. There are no tests or linters; do not add tests unless explicitly asked.
 - `./deploy.sh` runs `docker-compose down -v`, which **wipes the SQLite data volume**. Never run it against data worth keeping.
 - For local Docker testing use `/deploy-local` (`up`/`down`/`status`), not `docker compose up`: plain compose names the project after the folder, so every worktree leaves its own image and volume behind.
@@ -28,7 +28,7 @@ Waystone Web: Go (stdlib `net/http`, SQLite via `modernc.org/sqlite`, local user
 
 - Go: handlers named `HandleXxx`; always set `Content-Type: application/json` and an explicit status; decode bodies with `json.NewDecoder(r.Body).Decode(&v)`; guard methods with `r.Method` checks.
 - JS: `fetch()` only; wrap calls in try/catch and report via `showMessage(text, 'error')`; use `textContent` (or `escapeHtml()`) for user-generated content; init on `DOMContentLoaded`.
-- Styling follows `STYLE_GUIDE.md` (black, monospace, cyan accent). Read it before UI work. Bump the `?v=N` cache-busting query on CSS links when changing CSS.
+- Styling follows `STYLE_GUIDE.md` ("Scriptorium": parchment/candlelight themes via CSS tokens, Courier Prime + IM Fell, rubric-red accent; mock-ups in `docs/design/mockups/`). Read it before UI work. Bump the `?v=N` cache-busting query on CSS links when changing CSS.
 - Keep the app lightweight and minimal: surgical changes, reuse existing helpers before adding abstractions, no broad refactors unless asked.
 
 ## Git

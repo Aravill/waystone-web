@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 	"waystone-web/db"
 	"waystone-web/middleware"
+	"waystone-web/models"
 )
 
 func HandleProfile(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +75,7 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 		log.Printf("error fetching campaigns: %v", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "failed to fetch campaigns"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to fetch games"})
 		return
 	}
 
@@ -102,8 +104,8 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 	// Compute display_name
 	displayName := user.DisplayName()
 
-	// Compute initials from display name
-	initials := computeInitials(displayName)
+	// Default avatar: one letter of the display name ("?" for deleted users, below)
+	initials := avatarLetter(displayName)
 
 	// Check if this is the current user's profile
 	sessionUserID, _ := session["user_id"].(string)
@@ -412,26 +414,20 @@ func HandleUserRoutes(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func computeInitials(name string) string {
-	parts := strings.Fields(name)
-	if len(parts) == 0 {
+// userAvatarLetter is a user's default avatar letter; deleted accounts show "?".
+func userAvatarLetter(user *models.User) string {
+	if user.Deleted {
 		return "?"
 	}
+	return avatarLetter(user.DisplayName())
+}
 
-	initials := []rune{}
-	for _, part := range parts {
-		runes := []rune(part)
-		if len(runes) > 0 {
-			initials = append(initials, runes[0])
-		}
-		if len(initials) == 2 {
-			break
+// avatarLetter is the default avatar: the first letter or digit of the display name.
+func avatarLetter(name string) string {
+	for _, r := range name {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return strings.ToUpper(string(r))
 		}
 	}
-
-	if len(initials) == 0 {
-		return "?"
-	}
-
-	return strings.ToUpper(string(initials))
+	return "?"
 }

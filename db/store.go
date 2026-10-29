@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"log"
 	"time"
 	"waystone-web/auth"
 	"waystone-web/config"
@@ -77,8 +78,13 @@ func Initialize() error {
 	}
 
 	store = sqlStore
-	if err := seedIfEmpty(); err != nil {
-		return err
+	if !config.IsDevelopment() {
+		log.Println("ENVIRONMENT is not development: skipping demo seed data")
+	} else {
+		log.Println("WARNING: ENVIRONMENT=development: seeding demo data into an empty database (demo users share a known password)")
+		if err := seedIfEmpty(); err != nil {
+			return err
+		}
 	}
 	return EnsureAdmin()
 }
@@ -133,6 +139,16 @@ func seedIfEmpty() error {
 			}
 		}
 		now := time.Now().UTC().Format(time.RFC3339)
+		// Sign-ups point at seed users, so only add them when those users are seeded too.
+		for _, signup := range config.InitialSignups {
+			if len(users) > 0 {
+				break
+			}
+			signup.CreatedAt, signup.UpdatedAt = now, now
+			if err := store.CreateCampaignSignup(signup); err != nil {
+				return fmt.Errorf("failed to seed signup: %w", err)
+			}
+		}
 		for _, seeded := range config.InitialSessions() {
 			session := seeded.Session
 			session.ID = GenerateUUID()

@@ -100,11 +100,11 @@ func handleGetSessions(w http.ResponseWriter, r *http.Request, campaignID string
 
 	campaign, err := db.GetCampaignByID(campaignID)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve campaign")
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve game")
 		return
 	}
 	if campaign == nil {
-		writeJSONError(w, http.StatusNotFound, "campaign not found")
+		writeJSONError(w, http.StatusNotFound, "game not found")
 		return
 	}
 
@@ -114,7 +114,7 @@ func handleGetSessions(w http.ResponseWriter, r *http.Request, campaignID string
 		return
 	}
 	if !hasCampaignSessionAccess(campaign, userID) {
-		writeJSONError(w, http.StatusForbidden, "only campaign DM and registered players can view sessions")
+		writeJSONError(w, http.StatusForbidden, "only game DM and registered players can view sessions")
 		return
 	}
 
@@ -187,15 +187,15 @@ func handleCreateSession(w http.ResponseWriter, r *http.Request, campaignID stri
 
 	campaign, err := db.GetCampaignByID(campaignID)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve campaign")
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve game")
 		return
 	}
 	if campaign == nil {
-		writeJSONError(w, http.StatusNotFound, "campaign not found")
+		writeJSONError(w, http.StatusNotFound, "game not found")
 		return
 	}
 	if campaign.DM != userID {
-		writeJSONError(w, http.StatusForbidden, "only campaign DM can create sessions")
+		writeJSONError(w, http.StatusForbidden, "only game DM can create sessions")
 		return
 	}
 
@@ -264,7 +264,7 @@ func handleUpdateSessionStatus(w http.ResponseWriter, r *http.Request, campaignI
 		return
 	}
 	if campaign == nil {
-		writeJSONError(w, http.StatusNotFound, "campaign not found")
+		writeJSONError(w, http.StatusNotFound, "game not found")
 		return
 	}
 	if session == nil {
@@ -272,7 +272,7 @@ func handleUpdateSessionStatus(w http.ResponseWriter, r *http.Request, campaignI
 		return
 	}
 	if campaign.DM != userID {
-		writeJSONError(w, http.StatusForbidden, "only campaign DM can update sessions")
+		writeJSONError(w, http.StatusForbidden, "only game DM can update sessions")
 		return
 	}
 
@@ -346,7 +346,7 @@ func handleDeleteSession(w http.ResponseWriter, r *http.Request, campaignID, ses
 		return
 	}
 	if campaign == nil {
-		writeJSONError(w, http.StatusNotFound, "campaign not found")
+		writeJSONError(w, http.StatusNotFound, "game not found")
 		return
 	}
 	if session == nil {
@@ -354,7 +354,7 @@ func handleDeleteSession(w http.ResponseWriter, r *http.Request, campaignID, ses
 		return
 	}
 	if campaign.DM != userID {
-		writeJSONError(w, http.StatusForbidden, "only campaign DM can delete sessions")
+		writeJSONError(w, http.StatusForbidden, "only game DM can delete sessions")
 		return
 	}
 
@@ -400,7 +400,7 @@ func handleSubmitSessionResponse(w http.ResponseWriter, r *http.Request, campaig
 		return
 	}
 	if campaign == nil {
-		writeJSONError(w, http.StatusNotFound, "campaign not found")
+		writeJSONError(w, http.StatusNotFound, "game not found")
 		return
 	}
 	if session == nil {
@@ -416,7 +416,7 @@ func handleSubmitSessionResponse(w http.ResponseWriter, r *http.Request, campaig
 		}
 	}
 	if !isPlayer {
-		writeJSONError(w, http.StatusForbidden, "only registered campaign players can respond")
+		writeJSONError(w, http.StatusForbidden, "only registered game players can respond")
 		return
 	}
 
@@ -459,7 +459,7 @@ func handleGetSessionResponses(w http.ResponseWriter, r *http.Request, campaignI
 		return
 	}
 	if campaign == nil {
-		writeJSONError(w, http.StatusNotFound, "campaign not found")
+		writeJSONError(w, http.StatusNotFound, "game not found")
 		return
 	}
 	if session == nil {
@@ -473,7 +473,7 @@ func handleGetSessionResponses(w http.ResponseWriter, r *http.Request, campaignI
 		return
 	}
 	if !hasCampaignSessionAccess(campaign, userID) {
-		writeJSONError(w, http.StatusForbidden, "only campaign DM and registered players can view responses")
+		writeJSONError(w, http.StatusForbidden, "only game DM and registered players can view responses")
 		return
 	}
 
@@ -506,12 +506,7 @@ func handleGetSessionResponses(w http.ResponseWriter, r *http.Request, campaignI
 		}
 		respondedPlayers[response.UserID] = true
 		if user, ok := userMap[response.UserID]; ok && user != nil {
-			respObj.User = map[string]interface{}{
-				"id":           user.ID,
-				"name":         user.Name,
-				"nickname":     user.Nickname,
-				"display_name": user.DisplayName(),
-			}
+			respObj.User = userDisplayObject(user)
 		}
 		enriched = append(enriched, respObj)
 	}
@@ -522,12 +517,7 @@ func handleGetSessionResponses(w http.ResponseWriter, r *http.Request, campaignI
 			continue
 		}
 		if user, ok := userMap[playerID]; ok && user != nil {
-			pending = append(pending, map[string]interface{}{
-				"id":           user.ID,
-				"name":         user.Name,
-				"nickname":     user.Nickname,
-				"display_name": user.DisplayName(),
-			})
+			pending = append(pending, userDisplayObject(user))
 			continue
 		}
 		pending = append(pending, map[string]interface{}{

@@ -1,529 +1,371 @@
 # Waystone Web Style Guide
 
-This document defines the visual and design conventions used across the Waystone Web application. All new features and pages should follow these guidelines to maintain a consistent, cohesive user experience.
+The visual conventions for Waystone Web. Every page and feature follows them. Reference mock-ups live in `docs/design/mockups/`:
+
+| Mock-up | Shows |
+|---------|-------|
+| `style-sheet.png` | Inks, letters, seals, instruments: the source for this guide |
+| `login.png` | Narrow framed form |
+| `campaigns-parchment.png` | Header, nav, page title, game card grid (light) |
+| `type-icons.png` | The three game-type marks, light and dark |
+| `campaigns-candlelight.png` | The same page in the dark theme |
+| `calendar.png` | Modal sheet, calendar grid, session chips, reply buttons |
 
 ## Design Philosophy
 
-**Minimalistic, Terminal-Inspired Aesthetic**
+**"Scriptorium": typewritten text on a manuscript page.**
 
-- Dark, focused interface that puts content first
-- Monospace font for a technical, precise feel
-- Limited color palette emphasizing clarity over decoration
-- Subtle borders and spacing for visual structure
-- Responsive mobile-first approach
+- A calm parchment page with iron-gall ink, and a single red accent used the way scribes rubricated headings
+- Typewriter text for everything you read. Old-style display type only for titles and the brand
+- Minimal: square corners, hairline and double rules, no textures, shadows, gradients or glows
+- Decoration is typographic and sparse: `§`, `❦`, `✦`, `♛`. Never images of parchment, wax seals or scrolls
+- Light flavour copy ("Thy reply", "Aye / Perhaps / Nay") is welcome in headings and buttons, never in error messages or anything that has to be read precisely
+- Mobile-first and responsive
 
 ---
 
-## Color Palette
+## Colour
 
-### Primary Colors
+All colours are CSS custom properties on `:root`. Never hard-code a hex value in a component. Use the token.
 
-| Purpose | Color | Hex | Usage |
-|---------|-------|-----|-------|
-| Background | Pure Black | `#000000` | Page background, default container background |
-| Text (Primary) | Off-White | `#ffffff` | Headings, high-contrast text |
-| Text (Secondary) | Light Gray | `#e0e0e0` | Body text, primary content |
-| Text (Tertiary) | Medium Gray | `#888888` | Descriptions, metadata, secondary info |
-| Text (Disabled) | Dark Gray | `#555555` | Disabled state text, placeholders |
+### Parchment (light, default)
 
-### Accent Colors
+| Token | Name | Hex | Usage |
+|-------|------|-----|-------|
+| `--bg` | Vellum | `#F2EAD8` | Page background, cards, inputs |
+| `--folio` | Folio | `#E6DBC2` | Selected / hover fill, modal backdrop page, raised areas |
+| `--ink` | Iron-gall | `#2B241C` | Text, strong rules, primary button fill |
+| `--muted` | Faded ink | `#6B5E4B` | Metadata, labels, inactive nav, finished/cancelled |
+| `--line` | Hairline | `rgba(43, 36, 28, 0.4)` | Card borders, dividers, secondary button borders |
+| `--rubric` | Rubric | `#8E2A1E` | The accent: section marks, DMs, pending actions, errors, destructive actions, active nav underline, links |
+| `--verdigris` | Verdigris | `#355E52` | Success, Ongoing, accepted, confirmed sessions |
+| `--ochre` | Ochre | `#7A5A12` | Tentative, On Hiatus |
 
-| Purpose | Color | Hex | Usage |
-|---------|-------|-----|-------|
-| Accent / Interactive | Cyan | `#00d9ff` | Links, buttons, focus states, active borders |
-| Success | Green | `#00ff7f` | Success messages, confirmations |
-| Error | Hot Pink | `#ff006e` | Error messages, warnings, destructive actions |
+### Candlelight (dark)
 
-### Semantic Colors
+The same tokens redefined. Applied with `[data-theme="dark"]` on `<html>`, and by default under `@media (prefers-color-scheme: dark)`. A sun/moon button in the header (`static/theme.js`, loaded non-deferred in `<head>` so it applies before paint) flips the theme and stores the choice in `localStorage` under `waystone-theme`; until the user picks one, the system preference wins.
 
-| Purpose | Background | Text | Border |
-|---------|-----------|------|--------|
-| Success Message | `#0a1a0a` | `#00ff7f` | `#00ff7f` |
-| Error Message | `#1a0a0a` | `#ff006e` | `#ff006e` |
-| Disabled State | `#0a0a0a` | `#555555` (opacity 0.5) | `#2a2a2a` |
-| Active Element | `#0a1a1a` | `#ffffff` | `#00d9ff` |
+| Token | Hex |
+|-------|-----|
+| `--bg` | `#16120E` |
+| `--folio` | `#2A231B` |
+| `--ink` | `#E8DCC4` |
+| `--muted` | `#A8997F` |
+| `--line` | `rgba(232, 220, 196, 0.3)` |
+| `--rubric` | `#D9735C` |
+| `--verdigris` | `#7FB09E` |
+| `--ochre` | `#D4A94A` |
 
-### Border & Structure
+```css
+:root {
+    --bg: #F2EAD8; --folio: #E6DBC2; --ink: #2B241C; --muted: #6B5E4B;
+    --line: rgba(43, 36, 28, 0.4);
+    --rubric: #8E2A1E; --verdigris: #355E52; --ochre: #7A5A12;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+        --line: rgba(232, 220, 196, 0.3);
+        --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
+    }
+}
+:root[data-theme="dark"] { /* same values as the media query block */ }
+```
 
-| Element | Color | Hex |
-|---------|-------|-----|
-| Primary Borders | Dark Gray | `#333333` |
-| Subtle Borders | Darker Gray | `#2a2a2a` |
-| Dividers | Dark Gray | `#333333` |
+### Rules
+
+- One accent. `--rubric` is the only "look here" colour. Verdigris and ochre are only for state (success / tentative), never decoration.
+- Every token pair used for text meets 4.5:1 contrast on `--bg` in both themes. Check any new pairing.
+- Inverse elements (primary buttons) use `background: var(--ink); color: var(--bg)`, which flips correctly in dark mode.
+- State is never shown by colour alone: pair it with a glyph (`✓ ? ✗ ✦ ● ◐`), a border style (solid / dashed / dotted) or strikethrough.
 
 ---
 
 ## Typography
 
-### Font Family
+Three families, vendored as woff2 under `static/vendor/fonts/` (SIL Open Font License, latin and latin-ext subsets) and declared with `@font-face` at the top of `styles.css`. Pages need no font link, and nothing loads from a third party at runtime.
 
-```css
-font-family: 'Fira Code', monospace;
-```
+| Role | Family | Use for |
+|------|--------|---------|
+| Text | `'Courier Prime', 'Courier New', monospace` | Everything by default: body, labels, buttons, badges, inputs, nav |
+| Display | `'IM Fell English SC', serif` | Page titles (h1), card titles, modal titles, section headings, month names |
+| Blackletter | `'UnifrakturMaguntia', serif` | The "Waystone" wordmark and an optional drop cap on h1 only. Never for a whole word other than the brand, never below 32px |
 
-**Fira Code** is imported from Google Fonts. It's monospaced, professional, and evokes a technical terminal aesthetic.
+### Scale
 
-### Font Sizes & Weights
+| Element | Family | Size | Weight | Tracking | Case |
+|---------|--------|------|--------|----------|------|
+| Wordmark (header) | Blackletter | 34px | 400 | normal | as-is |
+| Page title (h1) | Display | 44px (drop cap 56px in `--rubric`) | 400 | normal | as-is (small caps come from the font) |
+| Section heading (h2) | Display | 24px, `--rubric`, prefixed `§` | 400 | normal | as-is |
+| Card / modal title | Display | 27px / 32px | 400 | normal | as-is |
+| Body | Text | 16px, line-height 1.6 | 400 | normal | sentence |
+| Small / meta | Text | 14px, `--muted` | 400 | normal | sentence |
+| Game system | Text | 14px italic, `--muted` | 400 | normal | as-is |
+| Label, nav, button | Text | 12–14px | 400 | 2px | UPPERCASE |
+| Eyebrow / kicker | Text | 12px, `--muted` | 400 | 3px | UPPERCASE |
+| Badge | Text | 11–12px | 400 | 2px | UPPERCASE |
 
-#### Desktop
-
-| Element | Size | Weight | Letter Spacing | Usage |
-|---------|------|--------|-----------------|-------|
-| Page Heading (h1) | 1.5em (24px) | 500 | 2px | Main page title |
-| Section Heading (h2) | 1.2em (19px) | 400 | 1px | Section titles |
-| Card Heading (h3) | 1.1em (18px) | 400 | 1px | Module/card titles |
-| Body Text | 0.95em (15px) | 400 | normal | Form labels, descriptions |
-| Small Text | 0.85em (14px) | 400 | normal | Metadata, secondary info |
-| Button Text | 0.85em (14px) | 400 | 1px | Buttons, links |
-| Badge Text | 0.75em (12px) | 400 | 0.5px | Status badges |
-
-#### Mobile
-
-Reduce by 1 step (e.g., h1: 1.2em → 24px becomes 20px). Maintain hierarchy and letter-spacing.
+On screens ≤ 768px drop h1 to 34px and card titles to 23px. Keep tracking and case.
 
 ---
 
 ## Layout & Spacing
 
-### Grid System
-
-- **Container Max Width**: 900px (for modular layouts like dashboard)
-- **Narrow Container Max Width**: 600px (for forms, like event signup)
-- **Mobile Padding**: 20px (on smaller screens)
-- **Desktop Padding**: 40px (standard horizontal padding)
-
-### Spacing Scale
-
-```
-Base Unit: 5px
-
-- 10px (2 units): Minimal spacing between related elements
-- 15px (3 units): Intra-group spacing
-- 20px (4 units): Small gaps, medium element spacing
-- 25px (5 units): Medium gaps
-- 30px (6 units): Large gaps, section spacing
-- 40px (8 units): Extra-large spacing, page padding
-```
-
-### Responsive Breakpoints
-
-```css
-@media (max-width: 768px) {
-    /* Mobile layout adjustments */
-    /* Single-column grids, reduced padding */
-}
-```
+- **Page width**: content in a centred column, `max-width: 1160px`, `padding: 0 24px` (16px on phones).
+- **Narrow pages** (login, change password, forms): `max-width: 420px`.
+- **Spacing scale** (multiples of 4px): 4, 8, 12, 16, 24, 32, 48, 64. Card padding 22–24px, grid gap 28px, page sections 32–40px apart.
+- **Card grid**: `grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 28px;`. It goes to one column on its own on phones.
+- **Units**: sizes in this guide are given in px for readability. The CSS writes them in rem (px / 16), with hairline border and outline widths kept in px.
+- **Breakpoint**: `@media (max-width: 768px)` for header stacking and type scale-down.
+- **Rules**: a `3px double var(--ink)` rule closes the header and modal headers. Hairlines (`1px solid var(--line)`) divide content within cards. A plain `1px solid var(--ink)` separates major sections.
+- **Corners**: always square. `border-radius` only on the round unread-count dot.
 
 ---
 
 ## Components
 
+Keep the existing class names (`.header`, `.nav-item`, `.message`, `.campaign-status-badge`, `.status-*`, `.module-card`, `.danger-zone`, …) and restyle them. Markup changes only where the design needs new structure: the shared header, page titles, and the banner game cards (shape layers, headpiece, corners and the notice slot are built in `campaigns.js`).
+
+### Header & navigation
+
+Wordmark left, nav centre, theme toggle + inbox + user + logout right, all on one row closed by a double rule. Flex-wrap so it stacks on phones. The page title moves out of the header into the page body as an h1 (see `campaigns-parchment.png`).
+
+```css
+.header {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
+    max-width: 1160px; margin: 0 auto; padding: 28px 24px 18px;
+    border-bottom: 3px double var(--ink);
+}
+.logo { font-family: 'UnifrakturMaguntia', serif; font-size: 34px; color: var(--ink); text-decoration: none; }
+.nav-item {
+    padding: 8px 0; color: var(--muted); text-decoration: none;
+    font-size: 14px; letter-spacing: 2px; text-transform: uppercase;
+    border-bottom: 2px solid transparent;
+}
+.nav-item:hover { color: var(--ink); }
+.nav-item.active { color: var(--ink); border-bottom-color: var(--rubric); }
+```
+
+The logo mark is the standing-stone from the mock-ups: a tapered stone with a downward rune, on a ground line. It is the `--stone-mark` mask in `styles.css`, coloured by `currentColor`, next to the wordmark (and above it on the login page). Unread inbox count: a 16px `--rubric` circle with `--bg` text.
+
+### Page title
+
+```html
+<h1 class="page-title"><span class="drop-cap">G</span>ames</h1>
+<p class="page-subtitle">6 games on the roll · 2 await thee</p>
+```
+
+The drop cap is optional and goes on the page h1. The one other place for it is a heading inside a modal that names a single thing, like the calendar's selected day (34px there). The subtitle summarises the list, and counts what awaits the viewer when that's above zero.
+
 ### Buttons
 
-#### Primary Button (CTA)
+Square, uppercase, 2px tracking, min-height 40px (44px for primary actions on touch). No transitions longer than 0.15s, no lift, no glow.
+
+| Variant | Style | Use |
+|---------|-------|-----|
+| Primary | `background: var(--ink); color: var(--bg); border: 1px solid var(--ink)` | One main action per view: Sign up, Register game, Enter, Save |
+| Secondary | `background: none; color: var(--ink); border: 1px solid var(--line)` | Follow, Calendar, Edit, Leave, Cancel |
+| Danger | `background: none; color: var(--rubric); border: 1px solid var(--rubric)` | Delete game, Delete account, Remove player |
+| Text link | `color: var(--rubric); text-decoration: underline; text-underline-offset: 4px` | "Sync to calendar →" |
+
+Hover: primary goes to `opacity: 0.85`, secondary and danger fill with their border colour and switch text to `--bg`. Disabled: `opacity: 0.5; cursor: not-allowed`.
+
+### Form inputs
+
+A ledger line, not a box:
 
 ```css
-.submit-btn, .logout-btn, .action-btn {
-    padding: 12px 16px;
-    background: #000000;
-    color: #00d9ff;
-    border: 1px solid #00d9ff;
-    font-family: 'Fira Code', monospace;
-    font-size: 0.85em;
-    transition: all 0.3s;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    cursor: pointer;
+label {
+    font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
 }
-
-.submit-btn:hover {
-    background: #00d9ff;
-    color: #000000;
+input, select, textarea {
+    font-family: inherit; font-size: 16px; color: var(--ink); background: transparent;
+    border: none; border-bottom: 1px solid var(--ink); padding: 10px 2px;
 }
+input:focus, select:focus, textarea:focus {
+    outline: none; border-bottom: 2px solid var(--rubric); padding-bottom: 9px;
+}
+input::placeholder { color: var(--muted); }
+.form-hint { font-size: 13px; color: var(--muted); }
+```
 
-.submit-btn:active {
-    opacity: 0.8;
+Textareas and multi-line fields may use a full `1px solid var(--line)` box.
+
+### Cards
+
+**Game cards are banners.** Each one stands on its own: no rod, so cards never read as one strip. A game gets one of three variants, picked from its id so it never changes. Each variant has its own shape, headpiece and decorated top corners:
+
+| Variant | Shape (`.banner-N`) | Headpiece | Top corners |
+|---------|--------------------|-----------|-------------|
+| 1 | Swallowtail: a V-notch cut into the bottom | Scrollwork curls around a diamond | Rounded bracket with an inward curl |
+| 2 | Pointed: the bottom tapers to a point | A leaf trefoil with leaf tips | Bracket with a corner leaf |
+| 3 | Torn: ragged bottom edge, a side rip, a nicked corner | Interlaced rings with arrowhead tips | Double bracket with a diamond |
+
+- **Outline:** the shape is drawn with clipped layers, not a border: a `--line` layer in the shape, then a `--bg` fill inset 1px (`--shape-0` / `--shape-1`). Shapes are `clip-path` polygons in `styles.css`, generated for insets 0, 1, 4 and 5px. Bottom padding clears the 24px notch or point.
+- **Needs action:** the same layers in `--rubric` make the double frame, so it follows the shape too.
+- **Corners:** 22px ornaments in `--muted` (`--rubric` when the card needs action), mirrored left and right. They sit inside the outline, and the top padding keeps them clear of the headpiece.
+- **Headpiece:** it fills the notice slot when the card has no alert. It's 90% of the card's width and exactly as tall as the notice line, built as end · rule · centrepiece · rule · end so the curls never stretch.
+- **Alignment:** cards share row tracks through subgrid (notice, header, people, buttons), so within a row of cards the hairline, players and buttons line up.
+
+Other cards (`.card`, profile, admin) stay plain rectangles:
+
+```css
+.card, .campaign-item {
+    background: var(--bg); border: 1px solid var(--line);
+    padding: 22px 24px; display: flex; flex-direction: column; gap: 14px;
 }
 ```
 
-**States:**
-- Default: Transparent bg, cyan text & border
-- Hover: Cyan bg, black text
-- Active: Opacity 0.8
-- Disabled: Grayed out (opacity 0.5), cursor: not-allowed
+Order inside a game card: notice slot (the pending notice, or the variant's headpiece) → type icon and name + status badge → title + game system → summary → hairline → DM, player avatars, seats · sign-ups, next session → actions in a 3-column grid. Each part is one subgrid row (see the banner notes above).
 
-### Form Inputs
+**Needs your action** (unanswered session for a player, pending sign-ups for the DM): the card gets `.needs-action`, which draws the rubric double frame in the banner's shape (the clipped layers described above), plus a notice line:
 
 ```css
-input, select {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid #333333;
-    background: #0a0a0a;
-    color: #e0e0e0;
-    font-family: 'Fira Code', monospace;
-    font-size: 0.95em;
-    transition: border-color 0.3s;
+.pending-notice {
+    font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--rubric);
 }
-
-input::placeholder {
-    color: #555555;
-}
-
-input:focus, select:focus {
-    outline: none;
-    border-color: #00d9ff;
-}
+/* content: "✦ A session awaits thy reply" / "✦ 3 sign-ups to review" */
 ```
 
-**States:**
-- Default: Dark bg, light gray text, subtle border
-- Focus: Cyan border highlight
-- Disabled: Grayed out, cursor: not-allowed
+Finished games render at `opacity: 0.72`.
 
-### Container / Card
+### Campaign status badge
 
-```css
-.container, .card {
-    background: #0a0a0a;
-    border: 1px solid #333333;
-    padding: 30px; /* or appropriate value */
-}
+Outlined, uppercase, a glyph before the label. Not clickable. Keep the existing tooltip (`data-tooltip`, `title`, `tabindex="0"`, `aria-label`) but drop the glow. Focus outline is `2px solid var(--rubric)`.
 
-.container {
-    max-width: 600px; /* narrow forms */
-    background: #000000; /* for root containers */
-}
-```
+| Status | Glyph | Colour | Border |
+|--------|-------|--------|--------|
+| Pitch | `✦` | `--rubric` | solid |
+| Ongoing | `●` | `--verdigris` | solid |
+| On Hiatus | `◐` | `--ochre` | dashed |
+| Finished | `✓` | `--muted` | solid |
+| Cancelled | `✗` | `--muted` | solid, label struck through |
 
-**Usage:**
-- `.container`: Wraps main content (e.g., signup form)
-- `.card`: Modular content blocks (e.g., event items, module cards)
-
-### Messages (Success / Error)
-
-```css
-.message {
-    margin-top: 15px;
-    padding: 12px;
-    display: none;
-    text-align: center;
-    font-size: 0.9em;
-    border: 1px solid;
-}
-
-.message.success {
-    background: #0a1a0a;
-    color: #00ff7f;
-    border-color: #00ff7f;
-    display: block;
-}
-
-.message.error {
-    background: #1a0a0a;
-    color: #ff006e;
-    border-color: #ff006e;
-    display: block;
-}
-```
-
-**Auto-hide**: Messages should auto-hide after 5 seconds via JavaScript.
-
-### Module Cards (Dashboard)
-
-```css
-.module-card {
-    background: #0a0a0a;
-    border: 1px solid #333333;
-    padding: 30px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s;
-    text-decoration: none;
-    color: inherit;
-    min-height: 180px;
-}
-
-.module-card.active {
-    border-color: #00d9ff;
-    background: #0a1a1a;
-}
-
-.module-card.active:hover {
-    border-color: #00d9ff;
-    box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
-    transform: translateY(-2px);
-}
-
-.module-card.disabled {
-    background: #0a0a0a;
-    border-color: #2a2a2a;
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-```
-
-**States:**
-- Active: Cyan border, slightly raised on hover with glow
-- Disabled: Grayed out, no hover effects
-
-### Status Badges
-
-```css
-.status-badge {
-    display: inline-block;
-    padding: 6px 12px;
-    font-size: 0.75em;
-    letter-spacing: 0.5px;
-    background: #0a0a0a;
-    border: 1px solid #00d9ff;
-    color: #00d9ff;
-    text-transform: uppercase;
-}
-
-.status-badge.coming-soon {
-    background: #1a0a0a;
-    border: 1px solid #ff006e;
-    color: #ff006e;
-}
-```
-
-### Campaign Status Badge
-
-**Purpose:** Distinguish campaign lifecycle states (Pitch, Ongoing, Finished, On Hiatus, Cancelled) with visual badges below the campaign title.
-
-**Visual Design:**
-- Label-like appearance: no border, colored text with subtle background tint
-- Uppercase text with letter spacing for clarity
-- Responsive glow effect on hover
-
-**Status Colors:**
-- **Pitch** (#ffd700 Gold): Campaign pitch phase - recruiting players
-- **Ongoing** (#00d9ff Cyan): Campaign is actively running
-- **Finished** (#00ff7f Green): Campaign has concluded
-- **On Hiatus** (#ff8c00 Orange): Campaign is temporarily paused
-- **Cancelled** (#ff006e Pink): Campaign has been cancelled
-
-**Hover Behavior:**
-- Text glows with status-specific color
-- Tooltip appears above badge on hover and keyboard focus
-- Keyboard focus includes clear focus-visible outline
-
-**Position:** Below the campaign title in the campaign card
-
-**CSS Example:**
 ```css
 .campaign-status-badge {
-    display: inline-block;
-    position: relative;
-    padding: 4px 10px;
-    border: none;
-    font-size: 0.75em;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    transition: text-shadow 0.2s ease;
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    padding: 3px 8px; border: 1px solid currentColor; background: none;
 }
-
-/* Tooltip appears on hover and focus */
-.campaign-status-badge::before {
-    content: attr(data-tooltip);
-    position: absolute;
-    background: #0a0a0a;
-    border: 1px solid;
-    padding: 6px 10px;
-    border-radius: 2px;
-    font-size: 0.85em;
-    white-space: nowrap;
-    bottom: 120%;
-    left: 50%;
-    transform: translateX(-50%);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s;
-    z-index: 1000;
-}
-
-.campaign-status-badge:hover::before,
-.campaign-status-badge:focus::before,
-.campaign-status-badge:focus-visible::before {
-    opacity: 1;
-}
-
-/* Clear focus-visible outline */
-.campaign-status-badge:focus-visible {
-    outline: 2px solid #00d9ff;
-    outline-offset: 2px;
-}
-
-/* Status variants */
-.campaign-item.status-pitch .campaign-status-badge {
-    background: rgba(255, 215, 0, 0.1);
-    color: #ffd700;
-}
-
-.campaign-item.status-ongoing .campaign-status-badge {
-    background: rgba(0, 217, 255, 0.1);
-    color: #00d9ff;
-}
-
-.campaign-item.status-finished .campaign-status-badge {
-    background: rgba(0, 255, 127, 0.1);
-    color: #00ff7f;
-}
-
-.campaign-item.status-hiatus .campaign-status-badge {
-    background: rgba(255, 140, 0, 0.1);
-    color: #ff8c00;
-}
-
-.campaign-item.status-cancelled .campaign-status-badge {
-    background: rgba(255, 0, 110, 0.1);
-    color: #ff006e;
-}
-
-/* Hover glow effects */
-.campaign-item.status-pitch .campaign-status-badge:hover {
-    text-shadow: 0 0 10px rgba(255, 215, 0, 0.6), 0 0 20px rgba(255, 215, 0, 0.3);
-}
-
-.campaign-item.status-ongoing .campaign-status-badge:hover {
-    text-shadow: 0 0 10px rgba(0, 217, 255, 0.6), 0 0 20px rgba(0, 217, 255, 0.3);
-}
-
-.campaign-item.status-finished .campaign-status-badge:hover {
-    text-shadow: 0 0 10px rgba(0, 255, 127, 0.6), 0 0 20px rgba(0, 255, 127, 0.3);
-}
-
-.campaign-item.status-hiatus .campaign-status-badge:hover {
-    text-shadow: 0 0 10px rgba(255, 140, 0, 0.6), 0 0 20px rgba(255, 140, 0, 0.3);
-}
-
-.campaign-item.status-cancelled .campaign-status-badge:hover {
-    text-shadow: 0 0 10px rgba(255, 0, 110, 0.6), 0 0 20px rgba(255, 0, 110, 0.3);
-}
+.status-pitch     .campaign-status-badge { color: var(--rubric); }
+.status-ongoing   .campaign-status-badge { color: var(--verdigris); }
+.status-hiatus    .campaign-status-badge { color: var(--ochre); border-style: dashed; }
+.status-finished  .campaign-status-badge { color: var(--muted); }
+.status-cancelled .campaign-status-badge { color: var(--muted); text-decoration: line-through; }
 ```
 
-**Required HTML Attributes (generated in JS):**
-- `data-tooltip`: Content displayed in tooltip pseudo-element
-- `title`: Accessible tooltip text for assistive technologies and native browser tooltips
-- `tabindex="0"`: Makes badge keyboard focusable
-- `aria-label`: Semantic label combining status name and meaning for screen readers
+### Campaign type badge
 
-**Do's:**
-- Use for campaign lifecycle state indication
-- Apply glow effect on hover
-- Show tooltip on hover and keyboard focus with descriptive text
-- Keep consistent with status colors across the campaign card
+An inline SVG mark plus an uppercase label, no box, fill or border. Flex row, `gap: 10px`, label 12px with 2px tracking, mark 28px (24px viewBox, `fill: none`, `stroke: currentColor`, `stroke-width: 1.5`, `aria-hidden="true"`, class `type-icon`). The info tooltip dot follows the label. See `type-icons.png`.
 
-**Don'ts:**
-- Don't use as a button or make it look clickable
-- Don't add borders - use color for text and background tint only
-- Don't add click handlers to the badge
-- Don't change status colors for different contexts
+| Type | Mark |
+|------|------|
+| One-shot | A single sword |
+| Adventure | Crossed swords behind a shield |
+| Campaign | A banner flanked by swords |
+
+The paths live in `TYPE_ICON_PATHS` in `campaigns.js`. The Adventure shield path carries `.type-icon__fill { fill: var(--bg) }` so it hides the swords behind it.
+
+### People
+
+- **DM**: `--rubric`, bold, prefixed `♛`. This is how DMs are "colourfully distinct" from players.
+- **Players**: plain `--ink`, separated by ` · `.
+- **User links** (`.user-button`): plain text in the role's colour with an underline on hover. No pill or box.
+- Display name precedence is unchanged: Nickname → Name → Username.
+
+### Session replies & chips
+
+| Reply | Glyph | Colour | Button label |
+|-------|-------|--------|--------------|
+| Accepted | `✓` | `--verdigris` | Aye |
+| Tentative | `?` | `--ochre` | Perhaps |
+| Declined | `✗` | `--rubric` | Nay |
+| Awaiting | `…` | `--rubric` | (none) |
+
+Reply buttons sit in a 3-column grid, min-height 44px. The user's current reply is filled with its colour (`color: var(--bg)`), the others are outlined.
+
+Calendar session chips (11px text, `padding: 3px 5px`):
+
+| Session | Style |
+|---------|-------|
+| Confirmed | `1px solid var(--verdigris)`, verdigris text, faint verdigris fill |
+| Suggested | `1px dashed var(--ink)` |
+| Cancelled | `1px solid var(--muted)`, muted text, struck through, no counts |
+
+Calendar grid: hairline cells, out-of-month days at 35% ink, selected day `background: var(--folio)` with a `2px solid var(--rubric)` inset outline. Days are square, and the month is sized to fit the modal's height. A legend (■ confirmed · ▢ suggested · ~~cancelled~~) sits right of the month name. A day's "awaiting a reply" count shows only when it is above zero, as a small rubric box in the corner.
+
+The day panel heading has an eyebrow ("Selected day" / "Month agenda") over a display-face heading. A suggestion the viewer hasn't answered gets a `--rubric` frame, like a card that needs action.
+
+Counts on buttons (pending sign-ups, unanswered sessions) are a small rubric tab on the button's top-right corner, so the label keeps its single line.
+
+### Modals
+
+The page dims to `--folio` (or `rgba(0,0,0,0.6)` in dark). The sheet is `--bg` with a double frame: `border: 1px solid var(--ink); outline: 1px solid var(--ink); outline-offset: 5px`. The header has an eyebrow + display title on the left, a text link + square `×` close button (40×40, `aria-label="Close"`) on the right, and a double rule underneath.
+
+### Messages
+
+```css
+.message { padding: 10px 16px; font-size: 14px; border: 1px solid; background: none; }
+.message.success { color: var(--verdigris); border-color: var(--verdigris); }  /* "✓ …" */
+.message.error   { color: var(--rubric);    border-color: var(--rubric); }     /* "✗ …" */
+```
+
+Auto-hide after 5 seconds (unchanged). Error text is plain and precise, no flavour copy.
+
+### Dashboard module cards
+
+Standard cards with a display-face title, a muted description and a status badge. Active module: `border-color: var(--ink)`, hover fills `--folio`. Disabled ("Coming soon"): `opacity: 0.5`, dashed `--line` border, `cursor: not-allowed`.
+
+### Danger zone
+
+`border: 1px solid var(--rubric)`, no fill, `§`-headed h2 in `--rubric`, danger buttons inside.
+
+### Avatars
+
+Square (no radius), `1px solid var(--line)` frame, `object-fit: cover`. Everyone has one: without an upload the avatar is the first letter of the display name (nickname → name → username), in the display face in `--rubric` on `--folio`. The API sends it as `avatar_letter` next to `avatar_url` on every user object.
+
+- **In lists** (game-card players, calendar replies): 30px avatars in place of names, linked to the profile, with the name as `title` and `aria-label`. Built by `userAvatarHtml()` in `campaigns.js`.
+- **Next to a name** (sign-ups dialog): same 30px avatar, not linked.
+- **Calendar replies**: a 2px border shows the reply. Accepted is solid `--verdigris`, Tentative dashed `--ochre`, Declined solid `--rubric` at 60% opacity, Awaiting dotted `--muted`.
+- **Profile**: the large avatar keeps its own size.
+
+### Ornaments
+
+- `§` prefixes section headings (h2).
+- `❦ ❦ ❦` (muted, 12px letter-spacing) may close a long page or list. At most one per page.
+- `— ❦ —` in `--rubric` may separate the brand block from a form (login).
+- Ornament glyphs are `aria-hidden="true"` when purely decorative.
 
 ---
 
 ## Interactions
 
-### Transitions
-
-All interactive elements use a **0.3s transition** for hover/focus states:
-
-```css
-transition: all 0.3s;
-```
-
-### Hover Effects
-
-**Active Elements:**
-- Border color shift (→ cyan)
-- Background subtle change
-- Optional: small lift (transform: translateY(-2px))
-- Optional: subtle glow (box-shadow with rgba)
-
-**Disabled Elements:**
-- No hover effects
-- cursor: not-allowed
-
-### Focus States
-
-All focusable elements (inputs, buttons, links) should have clear focus indication:
-
-```css
-outline: none; /* remove default */
-border-color: #00d9ff; /* or similar accent */
-```
+- Transitions: `0.15s` on colour, background and border only. No transforms, no shadows, no glow.
+- Hover changes fill or colour (see Buttons). Links underline.
+- Focus: every focusable element shows `outline: 2px solid var(--rubric); outline-offset: 2px` on `:focus-visible`. Inputs use the rubric underline instead.
+- Touch targets ≥ 40px, ≥ 44px for primary and reply buttons.
 
 ---
 
-## Grid Layouts
+## Do's and Don'ts
 
-### Dashboard Module Grid
+✅ Use tokens, never raw hex
+✅ Courier Prime for all text, Fell for titles, blackletter only for the brand
+✅ One accent (rubric). State colours only for state
+✅ Pair every state colour with a glyph, border style or strikethrough
+✅ Square corners, hairlines, double rules
+✅ Check both themes and phone width
 
-```css
-.modules-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 25px;
-    width: 100%;
-}
-```
-
-**Mobile**: Switches to single column (1fr) with reduced gap (20px).
-
-### Event List
-
-```css
-.events-list {
-    background: #0a0a0a;
-    padding: 15px;
-    max-height: 200px;
-    overflow-y: auto;
-    border: 1px solid #2a2a2a;
-}
-
-.event-item {
-    padding: 10px;
-    margin-bottom: 10px;
-    background: #111111;
-    border-left: 2px solid #00d9ff;
-}
-```
+❌ No border-radius (except the unread dot), shadows, glows, gradients or textures
+❌ No parchment/scroll images, wax seals or fake aging
+❌ No blackletter for body text, labels or anything that must be read quickly
+❌ No new colours outside the token set
+❌ No flavour copy in errors, validation or confirmations of destructive actions
+❌ No more than one ornament line per page
 
 ---
 
-## Best Practices
-
-### Do's
-
-✅ Use Fira Code for all text
-✅ Maintain consistent spacing (multiples of 5px)
-✅ Keep color palette to the 8 primary colors + neutrals
-✅ Use cyan (#00d9ff) for interactive/hover states
-✅ Include letter-spacing in headings (1px-2px)
-✅ Use transitions for smooth interactions (0.3s)
-✅ Test on mobile and desktop
-✅ Ensure sufficient color contrast (especially text)
-
-### Don'ts
-
-❌ Don't use gradients (except in special cases like previous gradient backgrounds)
-❌ Don't add border-radius to cards (keep them sharp, minimal)
-❌ Don't use drop shadows (exception: subtle glow on active elements)
-❌ Don't introduce new colors outside the palette
-❌ Don't animate text size or font-weight
-❌ Don't use animations longer than 0.3s for routine interactions
-❌ Don't add decorative elements that clutter the interface
-
----
-
-## Code Examples
-
-### New Page Template
+## Page template
 
 ```html
 <!DOCTYPE html>
@@ -531,342 +373,39 @@ border-color: #00d9ff; /* or similar accent */
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Page Title</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="page-specific.css">
+    <title>Waystone - Page</title>
+    <script src="/static/theme.js?v=N"></script> <!-- not deferred: applies the saved theme before paint -->
+    <link rel="stylesheet" href="/static/styles.css?v=N">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
-<body>
+<body x-data="page()">
     <div class="header">
-        <h1>Page Title</h1>
-        <button class="logout-btn">Logout</button>
+        <a href="/" class="logo">Waystone</a>
+        <nav class="nav-bar" aria-label="Main">
+            <a href="/" class="nav-item">Dashboard</a>
+            <a href="/campaigns" class="nav-item active" aria-current="page">Games</a>
+            <a href="/profile" class="nav-item">Profile</a>
+            <a href="/admin/users" class="nav-item" x-show="isAdmin">Admin</a>
+        </nav>
+        <div class="header-right">
+            <!-- inbox, user name, logout -->
+        </div>
     </div>
 
-    <div class="container">
-        <h2>Section Title</h2>
-        <form>
-            <div class="form-group">
-                <label for="input">Label</label>
-                <input id="input" type="text" placeholder="Placeholder">
-            </div>
-            <button type="submit" class="submit-btn">Submit</button>
-        </form>
-        <div class="message success">Success message</div>
-        <div class="message error">Error message</div>
-    </div>
-
-    <script src="page-specific.js"></script>
+    <main class="container">
+        <h1 class="page-title"><span class="drop-cap">P</span>age</h1>
+        <!-- content -->
+        <div class="message" :class="messageType" x-show="messageVisible" x-text="messageText"></div>
+    </main>
 </body>
 </html>
 ```
 
-### CSS Template
+## Cache-busting
 
-```css
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap');
-
-/* Reset */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-/* Base Styles */
-body {
-    font-family: 'Fira Code', monospace;
-    background: #000000;
-    color: #e0e0e0;
-    /* ... */
-}
-
-/* Components */
-.header {
-    /* ... */
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    /* Mobile styles */
-}
-```
+Reference CSS with a version query (`styles.css?v=N`) and bump `N` whenever the CSS changes. Static files are baked into the Docker image, so rebuild with `--no-cache`.
 
 ---
 
-## Profile Components
-
-### User Button
-
-```css
-.user-button {
-    display: inline-block;
-    padding: 8px 12px;
-    background: #0a1a1a;
-    border: 1px solid #00d9ff;
-    color: #00d9ff;
-    text-decoration: none;
-    font-family: 'Fira Code', monospace;
-    font-size: 0.85em;
-    border-radius: 3px;
-    transition: all 0.3s;
-    cursor: pointer;
-}
-
-.user-button:hover {
-    background: #00d9ff;
-    color: #000000;
-}
-```
-
-**Usage**: Render user references as interactive buttons linking to user profiles. Always use `display_name` (computed: nickname → name → email).
-
-### Profile Card
-
-```css
-.profile-card {
-    background: #0a0a0a;
-    border: 1px solid #333333;
-    padding: 30px;
-    margin-bottom: 30px;
-}
-
-.profile-avatar-section {
-    display: flex;
-    gap: 25px;
-    align-items: flex-start;
-}
-
-.profile-avatar {
-    width: 80px;
-    height: 80px;
-    border-radius: 5px;
-    background: #1a1a1a;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-.profile-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.profile-avatar-initials {
-    font-size: 2em;
-    font-weight: 500;
-    color: #00d9ff;
-}
-
-.profile-display-name {
-    font-size: 1.3em;
-    color: #ffffff;
-    margin-bottom: 10px;
-}
-
-.profile-meta {
-    font-size: 0.9em;
-    color: #b0b0b0;
-    margin-bottom: 8px;
-}
-```
-
-### Danger Zone
-
-```css
-.danger-zone {
-    border: 1px solid #ff006e;
-    background: #1a0a0a;
-    padding: 25px;
-    margin-top: 40px;
-}
-
-.danger-zone h2 {
-    color: #ff006e;
-    margin-bottom: 15px;
-}
-
-.danger-btn {
-    padding: 12px 20px;
-    background: transparent;
-    border: 1px solid #ff006e;
-    color: #ff006e;
-    font-family: 'Fira Code', monospace;
-    cursor: pointer;
-    transition: all 0.3s;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.danger-btn:hover {
-    background: #ff006e;
-    color: #000000;
-}
-```
-
-### Campaign Item (Profile Context)
-
-```css
-.campaign-item-profile {
-    background: #0a1a1a;
-    border: 1px solid #333333;
-    padding: 20px;
-    margin-bottom: 15px;
-    border-radius: 3px;
-}
-
-.campaign-item-profile h3 {
-    margin-bottom: 10px;
-    color: #ffffff;
-}
-
-.campaign-status {
-    font-size: 0.9em;
-    color: #b0b0b0;
-    margin: 0;
-}
-```
-
----
-
-## Maintenance
-
-**Version**: 1.0  
-**Last Updated**: 2024  
-**Next Review**: When adding new major features or pages
-
-### Unified Header & Navigation
-
-All pages use a consistent two-part header system:
-
-#### Header Structure (3-part layout)
-
-```html
-<div class="header">
-    <div class="header-left">
-        <a href="/" class="logo">Waystone</a>
-    </div>
-    <div class="header-center">
-        <h1>Page Title</h1>
-    </div>
-    <div class="header-right">
-        <span class="user-name" id="userName">User Email</span>
-        <button id="logoutBtn" class="logout-btn">Logout</button>
-    </div>
-</div>
-```
-
-**Purpose**: 
-- **Left**: Branding link back to dashboard
-- **Center**: Current page title
-- **Right**: Authenticated user info and logout action
-
-#### Navigation Bar
-
-```html
-<div class="nav-bar">
-    <a href="/" class="nav-item active" data-page="dashboard">Dashboard</a>
-    <a href="/campaigns" class="nav-item" data-page="campaigns">Campaigns</a>
-    <a href="/profile" class="nav-item" data-page="profile">Profile</a>
-</div>
-```
-
-**Purpose**: Shows available modules (Dashboard, Campaigns, Profile) with active indicator on current page. Users can navigate between sections.
-
-#### Header Styling
-
-```css
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px 40px;
-    border-bottom: 1px solid #333333;
-    gap: 20px;
-}
-
-.header-left .logo {
-    color: #ffffff;
-    font-size: 1.3em;
-    letter-spacing: 2px;
-    text-decoration: none;
-}
-
-.header-center h1 {
-    color: #ffffff;
-    font-size: 1.2em;
-    letter-spacing: 1px;
-    margin: 0;
-}
-
-.header-right {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.user-name {
-    color: #b0b0b0;
-    font-size: 0.9em;
-}
-```
-
-#### Navigation Bar Styling
-
-```css
-.nav-bar {
-    display: flex;
-    gap: 0;
-    padding: 0 40px;
-    border-bottom: 1px solid #333333;
-    background: #0a0a0a;
-}
-
-.nav-item {
-    padding: 15px 20px;
-    color: #888888;
-    text-decoration: none;
-    border-bottom: 2px solid transparent;
-    transition: all 0.3s;
-    font-size: 0.9em;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.nav-item:hover {
-    color: #e0e0e0;
-    border-bottom-color: #00d9ff;
-}
-
-.nav-item.active {
-    color: #ffffff;
-    border-bottom-color: #00d9ff;
-}
-```
-
-#### Mobile Responsive Header
-
-On screens ≤ 768px:
-- Header switches to column layout (stacked vertically)
-- Font sizes reduced by 1 step
-- Navigation items show with reduced padding
-- Maintains full functionality
-
-### Cache-Busting Strategy
-
-For development, all HTML files should reference CSS with query parameters to prevent browser caching:
-
-```html
-<!-- Use version query param to bypass browser cache -->
-<link rel="stylesheet" href="dashboard.css?v=1">
-<link rel="stylesheet" href="styles.css?v=1">
-```
-
-Increment the version number (`v=1` → `v=2`) when making CSS changes to ensure browsers fetch the latest stylesheet.
-
-When updating this guide:
-1. Document the change in a brief note
-2. Update the version number
-3. Ensure all existing pages follow the new guideline
-4. Get team consensus on major style changes
+**Version**: 2.0 (Scriptorium), replacing 1.0 (terminal/cyberpunk)
+**Last updated**: 2026-10-29
