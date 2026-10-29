@@ -136,6 +136,12 @@ func seedIfEmpty() error {
 			}
 		}
 		now := time.Now().UTC().Format(time.RFC3339)
+		for _, signup := range config.InitialSignups {
+			signup.CreatedAt, signup.UpdatedAt = now, now
+			if err := store.CreateCampaignSignup(signup); err != nil {
+				return fmt.Errorf("failed to seed signup: %w", err)
+			}
+		}
 		for _, seeded := range config.InitialSessions() {
 			session := seeded.Session
 			session.ID = GenerateUUID()
