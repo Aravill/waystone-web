@@ -166,12 +166,13 @@ func loadCampaignAndUser(w http.ResponseWriter, r *http.Request, campaignID stri
 
 func userDisplayObject(user *models.User) map[string]interface{} {
 	return map[string]interface{}{
-		"id":           user.ID,
-		"name":         user.Name,
-		"nickname":     user.Nickname,
-		"display_name": user.DisplayName(),
-		"profile_url":  fmt.Sprintf("/profile?user_id=%s", user.ID),
-		"avatar_url":   user.AvatarURL(),
+		"id":            user.ID,
+		"name":          user.Name,
+		"nickname":      user.Nickname,
+		"display_name":  user.DisplayName(),
+		"profile_url":   fmt.Sprintf("/profile?user_id=%s", user.ID),
+		"avatar_url":    user.AvatarURL(),
+		"avatar_letter": avatarLetter(user.DisplayName()),
 	}
 }
 

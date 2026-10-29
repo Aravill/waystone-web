@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 	"waystone-web/db"
 	"waystone-web/middleware"
@@ -103,7 +104,7 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 	displayName := user.DisplayName()
 
 	// Compute initials from display name
-	initials := computeInitials(displayName)
+	initials := avatarLetter(displayName)
 
 	// Check if this is the current user's profile
 	sessionUserID, _ := session["user_id"].(string)
@@ -412,26 +413,12 @@ func HandleUserRoutes(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func computeInitials(name string) string {
-	parts := strings.Fields(name)
-	if len(parts) == 0 {
-		return "?"
-	}
-
-	initials := []rune{}
-	for _, part := range parts {
-		runes := []rune(part)
-		if len(runes) > 0 {
-			initials = append(initials, runes[0])
-		}
-		if len(initials) == 2 {
-			break
+// avatarLetter is the default avatar: the first letter or digit of the display name.
+func avatarLetter(name string) string {
+	for _, r := range name {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return strings.ToUpper(string(r))
 		}
 	}
-
-	if len(initials) == 0 {
-		return "?"
-	}
-
-	return strings.ToUpper(string(initials))
+	return "?"
 }

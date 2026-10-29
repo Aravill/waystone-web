@@ -506,12 +506,7 @@ func handleGetSessionResponses(w http.ResponseWriter, r *http.Request, campaignI
 		}
 		respondedPlayers[response.UserID] = true
 		if user, ok := userMap[response.UserID]; ok && user != nil {
-			respObj.User = map[string]interface{}{
-				"id":           user.ID,
-				"name":         user.Name,
-				"nickname":     user.Nickname,
-				"display_name": user.DisplayName(),
-			}
+			respObj.User = userDisplayObject(user)
 		}
 		enriched = append(enriched, respObj)
 	}
@@ -522,12 +517,7 @@ func handleGetSessionResponses(w http.ResponseWriter, r *http.Request, campaignI
 			continue
 		}
 		if user, ok := userMap[playerID]; ok && user != nil {
-			pending = append(pending, map[string]interface{}{
-				"id":           user.ID,
-				"name":         user.Name,
-				"nickname":     user.Nickname,
-				"display_name": user.DisplayName(),
-			})
+			pending = append(pending, userDisplayObject(user))
 			continue
 		}
 		pending = append(pending, map[string]interface{}{
