@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gonfalon banner</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&amp;family=IM+Fell+English+SC&amp;family=UnifrakturMaguntia&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#8E2A1E}a:hover{color:#2B241C}
+.ws{--shadow:rgba(43,36,28,0.24);--bg:#F2EAD8;--folio:#E6DBC2;--ink:#2B241C;--muted:#6B5E4B;--line:rgba(43,36,28,0.4);--rubric:#8E2A1E;--verdigris:#355E52;--ochre:#7A5A12}
+.ws.dark{--shadow:rgba(0,0,0,0.7);--bg:#16120E;--folio:#2A231B;--ink:#E8DCC4;--muted:#A8997F;--line:rgba(232,220,196,0.3);--rubric:#D9735C;--verdigris:#7FB09E;--ochre:#D4A94A}
+.ws svg.frame{position:absolute;left:0;top:0;overflow:visible}
+.ws .ol{fill:var(--bg);filter:url(#ws-shadow);stroke:var(--line);stroke-width:1;stroke-linejoin:round}
+.ws .orn{fill:none;stroke:var(--muted);stroke-width:1;stroke-linecap:round;stroke-linejoin:round}
+.ws .drop{flood-color:var(--shadow)}
+.ws .hang{filter:url(#ws-shadow-sm)}
+.ws .stitch{stroke-dasharray:3 3}
+.ws .rnd-o{fill:var(--bg);stroke:var(--ink);stroke-width:1}
+.ws .rnd-i{fill:none;stroke:var(--line);stroke-width:1}
+.ws .act .ol{stroke:url(#ws-flash);stroke-width:1.5}
+.ws .ol,.ws .orn,.ws .rnd-i{transition:stroke .3s}
+.ws article:not(.act):hover .ol{stroke:var(--ink)}
+.ws article:not(.act):hover .orn,.ws article:not(.act):hover .rnd-i{stroke:var(--ink)}
+.ws .act .rnd-i{transition:stroke .3s,opacity .3s}
+.ws .act:hover .ol{stroke-width:2}
+.ws .act:hover .rnd-i{opacity:1}
+.ws article.done{opacity:.72;transition:opacity .3s}
+.ws article.done:hover{opacity:.92}
+.ws .fl-base{stop-color:var(--rubric)}
+.ws .fl-hi{stop-color:color-mix(in srgb,var(--rubric) 25%,#fff)}
+.ws .act .orn{stroke:var(--rubric)}
+.ws .act .rnd-o{stroke:var(--rubric)}
+.ws .act .rnd-i{stroke:var(--rubric);opacity:.55}
+.ws .type-icon{fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.ws .type-icon .fillbg{fill:var(--bg)}
+@keyframes ws-sway{from{transform:rotate(-0.7deg)}to{transform:rotate(0.7deg)}}
+@keyframes ws-swing{from{transform:rotate(-12deg)}to{transform:rotate(12deg)}}
+.ws .cloth{position:absolute;inset:0;transform-origin:50% 26px;animation:ws-sway 6.5s ease-in-out infinite alternate}
+.ws .swing{transform-box:fill-box;transform-origin:50% 0;animation:ws-swing 2.1s ease-in-out infinite alternate}
+.ws article:nth-of-type(2) .cloth{animation-delay:-2.6s}
+.ws article:nth-of-type(2) .swing{animation-delay:-0.9s;animation-duration:2.5s}
+.ws article:nth-of-type(3) .cloth{animation-delay:-5.1s;animation-duration:7.5s}
+.ws article:nth-of-type(3) .swing{animation-delay:-1.6s}
+.ws.still .cloth,.ws.still .swing{animation:none}
+.ws.still .act .ol{stroke:var(--rubric)}
+@media (prefers-reduced-motion: reduce){.ws .cloth,.ws .swing{animation:none}.ws .act .ol{stroke:var(--rubric)}}
+.ws .badge{font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:3px 8px;border:1px solid currentColor}
+.ws .btn{font-family:inherit;font-size:12px;letter-spacing:2px;text-transform:uppercase;min-height:40px;padding:0 6px;background:none;color:var(--ink);border:1px solid var(--line);cursor:pointer;transition:background-color .15s,color .15s,border-color .15s,opacity .15s}
+.ws .btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.ws .btn:hover{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.ws .btn.primary:hover{opacity:.85}
+.ws .btn:focus-visible{outline:2px solid var(--rubric);outline-offset:2px}
+.ws .av{width:30px;height:30px;box-sizing:border-box;border:1px solid var(--line);background:var(--folio);color:var(--rubric);font-family:'IM Fell English SC',serif;font-size:17px;display:flex;align-items:center;justify-content:center}
+</style>
+</helmet>
+<div class="ws {{themeClass}}" style="width: 1280px; min-height: 900px; box-sizing: border-box; padding: 40px 52px 56px; background: var(--bg); color: var(--ink); font-family: 'Courier Prime', 'Courier New', monospace; font-size: 16px; line-height: 1.6;">
+
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 44px;">
+<div>
+<h1 style="margin: 0; font-family: 'IM Fell English SC', serif; font-weight: 400; font-size: 44px; line-height: 1.1;"><span style="font-family: 'UnifrakturMaguntia', serif; font-size: 56px; color: var(--rubric);">G</span>ames</h1>
+<p style="margin: 6px 0 0; font-size: 14px; color: var(--muted);">Six tales on the roll · two await thee</p>
+</div>
+<button type="button" class="btn primary" style="min-height: 44px; padding: 0 22px; font-size: 13px;">+ Register game</button>
+</div>
+
+<!-- Cards share row tracks (subgrid). Each outline is ONE path, regenerated for the row's height every frame: points above y=470 stay put, points below shift down with the card and flutter (skew + ripple). Hanging pieces follow their anchor point and swing on their own. -->
+<div ref="{{gridRef}}" style="display: grid; grid-template-columns: repeat(3, 360px); grid-template-rows: 92px auto auto 1fr auto 120px; column-gap: 48px; min-height: 598px;">
+
+<!-- Card 1: gonfalon, needs action -->
+<article class="act" style="position: relative; grid-row: 1 / -1; display: grid; grid-template-rows: subgrid;">
+<div class="cloth">
+<svg class="frame" width="360" height="100%" aria-hidden="true">
+<defs><linearGradient id="ws-flash" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="240" y2="240"><stop class="fl-base" offset="0"></stop><stop class="fl-base" offset="0.38"></stop><stop class="fl-hi" offset="0.5"></stop><stop class="fl-base" offset="0.62"></stop><stop class="fl-base" offset="1"></stop><animateTransform attributeName="gradientTransform" type="translate" values="-260 -260; 520 520; 520 520" keyTimes="0; 0.55; 1" dur="4.5s" repeatCount="indefinite"></animateTransform></linearGradient><filter id="ws-shadow" filterUnits="userSpaceOnUse" x="-40" y="0" width="460" height="1600"><feDropShadow class="drop" dx="4" dy="8" stdDeviation="6"></feDropShadow></filter><filter id="ws-shadow-sm" filterUnits="userSpaceOnUse" x="-40" y="0" width="460" height="1600"><feDropShadow class="drop" dx="2" dy="4" stdDeviation="1.5"></feDropShadow></filter></defs>
+<path ref="{{r.a_o}}" class="ol" d="{{p.a_o}}"></path>
+<path ref="{{r.a_i}}" class="orn" d="{{p.a_i}}"></path>
+<g class="hang" ref="{{r.a_t}}"><path class="orn swing" d="M20 560 V570 M20 570 L24 575 L20 580 L16 575 Z M17.5 580 V591 M20 580 V594 M22.5 580 V591"></path></g>
+<circle class="rnd-o" cx="64" cy="26" r="24"></circle>
+<circle class="rnd-i" cx="64" cy="26" r="20"></circle>
+<svg x="50" y="12" width="28" height="28" viewBox="0 0 24 24" class="type-icon"><circle cx="12" cy="1.8" r="0.9"></circle><path d="M12 2.7 V4"></path><path d="M8 4 H16"></path><path d="M9 4 V14.5 L12 12 L15 14.5 V4"></path><path d="M12 12 V22.5"></path><path d="M2.5 3 V15"></path><path d="M0.8 15 H4.2"></path><path d="M2.5 15 V18.6"></path><circle cx="2.5" cy="19.7" r="1"></circle><path d="M21.5 3 V15"></path><path d="M19.8 15 H23.2"></path><path d="M21.5 15 V18.6"></path><circle cx="21.5" cy="19.7" r="1"></circle></svg>
+</svg>
+</div>
+<p style="position: absolute; left: 28px; right: 30px; top: 58px; height: 22px; margin: 0; display: flex; align-items: center; white-space: nowrap; color: var(--rubric); font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">✦ A session awaits thy reply</p>
+<div style="position: relative; grid-row: 2 / 6; display: grid; grid-template-rows: subgrid; padding: 0 30px 0 28px;">
+<div style="display: flex; flex-direction: column; gap: 10px; padding-bottom: 12px;">
+<div style="display: flex; align-items: center; gap: 8px;">
+<span class="badge" style="color: var(--verdigris);">● Ongoing</span>
+</div>
+<div>
+<h3 style="margin: 0; font-family: 'IM Fell English SC', serif; font-weight: 400; font-size: 27px; line-height: 1.15;">The Sunken Crown</h3>
+<p style="margin: 2px 0 0; font-size: 14px; font-style: italic; color: var(--muted);">D&amp;D 5e</p>
+</div>
+<p style="margin: 0; font-size: 14px; line-height: 1.5;">A drowned kingdom stirs beneath the bay. Thursdays, at the waystone.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; align-items: center; gap: 6px; color: var(--muted);" aria-hidden="true">
+<span style="flex: 1; height: 1px; background: var(--line);"></span>
+<svg width="14" height="10" viewBox="0 0 14 10" style="fill: none; stroke: currentColor;"><path d="M7 1 L13 5 L7 9 L1 5 Z"></path></svg>
+<span style="flex: 2.6; height: 1px; background: var(--line);"></span>
+</div>
+<div style="color: var(--rubric); font-weight: 700; font-size: 15px;">♛ Aldric</div>
+<div style="display: flex; gap: 6px;"><span class="av">M</span><span class="av">T</span><span class="av">W</span><span class="av">S</span></div>
+<p style="margin: 0; font-size: 14px; color: var(--muted);">4 / 5 seats · Thu 5 Nov, 19:00</p>
+</div>
+<div style="grid-row: 4; align-self: start; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+<button type="button" class="btn">Calendar</button>
+<button type="button" class="btn">Leave</button>
+</div>
+</div>
+</article>
+
+<!-- Card 2: torn standard, DM view with two rows of buttons -->
+<article style="position: relative; grid-row: 1 / -1; display: grid; grid-template-rows: subgrid;">
+<div class="cloth">
+<svg class="frame" width="360" height="100%" aria-hidden="true">
+<path ref="{{r.b_o}}" class="ol" d="{{p.b_o}}"></path>
+<path ref="{{r.b_i}}" class="orn" d="{{p.b_i}}"></path>
+<path class="orn" d="M16 299 L22 297 M3 281 V317 M8 286 V312 M12 292 V306"></path>
+<path ref="{{r.b_f1}}" class="orn" d="M318 502 L316 511"></path>
+<path ref="{{r.b_f2}}" class="orn" d="M290 512 L291 519"></path>
+<path ref="{{r.b_f3}}" class="orn" d="M262 522 L260 531"></path>
+<path ref="{{r.b_f4}}" class="orn" d="M200 544 L199 552"></path>
+<g class="hang" ref="{{r.b_c}}"><g class="swing">
+<path class="orn" d="M130 566 V574 M130 581 C125 585 125 591 130 595 C135 591 135 585 130 581 Z"></path>
+<circle class="orn" cx="130" cy="577.5" r="3.5"></circle>
+</g></g>
+<g class="orn">
+<g transform="translate(18 60)"><path d="M18 9 H9"></path><path d="M9 9 C7 5.5 3.5 5.5 1 9 C3.5 12.5 7 12.5 9 9 Z"></path></g>
+<path d="M36 69 H152 M208 69 H324"></path>
+<g transform="translate(152 60)"><path d="M28 2 C32 5.5 32 9.5 28 13 C24 9.5 24 5.5 28 2 Z"></path><path d="M28 13 C23 15.5 17 14.5 14 10.5 C19 9.5 24 10.5 28 13"></path><path d="M28 13 C33 15.5 39 14.5 42 10.5 C37 9.5 32 10.5 28 13"></path><path d="M28 13 V16.5"></path><path d="M0 9 H12 M44 9 H56"></path></g>
+<g transform="translate(342 60) scale(-1 1)"><path d="M18 9 H9"></path><path d="M9 9 C7 5.5 3.5 5.5 1 9 C3.5 12.5 7 12.5 9 9 Z"></path></g>
+</g>
+<circle class="rnd-o" cx="64" cy="26" r="24"></circle>
+<circle class="rnd-i" cx="64" cy="26" r="20"></circle>
+<svg x="50" y="12" width="28" height="28" viewBox="0 0 24 24" class="type-icon"><path d="M12 1.5 L13.6 4 V15 H10.4 V4 Z"></path><path d="M7 15 H17"></path><path d="M12 15 V19.5"></path><circle cx="12" cy="21" r="1.4"></circle></svg>
+</svg>
+</div>
+<div style="position: relative; grid-row: 2 / 6; display: grid; grid-template-rows: subgrid; padding: 0 30px 0 28px;">
+<div style="display: flex; flex-direction: column; gap: 10px; padding-bottom: 12px;">
+<div style="display: flex; align-items: center; gap: 8px;">
+<span class="badge" style="color: var(--rubric);">✦ Pitch</span>
+</div>
+<div>
+<h3 style="margin: 0; font-family: 'IM Fell English SC', serif; font-weight: 400; font-size: 27px; line-height: 1.15;">The Lantern Road</h3>
+<p style="margin: 2px 0 0; font-size: 14px; font-style: italic; color: var(--muted);">Mörk Borg</p>
+</div>
+<p style="margin: 0; font-size: 14px; line-height: 1.5;">One night, one road, one lantern that must not go out. Bring a spare character.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; align-items: center; gap: 6px; color: var(--muted);" aria-hidden="true">
+<span style="flex: 1; height: 1px; background: var(--line);"></span>
+<svg width="14" height="10" viewBox="0 0 14 10" style="fill: none; stroke: currentColor;"><path d="M7 1 L13 5 L7 9 L1 5 Z"></path></svg>
+<span style="flex: 2.6; height: 1px; background: var(--line);"></span>
+</div>
+<div style="color: var(--rubric); font-weight: 700; font-size: 15px;">♛ Tobin (you)</div>
+<div style="display: flex; gap: 6px;"><span class="av">S</span></div>
+<p style="margin: 0; font-size: 14px; color: var(--muted);">1 / 5 seats · Sat 14 Nov, 15:00</p>
+</div>
+<div style="grid-row: 4; align-self: start; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+<button type="button" class="btn">Calendar</button>
+<button type="button" class="btn">Edit</button>
+<button type="button" class="btn">Sign-ups</button>
+<button type="button" class="btn">Players</button>
+<button type="button" class="btn">Follow</button>
+<button type="button" class="btn">Share</button>
+</div>
+</div>
+</article>
+
+<!-- Card 3: dagged, finished -->
+<article class="done" style="position: relative; grid-row: 1 / -1; display: grid; grid-template-rows: subgrid;">
+<div class="cloth">
+<svg class="frame" width="360" height="100%" aria-hidden="true">
+<path ref="{{r.c_o}}" class="ol" d="{{p.c_o}}"></path>
+<path ref="{{r.c_i}}" class="orn stitch" d="{{p.c_i}}"></path>
+<path class="orn" d="M330 26 V55.5 H359.5"></path>
+<path class="orn" d="M7 33 H38 M90 33 H324"></path>
+<path ref="{{r.c_s}}" class="orn" d="M96 518 L122 541 L99 523"></path>
+<path ref="{{r.c_th}}" class="orn" d="M246 530 L245 538 M250 527 L251 534"></path>
+<g class="hang" ref="{{r.c_t}}"><path class="orn swing" d="M70 572 V580 M70 580 L74 585 L70 590 L66 585 Z M67.5 590 V600 M70 590 V603 M72.5 590 V600"></path></g>
+<g class="hang" ref="{{r.c_b}}"><g class="swing">
+<path class="orn" d="M336 548 V554 M331 572 C331 564 333 561 336 561 C339 561 341 564 341 572 Z M329 572 H343"></path>
+<circle class="orn" cx="336" cy="557.5" r="3.5"></circle>
+<circle class="orn" cx="336" cy="575" r="1.2"></circle>
+</g></g>
+<g class="orn">
+<g transform="translate(18 60)"><path d="M16 9 H4"></path><path d="M8 5 L3 9 L8 13"></path></g>
+<path d="M34 69 H154 M206 69 H326"></path>
+<g transform="translate(154 60)"><circle cx="20" cy="9" r="6.5"></circle><circle cx="32" cy="9" r="6.5"></circle><path d="M0 9 H11 M41 9 H52"></path><circle cx="26" cy="9" r="1"></circle></g>
+<g transform="translate(342 60) scale(-1 1)"><path d="M16 9 H4"></path><path d="M8 5 L3 9 L8 13"></path></g>
+</g>
+<circle class="rnd-o" cx="64" cy="26" r="24"></circle>
+<circle class="rnd-i" cx="64" cy="26" r="20"></circle>
+<svg x="50" y="12" width="28" height="28" viewBox="0 0 24 24" class="type-icon"><path d="M21.5 2.5 L7 17"></path><path d="M5 15 L9 19"></path><path d="M7 17 L4 20"></path><circle cx="3.2" cy="20.8" r="1.1"></circle><path d="M2.5 2.5 L17 17"></path><path d="M15 19 L19 15"></path><path d="M17 17 L20 20"></path><circle cx="20.8" cy="20.8" r="1.1"></circle><path class="fillbg" d="M12 6 L15.5 7.5 V11.5 Q15.5 15 12 17 Q8.5 15 8.5 11.5 V7.5 Z"></path><path d="M12 8 V15"></path></svg>
+</svg>
+</div>
+<div style="position: relative; grid-row: 2 / 6; display: grid; grid-template-rows: subgrid; padding: 0 30px 0 28px;">
+<div style="display: flex; flex-direction: column; gap: 10px; padding-bottom: 12px;">
+<div style="display: flex; align-items: center; gap: 8px;">
+<span class="badge" style="color: var(--muted);">✓ Finished</span>
+</div>
+<div>
+<h3 style="margin: 0; font-family: 'IM Fell English SC', serif; font-weight: 400; font-size: 27px; line-height: 1.15;">Night at the Gilded Goose</h3>
+<p style="margin: 2px 0 0; font-size: 14px; font-style: italic; color: var(--muted);">Call of Cthulhu</p>
+</div>
+<p style="margin: 0; font-size: 14px; line-height: 1.5;">An inn, a storm, a guest who never checked out.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; align-items: center; gap: 6px; color: var(--muted);" aria-hidden="true">
+<span style="flex: 1; height: 1px; background: var(--line);"></span>
+<svg width="14" height="10" viewBox="0 0 14 10" style="fill: none; stroke: currentColor;"><path d="M7 1 L13 5 L7 9 L1 5 Z"></path></svg>
+<span style="flex: 2.6; height: 1px; background: var(--line);"></span>
+</div>
+<div style="color: var(--rubric); font-weight: 700; font-size: 15px;">♛ Aldric</div>
+<div style="display: flex; gap: 6px;"><span class="av">W</span><span class="av">S</span><span class="av">C</span></div>
+<p style="margin: 0; font-size: 14px; color: var(--muted);">Played · Sat 17 Oct</p>
+</div>
+<div style="grid-row: 4; align-self: start; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+<button type="button" class="btn">Calendar</button>
+<button type="button" class="btn">Follow</button>
+</div>
+</div>
+</article>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["parchment","candlelight"],"default":"parchment"},"motion":{"editor":"boolean","default":true},"$preview":{"width":1280,"height":900}}'>
+// Banner geometry is authored for a 598px-tall card; JOIN is where the bottom zone starts.
+var BASE_H = 598, JOIN = 470;
+var FLUTTER_DEG = 4, RIPPLE_PX = 3;
+// Hovering a banner makes it catch a gust: flutter and ripple grow by these factors.
+var GUST_FLUTTER = 1.0, GUST_RIPPLE = 1.3, GUST_EASE = 0.06;
+var BANNERS = [
+  { key: 'a', period: 3.3, phase: 0,
+    outline: 'M0.5 26 H329.5 A30 30 0 0 0 359.5 56 V470 V506 L346 530 C310 514 268 502 230 494 C160 510 82 536 20 560 L0.5 542 L0.5 470 Z',
+    inner: 'M38 33 H7 V470 V524 C7 532 13 535 17 530',
+    hang: [['a_t', 20, 560]] },
+  { key: 'b', period: 3.8, phase: 2.1,
+    outline: 'M12 26 H359.5 V470 V480 L340 492 L332 486 L318 502 L306 496 L290 512 L276 507 L262 522 L248 516 L232 532 L218 527 L200 544 L186 539 L170 554 L156 551 L130 566 L0.5 510 L0.5 470 V316 L16 299 L0.5 282 V38 Z',
+    inner: 'M302 41 C298 39 300 33 306 33 H353 V470 V474 C353 481 348 483 344 479',
+    hang: [['b_f1', 318, 502], ['b_f2', 290, 512], ['b_f3', 262, 522], ['b_f4', 200, 544], ['b_c', 130, 566]] },
+  { key: 'c', period: 3.0, phase: 4.0,
+    outline: 'M0.5 26 H330 L359.5 55.5 V196 L352 201 L356 207 L350 212 L359.5 216 V470 V488 L336 548 L300 500 L246 530 L196 496 L70 572 L0.5 530 V520 L14 514 L0.5 510 V470 Z',
+    inner: 'M7 40 V470 V500',
+    hang: [['c_s', 122, 541], ['c_th', 246, 530], ['c_t', 70, 572], ['c_b', 336, 548]] }
+];
+var ARGS = { M: 2, L: 2, H: 1, V: 1, C: 6, S: 4, A: 7, Z: 0 };
+
+// Rewrite an absolute path through map(x, y); H and V become L so they can bend.
+function mapPath(d, map) {
+  var t = d.match(/[A-Za-z]|-?\d*\.?\d+/g), out = [], i = 0, cx = 0, cy = 0, cmd = 'M';
+  var f = function (v) { return Math.round(v * 100) / 100; };
+  while (i < t.length) {
+    if (/[A-Za-z]/.test(t[i])) { cmd = t[i]; i++; if (cmd === 'Z') { out.push('Z'); continue; } }
+    var n = t.slice(i, i + ARGS[cmd]).map(parseFloat), p;
+    i += ARGS[cmd];
+    if (cmd === 'H') { p = map(n[0], cy); cx = n[0]; out.push('L' + f(p[0]) + ' ' + f(p[1])); }
+    else if (cmd === 'V') { p = map(cx, n[0]); cy = n[0]; out.push('L' + f(p[0]) + ' ' + f(p[1])); }
+    else if (cmd === 'A') { p = map(n[5], n[6]); cx = n[5]; cy = n[6]; out.push('A' + n.slice(0, 5).join(' ') + ' ' + f(p[0]) + ' ' + f(p[1])); }
+    else {
+      var s = cmd;
+      for (var k = 0; k < n.length; k += 2) { p = map(n[k], n[k + 1]); s += (k ? ' ' : '') + f(p[0]) + ' ' + f(p[1]); }
+      cx = n[n.length - 2]; cy = n[n.length - 1]; out.push(s);
+    }
+  }
+  return out.join(' ');
+}
+
+function mapper(dy, skewDeg, ripple, wave) {
+  var k = Math.tan(skewDeg * Math.PI / 180);
+  return function (x, y) {
+    if (y < JOIN) return [x, y];
+    var d = y - JOIN;
+    return [x + k * d, y + dy + ripple * Math.sin(wave - x * 0.035) * (d / 100)];
+  };
+}
+
+class Component extends DCLogic {
+  refFor(key) {
+    this.els = this.els || {};
+    this.cbs = this.cbs || {};
+    if (!this.cbs[key]) { var self = this; this.cbs[key] = function (el) { self.els[key] = el; }; }
+    return this.cbs[key];
+  }
+
+  componentDidMount() {
+    var self = this;
+    this.t0 = performance.now();
+    var loop = function (now) { self.frame(now); self.raf = requestAnimationFrame(loop); };
+    this.raf = requestAnimationFrame(loop);
+  }
+
+  componentWillUnmount() { cancelAnimationFrame(this.raf); }
+
+  frame(now) {
+    var els = this.els || {};
+    var t = (now - this.t0) / 1000;
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var motion = (this.props.motion ?? true) && !reduced;
+    var dy = (this.grid ? this.grid.offsetHeight : BASE_H) - BASE_H;
+    BANNERS.forEach(function (b) {
+      var w = 2 * Math.PI * t / b.period + b.phase;
+      var card = els[b.key + '_o'] && els[b.key + '_o'].closest('article');
+      var target = card && card.matches(':hover') ? 1 : 0;
+      b.gust = (b.gust || 0) + (target - (b.gust || 0)) * GUST_EASE;
+      var map = mapper(dy, motion ? FLUTTER_DEG * (1 + GUST_FLUTTER * b.gust) * Math.sin(w) : 0, motion ? RIPPLE_PX * (1 + GUST_RIPPLE * b.gust) : 0, w * 1.7);
+      if (els[b.key + '_o']) els[b.key + '_o'].setAttribute('d', mapPath(b.outline, map));
+      if (els[b.key + '_i']) els[b.key + '_i'].setAttribute('d', mapPath(b.inner, map));
+      b.hang.forEach(function (h) {
+        var el = els[h[0]];
+        if (!el) return;
+        var p = map(h[1], h[2]);
+        el.setAttribute('transform', 'translate(' + (p[0] - h[1]).toFixed(2) + ' ' + (p[1] - h[2]).toFixed(2) + ')');
+      });
+    });
+  }
+
+  renderVals() {
+    var self = this;
+    var theme = this.props.theme ?? 'parchment';
+    var motion = this.props.motion ?? true;
+    var r = {}, p = {};
+    var still = mapper(0, 0, 0, 0);
+    BANNERS.forEach(function (b) {
+      r[b.key + '_o'] = self.refFor(b.key + '_o');
+      r[b.key + '_i'] = self.refFor(b.key + '_i');
+      p[b.key + '_o'] = mapPath(b.outline, still);
+      p[b.key + '_i'] = mapPath(b.inner, still);
+      b.hang.forEach(function (h) { r[h[0]] = self.refFor(h[0]); });
+    });
+    return {
+      themeClass: (theme === 'candlelight' ? 'dark' : '') + (motion ? '' : ' still'),
+      gridRef: function (el) { self.grid = el; },
+      r: r,
+      p: p
+    };
+  }
+}
+</script>
+</body>
+</html>

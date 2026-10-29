@@ -10,6 +10,7 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 | `type-icons.png` | The three game-type marks, light and dark |
 | `campaigns-candlelight.png` | The same page in the dark theme |
 | `calendar.png` | Modal sheet, calendar grid, session chips, reply buttons |
+| `banners.dc.html` | The banner redesign: three variants, see `BANNER_DESIGN_GUIDE.md` |
 
 ## Design Philosophy
 
@@ -193,6 +194,8 @@ input::placeholder { color: var(--muted); }
 Textareas and multi-line fields may use a full `1px solid var(--line)` box.
 
 ### Cards
+
+> **Banner redesign:** the decisions for the next iteration of the game banners (silhouettes, fixed type medallion, aligned tracks, two button rows, stretching construction) live in [`BANNER_DESIGN_GUIDE.md`](BANNER_DESIGN_GUIDE.md). It takes precedence over this section for anything banner-specific; the text below describes the banners as currently implemented.
 
 **Game cards are banners.** Each one stands on its own: no rod, so cards never read as one strip. A game gets one of three variants, picked from its id so it never changes. Each variant has its own shape, headpiece and decorated top corners:
 
