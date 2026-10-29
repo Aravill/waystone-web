@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"strings"
 	"time"
 	"waystone-web/auth"
 	"waystone-web/models"
@@ -10,6 +12,12 @@ const (
 	DBPath      = "./data/waystone.db"
 	DefaultPort = "8080"
 )
+
+// IsProduction reports whether ENVIRONMENT is "production" (case-insensitive).
+// Production skips the demo seed data below.
+func IsProduction() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("ENVIRONMENT")), "production")
+}
 
 const (
 	sojournID = "ea213cb4-9ab9-49ff-a29f-3fafb7b4799c"

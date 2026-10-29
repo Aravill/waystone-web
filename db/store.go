@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"log"
 	"time"
 	"waystone-web/auth"
 	"waystone-web/config"
@@ -77,7 +78,9 @@ func Initialize() error {
 	}
 
 	store = sqlStore
-	if err := seedIfEmpty(); err != nil {
+	if config.IsProduction() {
+		log.Println("ENVIRONMENT=production: skipping seed data")
+	} else if err := seedIfEmpty(); err != nil {
 		return err
 	}
 	return EnsureAdmin()
