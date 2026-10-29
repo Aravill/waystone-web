@@ -91,13 +91,16 @@ Cards grow with their content and must never distort, so the outline isn't a fix
 
 Banners sway in the breeze, clearly visible but not distracting. This is a banner-only exception to the style guide's "no transforms, 0.15s colour transitions only" rule.
 
-- **Only the cloth moves; text and buttons stay still.** The banner SVG (outline, inner lines, headpiece, medallion, ornaments) sits in one `.cloth` layer. The content layer and the notice don't move.
+- **Only the cloth moves; text and buttons stay still.** The banner SVG (outline, inner lines, headpiece, medallion, ornaments) sits in one `.banner-cloth` layer. The cloth itself never gets a CSS transform; all its movement is drawn into the path geometry. The content layer and the notice don't move.
 - **Sway (JS, a bend, not a rotation):** the top edge and upper sides never tilt. From 45% of the height down (`BANNER_BEND`), the cloth drifts sideways, growing quadratically to ±7px at the bottom (`BANNER_SWAY_PX`, about what the old ±0.7° rotation gave). Period 13–15s per card. It's applied in `bannerMapper()`, so hanging pieces ride along.
+  - **Why a bend:** a 1px line tilted by a fraction of a degree shows pixel steps (short doubled-looking segments that crawl as it swings). Keeping the top and upper sides perfectly vertical keeps them crisp. The lower sides do tilt as they bend, but those steps are short and sit where the cloth is already moving.
+  - **Rule:** never rotate or skew the straight upper part of a banner. New motion goes into the lower half, the bottom edge or the ornaments.
+  - The mock-up (`banners.dc.html`) still uses the old CSS rotation. The app is the reference for the sway.
 - **Flutter (JS, per frame):** everything below the join line skews by ±4° (sine, period 3–3.8s per card). On top of that, a ripple of up to 3px runs along the bottom edge (`sin(wave − x·0.035)`, growing with depth below the join), so the tails ripple instead of tilting rigidly.
 - **Swing (CSS):** hanging ornaments rotate ±12° about their attachment point (`transform-box: fill-box; transform-origin: 50% 0`), 2.1–2.5s. Each ornament also rides along with its anchor point as the bottom flutters.
-- **Out of step:** each card has its own phase, period and CSS delays, seeded from the game id (`data-period` / `data-phase`, inline `--sway-dur` / `--sway-delay` / `--swing-dur` / `--swing-delay`), not from `nth-of-type`. A row never moves in unison.
+- **Out of step:** each card has its own phase, period and CSS delays, seeded from the game id (`data-period` / `data-phase` for the flutter, `data-sway-period` / `data-sway-phase` for the bend, inline `--swing-dur` / `--swing-delay` for the ornaments), not from `nth-of-type`. A row never moves in unison.
 - **Reduced motion:** everything stops under `prefers-reduced-motion: reduce`, and the outline is drawn still.
-- **Tuning history:** ±0.35° / 1.4° / 6° felt too timid; +15% (±0.4° / 1.6° / 6.9°) was still too gentle. The values above are the current pass.
+- **Tuning history:** ±0.35° / 1.4° / 6° felt too timid; +15% (±0.4° / 1.6° / 6.9°) was still too gentle. The values above are the current pass. The ±0.7° rotation was later replaced by the bend (see Tried and rejected).
 
 ---
 
