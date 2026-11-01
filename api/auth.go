@@ -47,8 +47,9 @@ var trustProxy, _ = strconv.ParseBool(os.Getenv("TRUST_PROXY"))
 // single client typically controls a whole /64.
 func clientIP(r *http.Request) string {
 	if trustProxy {
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			parts := strings.Split(xff, ",")
+		// Last header line: some proxies add a new line instead of appending.
+		if vals := r.Header.Values("X-Forwarded-For"); len(vals) > 0 {
+			parts := strings.Split(vals[len(vals)-1], ",")
 			if key, ok := ipKey(strings.TrimSpace(parts[len(parts)-1])); ok {
 				return key
 			}
