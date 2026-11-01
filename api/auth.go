@@ -208,8 +208,8 @@ func HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(body.NewPassword) < auth.MinPasswordLength {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "new password must be at least 8 characters"})
+	if v := auth.PasswordPolicyViolations(body.NewPassword, user.Username); len(v) > 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "new " + auth.PasswordPolicyError(v)})
 		return
 	}
 	if body.NewPassword == body.CurrentPassword {
