@@ -453,7 +453,7 @@ func (s *SQLiteStore) SaveUser(user models.User) error {
 		roles = excluded.roles,
 		blocked = excluded.blocked,
 		deleted = excluded.deleted,
-		session_version = excluded.session_version,
+		session_version = MAX(session_version, excluded.session_version),
 		updated_at = excluded.updated_at
 	`
 
