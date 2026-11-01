@@ -86,7 +86,8 @@ func PasswordPolicyError(violations []string) string {
 func GenerateTempPassword(username string) (string, error) {
 	max := big.NewInt(int64(len(tempPasswordAlphabet)))
 	out := make([]byte, tempPasswordLen)
-	for {
+	// Each draw passes ~85% of the time; the cap only makes termination obvious.
+	for attempt := 0; attempt < 100; attempt++ {
 		for i := range out {
 			n, err := rand.Int(rand.Reader, max)
 			if err != nil {
@@ -98,6 +99,7 @@ func GenerateTempPassword(username string) (string, error) {
 			return string(out), nil
 		}
 	}
+	return "", errors.New("could not generate a policy-compliant temporary password")
 }
 
 // ParseUsername trims, lowercases and validates a username.
