@@ -12,6 +12,7 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - SESSION_SECRET=${SESSION_SECRET}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
       - TRUST_PROXY=${TRUST_PROXY:-}
       - SEED_DEMO_DATA=${SEED_DEMO_DATA:-}
     restart: unless-stopped
