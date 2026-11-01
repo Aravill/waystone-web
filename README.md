@@ -55,6 +55,7 @@ A lightweight Go application hosting event sign-up and campaign management. Buil
 
 - Docker (version 20.10+)
 - Docker Compose (version 1.29+)
+- Go 1.27+ (only for running without Docker)
 
 ## Quick Start
 
