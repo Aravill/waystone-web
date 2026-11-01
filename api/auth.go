@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/netip"
 	"net/http"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -162,7 +162,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 	loginAccountLimiter.Reset(accountKey)
 	loginIPLimiter.Forgive(ip)
 
-	if err := middleware.SetSession(w, r, user.ID); err != nil {
+	if err := middleware.SetSession(w, r, user); err != nil {
 		log.Printf("failed to set session: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to set session"})
 		return
@@ -181,14 +181,7 @@ func HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := middleware.GetSession(r)
-	userID, _ := session["user_id"].(string)
-	if err != nil || userID == "" {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "not authenticated"})
-		return
-	}
-
-	user, err := db.GetUserByID(userID)
+	user, err := middleware.SessionUser(w, r)
 	if err != nil {
 		log.Printf("change-password: DB error: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to fetch user"})
@@ -244,6 +237,15 @@ func HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SetUserPassword revoked all sessions; re-issue this one with the new version.
+	updated, err := db.GetUserByID(user.ID)
+	if err != nil || updated == nil {
+		log.Printf("change-password: failed to reload user: %v", err)
+		middleware.ClearSession(w, r)
+	} else if err := middleware.SetSession(w, r, updated); err != nil {
+		log.Printf("change-password: failed to re-issue session: %v", err)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]string{"status": "password changed"})
 }
 
@@ -265,20 +267,8 @@ func HandleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleGetCurrentUser(w http.ResponseWriter, r *http.Request) {
-	session, err := middleware.GetSession(r)
-	if err != nil {
-		http.Error(w, "not authenticated", http.StatusUnauthorized)
-		return
-	}
-
-	userID, ok := session["user_id"].(string)
-	if !ok {
-		http.Error(w, "invalid session", http.StatusUnauthorized)
-		return
-	}
-
-	// Reload fresh user data from DB
-	user, err := db.GetUserByID(userID)
+	// Reload fresh user data from DB (also rejects deleted users and revoked sessions)
+	user, err := middleware.SessionUser(w, r)
 	if err != nil {
 		log.Printf("error fetching user: %v", err)
 		http.Error(w, "failed to fetch user", http.StatusInternalServerError)
@@ -286,9 +276,7 @@ func HandleGetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user == nil {
-		// User was deleted - clear session and return 401
-		middleware.ClearSession(w, r)
-		http.Error(w, "user not found", http.StatusUnauthorized)
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
 		return
 	}
 
