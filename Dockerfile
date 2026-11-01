@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.27-alpine3.24 AS builder
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o waystone-web .
 
 # Runtime stage
-FROM alpine:latest
+FROM alpine:3.24
 
 RUN apk --no-cache add ca-certificates
 
