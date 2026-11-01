@@ -2,9 +2,14 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
+	"time"
 	"waystone-web/auth"
 	"waystone-web/db"
 	"waystone-web/middleware"
@@ -14,6 +19,48 @@ var (
 	dummyHashOnce sync.Once
 	dummyHash     string
 )
+
+const (
+	authFailureWindow = 15 * time.Minute
+	authMaxKeys       = 10000
+)
+
+var (
+	// Keyed on ip|username so a stranger can't lock the real user out.
+	loginAccountLimiter = auth.NewFailureLimiter(5, authFailureWindow, authMaxKeys)
+	// Keyed on IP to cap guesses spread across many usernames.
+	loginIPLimiter = auth.NewFailureLimiter(20, authFailureWindow, authMaxKeys)
+	// Keyed on user ID to stop current-password guessing with a stolen session.
+	changePasswordLimiter = auth.NewFailureLimiter(5, authFailureWindow, authMaxKeys)
+)
+
+// clientIP returns the last X-Forwarded-For entry (the one appended by the
+// nearest proxy), else the host part of RemoteAddr. A client reaching the
+// port directly can forge X-Forwarded-For; that only weakens the per-IP
+// limit, not the per-account one.
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		if ip := strings.TrimSpace(parts[len(parts)-1]); ip != "" {
+			return ip
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+// writeTooManyAttempts responds 429 with a Retry-After header in seconds.
+func writeTooManyAttempts(w http.ResponseWriter, retry time.Duration) {
+	secs := int((retry + time.Second - 1) / time.Second)
+	mins := (secs + 59) / 60
+	w.Header().Set("Retry-After", strconv.Itoa(secs))
+	writeJSON(w, http.StatusTooManyRequests, map[string]string{
+		"error": fmt.Sprintf("too many failed attempts, try again in %d min", mins),
+	})
+}
 
 // getDummyHash returns a valid bcrypt hash used to equalise login timing when
 // the user does not exist, is blocked or has no password.
@@ -39,7 +86,17 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ip := clientIP(r)
+	accountKey := ip + "|" + strings.ToLower(strings.TrimSpace(body.Username))
+	// Check before bcrypt so blocked clients don't cost CPU.
+	if retry := max(loginAccountLimiter.RetryAfter(accountKey), loginIPLimiter.RetryAfter(ip)); retry > 0 {
+		writeTooManyAttempts(w, retry)
+		return
+	}
+
 	invalid := func() {
+		loginAccountLimiter.RecordFailure(accountKey)
+		loginIPLimiter.RecordFailure(ip)
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid username or password"})
 	}
 
@@ -66,6 +123,8 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		invalid()
 		return
 	}
+
+	loginAccountLimiter.Reset(accountKey)
 
 	if err := middleware.SetSession(w, r, user.ID); err != nil {
 		log.Printf("failed to set session: %v", err)
@@ -127,10 +186,16 @@ func HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "new password must differ from the current one"})
 		return
 	}
+	if retry := changePasswordLimiter.RetryAfter(user.ID); retry > 0 {
+		writeTooManyAttempts(w, retry)
+		return
+	}
 	if user.PasswordHash == "" || !auth.CheckPassword(user.PasswordHash, body.CurrentPassword) {
+		changePasswordLimiter.RecordFailure(user.ID)
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "current password is incorrect"})
 		return
 	}
+	changePasswordLimiter.Reset(user.ID)
 
 	hash, err := auth.HashPassword(body.NewPassword)
 	if err != nil {
