@@ -32,6 +32,11 @@ func EnsureAdmin() error {
 		user = &models.User{Username: username, Name: username, Roles: []string{models.RoleUser}}
 	}
 
+	// Revoke existing sessions only when ADMIN_PASSWORD actually changed, so a
+	// plain restart doesn't log the admin out.
+	if user.PasswordHash != "" && !auth.CheckPassword(user.PasswordHash, password) {
+		user.SessionVersion++
+	}
 	user.PasswordHash = hash
 	user.MustChangePassword = false
 	user.Blocked = false

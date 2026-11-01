@@ -115,12 +115,12 @@ func GetUserAvatar(id string) ([]byte, string, error) {
 	return GetStore().GetUserAvatar(id)
 }
 
-// SetUserBlocked updates the blocked status of a user
+// SetUserBlocked updates the blocked status of a user; blocking also revokes their sessions
 func SetUserBlocked(id string, blocked bool) error {
 	return GetStore().SetUserBlocked(id, blocked)
 }
 
-// SetUserPassword stores a new password hash and the must-change flag
+// SetUserPassword stores a new password hash and the must-change flag, revoking all sessions
 func SetUserPassword(id, hash string, mustChange bool) error {
 	return GetStore().SetUserPassword(id, hash, mustChange)
 }

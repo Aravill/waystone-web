@@ -67,6 +67,7 @@ func (s *SQLiteStore) initSchema() error {
 		avatar BLOB,
 		avatar_type TEXT NOT NULL DEFAULT '',
 		avatar_version INTEGER NOT NULL DEFAULT 0,
+		session_version INTEGER NOT NULL DEFAULT 0,
 		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
@@ -201,7 +202,7 @@ func (s *SQLiteStore) initSchema() error {
 		}
 	}
 
-	// Add users.deleted and avatar columns to older databases.
+	// Add users columns introduced after the table was first created.
 	rows, err = s.db.Query(`PRAGMA table_info(users)`)
 	if err != nil {
 		return fmt.Errorf("failed to inspect users table: %w", err)
@@ -224,6 +225,7 @@ func (s *SQLiteStore) initSchema() error {
 		{"avatar_type", "TEXT NOT NULL DEFAULT ''"},
 		{"avatar_version", "INTEGER NOT NULL DEFAULT 0"},
 		{"needs_profile_setup", "INTEGER NOT NULL DEFAULT 0"},
+		{"session_version", "INTEGER NOT NULL DEFAULT 0"},
 	} {
 		if !userCols[col.name] {
 			if _, err := s.db.Exec(`ALTER TABLE users ADD COLUMN ` + col.name + ` ` + col.def); err != nil {
@@ -439,8 +441,8 @@ func (s *SQLiteStore) SaveUser(user models.User) error {
 	}
 
 	query := `
-	INSERT INTO users (id, username, password_hash, must_change_password, needs_profile_setup, name, nickname, roles, blocked, deleted, created_at, updated_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO users (id, username, password_hash, must_change_password, needs_profile_setup, name, nickname, roles, blocked, deleted, session_version, created_at, updated_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
 		username = excluded.username,
 		password_hash = excluded.password_hash,
@@ -451,6 +453,7 @@ func (s *SQLiteStore) SaveUser(user models.User) error {
 		roles = excluded.roles,
 		blocked = excluded.blocked,
 		deleted = excluded.deleted,
+		session_version = excluded.session_version,
 		updated_at = excluded.updated_at
 	`
 
@@ -466,6 +469,7 @@ func (s *SQLiteStore) SaveUser(user models.User) error {
 		string(rolesJSON),
 		blockedInt,
 		deletedInt,
+		user.SessionVersion,
 		user.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		user.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	)
@@ -477,7 +481,7 @@ func (s *SQLiteStore) GetAllUsers() ([]models.User, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	rows, err := s.db.Query("SELECT id, username, password_hash, must_change_password, needs_profile_setup, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, created_at, updated_at FROM users ORDER BY id")
+	rows, err := s.db.Query("SELECT id, username, password_hash, must_change_password, needs_profile_setup, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, session_version, created_at, updated_at FROM users ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -503,6 +507,7 @@ func (s *SQLiteStore) GetAllUsers() ([]models.User, error) {
 			&deletedInt,
 			&user.AvatarType,
 			&user.AvatarVersion,
+			&user.SessionVersion,
 			&createdAtStr,
 			&updatedAtStr,
 		)
@@ -554,7 +559,7 @@ func (s *SQLiteStore) GetUserByUsername(username string) (*models.User, error) {
 	var blockedInt, mustChangeInt, needsSetupInt, deletedInt int
 	var createdAtStr, updatedAtStr string
 
-	query := `SELECT id, username, password_hash, must_change_password, needs_profile_setup, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, created_at, updated_at FROM users WHERE username = ?`
+	query := `SELECT id, username, password_hash, must_change_password, needs_profile_setup, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, session_version, created_at, updated_at FROM users WHERE username = ?`
 	err := s.db.QueryRow(query, username).Scan(
 		&user.ID,
 		&user.Username,
@@ -568,6 +573,7 @@ func (s *SQLiteStore) GetUserByUsername(username string) (*models.User, error) {
 		&deletedInt,
 		&user.AvatarType,
 		&user.AvatarVersion,
+		&user.SessionVersion,
 		&createdAtStr,
 		&updatedAtStr,
 	)
@@ -616,7 +622,7 @@ func (s *SQLiteStore) GetUserByID(id string) (*models.User, error) {
 	var blockedInt, mustChangeInt, needsSetupInt, deletedInt int
 	var createdAtStr, updatedAtStr string
 
-	query := `SELECT id, username, password_hash, must_change_password, needs_profile_setup, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, created_at, updated_at FROM users WHERE id = ?`
+	query := `SELECT id, username, password_hash, must_change_password, needs_profile_setup, name, nickname, roles, blocked, deleted, avatar_type, avatar_version, session_version, created_at, updated_at FROM users WHERE id = ?`
 	err := s.db.QueryRow(query, id).Scan(
 		&user.ID,
 		&user.Username,
@@ -630,6 +636,7 @@ func (s *SQLiteStore) GetUserByID(id string) (*models.User, error) {
 		&deletedInt,
 		&user.AvatarType,
 		&user.AvatarVersion,
+		&user.SessionVersion,
 		&createdAtStr,
 		&updatedAtStr,
 	)
@@ -803,9 +810,10 @@ func (s *SQLiteStore) SetUserBlocked(id string, blocked bool) error {
 		blockedInt = 1
 	}
 
+	// Blocking bumps session_version so unblocking doesn't revive cookies issued before the block.
 	_, err := s.db.Exec(
-		`UPDATE users SET blocked=?, updated_at=? WHERE id=?`,
-		blockedInt, time.Now().UTC().Format(time.RFC3339), id,
+		`UPDATE users SET blocked=?, session_version=session_version+?, updated_at=? WHERE id=?`,
+		blockedInt, blockedInt, time.Now().UTC().Format(time.RFC3339), id,
 	)
 	return err
 }
@@ -819,8 +827,9 @@ func (s *SQLiteStore) SetUserPassword(id, hash string, mustChange bool) error {
 		mustChangeInt = 1
 	}
 
+	// Bumping session_version revokes every existing session cookie for the user.
 	_, err := s.db.Exec(
-		`UPDATE users SET password_hash=?, must_change_password=?, updated_at=? WHERE id=?`,
+		`UPDATE users SET password_hash=?, must_change_password=?, session_version=session_version+1, updated_at=? WHERE id=?`,
 		hash, mustChangeInt, time.Now().UTC().Format(time.RFC3339), id,
 	)
 	return err
