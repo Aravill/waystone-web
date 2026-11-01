@@ -38,7 +38,7 @@ func InitAuth() {
 	case slices.Contains(knownPlaceholderSecrets, sessionSecret):
 		log.Fatalf("SESSION_SECRET is a known placeholder value; %s", hint)
 	case len(sessionSecret) < minSessionSecretLen:
-		log.Fatalf("SESSION_SECRET must be at least %d bytes (got %d); %s", minSessionSecretLen, len(sessionSecret), hint)
+		log.Fatalf("SESSION_SECRET must be at least %d characters (got %d); %s", minSessionSecretLen, len(sessionSecret), hint)
 	}
 
 	store := sessions.NewCookieStore([]byte(sessionSecret))

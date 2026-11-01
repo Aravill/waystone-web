@@ -37,7 +37,7 @@ case "${1:-up}" in
     docker info >/dev/null 2>&1 || { echo "Docker is not running." >&2; exit 1; }
     echo "Deploying $(git -C "$SRC" rev-parse --abbrev-ref HEAD) from $SRC"
     if [ -n "$ENV_FILE" ]; then echo "Using env file: $ENV_FILE"
-    else echo "WARNING: no .env found - SESSION_SECRET unset, compose will refuse to start (needs >=32 chars)."; fi
+    else echo "WARNING: no .env found - SESSION_SECRET unset, the app will exit on start (needs >=32 chars)."; fi
     cleanup
     compose up -d --build
     for _ in $(seq 1 30); do
