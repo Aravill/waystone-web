@@ -165,6 +165,7 @@ A `.env` file is used to manage environment variables. The `deploy.sh` script wi
 | `ADMIN_USERNAME` | `admin` | No | Username of the env-managed admin account |
 | `ADMIN_PASSWORD` | (empty) | Yes | Password of the admin account; applied on every startup. Write `$` as `$$` in `.env` (compose interpolates it). If unset, the admin cannot log in |
 | `SESSION_SECRET` | (none) | Yes | Secret key for signing session cookies, min 32 chars (`openssl rand -base64 32`). The server refuses to start if it is unset, too short, or an old placeholder value |
+| `TRUST_PROXY` | (off) | No | Use the last `X-Forwarded-For` entry as the client IP for login rate limits. Set only when the app is reachable solely through a reverse proxy (e.g. Caddy) |
 
 ### Example .env File
 

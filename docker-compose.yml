@@ -12,6 +12,7 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - SESSION_SECRET=${SESSION_SECRET}
+      - TRUST_PROXY=${TRUST_PROXY:-}
     restart: unless-stopped
     volumes:
       - waystone-data:/root/data

@@ -2,9 +2,15 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
+	"net/netip"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
 	"sync"
+	"time"
 	"waystone-web/auth"
 	"waystone-web/db"
 	"waystone-web/middleware"
@@ -14,6 +20,75 @@ var (
 	dummyHashOnce sync.Once
 	dummyHash     string
 )
+
+const (
+	authFailureWindow = 15 * time.Minute
+	authMaxKeys       = 10000
+)
+
+var (
+	// Keyed on ip|username so a stranger can't lock the real user out.
+	loginAccountLimiter = auth.NewFailureLimiter(5, authFailureWindow, authMaxKeys)
+	// Keyed on IP to cap guesses spread across many usernames.
+	loginIPLimiter = auth.NewFailureLimiter(20, authFailureWindow, authMaxKeys)
+	// Keyed on user ID to stop current-password guessing with a stolen session.
+	changePasswordLimiter = auth.NewFailureLimiter(5, authFailureWindow, authMaxKeys)
+)
+
+// trustProxy enables reading the client IP from X-Forwarded-For. Only set
+// TRUST_PROXY when the app is reachable solely through a reverse proxy.
+var trustProxy, _ = strconv.ParseBool(os.Getenv("TRUST_PROXY"))
+
+// clientIP returns the rate-limit key for the client address. By default it
+// is RemoteAddr's host, since any client can forge X-Forwarded-For. With
+// TRUST_PROXY set, the last X-Forwarded-For entry is used instead: that is
+// the one appended by the nearest (trusted) proxy; if it doesn't parse,
+// RemoteAddr is used. IPv6 addresses are keyed on their /64 prefix, since a
+// single client typically controls a whole /64.
+func clientIP(r *http.Request) string {
+	if trustProxy {
+		// Last header line: some proxies add a new line instead of appending.
+		if vals := r.Header.Values("X-Forwarded-For"); len(vals) > 0 {
+			parts := strings.Split(vals[len(vals)-1], ",")
+			if key, ok := ipKey(strings.TrimSpace(parts[len(parts)-1])); ok {
+				return key
+			}
+		}
+	}
+	if key, ok := ipKey(r.RemoteAddr); ok {
+		return key
+	}
+	return r.RemoteAddr
+}
+
+// ipKey parses "ip" or "ip:port" into a limiter key (IPv6 reduced to /64).
+func ipKey(s string) (string, bool) {
+	addr, err := netip.ParseAddr(s)
+	if err != nil {
+		ap, err := netip.ParseAddrPort(s)
+		if err != nil {
+			return "", false
+		}
+		addr = ap.Addr()
+	}
+	addr = addr.Unmap()
+	if addr.Is6() {
+		if p, err := addr.Prefix(64); err == nil {
+			return p.String(), true
+		}
+	}
+	return addr.String(), true
+}
+
+// writeTooManyAttempts responds 429 with a Retry-After header in seconds.
+func writeTooManyAttempts(w http.ResponseWriter, retry time.Duration) {
+	secs := int((retry + time.Second - 1) / time.Second)
+	mins := (secs + 59) / 60
+	w.Header().Set("Retry-After", strconv.Itoa(secs))
+	writeJSON(w, http.StatusTooManyRequests, map[string]string{
+		"error": fmt.Sprintf("too many failed attempts, try again in %d min", mins),
+	})
+}
 
 // getDummyHash returns a valid bcrypt hash used to equalise login timing when
 // the user does not exist, is blocked or has no password.
@@ -34,8 +109,26 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
+		return
+	}
+
+	// A malformed username keys on "ip|" so the map can't grow with junk names.
+	username, usernameErr := auth.ParseUsername(body.Username)
+	ip := clientIP(r)
+	accountKey := ip + "|" + username
+	// Count the attempt before bcrypt: blocked clients cost no CPU, and
+	// concurrent requests can't all slip past the limit. A request blocked by
+	// the IP limiter gives its account attempt back.
+	if retry := loginAccountLimiter.Attempt(accountKey); retry > 0 {
+		writeTooManyAttempts(w, retry)
+		return
+	}
+	if retry := loginIPLimiter.Attempt(ip); retry > 0 {
+		loginAccountLimiter.Forgive(accountKey)
+		writeTooManyAttempts(w, retry)
 		return
 	}
 
@@ -43,8 +136,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid username or password"})
 	}
 
-	username, err := auth.ParseUsername(body.Username)
-	if err != nil {
+	if usernameErr != nil {
 		auth.CheckPassword(getDummyHash(), body.Password)
 		invalid()
 		return
@@ -66,6 +158,9 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		invalid()
 		return
 	}
+
+	loginAccountLimiter.Reset(accountKey)
+	loginIPLimiter.Forgive(ip)
 
 	if err := middleware.SetSession(w, r, user.ID); err != nil {
 		log.Printf("failed to set session: %v", err)
@@ -114,6 +209,7 @@ func HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		CurrentPassword string `json:"current_password"`
 		NewPassword     string `json:"new_password"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
 		return
@@ -127,10 +223,15 @@ func HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "new password must differ from the current one"})
 		return
 	}
+	if retry := changePasswordLimiter.Attempt(user.ID); retry > 0 {
+		writeTooManyAttempts(w, retry)
+		return
+	}
 	if user.PasswordHash == "" || !auth.CheckPassword(user.PasswordHash, body.CurrentPassword) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "current password is incorrect"})
 		return
 	}
+	changePasswordLimiter.Reset(user.ID)
 
 	hash, err := auth.HashPassword(body.NewPassword)
 	if err != nil {
