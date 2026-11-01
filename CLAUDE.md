@@ -23,6 +23,7 @@ Waystone Web: Go (stdlib `net/http`, SQLite via `modernc.org/sqlite`, local user
 - Session responses are one per `(session_id, user_id)` (upsert); pending players are computed from the campaign's player list.
 - When changing `models/user.go`, update seed data in `config/config.go` and keep `SaveUser` and the `SELECT`/`Scan` sites in `db/sqlite_store.go` in sync.
 - The `ADMIN_USERNAME` user is env-managed: password reset from `.env` on every start; can't be blocked, deleted or demoted.
+- The session cookie is `Secure` by default (`SESSION_COOKIE_SECURE`): fine on `http://localhost`, but over plain HTTP on a LAN IP login returns 200 and the cookie silently never sticks; set it to `false` there.
 
 ## Conventions
 

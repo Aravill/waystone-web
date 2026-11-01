@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/sessions"
@@ -43,13 +44,39 @@ func InitAuth() {
 	}
 
 	store := sessions.NewCookieStore([]byte(sessionSecret))
+	// Every session copies these Options (gorilla's store.New), so the
+	// MaxAge -1 deletion cookie in ClearSession carries the same flags.
 	store.Options = &sessions.Options{
 		Path:     "/",
-		MaxAge:   30 * 24 * 60 * 60,
 		HttpOnly: true,
+		Secure:   sessionCookieSecure(),
 		SameSite: http.SameSiteLaxMode,
 	}
+	// MaxAge sets both the cookie lifetime and securecookie's server-side
+	// expiry check, so the two can't drift apart.
+	store.MaxAge(30 * 24 * 60 * 60)
 	sessionStore = store
+}
+
+// sessionCookieSecure reads SESSION_COOKIE_SECURE (default true). Browsers
+// silently drop Secure cookies on plain-HTTP origins other than localhost:
+// http://localhost:8080 still works, but logging in via http://<lan-ip>:8080
+// without the TLS proxy returns 200 yet the cookie never sticks. Set it to
+// false only for such plain-HTTP setups.
+func sessionCookieSecure() bool {
+	v := os.Getenv("SESSION_COOKIE_SECURE")
+	if v == "" {
+		return true
+	}
+	secure, err := strconv.ParseBool(v)
+	if err != nil {
+		log.Printf("WARNING: invalid SESSION_COOKIE_SECURE %q; keeping session cookies Secure", v)
+		return true
+	}
+	if !secure {
+		log.Printf("WARNING: SESSION_COOKIE_SECURE=false: session cookies are sent over plain HTTP")
+	}
+	return secure
 }
 
 // SetSession stores the user ID and session version; everything else is read from the DB per request.
