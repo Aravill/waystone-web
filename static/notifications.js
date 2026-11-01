@@ -45,6 +45,11 @@
             async refreshCount() {
                 try {
                     const response = await fetch('/api/notifications/unread-count');
+                    if (response.status === 401) {
+                        // Session revoked (e.g. password changed elsewhere).
+                        window.location.href = '/login.html';
+                        return;
+                    }
                     if (!response.ok) return;
                     const data = await response.json();
                     // Let the page refresh its own data when new notifications arrive.
