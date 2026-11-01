@@ -20,6 +20,7 @@ type User struct {
 	Deleted            bool      `json:"deleted"`
 	AvatarType         string    `json:"-"` // "" = no avatar
 	AvatarVersion      int       `json:"-"`
+	SessionVersion     int       `json:"-"` // bumped to revoke all existing session cookies
 }
 
 // DisplayName returns nickname, then name, then username ("Deleted user" once anonymized).

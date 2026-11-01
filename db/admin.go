@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"unicode/utf8"
 	"waystone-web/auth"
 	"waystone-web/models"
 )
@@ -16,6 +17,12 @@ func EnsureAdmin() error {
 	if password == "" {
 		log.Println("WARNING: ADMIN_PASSWORD is not set - the admin account cannot log in")
 		return nil
+	}
+	if len(password) > auth.MaxPasswordBytes {
+		log.Fatalf("ADMIN_PASSWORD is %d bytes long; bcrypt accepts at most %d bytes - use a shorter password", len(password), auth.MaxPasswordBytes)
+	}
+	if n := utf8.RuneCountInString(password); n < auth.MinPasswordLength {
+		log.Printf("WARNING: ADMIN_PASSWORD is only %d characters - use at least %d", n, auth.MinPasswordLength)
 	}
 
 	hash, err := auth.HashPassword(password)
@@ -32,6 +39,11 @@ func EnsureAdmin() error {
 		user = &models.User{Username: username, Name: username, Roles: []string{models.RoleUser}}
 	}
 
+	// Revoke existing sessions only when ADMIN_PASSWORD actually changed, so a
+	// plain restart doesn't log the admin out.
+	if user.PasswordHash != "" && !auth.CheckPassword(user.PasswordHash, password) {
+		user.SessionVersion++
+	}
 	user.PasswordHash = hash
 	user.MustChangePassword = false
 	user.Blocked = false
