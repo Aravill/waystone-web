@@ -5,9 +5,10 @@ import (
 	"time"
 )
 
-// FailureLimiter is an in-memory fixed-window limiter for failed attempts.
-// After max failures within window, RetryAfter reports the time left until
-// the window expires. State is per-process and lost on restart.
+// FailureLimiter is an in-memory fixed-window limiter for password attempts.
+// Each attempt counts up front (Attempt); successes are undone via Reset or
+// Forgive, so the count effectively tracks failures. After max within window,
+// Attempt reports the time left until the window expires. State is per-process and lost on restart.
 type FailureLimiter struct {
 	mu      sync.Mutex
 	max     int
@@ -25,38 +26,38 @@ func NewFailureLimiter(max int, window time.Duration, maxKeys int) *FailureLimit
 	return &FailureLimiter{max: max, window: window, maxKeys: maxKeys, entries: map[string]*failureEntry{}}
 }
 
-// RetryAfter returns how long key is blocked for, or 0 if it is not blocked.
-func (l *FailureLimiter) RetryAfter(key string) time.Duration {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	e, ok := l.entries[key]
-	if !ok {
-		return 0
-	}
-	left := e.start.Add(l.window).Sub(time.Now())
-	if left <= 0 {
-		delete(l.entries, key)
-		return 0
-	}
-	if e.count < l.max {
-		return 0
-	}
-	return left
-}
-
-// RecordFailure counts one failed attempt for key.
-func (l *FailureLimiter) RecordFailure(key string) {
+// Attempt atomically checks and counts one attempt for key. It returns how
+// long key is blocked for, or 0 if the attempt is allowed (and counted).
+// Counting before the expensive check stops concurrent requests from all
+// slipping through while bcrypt runs.
+func (l *FailureLimiter) Attempt(key string) time.Duration {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := time.Now()
-	if e, ok := l.entries[key]; ok && now.Sub(e.start) < l.window {
-		e.count++
-		return
+	if e, ok := l.entries[key]; ok {
+		if left := e.start.Add(l.window).Sub(now); left > 0 {
+			if e.count >= l.max {
+				return left
+			}
+			e.count++
+			return 0
+		}
+		delete(l.entries, key)
 	}
-	if _, ok := l.entries[key]; !ok && len(l.entries) >= l.maxKeys {
+	if len(l.entries) >= l.maxKeys {
 		l.evict(now)
 	}
 	l.entries[key] = &failureEntry{count: 1, start: now}
+	return 0
+}
+
+// Forgive un-counts one attempt for key, e.g. after it turned out to succeed.
+func (l *FailureLimiter) Forgive(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if e, ok := l.entries[key]; ok && e.count > 0 {
+		e.count--
+	}
 }
 
 // Reset clears any failures recorded for key.
