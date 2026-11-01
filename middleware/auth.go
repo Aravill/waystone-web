@@ -48,11 +48,13 @@ func InitAuth() {
 	// MaxAge -1 deletion cookie in ClearSession carries the same flags.
 	store.Options = &sessions.Options{
 		Path:     "/",
-		MaxAge:   30 * 24 * 60 * 60,
 		HttpOnly: true,
 		Secure:   sessionCookieSecure(),
 		SameSite: http.SameSiteLaxMode,
 	}
+	// MaxAge sets both the cookie lifetime and securecookie's server-side
+	// expiry check, so the two can't drift apart.
+	store.MaxAge(30 * 24 * 60 * 60)
 	sessionStore = store
 }
 
@@ -72,7 +74,7 @@ func sessionCookieSecure() bool {
 		return true
 	}
 	if !secure {
-		log.Printf("SESSION_COOKIE_SECURE=false: session cookies are sent over plain HTTP")
+		log.Printf("WARNING: SESSION_COOKIE_SECURE=false: session cookies are sent over plain HTTP")
 	}
 	return secure
 }
