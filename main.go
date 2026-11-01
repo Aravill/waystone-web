@@ -54,8 +54,10 @@ func main() {
 	}()
 
 	<-ctx.Done()
+	stop() // a second signal now kills the process immediately
 	log.Println("Shutting down server")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Under Docker's 10s stop grace period, so db.Close still runs.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("Server shutdown error: %v", err)
