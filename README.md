@@ -78,7 +78,7 @@ docker-compose up -d
 
 ```bash
 go mod download
-go run main.go
+SESSION_SECRET=$(openssl rand -base64 32) ADMIN_PASSWORD=... go run main.go
 ```
 
 Visit: **http://localhost:8080**
@@ -164,7 +164,7 @@ A `.env` file is used to manage environment variables. The `deploy.sh` script wi
 | `PORT` | `8080` | No | Server port number |
 | `ADMIN_USERNAME` | `admin` | No | Username of the env-managed admin account |
 | `ADMIN_PASSWORD` | (empty) | Yes | Password of the admin account; applied on every startup. Write `$` as `$$` in `.env` (compose interpolates it). If unset, the admin cannot log in |
-| `SESSION_SECRET` | (insecure default) | Yes in production | Secret key for signing session cookies (set to a random value) |
+| `SESSION_SECRET` | (none) | Yes | Secret key for signing session cookies, min 32 chars (`openssl rand -base64 32`). The server refuses to start if it is unset, too short, or an old placeholder value |
 
 ### Example .env File
 
