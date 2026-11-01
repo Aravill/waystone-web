@@ -11,7 +11,7 @@ services:
       - PORT=8080
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - SESSION_SECRET=${SESSION_SECRET:-your-secret-key-change-me}
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set (min 32 chars; openssl rand -base64 32)}
     restart: unless-stopped
     volumes:
       - waystone-data:/root/data

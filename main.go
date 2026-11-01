@@ -13,6 +13,8 @@ import (
 )
 
 func main() {
+	middleware.InitAuth()
+
 	if err := db.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
@@ -22,8 +24,6 @@ func main() {
 	if port == "" {
 		port = config.DefaultPort
 	}
-
-	middleware.InitAuth()
 
 	api.RegisterRoutes()
 

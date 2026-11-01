@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/gorilla/sessions"
@@ -16,17 +17,28 @@ import (
 var sessionStore sessions.Store
 
 const (
-	SessionName          = "auth_session"
-	defaultSessionSecret = "default-insecure-secret-change-this"
+	SessionName         = "auth_session"
+	minSessionSecretLen = 32
 )
 
+// Placeholder secrets that shipped in earlier code/config; anyone could forge cookies with them.
+var knownPlaceholderSecrets = []string{
+	"default-insecure-secret-change-this",
+	"your-secret-key-change-me",
+	"change-me-to-random-secret-in-production",
+}
+
+// InitAuth exits the process if SESSION_SECRET is missing, a known placeholder, or too short.
 func InitAuth() {
 	sessionSecret := os.Getenv("SESSION_SECRET")
-	if sessionSecret == "" {
-		sessionSecret = defaultSessionSecret
-	}
-	if sessionSecret == defaultSessionSecret {
-		log.Println("WARNING: SESSION_SECRET is not set - using an insecure default")
+	const hint = "generate one with: openssl rand -base64 32"
+	switch {
+	case sessionSecret == "":
+		log.Fatalf("SESSION_SECRET is not set; %s", hint)
+	case slices.Contains(knownPlaceholderSecrets, sessionSecret):
+		log.Fatalf("SESSION_SECRET is a known placeholder value; %s", hint)
+	case len(sessionSecret) < minSessionSecretLen:
+		log.Fatalf("SESSION_SECRET must be at least %d bytes (got %d); %s", minSessionSecretLen, len(sessionSecret), hint)
 	}
 
 	store := sessions.NewCookieStore([]byte(sessionSecret))

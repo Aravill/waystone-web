@@ -9,7 +9,8 @@ if [ ! -f .env ]; then
     if [ -f .env.example ]; then
         echo "📋 Creating .env file from .env.example..."
         cp .env.example .env
-        echo "⚠️  Please edit .env and set ADMIN_PASSWORD (and optionally ADMIN_USERNAME)"
+        echo "⚠️  Please edit .env and set SESSION_SECRET and ADMIN_PASSWORD (and optionally ADMIN_USERNAME)"
+        echo "   SESSION_SECRET is required (min 32 chars): openssl rand -base64 32"
         echo "   Without ADMIN_PASSWORD the admin account cannot log in."
     else
         echo "⚠️  Warning: Neither .env nor .env.example found"
@@ -30,6 +31,11 @@ if [ ! -z "$ADMIN_PASSWORD" ]; then
     echo "✓ ADMIN_PASSWORD is set"
 else
     echo "⚠️  ADMIN_PASSWORD not set (admin can't log in)"
+fi
+
+if [ -z "$SESSION_SECRET" ]; then
+    echo "❌ SESSION_SECRET not set in .env (required, min 32 chars). Generate one: openssl rand -base64 32"
+    exit 1
 fi
 
 echo "✓ ADMIN_USERNAME=${ADMIN_USERNAME:-admin}"
