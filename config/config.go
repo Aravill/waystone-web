@@ -19,7 +19,8 @@ const (
 	simonID   = "e5c1b8f3-7a2d-4e69-8b04-6f9d2c3a1e03"
 )
 
-// InitialPasswords are preset passwords for seeded users, keyed by user ID.
+// InitialPasswords are preset passwords for the demo users, keyed by user ID.
+// Demo data (users, campaigns, sessions) is seeded only with SEED_DEMO_DATA on.
 var InitialPasswords = map[string]string{
 	testyID: "ohgoditsacat",
 	royID:   "ohgoditsacat",

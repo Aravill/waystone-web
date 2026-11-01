@@ -79,6 +79,8 @@ docker-compose up -d
 ```bash
 go mod download
 SESSION_SECRET=$(openssl rand -base64 32) ADMIN_PASSWORD=... go run main.go
+# with demo users, campaigns and sessions on a fresh DB:
+SEED_DEMO_DATA=1 SESSION_SECRET=$(openssl rand -base64 32) ADMIN_PASSWORD=... go run main.go
 ```
 
 Visit: **http://localhost:8080**
@@ -185,11 +187,9 @@ The application uses **SQLite** (embedded SQL database) to store campaigns, user
 - Data survives container recreation during rebuilds
 
 ### Initial Data
-On first run, the application automatically seeds two sample campaigns:
-1. "Age of Sojourn" - An epic campaign of discovery and adventure
-2. "Embittered Arcanist" - Figure out who turned the Archmage into a sheep
+On first run (empty database) the application seeds the game systems list (`InitialSystems` in `config/config.go`); admins can manage it afterwards.
 
-These can be replaced by modifying the `InitialCampaigns` list in `config/config.go`.
+Demo data is seeded only when `SEED_DEMO_DATA` is set to `1`/`true` (default off). It is meant for local development: it creates the users `testy`, `roy`, `adam` and `simon` with a password that is public in this repo (`InitialPasswords`), two sample campaigns ("Age of Sojourn" and "Embittered Arcanist") and Age of Sojourn's session history. The server logs a warning on every start while it is on. **Never enable it on a publicly reachable instance.**
 
 ## Authentication & Users
 
