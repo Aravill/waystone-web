@@ -141,7 +141,7 @@ func HandleAdminUsers(w http.ResponseWriter, r *http.Request) {
 			adminError(w, http.StatusConflict, "username already taken")
 			return
 		}
-		tempPassword, err := auth.GenerateTempPassword()
+		tempPassword, err := auth.GenerateTempPassword(username)
 		if err != nil {
 			adminError(w, http.StatusInternalServerError, "failed to generate password")
 			return
@@ -285,7 +285,7 @@ func HandleAdminUserActions(w http.ResponseWriter, r *http.Request) {
 			adminError(w, http.StatusConflict, "cannot reset your own password")
 			return
 		}
-		tempPassword, err := auth.GenerateTempPassword()
+		tempPassword, err := auth.GenerateTempPassword(target.Username)
 		if err != nil {
 			adminError(w, http.StatusInternalServerError, "failed to generate password")
 			return
