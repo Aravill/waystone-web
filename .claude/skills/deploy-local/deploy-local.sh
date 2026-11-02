@@ -2,7 +2,7 @@
 # Local Docker deploy for manual testing. Always uses one fixed compose project
 # so repeated deploys (from main or any worktree) never pile up images/volumes.
 #   deploy-local.sh up      build + start with a fresh DB (default)
-#   deploy-local.sh down    stop and remove container, volume, image
+#   deploy-local.sh down    stop and remove container, volumes (DB + backups), image
 #   deploy-local.sh status  show what's running
 set -euo pipefail
 
@@ -18,11 +18,13 @@ for f in "$SRC/.env" "$MAIN/.env"; do
   if [ -f "$f" ]; then ENV_FILE=$f; break; fi
 done
 
+# compose.local.yml keeps test backups in a volume instead of ./backups on the host.
 compose() {
+  local files=(-f "$SRC/docker-compose.yml" -f "$SRC/.claude/skills/deploy-local/compose.local.yml")
   if [ -n "$ENV_FILE" ]; then
-    docker compose -p "$PROJECT" --project-directory "$SRC" --env-file "$ENV_FILE" -f "$SRC/docker-compose.yml" "$@"
+    docker compose -p "$PROJECT" --project-directory "$SRC" --env-file "$ENV_FILE" "${files[@]}" "$@"
   else
-    docker compose -p "$PROJECT" --project-directory "$SRC" -f "$SRC/docker-compose.yml" "$@"
+    docker compose -p "$PROJECT" --project-directory "$SRC" "${files[@]}" "$@"
   fi
 }
 
