@@ -310,7 +310,7 @@ Auto-hide after 5 seconds (unchanged). Error text is plain and precise, no flavo
 Each module is a waystone: an absolutely positioned SVG (`viewBox 0 0 320 420`, uniform scaling) draws a hairline standing stone with an inner carved line, crack/chip/lichen strokes and a ground line with grass tufts in `--muted`; one distinct silhouette per card (`stone-1/2/3`). Inside: a 48px rune icon (24px grid, 1.5 stroke, `currentColor`), Fell display title, muted italic description and a status badge pinned above the ground. Cards are max 20rem wide, `aspect-ratio: 320 / 420`.
 
 - **Active ("Open road")**: outline and rune `--ink`. Hover / `:focus-visible`: stone fill `--folio`, outline and rune `--rubric`; focus also gets the 2px rubric outline.
-- **Disabled ("Coming soon")**: dormant stone, `opacity: 0.55`, dashed outline, rune `--muted`, `cursor: not-allowed`, no hover change.
+- **Disabled ("Coming soon")**: dormant stone, `opacity: 0.7`, dashed outline, badge `✧ Coming soon`, rune `--muted`, `cursor: not-allowed`, no hover change.
 
 ### Danger zone
 
