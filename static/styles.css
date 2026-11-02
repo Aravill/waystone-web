@@ -353,7 +353,8 @@ h2 {
 .btn-danger,
 .btn-confirm-danger,
 .session-actions .btn-action-cancel,
-#signupsModal .signups-btn-kick {
+#signupsModal .signups-btn-kick,
+.discord-invite-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -411,7 +412,8 @@ button:disabled {
 .panel-suggest:hover:not(:disabled),
 #signupsModal .signups-btn-decline:hover:not(:disabled),
 #signupsModal .signups-open-toggle:hover:not(:disabled),
-.logout-btn:hover:not(:disabled) {
+.logout-btn:hover:not(:disabled),
+.discord-invite-btn:hover {
     background: var(--ink);
     color: var(--bg);
     border-color: var(--ink);
