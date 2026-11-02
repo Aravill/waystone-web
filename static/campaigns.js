@@ -187,7 +187,7 @@ function bannerFrame(now) {
             s,
             w: s.cloth.offsetWidth, h: s.cloth.offsetHeight,
             visible: r.bottom > -150 && r.top < window.innerHeight + 150,
-            hover: c.matches(':hover')
+            hover: c.classList.contains('on-cloth')
         });
     }
     for (const { s, w, h, visible, hover } of cards) {
@@ -229,18 +229,27 @@ function bannerGameUrl(event) {
 }
 const bannerList = document.getElementById('campaignsList');
 if (bannerList) {
-    // The pointer cursor follows the cloth's silhouette, not the card's rectangle.
+    // Hover (gust, outline colour, cursor) follows the cloth's silhouette, not the
+    // card's rectangle: .on-cloth stands in for :hover. Re-checked on scroll too,
+    // since the page can move under a still pointer.
     let hoverCard = null;
-    bannerList.addEventListener('mousemove', (event) => {
-        const card = event.target.closest('.campaign-item');
+    let pointer = null;
+    const updateClothHover = () => {
+        const el = pointer && document.elementFromPoint(pointer.clientX, pointer.clientY);
+        const card = el && bannerList.contains(el) ? el.closest('.campaign-item') : null;
         if (hoverCard && hoverCard !== card) hoverCard.classList.remove('on-cloth');
         hoverCard = card;
-        if (card) card.classList.toggle('on-cloth', bannerOnCloth(card, event));
+        if (card) card.classList.toggle('on-cloth', bannerOnCloth(card, pointer));
+    };
+    bannerList.addEventListener('mousemove', (event) => {
+        pointer = { clientX: event.clientX, clientY: event.clientY };
+        updateClothHover();
     });
     bannerList.addEventListener('mouseleave', () => {
-        hoverCard?.classList.remove('on-cloth');
-        hoverCard = null;
+        pointer = null;
+        updateClothHover();
     });
+    window.addEventListener('scroll', () => { if (pointer) updateClothHover(); }, { passive: true });
     bannerList.addEventListener('click', (event) => {
         const url = bannerGameUrl(event);
         if (!url) return;

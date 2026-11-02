@@ -820,11 +820,11 @@ select option {
 }
 
 /* Hover: ink up the quiet lines; needs-action cards keep their rubric frame */
-.campaign-item:not(.needs-action):hover :is(.banner-outline, .banner-orn, .banner-ring-i) {
+.campaign-item.on-cloth:not(.needs-action) :is(.banner-outline, .banner-orn, .banner-ring-i) {
     stroke: var(--ink);
 }
 
-.campaign-item:not(.needs-action):hover .card-headpiece {
+.campaign-item.on-cloth:not(.needs-action) .card-headpiece {
     color: var(--ink);
 }
 
@@ -842,11 +842,11 @@ select option {
     opacity: 0.55;
 }
 
-.needs-action:hover .banner-outline {
+.needs-action.on-cloth .banner-outline {
     stroke-width: 2;
 }
 
-.needs-action:hover .banner-ring-i {
+.needs-action.on-cloth .banner-ring-i {
     opacity: 1;
 }
 
@@ -855,7 +855,7 @@ select option {
     transition: opacity 0.3s;
 }
 
-.campaign-item.status-finished:hover {
+.campaign-item.status-finished.on-cloth {
     opacity: 0.92;
 }
 
@@ -2710,8 +2710,9 @@ select option {
     color: var(--ink);
 }
 
-/* The banner cloth opens the game page (.on-cloth is set by campaigns.js);
-   the title link stays for keyboard users. */
+/* The banner cloth opens the game page; .on-cloth (set by campaigns.js while the
+   pointer is over the silhouette) replaces :hover for banners. The title link
+   stays for keyboard users. */
 .campaign-item.on-cloth {
     cursor: pointer;
 }
