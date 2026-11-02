@@ -57,5 +57,5 @@ This document describes what must-have features are to be implemented before pre
     - [x] SQLite
     - [x] Alpine.js
     - [x] Code review skill
-- [ ] Misc
-    - [ ] Waystone logo on the page
+- [x] Misc
+    - [x] Waystone logo on the page
