@@ -66,14 +66,21 @@ chmod +x deploy.sh
 ./deploy.sh
 ```
 
-The application will be available at: **http://localhost:8080**
+This is the production deployment: the app is served at **https://waystone.aravill.org** through Caddy (automatic Let's Encrypt certificates). The app itself only listens on `127.0.0.1:8080`. Data is kept across deploys.
 
-### 2. Manual Deployment
+Production setup:
+1. Point a DNS A/AAAA record for `waystone.aravill.org` at the server and open ports 80 and 443 (TCP, plus 443/UDP).
+2. Create `.env` with `SESSION_SECRET`, `ADMIN_PASSWORD` and `TRUST_PROXY=1` (see below).
+3. Run `./deploy.sh`.
+
+### 2. Local Docker (no Caddy)
 
 ```bash
-docker-compose build
-docker-compose up -d
+docker compose build
+docker compose up -d
 ```
+
+The app is then at **http://localhost:8080** (Caddy only starts with `--profile prod`).
 
 ### 3. Local Development (without Docker)
 
@@ -113,22 +120,22 @@ Visit: **http://localhost:8080**
 
 ```bash
 # Build the image
-docker-compose build
+docker compose build
 
 # Start the application
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop the application
-docker-compose stop
+docker compose stop
 
 # Remove containers and volumes
-docker-compose down
+docker compose down
 
 # Restart the application
-docker-compose restart
+docker compose restart
 ```
 
 ## Environment Variables
@@ -169,7 +176,9 @@ A `.env` file is used to manage environment variables. The `deploy.sh` script wi
 | `ADMIN_PASSWORD` | (empty) | Yes | Password of the admin account; applied on every startup. Write `$` as `$$` in `.env` (compose interpolates it). If unset, the admin cannot log in |
 | `SESSION_SECRET` | (none) | Yes | Secret key for signing session cookies, min 32 chars (`openssl rand -base64 32`). The server refuses to start if it is unset, too short, or an old placeholder value |
 | `SESSION_COOKIE_SECURE` | `true` | No | Mark the session cookie `Secure` (HTTPS only). Browsers drop Secure cookies on plain-HTTP origins other than `localhost` (older Safari drops them there too), so set `false` only when serving over plain HTTP on a LAN IP/hostname (login otherwise "succeeds" but the cookie never sticks) |
-| `TRUST_PROXY` | (off) | No | Use the last `X-Forwarded-For` entry as the client IP for login rate limits. Set only when the app is reachable solely through a reverse proxy (e.g. Caddy) |
+| `TRUST_PROXY` | (off) | No | Use the last `X-Forwarded-For` entry as the client IP for login rate limits. Set only when the app is reachable solely through a reverse proxy (e.g. Caddy); set `1` in production |
+| `BACKUP_DIR` | (empty = disabled) | No | Directory for SQLite snapshots (`waystone-YYYYMMDD-HHMMSS.db`, UTC), written on startup and every 24h. In docker compose it is `/root/backups`, bind-mounted to `./backups` |
+| `BACKUP_KEEP` | `14` | No | Number of newest snapshots to keep |
 
 ### Example .env File
 
@@ -184,9 +193,14 @@ The application uses **SQLite** (embedded SQL database) to store campaigns, user
 - Container path: `/root/data/waystone.db`
 
 ### Data Preservation
-- Data persists across container restarts: `docker-compose restart`
-- Data is removed only when volumes are explicitly deleted: `docker-compose down -v`
-- Data survives container recreation during rebuilds
+- Data persists across container restarts: `docker compose restart`
+- Data is removed only when volumes are explicitly deleted: `docker compose down -v`
+- Data survives container recreation, rebuilds and `./deploy.sh` (which never uses `-v`)
+
+### Backups
+Snapshots are written to `./backups` on the host (daily, newest `BACKUP_KEEP` kept). A local copy does not survive disk loss, so copy `./backups` off the server regularly (e.g. an `rsync`/`rclone` cron job).
+
+To restore: stop the app (`docker compose --profile prod stop waystone-web`), copy a snapshot over `waystone.db` in the `waystone-data` volume (`/root/data/waystone.db` in the container), then start it again.
 
 ### Initial Data
 On first run (empty database) the application seeds the game systems list (`InitialSystems` in `config/config.go`); admins can manage it afterwards.
@@ -229,7 +243,7 @@ All admin endpoints require the `admin` role.
 
 ### Initial Setup
 
-Set `ADMIN_PASSWORD` (and optionally `ADMIN_USERNAME`) in `.env`, start the app and log in as the admin. The database is wiped on every `./deploy.sh` (`down -v`), but the admin is recreated from `.env` on each start. Locally, delete `./data/waystone.db` after schema changes.
+Set `ADMIN_PASSWORD` (and optionally `ADMIN_USERNAME`) in `.env`, start the app and log in as the admin. The admin is recreated from `.env` on each start. Locally, delete `./data/waystone.db` after schema changes.
 
 ## User Roles & Permissions
 
@@ -279,7 +293,7 @@ ports:
 
 **Container won't start**: Check logs with:
 ```bash
-docker-compose logs waystone-web
+docker compose logs waystone-web
 ```
 
 ## Development
@@ -295,8 +309,8 @@ http.HandleFunc("/api/myendpoint", handleMyEndpoint)
 ### Rebuilding After Changes
 
 ```bash
-docker-compose build --no-cache
-docker-compose up -d
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ## Future Enhancements
@@ -305,7 +319,6 @@ docker-compose up -d
 - Email confirmations for signups
 - Admin panel for creating/editing events
 - Signup list management and export (CSV/PDF)
-- Data backup and recovery
 - Role hierarchy (e.g., "super-admin" > "admin" > "moderator")
 - Permission groups (granular permissions instead of just roles)
 - Audit logs for role assignments and access attempts

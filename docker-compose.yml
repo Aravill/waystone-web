@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       - PORT=8080
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
@@ -15,10 +15,30 @@ services:
       - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
       - TRUST_PROXY=${TRUST_PROXY:-}
       - SEED_DEMO_DATA=${SEED_DEMO_DATA:-}
+      - BACKUP_DIR=${BACKUP_DIR:-/root/backups}
+      - BACKUP_KEEP=${BACKUP_KEEP:-14}
     restart: unless-stopped
     volumes:
       - waystone-data:/root/data
+      - ./backups:/root/backups
+
+  caddy:
+    image: caddy:2.10-alpine
+    profiles: ["prod"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - waystone-web
 
 volumes:
   waystone-data:
+  caddy-data:
+  caddy-config:
 

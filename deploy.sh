@@ -47,35 +47,27 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-# Build the Docker image
+# Build and (re)create the containers in place. The data volume is kept: never pass -v.
 echo ""
-echo "📦 Building Docker image..."
-docker-compose build
-
-# Stop any existing container and wipe the data volume for a clean DB
-echo "🛑 Stopping any existing containers and clearing data..."
-docker-compose down -v 2>/dev/null || true
-
-# Start the container
-echo "▶️  Starting container..."
-docker-compose up -d
+echo "📦 Building and starting containers (data volume is preserved)..."
+docker compose --profile prod up -d --build
 
 # Wait for container to be ready
 echo "⏳ Waiting for application to be ready..."
 sleep 2
 
 # Check if container is running
-if docker-compose ps | grep -q "Up"; then
+if docker compose --profile prod ps | grep -q "Up"; then
     echo "✅ Deployment successful!"
-    echo "🌐 Application is running at http://localhost:8080"
+    echo "🌐 Application is served at https://waystone.aravill.org (via Caddy)"
     echo ""
     echo "Available commands:"
-    echo "  docker-compose logs -f          # View logs"
-    echo "  docker-compose stop             # Stop the application"
-    echo "  docker-compose down             # Stop and remove containers"
-    echo "  docker-compose down -v          # Stop and remove containers + data volume"
+    echo "  docker compose --profile prod logs -f     # View logs"
+    echo "  docker compose --profile prod stop        # Stop the application"
+    echo "  docker compose --profile prod down        # Stop and remove containers (data kept)"
+    echo "  docker compose --profile prod down -v     # DESTROYS ALL DATA (database volume + TLS certs)"
 else
     echo "❌ Failed to start container"
-    docker-compose logs
+    docker compose --profile prod logs
     exit 1
 fi
