@@ -1,5 +1,19 @@
 [x-cloak] { display: none !important; }
 
+/* Short note under the page title on what Waystone is for */
+.home-intro {
+    max-width: 40rem;
+    margin-top: 1rem;
+    color: var(--ink);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+}
+
+/* Secondary button styles come from the shared base in styles.css */
+.discord-invite-btn {
+    margin-top: 1rem;
+}
+
 /* Modules Grid: a row of waystones */
 .modules-grid {
     display: grid;

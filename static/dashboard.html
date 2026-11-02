@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Waystone - Dashboard</title>
+    <title>Waystone - Home</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=43">
-    <link rel="stylesheet" href="dashboard.css?v=8">
+    <link rel="stylesheet" href="/static/styles.css?v=44">
+    <link rel="stylesheet" href="dashboard.css?v=10">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -17,7 +17,7 @@
             <a href="/" class="logo">Waystone</a>
         </div>
         <nav class="nav-bar" aria-label="Main">
-            <a href="/" class="nav-item active" aria-current="page" data-page="dashboard">Dashboard</a>
+            <a href="/" class="nav-item active" aria-current="page" data-page="dashboard">Home</a>
             <a href="/campaigns" class="nav-item" data-page="campaigns">Games</a>
             <a href="/profile" class="nav-item" data-page="profile">Profile</a>
             <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
@@ -29,8 +29,15 @@
     </div>
 
     <div class="container">
-        <h1 class="page-title"><span class="drop-cap">D</span>ashboard</h1>
+        <h1 class="page-title"><span class="drop-cap">H</span>ome</h1>
         <p class="page-subtitle">Three roads lead from this stone &middot; one lies open</p>
+        <p class="home-intro">
+            Waystone is a gathering place for the Waystone Discord community: schedule sessions,
+            sign up for games, and find your way between the roads below. It is built for our
+            members and still growing, so if something is broken or there is a feature you would
+            like to see, leave your feedback on Discord.
+        </p>
+        <a href="https://discord.gg/waystone" class="discord-invite-btn" target="_blank" rel="noopener noreferrer">Join our Discord &rarr;</a>
         <div class="dashboard">
             <h2 class="section-header">Choose thy road</h2>
 
@@ -52,7 +59,7 @@
                     </div>
                 </a>
 
-                <!-- Chat Games (Disabled) -->
+                <!-- Chat (Disabled) -->
                 <div aria-disabled="true" class="module-card disabled stone-2">
                     <svg class="stone-outline" viewBox="0 0 320 420" aria-hidden="true">
                         <path class="stone-body" d="M44 404L52 124L66 62Q72 38 100 33L222 28Q250 30 258 64L278 404Z"/>
@@ -63,13 +70,13 @@
                     </svg>
                     <div class="card-inner">
                         <svg class="stone-rune" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 3C12 4 7.5 9.5 6 18"/><path d="M20 3C19.5 9 15.5 13 9 14"/><path d="M11 9.5H15.5"/><path d="M6 18L3.5 21"/></svg>
-                        <h3>Chat Games</h3>
+                        <h3>Chat</h3>
                         <p class="description">Interactive games</p>
                         <span class="status-badge coming-soon">&#10023; Coming soon</span>
                     </div>
                 </div>
 
-                <!-- Anevion Wiki (Disabled) -->
+                <!-- Codex (Disabled) -->
                 <div aria-disabled="true" class="module-card disabled stone-3">
                     <svg class="stone-outline" viewBox="0 0 320 420" aria-hidden="true">
                         <path class="stone-body" d="M38 404L56 112Q60 52 94 32L168 24L194 42L214 34Q252 52 260 112L284 404Z"/>
@@ -80,7 +87,7 @@
                     </svg>
                     <div class="card-inner">
                         <svg class="stone-rune" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5C6 4.5 9 4.8 12 7C15 4.8 18 4.5 21 5.5V18.5C18 17.5 15 17.8 12 20C9 17.8 6 17.5 3 18.5Z"/><path d="M12 7V20"/></svg>
-                        <h3>Anevion Wiki</h3>
+                        <h3>Codex</h3>
                         <p class="description">World database</p>
                         <span class="status-badge coming-soon">&#10023; Coming soon</span>
                     </div>

@@ -378,7 +378,7 @@ Square (no radius), `1px solid var(--line)` frame, `object-fit: cover`. Everyone
     <div class="header">
         <a href="/" class="logo">Waystone</a>
         <nav class="nav-bar" aria-label="Main">
-            <a href="/" class="nav-item">Dashboard</a>
+            <a href="/" class="nav-item">Home</a>
             <a href="/campaigns" class="nav-item active" aria-current="page">Games</a>
             <a href="/profile" class="nav-item">Profile</a>
             <a href="/admin/users" class="nav-item" x-show="isAdmin">Admin</a>
