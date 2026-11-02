@@ -2,6 +2,9 @@ package db
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"strconv"
 	"time"
 	"waystone-web/auth"
 	"waystone-web/config"
@@ -97,6 +100,22 @@ func Close() error {
 	return nil
 }
 
+// seedDemoData reports whether SEED_DEMO_DATA asks for the demo users,
+// campaigns and sessions (local development only: the demo users share a
+// password that is public in this repo).
+func seedDemoData() bool {
+	v := os.Getenv("SEED_DEMO_DATA")
+	if v == "" {
+		return false
+	}
+	on, err := strconv.ParseBool(v)
+	if err != nil {
+		log.Printf("WARNING: SEED_DEMO_DATA=%q is not a boolean - demo data disabled", v)
+		return false
+	}
+	return on
+}
+
 func seedIfEmpty() error {
 
 	campaigns, err := store.GetAllCampaigns()
@@ -109,13 +128,10 @@ func seedIfEmpty() error {
 		return err
 	}
 
-	// Only seed if database already has all seeded domains.
-	if len(campaigns) > 0 && len(users) > 0 {
-		return nil
-	}
-
-	// Seed campaigns if empty
-	if len(campaigns) == 0 {
+	// Reference data: the game systems list, seeded only into a brand-new
+	// database (this runs before EnsureAdmin, so a fresh DB has no users) so
+	// systems an admin deleted don't come back on restart.
+	if len(campaigns) == 0 && len(users) == 0 {
 		systems, err := store.GetAllSystems()
 		if err != nil {
 			return err
@@ -127,6 +143,20 @@ func seedIfEmpty() error {
 				}
 			}
 		}
+	}
+
+	if !seedDemoData() {
+		return nil
+	}
+	log.Println("WARNING: SEED_DEMO_DATA is on - demo accounts (testy, roy, adam, simon) with a publicly known password may exist. Never enable it on a public instance.")
+
+	// Only seed if database already has all seeded domains.
+	if len(campaigns) > 0 && len(users) > 0 {
+		return nil
+	}
+
+	// Seed demo campaigns if empty
+	if len(campaigns) == 0 {
 		for _, campaign := range config.InitialCampaigns {
 			if err := store.SaveCampaign(campaign); err != nil {
 				return fmt.Errorf("failed to seed campaign: %w", err)
@@ -155,7 +185,7 @@ func seedIfEmpty() error {
 		}
 	}
 
-	// Seed users if empty
+	// Seed demo users if empty
 	if len(users) == 0 {
 		for _, user := range config.InitialUsers {
 			if password, ok := config.InitialPasswords[user.ID]; ok {
