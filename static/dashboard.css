@@ -108,6 +108,11 @@
     fill: var(--folio);
 }
 
+.module-card.active:hover .status-badge,
+.module-card.active:focus-visible .status-badge {
+    background: var(--folio);
+}
+
 /* Dormant stones */
 .module-card.disabled {
     opacity: 0.55;
@@ -145,6 +150,7 @@
     margin-bottom: 16%;
     padding: 0.1875rem 0.5rem;
     background: var(--bg);
+    transition: background-color 0.15s;
     font-size: 0.6875rem;
     letter-spacing: 0.125rem;
     border: 1px solid var(--ink);
