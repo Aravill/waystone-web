@@ -292,6 +292,7 @@ window.campaignsPage = function () {
         systems: [],
         campaignTypes: CAMPAIGN_TYPES,
         editingCampaignId: '',
+        editReturnTo: '', // set when the edit dialog was opened from a game page
         currentCalendarDate: new Date(),
         currentCampaignId: null,
         currentCampaignTitle: '',
@@ -420,6 +421,7 @@ window.campaignsPage = function () {
                 this.openCalendar(cal.id, cal.title, cal.dm === this.currentUserId, cal.first_unanswered_session_date || '');
             } else if (edit?.can_manage) {
                 this.openEditModal(edit.id);
+                this.editReturnTo = '/games/' + encodeURIComponent(edit.id);
             } else if (signups && signups.dm === this.currentUserId) {
                 this.openSignupsModal(signups.id, signups.title);
             } else {
@@ -478,6 +480,11 @@ window.campaignsPage = function () {
 
         closeModal() {
             this.modalOpen = false;
+            if (this.editReturnTo) {
+                const to = this.editReturnTo;
+                this.editReturnTo = '';
+                window.location.href = to;
+            }
         },
 
         handleModalBackdropClick(event) {
@@ -563,6 +570,7 @@ window.campaignsPage = function () {
                     this.showMessage(data.error || 'Failed to delete game', 'error');
                     return;
                 }
+                this.editReturnTo = ''; // the game page is gone; stay on the list
                 this.closeModal();
                 this.showMessage(data.message || 'Game deleted', 'success');
                 await this.loadCampaigns();
