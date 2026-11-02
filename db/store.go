@@ -163,6 +163,16 @@ func seedIfEmpty() error {
 			}
 		}
 		now := time.Now().UTC().Format(time.RFC3339)
+		// Sign-ups point at seed users, so only add them when those users are seeded too.
+		for _, signup := range config.InitialSignups {
+			if len(users) > 0 {
+				break
+			}
+			signup.CreatedAt, signup.UpdatedAt = now, now
+			if err := store.CreateCampaignSignup(signup); err != nil {
+				return fmt.Errorf("failed to seed signup: %w", err)
+			}
+		}
 		for _, seeded := range config.InitialSessions() {
 			session := seeded.Session
 			session.ID = GenerateUUID()

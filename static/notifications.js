@@ -3,7 +3,7 @@
     const TEMPLATE = `
 <div class="notif" x-data="notificationsInbox()" @click.outside="open = false" @keydown.escape.window="open = false">
     <button type="button" class="notif-btn" :class="{ 'has-unread': unread > 0 }" x-ref="btn" @click="toggle()" :aria-expanded="open" aria-label="Inbox" title="Inbox">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><rect x="3" y="5" width="18" height="14"/><path d="M3 6l9 7 9-7"/></svg><span class="notif-badge" x-show="unread > 0" x-cloak x-text="unread > 99 ? '99+' : unread"></span>
+        <svg viewBox="0 0 24 24" width="1.125rem" height="1.125rem" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><rect x="3" y="5" width="18" height="14"/><path d="M3 6l9 7 9-7"/></svg><span class="notif-badge" x-show="unread > 0" x-cloak x-text="unread > 99 ? '99+' : unread"></span>
     </button>
     <div class="notif-panel" x-show="open" x-cloak>
         <div class="notif-panel-header">
