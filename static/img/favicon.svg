@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Favicon: the header's standing-stone mark (the stone-mark token in styles.css) on a
+       parchment tile, redrawn with heavier strokes so it survives 16px.
+       Follows the OS theme (browser tabs can't see the in-app toggle). -->
+  <style>
+    .tile { fill: #F2EAD8; }
+    .ink { stroke: #2B241C; }
+    .rune { stroke: #8E2A1E; }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #16120E; }
+      .ink { stroke: #E8DCC4; }
+      .rune { stroke: #D9735C; }
+    }
+  </style>
+  <rect class="tile" width="32" height="32"/>
+  <g fill="none" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+    <path class="ink" d="M9.5 27L10.5 10Q16 2.5 21.5 10L22.5 27Z"/>
+    <path class="ink" d="M4 27H28"/>
+    <path class="rune" d="M16 12V22M12.75 15.5L16 18.75L19.25 15.5"/>
+  </g>
+</svg>
