@@ -2710,8 +2710,9 @@ select option {
     color: var(--ink);
 }
 
-/* The whole banner opens the game page; the title link stays for keyboard users. */
-.campaign-item {
+/* The banner cloth opens the game page (.on-cloth is set by campaigns.js);
+   the title link stays for keyboard users. */
+.campaign-item.on-cloth {
     cursor: pointer;
 }
 

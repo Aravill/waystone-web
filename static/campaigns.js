@@ -210,16 +210,37 @@ function bannerFrame(now) {
 }
 if (document.getElementById('campaignsList')) requestAnimationFrame(bannerFrame);
 
-// Clicking anywhere on a banner opens its game page; its own links, buttons and
-// the medallion keep their behaviour. Keyboard users reach it via the title link.
+// Clicking the banner cloth opens its game page; the empty corners around the
+// silhouette, the banner's own links and buttons and the medallion don't.
+// Keyboard users reach the page via the title link.
+function bannerOnCloth(card, event) {
+    const outline = card.querySelector('.banner-outline');
+    const ctm = outline?.getScreenCTM();
+    if (!ctm || !outline.isPointInFill) return true;
+    const pt = new DOMPoint(event.clientX, event.clientY).matrixTransform(ctm.inverse());
+    return outline.isPointInFill(pt);
+}
 function bannerGameUrl(event) {
     const card = event.target.closest('.campaign-item');
     if (!card || event.target.closest('a, button, input, select, textarea, label, [tabindex]')) return '';
+    if (!bannerOnCloth(card, event)) return '';
     if (String(window.getSelection?.() || '')) return ''; // let people select text
     return card.querySelector('.campaign-title-link')?.getAttribute('href') || '';
 }
 const bannerList = document.getElementById('campaignsList');
 if (bannerList) {
+    // The pointer cursor follows the cloth's silhouette, not the card's rectangle.
+    let hoverCard = null;
+    bannerList.addEventListener('mousemove', (event) => {
+        const card = event.target.closest('.campaign-item');
+        if (hoverCard && hoverCard !== card) hoverCard.classList.remove('on-cloth');
+        hoverCard = card;
+        if (card) card.classList.toggle('on-cloth', bannerOnCloth(card, event));
+    });
+    bannerList.addEventListener('mouseleave', () => {
+        hoverCard?.classList.remove('on-cloth');
+        hoverCard = null;
+    });
     bannerList.addEventListener('click', (event) => {
         const url = bannerGameUrl(event);
         if (!url) return;
