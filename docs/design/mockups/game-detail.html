@@ -1,0 +1,284 @@
+<title>Waystone Game Page</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
+<style>
+/* Layout: one manuscript column; below the title block a two-column folio:
+   the tale + chronicle on the left, the company in a narrow margin on the right.
+   Phones stack: tale, company, chronicle. Tokens are STYLE_GUIDE.md's. */
+:root {
+    --bg: #F2EAD8; --folio: #E6DBC2; --ink: #2B241C; --muted: #6B5E4B;
+    --line: rgba(43, 36, 28, 0.4);
+    --rubric: #8E2A1E; --verdigris: #355E52; --ochre: #7A5A12;
+    --text: 'Courier Prime', 'Courier New', monospace;
+    --display: 'IM Fell English SC', Georgia, serif;
+    --black: 'UnifrakturMaguntia', 'IM Fell English SC', serif;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+        --line: rgba(232, 220, 196, 0.3);
+        --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
+        color-scheme: dark;
+    }
+}
+:root[data-theme="dark"] {
+    --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+    --line: rgba(232, 220, 196, 0.3);
+    --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
+    color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--text); font-size: 1rem; line-height: 1.6;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0 4rem;
+}
+a { color: var(--rubric); text-underline-offset: 4px; }
+:focus-visible { outline: 2px solid var(--rubric); outline-offset: 2px; }
+.wrap { max-width: 72.5rem; margin: 0 auto; }
+
+/* Header (as in the app) */
+.header {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 1.75rem 0 1.125rem; border-bottom: 3px double var(--ink);
+}
+.logo { font-family: var(--black); font-size: 2.125rem; color: var(--ink); text-decoration: none; line-height: 1; }
+.nav { display: flex; gap: 1.75rem; flex-wrap: wrap; }
+.nav a {
+    padding: .5rem 0; color: var(--muted); text-decoration: none; font-size: .875rem;
+    letter-spacing: 2px; text-transform: uppercase; border-bottom: 2px solid transparent;
+}
+.nav a.active { color: var(--ink); border-bottom-color: var(--rubric); }
+.header-right { display: flex; align-items: center; gap: 1rem; font-size: .875rem; }
+
+/* Buttons */
+.btn {
+    font-family: var(--text); font-size: .8125rem; letter-spacing: 2px; text-transform: uppercase;
+    min-height: 2.5rem; padding: 0 1rem; border: 1px solid var(--line); background: none; color: var(--ink);
+    cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+}
+.btn:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn--primary { background: var(--ink); color: var(--bg); border-color: var(--ink); min-height: 2.75rem; }
+.btn--primary:hover { opacity: .85; }
+
+/* Title block */
+.crumb { display: inline-block; margin-top: 2rem; font-size: .8125rem; letter-spacing: 2px; text-transform: uppercase; }
+.title-block {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem 2rem; align-items: end;
+    padding: 1.25rem 0 1.75rem; border-bottom: 1px solid var(--ink);
+}
+.kicker { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.type-mark { display: inline-flex; align-items: center; gap: .5rem; color: var(--ink);
+    font-size: .75rem; letter-spacing: 3px; text-transform: uppercase; }
+.type-mark svg { width: 1.75rem; height: 1.75rem; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.system { font-style: italic; color: var(--muted); font-size: .875rem; }
+.badge { font-size: .6875rem; letter-spacing: 2px; text-transform: uppercase; padding: 3px 8px; border: 1px solid currentColor; }
+.badge--ongoing { color: var(--verdigris); }
+h1 {
+    font-family: var(--display); font-weight: 400; font-size: 2.75rem; line-height: 1.1;
+    margin: .75rem 0 .5rem; text-wrap: balance;
+}
+.drop-cap { font-family: var(--black); color: var(--rubric); font-size: 3.5rem; }
+.lede { margin: 0; max-width: 60ch; color: var(--muted); font-size: 1.0625rem; }
+.actions { display: flex; flex-wrap: wrap; gap: .625rem; justify-content: flex-end; }
+
+/* Folio: main column + company margin */
+.folio {
+    display: grid; gap: 2.5rem 3.5rem; padding-top: 2rem;
+    grid-template-columns: minmax(0, 1fr) 19rem;
+    grid-template-areas: "tale company" "chronicle company";
+    align-items: start;
+}
+.tale { grid-area: tale; min-width: 0; }
+.company { grid-area: company; min-width: 0; }
+.chronicle { grid-area: chronicle; min-width: 0; }
+h2 {
+    font-family: var(--display); font-weight: 400; font-size: 1.5rem; color: var(--rubric);
+    margin: 0 0 1rem; display: flex; align-items: baseline; gap: .75rem; flex-wrap: wrap;
+}
+h2 .count { font-family: var(--text); font-size: .75rem; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+
+/* The tale */
+.tale-text { max-width: 65ch; }
+.tale-text p { margin: 0 0 1rem; }
+
+/* The company */
+.company { border: 1px solid var(--line); padding: 1.375rem 1.5rem; }
+.people { list-style: none; margin: 0; padding: 0; display: grid; gap: .875rem; }
+.person { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .875rem; align-items: center; }
+.person a { color: inherit; text-decoration: none; }
+.person a:hover .person-name { text-decoration: underline; }
+.person-name { display: block; overflow-wrap: anywhere; }
+.person-role { display: block; font-size: .75rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.person--dm .person-name { color: var(--rubric); font-weight: 700; }
+.person--dm { padding-bottom: .875rem; border-bottom: 1px solid var(--line); }
+.avatar {
+    width: 2.5rem; height: 2.5rem; border: 1px solid var(--line); background: var(--folio);
+    display: grid; place-items: center; font-family: var(--display); font-size: 1.25rem; color: var(--rubric);
+    object-fit: cover; flex: none;
+}
+.avatar--lg { width: 3.25rem; height: 3.25rem; font-size: 1.625rem; }
+.avatar--sm { width: 1.875rem; height: 1.875rem; font-size: 1rem; }
+.avatar--img { background: var(--folio) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='%237a6a52'/%3E%3Ccircle cx='20' cy='15' r='7' fill='%23d9c9a8'/%3E%3Cpath d='M6 40c2-10 8-14 14-14s12 4 14 14z' fill='%23d9c9a8'/%3E%3C/svg%3E") center/cover; }
+.seats { margin: 1rem 0 0; padding-top: .875rem; border-top: 1px solid var(--line); font-size: .875rem; color: var(--muted); }
+
+/* The chronicle */
+.next {
+    display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: baseline;
+    border: 1px dashed var(--ink); padding: .75rem 1rem; margin-bottom: 1.25rem; font-size: .9375rem;
+}
+.eyebrow { font-size: .75rem; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+.sessions { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink); }
+.session {
+    display: grid; grid-template-columns: 3.5rem minmax(0, 1fr) auto; gap: .25rem 1rem; align-items: center;
+    padding: .875rem 0; border-bottom: 1px solid var(--line);
+}
+.session-no { font-family: var(--display); font-size: 1.5rem; color: var(--rubric); line-height: 1; font-variant-numeric: oldstyle-nums; }
+.session-date { display: block; }
+.session-meta { display: block; font-size: .875rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.attendees { display: flex; flex-wrap: wrap; gap: .25rem; justify-content: flex-end; }
+.attendees .avatar { border: 2px solid var(--verdigris); }
+.session--you .session-date::after { content: " · you were there"; color: var(--verdigris); font-size: .8125rem; }
+.more { margin-top: 1rem; display: inline-block; }
+.ornament { text-align: center; color: var(--muted); letter-spacing: 12px; margin-top: 3rem; }
+
+/* Mock-up only */
+.mock-toggle { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--bg); }
+
+@media (max-width: 768px) {
+    h1 { font-size: 2.125rem; }
+    .drop-cap { font-size: 2.75rem; }
+    .title-block { grid-template-columns: minmax(0, 1fr); }
+    .actions { justify-content: flex-start; }
+    .folio { grid-template-columns: minmax(0, 1fr); grid-template-areas: "tale" "company" "chronicle"; }
+    .session { grid-template-columns: 2.5rem minmax(0, 1fr); }
+    .attendees { grid-column: 2; justify-content: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+    <header class="header">
+        <a href="#" class="logo">Waystone</a>
+        <nav class="nav" aria-label="Main">
+            <a href="#">Home</a>
+            <a href="#" class="active" aria-current="page">Games</a>
+            <a href="#">Profile</a>
+        </nav>
+        <div class="header-right"><span>Wren</span><button class="btn" type="button">Logout</button></div>
+    </header>
+
+    <main>
+        <a href="#" class="crumb">← All games</a>
+
+        <section class="title-block">
+            <div>
+                <div class="kicker">
+                    <span class="type-mark" title="Campaign: a long, overarching story with no set number of sessions.">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M8 4h8l-2 3 2 3H8z"/><path d="M4 21 9 9M20 21 15 9"/></svg>
+                        Campaign
+                    </span>
+                    <span class="system">D&amp;D 5e</span>
+                    <span class="badge badge--ongoing">● Ongoing</span>
+                </div>
+                <h1><span class="drop-cap">T</span>he Sunken Crown</h1>
+                <p class="lede">A drowned kingdom stirs beneath the Saltmarsh. Someone is diving for its crown, and the tide is turning red.</p>
+            </div>
+            <div class="actions">
+                <button class="btn" type="button">Calendar</button>
+                <button class="btn" type="button">Following ✓</button>
+                <button class="btn" type="button">Leave</button>
+            </div>
+        </section>
+
+        <div class="folio">
+            <section class="tale" aria-labelledby="tale-h">
+                <h2 id="tale-h">§ The tale</h2>
+                <div class="tale-text">
+                    <p>Three hundred years ago the kingdom of Ys slid beneath the waves in a single night. The fishermen of Saltmarsh still pull up coral-crusted coins in their nets, and nobody asks where they come from.</p>
+                    <p>This spring the coins stopped. Instead the nets bring up bodies, every one of them wearing a circlet of black pearl. The town council wants it quiet. The temple of the Tide Mother wants it stopped. The smugglers in the sea caves under Gellan's Rock want to know who is cutting into their trade.</p>
+                    <p>You are a crew of hired divers, disgraced sailors and curious scholars who took the council's coin. Expect investigation, ship-to-ship fights, a fair bit of swimming, and a dungeon that floods on a timer.</p>
+                    <p>We play every other Thursday evening, roughly three hours. Levels 3 to 12, milestone levelling. New players welcome; I'll help with characters.</p>
+                </div>
+            </section>
+
+            <aside class="company" aria-labelledby="company-h">
+                <h2 id="company-h">§ The company</h2>
+                <ul class="people">
+                    <li class="person person--dm">
+                        <a href="#" class="avatar avatar--lg avatar--img" aria-label="Aldric's profile"></a>
+                        <a href="#"><span class="person-name">♛ Aldric</span><span class="person-role">Dungeon master</span></a>
+                    </li>
+                    <li class="person"><a href="#" class="avatar" aria-label="Mira's profile">M</a><a href="#"><span class="person-name">Mira</span></a></li>
+                    <li class="person"><a href="#" class="avatar avatar--img" aria-label="Tobin's profile"></a><a href="#"><span class="person-name">Tobin</span></a></li>
+                    <li class="person"><a href="#" class="avatar" aria-label="Wren's profile">W</a><a href="#"><span class="person-name">Wren <span style="color:var(--muted)">(you)</span></span></a></li>
+                    <li class="person"><a href="#" class="avatar" aria-label="Sable's profile">S</a><a href="#"><span class="person-name">Sable</span></a></li>
+                </ul>
+                <p class="seats">4 / 5 seats · sign-ups closed</p>
+            </aside>
+
+            <section class="chronicle" aria-labelledby="chron-h">
+                <h2 id="chron-h">§ The chronicle <span class="count">7 sessions played</span></h2>
+
+                <div class="next">
+                    <span class="eyebrow">Next</span>
+                    <span>Thu 12 Nov 2026, 19:00</span>
+                    <a href="#">Open calendar →</a>
+                </div>
+
+                <ol class="sessions" reversed>
+                    <li class="session session--you">
+                        <span class="session-no" aria-label="Session 7">VII</span>
+                        <span><span class="session-date">Thu 29 Oct 2026</span><span class="session-meta">19:00 – 22:00 · 3 h</span></span>
+                        <span class="attendees" aria-label="Attended: Mira, Tobin, Wren, Sable">
+                            <span class="avatar avatar--sm" title="Mira">M</span><span class="avatar avatar--sm avatar--img" title="Tobin"></span><span class="avatar avatar--sm" title="Wren">W</span><span class="avatar avatar--sm" title="Sable">S</span>
+                        </span>
+                    </li>
+                    <li class="session">
+                        <span class="session-no" aria-label="Session 6">VI</span>
+                        <span><span class="session-date">Thu 15 Oct 2026</span><span class="session-meta">19:00 – 22:30 · 3½ h</span></span>
+                        <span class="attendees" aria-label="Attended: Mira, Tobin, Sable">
+                            <span class="avatar avatar--sm" title="Mira">M</span><span class="avatar avatar--sm avatar--img" title="Tobin"></span><span class="avatar avatar--sm" title="Sable">S</span>
+                        </span>
+                    </li>
+                    <li class="session session--you">
+                        <span class="session-no" aria-label="Session 5">V</span>
+                        <span><span class="session-date">Thu 1 Oct 2026</span><span class="session-meta">19:00 – 22:00 · 3 h</span></span>
+                        <span class="attendees" aria-label="Attended: Mira, Tobin, Wren, Sable">
+                            <span class="avatar avatar--sm" title="Mira">M</span><span class="avatar avatar--sm avatar--img" title="Tobin"></span><span class="avatar avatar--sm" title="Wren">W</span><span class="avatar avatar--sm" title="Sable">S</span>
+                        </span>
+                    </li>
+                    <li class="session session--you">
+                        <span class="session-no" aria-label="Session 4">IV</span>
+                        <span><span class="session-date">Sat 19 Sep 2026</span><span class="session-meta">15:00 – 19:00 · 4 h</span></span>
+                        <span class="attendees" aria-label="Attended: Mira, Wren, Sable">
+                            <span class="avatar avatar--sm" title="Mira">M</span><span class="avatar avatar--sm" title="Wren">W</span><span class="avatar avatar--sm" title="Sable">S</span>
+                        </span>
+                    </li>
+                    <li class="session session--you">
+                        <span class="session-no" aria-label="Session 3">III</span>
+                        <span><span class="session-date">Thu 3 Sep 2026</span><span class="session-meta">19:00 – 22:00 · 3 h</span></span>
+                        <span class="attendees" aria-label="Attended: Mira, Tobin, Wren">
+                            <span class="avatar avatar--sm" title="Mira">M</span><span class="avatar avatar--sm avatar--img" title="Tobin"></span><span class="avatar avatar--sm" title="Wren">W</span>
+                        </span>
+                    </li>
+                </ol>
+                <a href="#" class="more">Show all 7 sessions ↓</a>
+            </section>
+        </div>
+
+        <p class="ornament" aria-hidden="true">❦❦❦</p>
+    </main>
+</div>
+
+<button class="btn mock-toggle" type="button" id="themeToggle">Toggle theme</button>
+<script>
+document.getElementById('themeToggle').addEventListener('click', () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = dark ? 'light' : 'dark';
+});
+</script>

@@ -46,6 +46,7 @@ This document describes what must-have features are to be implemented before pre
     - [x] Visually distinct campaign statuses
     - [x] Campaign types (and their visual distinction) - Campaign, Adventure, One-shot
     - [x] Game systems - admins manage known systems (optional logo); campaigns pick one or type a custom one; shown on the campaign card
+    - [x] Game page - full description (basic Markdown), company, chronicle of played sessions with attendees (visible to all users)
 - [x] Profile
     - [x] Standard operations
         - [x] Changing nicknames
