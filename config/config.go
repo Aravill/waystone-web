@@ -1,8 +1,6 @@
 package config
 
 import (
-	"os"
-	"strings"
 	"time"
 	"waystone-web/auth"
 	"waystone-web/models"
@@ -12,13 +10,6 @@ const (
 	DBPath      = "./data/waystone.db"
 	DefaultPort = "8080"
 )
-
-// IsDevelopment reports whether ENVIRONMENT is "development" (case-insensitive).
-// Only development seeds the demo data below: its users share a known password,
-// so any other value - including unset - must never load it.
-func IsDevelopment() bool {
-	return strings.EqualFold(strings.TrimSpace(os.Getenv("ENVIRONMENT")), "development")
-}
 
 const (
 	sojournID = "ea213cb4-9ab9-49ff-a29f-3fafb7b4799c"
@@ -37,7 +28,8 @@ const (
 	thornsID    = "f4b29c85-6a1d-4b03-8e7f-3d9a5c2b1e09"
 )
 
-// InitialPasswords are preset passwords for seeded users, keyed by user ID.
+// InitialPasswords are preset passwords for the demo users, keyed by user ID.
+// Demo data (users, campaigns, sessions) is seeded only with SEED_DEMO_DATA on.
 var InitialPasswords = map[string]string{
 	testyID:  "ohgoditsacat",
 	royID:    "ohgoditsacat",

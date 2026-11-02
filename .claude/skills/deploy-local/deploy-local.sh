@@ -32,16 +32,12 @@ cleanup() {
   docker image prune -f --filter "label=com.docker.compose.project=$PROJECT" >/dev/null
 }
 
-# Local test deploys always get the demo data (seeding is opt-in, see .env.example).
-# A shell variable takes precedence over the env file in compose interpolation.
-export ENVIRONMENT=development
-
 case "${1:-up}" in
   up)
     docker info >/dev/null 2>&1 || { echo "Docker is not running." >&2; exit 1; }
     echo "Deploying $(git -C "$SRC" rev-parse --abbrev-ref HEAD) from $SRC"
     if [ -n "$ENV_FILE" ]; then echo "Using env file: $ENV_FILE"
-    else echo "WARNING: no .env found - ADMIN_PASSWORD unset, admin can't log in."; fi
+    else echo "WARNING: no .env found - SESSION_SECRET unset, the app will exit on start (needs >=32 chars)."; fi
     cleanup
     compose up -d --build
     for _ in $(seq 1 30); do

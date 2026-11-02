@@ -2,6 +2,7 @@
 window.changePasswordPage = function() {
     return {
         mustChange: false,
+        username: '',
         needsProfileSetup: false,
         currentPassword: '',
         newPassword: '',
@@ -20,6 +21,7 @@ window.changePasswordPage = function() {
                 }
                 const user = await response.json();
                 this.needsProfileSetup = !!user.needs_profile_setup;
+                this.username = user.username || '';
                 if (user.is_env_admin) {
                     window.location.href = '/';
                     return;
@@ -29,6 +31,22 @@ window.changePasswordPage = function() {
                 console.error('Auth check failed:', error);
                 window.location.href = '/login.html';
             }
+        },
+
+        // Mirrors auth.PasswordPolicyViolations; the server stays the source of truth.
+        rules() {
+            const pw = this.newPassword;
+            const rules = [
+                { text: 'at least 10 characters', ok: [...pw].length >= 10 },
+                { text: 'at most 72 bytes (accented/non-Latin characters count as 2-4)', ok: new TextEncoder().encode(pw).length <= 72 },
+                { text: 'a lowercase letter', ok: /\p{Ll}/u.test(pw) },
+                { text: 'an uppercase letter', ok: /\p{Lu}/u.test(pw) },
+                { text: 'a digit', ok: /\p{Nd}/u.test(pw) },
+            ];
+            if (this.username) {
+                rules.push({ text: 'does not contain your username', ok: !pw.toLowerCase().includes(this.username.toLowerCase()) });
+            }
+            return rules;
         },
 
         async submit() {
