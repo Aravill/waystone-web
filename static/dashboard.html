@@ -7,7 +7,7 @@
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
     <link rel="stylesheet" href="/static/styles.css?v=41">
-    <link rel="stylesheet" href="dashboard.css?v=5">
+    <link rel="stylesheet" href="dashboard.css?v=6">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -30,37 +30,63 @@
 
     <div class="container">
         <h1 class="page-title"><span class="drop-cap">D</span>ashboard</h1>
+        <p class="page-subtitle">Three roads lead from this stone &middot; one lies open</p>
         <div class="dashboard">
-            <h2 class="section-header">Select a Module</h2>
-            
+            <h2 class="section-header">Choose thy road</h2>
+
             <div class="modules-grid">
                 <!-- Games (Active) -->
-                <a href="/campaigns" class="module-card active">
+                <a href="/campaigns" class="module-card active stone-1">
+                    <svg class="stone-outline" viewBox="0 0 320 420" aria-hidden="true">
+                        <path class="stone-body" d="M40 404L58 142Q62 62 102 36Q142 14 184 28Q228 40 244 108L280 404Z"/>
+                        <path class="stone-carve" d="M52 392L68 146Q72 76 108 52Q142 34 180 44Q216 54 231 112L267 392"/>
+                        <path class="stone-ground" d="M10 404H310"/>
+                        <path class="stone-wear" d="M236 150L226 168L232 184M72 250L84 258M64 330l9 -6M247 300l-7 12M96 372c2 -3 5 -3 6 0M226 366c2 -3 5 -3 6 0"/>
+                        <path class="stone-wear" d="M30 404L28 395M30 404L34 397M262 404L260 396M262 404L266 398M268 404L272 400M110 404L108 398M112 404L116 399"/>
+                    </svg>
                     <div class="card-inner">
+                        <svg class="stone-rune" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.5 2.5 L7 17"/><path d="M5 15 L9 19"/><path d="M7 17 L4 20"/><circle cx="3.2" cy="20.8" r="1.1"/><path d="M2.5 2.5 L17 17"/><path d="M15 19 L19 15"/><path d="M17 17 L20 20"/><circle cx="20.8" cy="20.8" r="1.1"/><path class="type-icon__fill" d="M12 6 L15.5 7.5 V11.5 Q15.5 15 12 17 Q8.5 15 8.5 11.5 V7.5 Z"/><path d="M12 8 V15"/></svg>
                         <h3>Games</h3>
                         <p class="description">Session scheduling &amp; sign-ups</p>
-                        <span class="status-badge">Active</span>
+                        <span class="status-badge">&#10022; Open road</span>
                     </div>
                 </a>
 
                 <!-- Chat Games (Disabled) -->
-                <div class="module-card disabled">
+                <div aria-disabled="true" class="module-card disabled stone-2">
+                    <svg class="stone-outline" viewBox="0 0 320 420" aria-hidden="true">
+                        <path class="stone-body" d="M44 404L52 124L66 62Q72 38 100 33L222 28Q250 30 258 64L278 404Z"/>
+                        <path class="stone-carve" d="M56 392L63 128L76 72Q81 52 104 47L220 42Q240 44 245 68L266 392"/>
+                        <path class="stone-ground" d="M10 404H310"/>
+                        <path class="stone-wear" d="M62 190L74 200L68 214M248 250l-10 8l6 14M250 330h-8M80 320c2 -3 5 -3 6 0M96 330c2 -3 5 -3 6 0M70 300c2 -3 5 -3 6 0"/>
+                        <path class="stone-wear" d="M30 404L28 396M30 404L34 398M286 404L284 397M286 404L290 399M292 404L296 401M190 404L188 398M192 404L196 399"/>
+                    </svg>
                     <div class="card-inner">
+                        <svg class="stone-rune" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 3C12 4 7.5 9.5 6 18"/><path d="M20 3C19.5 9 15.5 13 9 14"/><path d="M11 9.5H15.5"/><path d="M6 18L3.5 21"/></svg>
                         <h3>Chat Games</h3>
-                        <p class="description">Interactive Games</p>
-                        <span class="status-badge coming-soon">Coming Soon</span>
+                        <p class="description">Interactive games</p>
+                        <span class="status-badge coming-soon">&#9680; Coming soon</span>
                     </div>
                 </div>
 
                 <!-- Anevion Wiki (Disabled) -->
-                <div class="module-card disabled">
+                <div aria-disabled="true" class="module-card disabled stone-3">
+                    <svg class="stone-outline" viewBox="0 0 320 420" aria-hidden="true">
+                        <path class="stone-body" d="M38 404L56 112Q60 52 94 32L168 24L194 42L214 34Q252 52 260 112L284 404Z"/>
+                        <path class="stone-carve" d="M50 392L68 116Q72 66 100 48L166 40L196 60L214 50Q240 64 247 116L271 392"/>
+                        <path class="stone-ground" d="M10 404H310"/>
+                        <path class="stone-wear" d="M178 40L186 56L196 52M72 220l10 6M240 220l-8 10l4 12M66 340l9 -4M262 330l-7 8M230 372c2 -3 5 -3 6 0M244 366c2 -3 5 -3 6 0"/>
+                        <path class="stone-wear" d="M26 404L24 396M26 404L30 398M296 404L294 397M296 404L300 399M80 404L78 398M82 404L86 399"/>
+                    </svg>
                     <div class="card-inner">
+                        <svg class="stone-rune" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5C6 4.5 9 4.8 12 7C15 4.8 18 4.5 21 5.5V18.5C18 17.5 15 17.8 12 20C9 17.8 6 17.5 3 18.5Z"/><path d="M12 7V20"/></svg>
                         <h3>Anevion Wiki</h3>
-                        <p class="description">World Database</p>
-                        <span class="status-badge coming-soon">Coming Soon</span>
+                        <p class="description">World database</p>
+                        <span class="status-badge coming-soon">&#9680; Coming soon</span>
                     </div>
                 </div>
             </div>
+            <p class="ornament" aria-hidden="true">&#10086; &#10086; &#10086;</p>
         </div>
     </div>
 
