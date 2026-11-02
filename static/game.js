@@ -233,6 +233,30 @@ window.gamePage = function () {
             await this.postAction(`/api/campaigns/${encodeURIComponent(this.campaign.id)}/signups/${encodeURIComponent(this.currentUserId)}`, 'DELETE', 'Sign-up withdrawn', 'Failed to withdraw');
         },
 
+        async deleteGame() {
+            const ok = await this.askConfirm({
+                title: 'Delete game',
+                message: `Delete "${this.campaign.title}"? This also deletes its sessions and sign-ups and cannot be undone.`,
+                confirmLabel: 'Delete'
+            });
+            if (!ok) return;
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.campaign.id)}`, { method: 'DELETE' });
+                if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to delete game', 'error');
+                    return;
+                }
+                window.location.href = '/campaigns'; // the game page no longer exists
+            } catch (error) {
+                this.showMessage('Error deleting game: ' + error.message, 'error');
+            }
+        },
+
         // askConfirm opens the confirm modal and resolves to true on confirm, false on cancel.
         askConfirm({ title, message, confirmLabel }) {
             if (this.confirmDialog.resolve) this.confirmDialog.resolve(false);

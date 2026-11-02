@@ -84,6 +84,7 @@
                                 <button type="button" class="campaign-action-btn campaign-signup-btn" :disabled="!campaign.sign_ups_open" :aria-disabled="!campaign.sign_ups_open" @click="signUp()">Sign-up</button>
                             </template>
                             <a class="campaign-action-btn" x-show="campaign.can_manage" :href="'/campaigns?edit=' + encodeURIComponent(campaign.id)">Edit</a>
+                            <button type="button" class="btn-danger" x-show="campaign.can_manage" @click="deleteGame()">Delete game</button>
                         </div>
                     </section>
 
@@ -172,6 +173,6 @@
 
     <script src="/static/notifications.js?v=9"></script>
     <script src="/campaigns.js?v=45"></script>
-    <script src="/static/game.js?v=1"></script>
+    <script src="/static/game.js?v=2"></script>
 </body>
 </html>
