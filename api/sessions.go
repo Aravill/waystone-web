@@ -408,18 +408,26 @@ func handleSubmitSessionResponse(w http.ResponseWriter, r *http.Request, campaig
 		return
 	}
 
-	isPlayer := false
-	for _, playerID := range campaign.Players {
-		if playerID == userID {
-			isPlayer = true
-			break
-		}
-	}
-	if !isPlayer {
+	if !isCampaignPlayer(campaign, userID) {
 		writeJSONError(w, http.StatusForbidden, "only registered game players can respond")
 		return
 	}
 
+	writeSessionResponse(w, r, sessionID, userID)
+}
+
+func isCampaignPlayer(c *models.Campaign, userID string) bool {
+	for _, playerID := range c.Players {
+		if playerID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+// writeSessionResponse decodes the participation body, stores the user's
+// response to the session and writes the 201 reply.
+func writeSessionResponse(w http.ResponseWriter, r *http.Request, sessionID, userID string) {
 	type submitResponseRequest struct {
 		Participation models.ParticipationStatus `json:"participation"`
 	}

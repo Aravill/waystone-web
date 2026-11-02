@@ -373,6 +373,7 @@ func handleWithdrawSignup(w http.ResponseWriter, r *http.Request, campaignID, ta
 		return
 	}
 
+	_ = db.DeleteGuestToken(campaignID, userID)
 	notifType, message := models.NotificationSignupWithdrawn, "sign-up withdrawn"
 	if wasPlayer {
 		notifType, message = models.NotificationPlayerLeft, "left the game"
@@ -408,6 +409,7 @@ func handleKickPlayer(w http.ResponseWriter, r *http.Request, campaignID, target
 	}
 
 	if applySignupStatus(w, campaignID, targetUserID, models.SignupKicked, "player removed") != nil {
+		_ = db.DeleteGuestToken(campaignID, targetUserID)
 		notify(userID, []string{targetUserID}, models.NotificationPlayerKicked, campaign, "", nil)
 	}
 }
