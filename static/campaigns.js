@@ -228,37 +228,47 @@ function bannerGameUrl(event) {
     return card.querySelector('.campaign-title-link')?.getAttribute('href') || '';
 }
 const bannerList = document.getElementById('campaignsList');
+// Hover (gust, outline colour, cursor) follows the cloth's silhouette, not the card's
+// rectangle: .on-cloth stands in for :hover. Only real mice count (touch has no hover).
+// Re-checked on scroll and after a re-render, since the page can move under a still pointer.
+// The medallion hotspot counts as cloth for hover.
+let hoverCard = null;
+let clothPointer = null;
+function updateClothHover() {
+    if (!bannerList) return;
+    const el = clothPointer && document.elementFromPoint(clothPointer.clientX, clothPointer.clientY);
+    const card = el && bannerList.contains(el) ? el.closest('.campaign-item') : null;
+    if (hoverCard && hoverCard !== card) hoverCard.classList.remove('on-cloth');
+    hoverCard = card;
+    if (card) card.classList.toggle('on-cloth', !!el.closest('.banner-type') || bannerOnCloth(card, clothPointer));
+}
 if (bannerList) {
-    // Hover (gust, outline colour, cursor) follows the cloth's silhouette, not the
-    // card's rectangle: .on-cloth stands in for :hover. Re-checked on scroll too,
-    // since the page can move under a still pointer.
-    let hoverCard = null;
-    let pointer = null;
-    const updateClothHover = () => {
-        const el = pointer && document.elementFromPoint(pointer.clientX, pointer.clientY);
-        const card = el && bannerList.contains(el) ? el.closest('.campaign-item') : null;
-        if (hoverCard && hoverCard !== card) hoverCard.classList.remove('on-cloth');
-        hoverCard = card;
-        if (card) card.classList.toggle('on-cloth', bannerOnCloth(card, pointer));
-    };
-    bannerList.addEventListener('mousemove', (event) => {
-        pointer = { clientX: event.clientX, clientY: event.clientY };
+    bannerList.addEventListener('pointermove', (event) => {
+        if (event.pointerType !== 'mouse') return;
+        clothPointer = { clientX: event.clientX, clientY: event.clientY };
         updateClothHover();
     });
-    bannerList.addEventListener('mouseleave', () => {
-        pointer = null;
+    bannerList.addEventListener('pointerleave', (event) => {
+        if (event.pointerType !== 'mouse') return;
+        clothPointer = null;
         updateClothHover();
     });
-    window.addEventListener('scroll', () => { if (pointer) updateClothHover(); }, { passive: true });
+    bannerList.addEventListener('pointerdown', (event) => {
+        if (event.pointerType === 'mouse') return;
+        clothPointer = null;
+        updateClothHover();
+        bannerList.querySelectorAll('.on-cloth').forEach((c) => c.classList.remove('on-cloth'));
+    });
+    window.addEventListener('scroll', () => { if (clothPointer) updateClothHover(); }, { passive: true });
     bannerList.addEventListener('click', (event) => {
         const url = bannerGameUrl(event);
         if (!url) return;
-        if (event.ctrlKey || event.metaKey || event.shiftKey) window.open(url, '_blank');
+        if (event.ctrlKey || event.metaKey || event.shiftKey) window.open(url, '_blank', 'noopener');
         else window.location.href = url;
     });
     bannerList.addEventListener('auxclick', (event) => {
         const url = event.button === 1 ? bannerGameUrl(event) : '';
-        if (url) window.open(url, '_blank');
+        if (url) window.open(url, '_blank', 'noopener');
     });
 }
 
@@ -344,7 +354,7 @@ window.campaignsPage = function () {
         systems: [],
         campaignTypes: CAMPAIGN_TYPES,
         editingCampaignId: '',
-        editReturnTo: '', // set when the edit dialog was opened from a game page
+        returnTo: '', // set when a dialog was opened by a game page link; closing it goes back there
         currentCalendarDate: new Date(),
         currentCampaignId: null,
         currentCampaignTitle: '',
@@ -464,23 +474,41 @@ window.campaignsPage = function () {
             this.openDeepLink();
         },
 
-        // Links from the game page: ?calendar=ID, ?edit=ID or ?signups=ID open that dialog.
+        // Links from the game page: ?calendar=ID, ?edit=ID or ?signups=ID open that dialog,
+        // and closing it returns to the game page.
         openDeepLink() {
             const params = new URLSearchParams(location.search);
             const find = (key) => this.campaigns.find((c) => c.id === params.get(key));
             const cal = find('calendar'), edit = find('edit'), signups = find('signups');
-            if (cal) {
-                this.openCalendar(cal.id, cal.title, cal.dm === this.currentUserId, cal.first_unanswered_session_date || '');
-            } else if (edit?.can_manage) {
-                this.openEditModal(edit.id);
-                this.editReturnTo = '/games/' + encodeURIComponent(edit.id);
-            } else if (signups && signups.dm === this.currentUserId) {
-                this.openSignupsModal(signups.id, signups.title);
-            } else {
+            const target = cal
+                || (edit?.can_manage ? edit : null)
+                || (signups && signups.dm === this.currentUserId ? signups : null);
+            if (!target) {
+                if (['calendar', 'edit', 'signups'].some((key) => params.has(key))) {
+                    history.replaceState(null, '', '/campaigns');
+                    this.showMessage("Game not found or you can't open that dialog", 'error');
+                }
                 return;
             }
-            const target = cal || edit || signups;
+            this.returnTo = '/games/' + encodeURIComponent(target.id);
+            if (target === cal) {
+                this.openCalendar(cal.id, cal.title, cal.dm === this.currentUserId, cal.first_unanswered_session_date || '');
+            } else if (target === edit) {
+                this.openEditModal(edit.id);
+            } else {
+                this.openSignupsModal(signups.id, signups.title);
+            }
             history.replaceState(null, '', '/campaigns#campaign-' + target.id);
+            document.getElementById('campaign-' + target.id)?.scrollIntoView({ block: 'start' });
+        },
+
+        // Leaves for the page that opened the dialog, if any. replace() keeps the history
+        // from growing: the list page with the dialog is not a stop worth going back to.
+        leaveToReturnPage() {
+            if (!this.returnTo) return;
+            const to = this.returnTo;
+            this.returnTo = '';
+            window.location.replace(to);
         },
 
         async loadSystems() {
@@ -532,11 +560,7 @@ window.campaignsPage = function () {
 
         closeModal() {
             this.modalOpen = false;
-            if (this.editReturnTo) {
-                const to = this.editReturnTo;
-                this.editReturnTo = '';
-                window.location.href = to;
-            }
+            this.leaveToReturnPage();
         },
 
         handleModalBackdropClick(event) {
@@ -575,6 +599,13 @@ window.campaignsPage = function () {
                     return;
                 }
 
+                if (editing && this.returnTo) {
+                    // the game page shows "Game updated"
+                    const to = this.returnTo;
+                    this.returnTo = '';
+                    window.location.replace(to + '?updated=1');
+                    return;
+                }
                 this.showMessage(editing ? 'Game updated' : 'Game created successfully!', 'success');
                 this.closeModal();
                 await this.loadCampaigns();
@@ -622,7 +653,7 @@ window.campaignsPage = function () {
                     this.showMessage(data.error || 'Failed to delete game', 'error');
                     return;
                 }
-                this.editReturnTo = ''; // the game page is gone; stay on the list
+                this.returnTo = ''; // the game page is gone; stay on the list
                 this.closeModal();
                 this.showMessage(data.message || 'Game deleted', 'success');
                 await this.loadCampaigns();
@@ -646,6 +677,7 @@ window.campaignsPage = function () {
                     || (bannerStatusRank(a?.status) - bannerStatusRank(b?.status)));
                 await this.$nextTick();
                 slideBanners(before);
+                updateClothHover();
             } catch (error) {
                 if (quiet) {
                     console.error('Failed to refresh campaigns:', error);
@@ -884,6 +916,7 @@ window.campaignsPage = function () {
 
         closeSignupsModal() {
             this.signupsModalOpen = false;
+            this.leaveToReturnPage();
         },
 
         handleSignupsBackdropClick(event) {
@@ -1091,6 +1124,7 @@ window.campaignsPage = function () {
             this.showCreateSessionModal = false;
             this.clearSelectedDay();
             this.sessionResponseCache = {};
+            this.leaveToReturnPage();
         },
 
         handleCalendarBackdropClick(event) {
@@ -1259,14 +1293,7 @@ window.campaignsPage = function () {
         },
 
         getSessionEndTime(session) {
-            const time = session?.time || '';
-            const duration = Number(session?.duration) || 0;
-            const [hour, minute] = String(time).split(':').map((part) => Number(part));
-            if (Number.isNaN(hour) || Number.isNaN(minute)) return time;
-            const totalMinutes = (hour * 60) + minute + duration;
-            const endHour = Math.floor((totalMinutes % (24 * 60)) / 60);
-            const endMinute = totalMinutes % 60;
-            return `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+            return getSessionEndTime(session);
         },
 
         getSessionTimeRange(session) {
@@ -1401,8 +1428,7 @@ window.campaignsPage = function () {
         },
 
         parseDateLocal(dateStr) {
-            const [year, month, day] = String(dateStr).split('-').map(Number);
-            return new Date(year, month - 1, day);
+            return parseDateLocal(dateStr);
         },
 
         formatDayHeading(date) {
@@ -1414,12 +1440,7 @@ window.campaignsPage = function () {
         },
 
         getDurationLabel(session) {
-            const total = Number(session?.duration) || 0;
-            const hours = Math.floor(total / 60);
-            const minutes = total % 60;
-            if (hours && minutes) return `${hours}h ${minutes}m`;
-            if (hours) return `${hours}h`;
-            return `${minutes}m`;
+            return getDurationLabel(session);
         },
 
         getSessionMeta(session) {
@@ -1600,6 +1621,32 @@ function getDefaultTimezone() {
     } catch (error) {
         return 'UTC';
     }
+}
+
+function parseDateLocal(dateStr) {
+    const [year, month, day] = String(dateStr).split('-').map(Number);
+    return new Date(year, month - 1, day);
+}
+
+// End time "HH:MM" of a session; a malformed start time is returned as is.
+function getSessionEndTime(session) {
+    const time = session?.time || '';
+    const duration = Number(session?.duration) || 0;
+    const [hour, minute] = String(time).split(':').map((part) => Number(part));
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return time;
+    const totalMinutes = (hour * 60) + minute + duration;
+    const endHour = Math.floor((totalMinutes % (24 * 60)) / 60);
+    const endMinute = totalMinutes % 60;
+    return `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+}
+
+function getDurationLabel(session) {
+    const total = Number(session?.duration) || 0;
+    const hours = Math.floor(total / 60);
+    const minutes = total % 60;
+    if (hours && minutes) return `${hours}h ${minutes}m`;
+    if (hours) return `${hours}h`;
+    return `${minutes}m`;
 }
 
 function getTimezoneOptions() {
