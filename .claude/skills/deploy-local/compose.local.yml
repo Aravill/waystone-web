@@ -1,0 +1,10 @@
+# Local test deploys only (layered on docker-compose.yml by deploy-local.sh).
+# Replaces the ./backups host bind mount with a named volume, so test backups
+# never land in the repo and `down` (down -v) removes them with everything else.
+services:
+  waystone-web:
+    volumes:
+      - waystone-backups:/root/backups
+
+volumes:
+  waystone-backups:
