@@ -2710,12 +2710,16 @@ select option {
     color: var(--ink);
 }
 
+/* The whole banner opens the game page; the title link stays for keyboard users. */
+.campaign-item {
+    cursor: pointer;
+}
+
 .campaign-title-link {
     color: inherit;
     text-decoration: none;
 }
 
-.campaign-title-link:hover,
 .campaign-title-link:focus-visible {
     text-decoration: underline;
     text-underline-offset: 4px;

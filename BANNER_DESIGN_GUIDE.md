@@ -116,6 +116,7 @@ Banners sway in the breeze, clearly visible but not distracting. This is a banne
 - **Needs action:** the outline (1.5px), side edges, inner lines, ornaments and medallion rings turn `--rubric`, and the notice takes the headpiece row. This replaces the old rubric double frame.
   - **A flash rolls over the outline:** a light band sweeps diagonally (45°, top-left → bottom-right) across the rubric border, then pauses (4.5s cycle: ~2.5s sweep, ~2s rest). It's the outline's own stroke, a `userSpaceOnUse` linear gradient (`--rubric` · `--rubric` 25% mixed with white · `--rubric`) moved by `gradientTransform`, so there's no overlay path. The gradient is one shared definition (`#banner-flash`), so all needs-action cards flash in sync. Only the outline flashes; the ornaments, medallion and notice stay solid. The stroke falls back to solid `--rubric` under reduced motion or with the motion tweak off.
 - **Finished:** the whole card at `opacity: 0.72`, rising to `0.92` on hover.
+- **Click:** clicking anywhere on the banner opens the game page (`/games/{id}`). Its own links, buttons and the medallion hotspot keep their behaviour, selecting text doesn't navigate, and Ctrl/Cmd/middle-click open a new tab. The cursor is a pointer over the whole card. The title is a plain-looking link (underlined only on `:focus-visible`) so keyboard and screen-reader users still have a target.
 - **Hover:** every banner reacts, needs-action included.
   - **Banners that need no action:** the banner catches a gust, so it feels like something you can pick up. Over 0.3s, the outline, inner lines, ornaments and inner medallion ring darken from `--line` / `--muted` to `--ink`. The flutter eases up to double (±8°) and the ripple to 2.3× (~7px), then settles back when the pointer leaves (eased per frame, factor 0.06, so it never jumps). Text and buttons stay still. With motion off, only the colour changes.
   - **Needs-action banners** get the same gust and keep their rubric flash. The outline thickens from 1.5 to 2px and the inner medallion ring goes to full rubric (opacity 0.55 → 1). There's no colour change, so it still reads as "action needed".
@@ -141,6 +142,7 @@ New variants follow the same recipe: a distinct silhouette, one or two wear mark
 
 ## Tried and rejected
 
+- **The title as the visible link to the game page** (underlined on hover): replaced by clicking the whole banner, which already reacts to hover like something you pick up.
 - **A vine tendril** along the top in place of the headpiece: dropped in favour of the existing centred headpiece.
 - **The notice on the top edge**, between the medallion and the corner: no breathing room, it touched the border.
 - **The notice as an extra content line:** it pushed the content down and broke the alignment between cards.

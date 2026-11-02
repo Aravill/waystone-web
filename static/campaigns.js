@@ -210,6 +210,28 @@ function bannerFrame(now) {
 }
 if (document.getElementById('campaignsList')) requestAnimationFrame(bannerFrame);
 
+// Clicking anywhere on a banner opens its game page; its own links, buttons and
+// the medallion keep their behaviour. Keyboard users reach it via the title link.
+function bannerGameUrl(event) {
+    const card = event.target.closest('.campaign-item');
+    if (!card || event.target.closest('a, button, input, select, textarea, label, [tabindex]')) return '';
+    if (String(window.getSelection?.() || '')) return ''; // let people select text
+    return card.querySelector('.campaign-title-link')?.getAttribute('href') || '';
+}
+const bannerList = document.getElementById('campaignsList');
+if (bannerList) {
+    bannerList.addEventListener('click', (event) => {
+        const url = bannerGameUrl(event);
+        if (!url) return;
+        if (event.ctrlKey || event.metaKey || event.shiftKey) window.open(url, '_blank');
+        else window.location.href = url;
+    });
+    bannerList.addEventListener('auxclick', (event) => {
+        const url = event.button === 1 ? bannerGameUrl(event) : '';
+        if (url) window.open(url, '_blank');
+    });
+}
+
 // Banner order: those needing the user's action first, then by status. Array.sort is stable,
 // so ties keep the API's order.
 const BANNER_STATUS_ORDER = ['Pitch', 'Ongoing', 'On Hiatus', 'Finished', 'Cancelled'];
