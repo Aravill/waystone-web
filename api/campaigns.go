@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -63,6 +64,21 @@ func campaignSessionSummaries(campaigns []models.Campaign) (map[string]campaignS
 			summary.played = append(summary.played, session)
 		}
 		result[session.CampaignID] = summary
+	}
+	// Number sessions chronologically across timezones: by start instant, then id.
+	for id, summary := range result {
+		starts := make(map[string]time.Time, len(summary.played))
+		for _, p := range summary.played {
+			starts[p.ID], _ = sessionStart(p)
+		}
+		sort.SliceStable(summary.played, func(a, b int) bool {
+			pa, pb := summary.played[a], summary.played[b]
+			if !starts[pa.ID].Equal(starts[pb.ID]) {
+				return starts[pa.ID].Before(starts[pb.ID])
+			}
+			return pa.ID < pb.ID
+		})
+		result[id] = summary
 	}
 	return result, nil
 }
@@ -360,6 +376,10 @@ func (req *campaignRequest) normalize() string {
 		return "invalid game type"
 	case req.DesiredPlayerCount < 0:
 		return "desired player count cannot be negative"
+	case utf8.RuneCountInString(req.Summary) > 1000:
+		return "summary must be at most 1000 characters"
+	case utf8.RuneCountInString(req.Description) > 20000:
+		return "description must be at most 20000 characters"
 	case utf8.RuneCountInString(req.System) > 64:
 		return "system must be at most 64 characters"
 	}

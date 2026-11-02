@@ -226,6 +226,16 @@ func handleCreateSession(w http.ResponseWriter, r *http.Request, campaignID stri
 		return
 	}
 
+	existing, err := db.GetSessionsByCampaignIDs([]string{campaignID}, "")
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve sessions")
+		return
+	}
+	if len(existing) >= 999 {
+		writeJSONError(w, http.StatusConflict, "a game can have at most 999 sessions")
+		return
+	}
+
 	session := models.CampaignSession{
 		ID:         db.GenerateUUID(),
 		CampaignID: campaignID,
