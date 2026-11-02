@@ -259,6 +259,8 @@ window.campaignsPage = function () {
     return {
         displayName: 'User',
         isAdmin: false,
+        guestLinks: {},
+        guestTtlHours: 24,
         currentUserId: '',
         campaigns: [],
         loading: true,
@@ -789,6 +791,7 @@ window.campaignsPage = function () {
             this.signupsCampaignId = campaignId;
             this.signupsCampaignTitle = campaignTitle;
             this.signups = [];
+            this.guestLinks = {};
             this.showDeclinedSignups = false;
             this.signupsModalOpen = true;
             await this.loadSignups();
@@ -816,6 +819,7 @@ window.campaignsPage = function () {
                 this.signupsAcceptedCount = data.accepted_count || 0;
                 this.signupsDesiredCount = parseInt(data.desired_player_count, 10) || 0;
                 this.signupsOpen = data.sign_ups_open === true;
+                await this.loadGuestLinks();
             } catch (error) {
                 this.showMessage('Error loading sign-ups: ' + error.message, 'error');
             }
@@ -848,6 +852,76 @@ window.campaignsPage = function () {
                 await this.loadCampaigns();
             } catch (error) {
                 this.showMessage('Error updating sign-up: ' + error.message, 'error');
+            }
+        },
+
+        async loadGuestLinks() {
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.signupsCampaignId)}/guest-links`);
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to load guest links', 'error');
+                    return;
+                }
+                this.guestLinks = data.links || {};
+            } catch (error) {
+                this.showMessage('Error loading guest links: ' + error.message, 'error');
+            }
+        },
+
+        guestUrl(userId) {
+            const link = this.guestLinks[userId];
+            return link ? `${window.location.origin}/r/${link.token}` : '';
+        },
+
+        guestLinkExpiry(userId) {
+            const link = this.guestLinks[userId];
+            if (!link) return '';
+            const when = new Date(link.expires_at);
+            const text = when.toLocaleString('default', { dateStyle: 'medium', timeStyle: 'short' });
+            return when <= new Date() ? `expired ${text}` : `valid until ${text}`;
+        },
+
+        async createGuestLink(userId) {
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.signupsCampaignId)}/players/${encodeURIComponent(userId)}/guest-link`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ttl_hours: this.guestTtlHours })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to create guest link', 'error');
+                    return;
+                }
+                await this.loadGuestLinks();
+            } catch (error) {
+                this.showMessage('Error creating guest link: ' + error.message, 'error');
+            }
+        },
+
+        async revokeGuestLink(userId) {
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.signupsCampaignId)}/players/${encodeURIComponent(userId)}/guest-link`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to revoke guest link', 'error');
+                    return;
+                }
+                await this.loadGuestLinks();
+            } catch (error) {
+                this.showMessage('Error revoking guest link: ' + error.message, 'error');
+            }
+        },
+
+        async copyGuestLink(userId) {
+            try {
+                await navigator.clipboard.writeText(this.guestUrl(userId));
+                this.showMessage('Link copied', 'success');
+            } catch (error) {
+                this.showMessage('Copy failed - select and copy the link manually', 'error');
             }
         },
 

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>Reply — Waystone</title>
+    <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+    <script src="/static/theme.js?v=4"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=41">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .guest-sessions { display: flex; flex-direction: column; gap: 1rem; margin-top: 1.5rem; }
+        .guest-date { font-family: var(--font-display); font-size: 1.25rem; color: var(--ink); }
+        .guest-counts { color: var(--muted); font-size: 0.875rem; margin-top: 0.5rem; }
+    </style>
+</head>
+<body x-data="guestPage()" x-cloak>
+    <main class="container container--narrow" style="max-width: 40rem;">
+        <div x-show="messageVisible" x-text="messageText"
+            :class="messageType === 'error' ? 'message error' : 'message success'"
+            style="display: none;"></div>
+
+        <template x-if="state === 'invalid'">
+            <div>
+                <h1 class="page-title">Link not valid</h1>
+                <p class="form-hint">This link is not valid. Ask your DM for a new one.</p>
+            </div>
+        </template>
+        <template x-if="state === 'expired'">
+            <div>
+                <h1 class="page-title">Link expired</h1>
+                <p class="form-hint">This link has expired. Ask your DM for a new one.</p>
+            </div>
+        </template>
+
+        <template x-if="state === 'ready'">
+            <div>
+                <h1 class="page-title" x-text="campaignTitle"></h1>
+                <p class="form-hint" x-text="'Replying as ' + displayName"></p>
+                <p class="form-hint" x-text="'Link valid until ' + formatExpiry()"></p>
+
+                <p class="panel-empty" x-show="sessions.length === 0">No upcoming sessions.</p>
+
+                <div class="guest-sessions">
+                    <template x-for="s in sessions" :key="s.id">
+                        <div class="panel-session">
+                            <div class="guest-date" x-text="formatAgendaDate(s)"></div>
+                            <div class="panel-session-head">
+                                <span class="panel-session-time" x-text="getSessionTimeRange(s)"></span>
+                                <span class="panel-status-tag" :class="`chip-${s.status}`" x-text="s.status"></span>
+                            </div>
+                            <div class="panel-session-meta" x-text="getSessionMeta(s)"></div>
+                            <div class="guest-counts" x-text="getCounts(s)"></div>
+
+                            <div class="player-responses" x-show="s.status !== 'Cancelled'">
+                                <p class="pending-notice"><span aria-hidden="true">✦</span> Thy reply</p>
+                                <div class="session-actions session-replies">
+                                    <button type="button" class="btn-response btn-response--accepted"
+                                            :class="{ 'selected': s.current_user_participation === 'Accepted' }"
+                                            @click="respond('Accepted', s)">Aye</button>
+                                    <button type="button" class="btn-response btn-response--tentative"
+                                            :class="{ 'selected': s.current_user_participation === 'Tentative' }"
+                                            @click="respond('Tentative', s)">Perhaps</button>
+                                    <button type="button" class="btn-response btn-response--declined"
+                                            :class="{ 'selected': s.current_user_participation === 'Declined' }"
+                                            @click="respond('Declined', s)">Nay</button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+    </main>
+
+    <script src="/static/guest.js?v=1"></script>
+</body>
+</html>

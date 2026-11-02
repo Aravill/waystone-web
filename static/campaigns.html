@@ -386,8 +386,25 @@
                                 <div class="signups-item-info">
                                     <span class="signups-item-name" x-text="signup.signup_user ? signup.signup_user.display_name : signup.user_id"></span>
                                     <span class="signups-item-time" x-text="`signed up ${formatSignupTime(signup.created_at)}`"></span>
+                                    <template x-if="guestLinks[signup.user_id]">
+                                        <span class="signups-item-time">
+                                            <code style="user-select: all; overflow-wrap: anywhere;" x-text="guestUrl(signup.user_id)"></code>
+                                            <span x-text="guestLinkExpiry(signup.user_id)"></span>
+                                        </span>
+                                    </template>
                                 </div>
-                                <div class="signups-item-actions">
+                                <div class="signups-item-actions" style="flex-wrap: wrap; justify-content: flex-end;">
+                                    <select x-model.number="guestTtlHours" aria-label="Guest link lifetime" style="width: auto; margin: 0;">
+                                        <option value="1">1 hour</option>
+                                        <option value="24">1 day</option>
+                                        <option value="72">3 days</option>
+                                        <option value="168">1 week</option>
+                                        <option value="336">2 weeks</option>
+                                        <option value="720">30 days</option>
+                                    </select>
+                                    <button type="button" class="btn-action" @click="createGuestLink(signup.user_id)" x-text="guestLinks[signup.user_id] ? 'Regenerate' : 'Guest link'"></button>
+                                    <button type="button" class="btn-action" x-show="guestLinks[signup.user_id]" @click="copyGuestLink(signup.user_id)">Copy</button>
+                                    <button type="button" class="btn-action" x-show="guestLinks[signup.user_id]" @click="revokeGuestLink(signup.user_id)">Revoke</button>
                                     <button type="button" class="btn-action signups-btn-kick" @click="kickPlayer(signup.user_id)">Kick</button>
                                 </div>
                             </li>
@@ -472,6 +489,6 @@
     </div>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="campaigns.js?v=35"></script>
+    <script src="campaigns.js?v=36"></script>
 </body>
 </html>
