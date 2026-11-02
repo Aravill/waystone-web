@@ -2013,6 +2013,7 @@ select option {
 
 .panel-session-head {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     gap: 0.5rem;
@@ -2141,10 +2142,14 @@ select option {
     margin-bottom: 0.75rem;
 }
 
+/* Equal thirds when they fit; wrap instead of overflowing a narrow panel */
 .session-replies {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.session-replies .btn-response {
+    flex: 1 1 0;
+    min-width: max-content;
 }
 
 .btn-response {
