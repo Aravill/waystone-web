@@ -2432,6 +2432,26 @@ select option {
     border-bottom: 1px solid var(--ink);
 }
 
+/* Needs the viewer's action: a rubric hairline, like the banner's frame */
+.game-head.needs-action {
+    border-bottom-color: var(--rubric);
+}
+
+.game-notice {
+    margin-bottom: 0.75rem;
+}
+
+.game-error {
+    margin: 2rem 0;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rubric);
+    color: var(--rubric);
+}
+
+.game-error p {
+    margin: 0 0 0.75rem;
+}
+
 .game-head .page-title {
     margin: 0.75rem 0 0.5rem;
     text-wrap: balance;
@@ -2490,7 +2510,6 @@ select option {
 }
 
 .game-tale { grid-area: tale; min-width: 0; }
-.game-company { grid-area: company; min-width: 0; }
 .game-chronicle { grid-area: chronicle; min-width: 0; }
 
 .game-folio h2 {
@@ -2547,10 +2566,12 @@ select option {
 
 .game-text a {
     color: var(--rubric);
-    text-underline-offset: 4px;
+    text-underline-offset: 0.25rem;
 }
 
 .game-company {
+    grid-area: company;
+    min-width: 0;
     border: 1px solid var(--line);
     padding: 1.375rem 1.5rem;
 }
@@ -2647,7 +2668,7 @@ select option {
 
 .game-session {
     display: grid;
-    grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+    grid-template-columns: 2.25rem minmax(0, 1fr) auto; /* fits three 1.125rem Courier digits */
     gap: 0.25rem 1rem;
     align-items: center;
     padding: 0.875rem 0;
@@ -2655,10 +2676,13 @@ select option {
 }
 
 .game-session-no {
-    font-family: var(--font-display);
-    font-size: 1.5rem;
+    /* Courier's lining figures: the display face only has old-style numerals ("10" reads as "Io") */
+    font-family: var(--font-text);
+    font-size: 1.125rem;
+    font-weight: 700;
     line-height: 1;
     color: var(--rubric);
+    font-variant-numeric: tabular-nums;
 }
 
 .game-session-date {
@@ -2683,8 +2707,26 @@ select option {
     border: 2px solid var(--verdigris);
 }
 
+.game-attendee--dm {
+    position: relative;
+    display: inline-flex;
+}
+
 .game-attendee--dm .user-avatar {
     border-color: var(--rubric);
+}
+
+/* The DM is marked by a crown as well as the colour */
+.game-attendee--dm::after {
+    content: "♛" / "";
+    position: absolute;
+    right: -0.25rem;
+    bottom: -0.375rem;
+    color: var(--rubric);
+    background: var(--bg);
+    font-size: 0.75rem;
+    line-height: 1;
+    pointer-events: none;
 }
 
 .game-session--you .game-session-date::after {
@@ -2702,7 +2744,7 @@ select option {
     color: var(--rubric);
     font: inherit;
     text-decoration: underline;
-    text-underline-offset: 4px;
+    text-underline-offset: 0.25rem;
     cursor: pointer;
 }
 
@@ -2724,7 +2766,7 @@ select option {
 
 .campaign-title-link:focus-visible {
     text-decoration: underline;
-    text-underline-offset: 4px;
+    text-underline-offset: 0.25rem;
 }
 
 /* ---------- Responsive ---------- */
@@ -2743,7 +2785,7 @@ select option {
     }
 
     .game-session {
-        grid-template-columns: 2.5rem minmax(0, 1fr);
+        grid-template-columns: 2.25rem minmax(0, 1fr);
     }
 
     .game-attendees {

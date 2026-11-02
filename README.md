@@ -103,9 +103,17 @@ Visit: **http://localhost:8080**
 - **GET** `/api/campaigns`
 - Returns: List of campaigns with title, status, summary, description, DM, players, and sign-up openness.
 
+### Create / Update Campaign
+- **POST** `/api/campaigns`, **PUT** `/api/campaigns/{id}`
+- Limits: `summary` at most 1000 characters, `description` at most 20000, `system` at most 64.
+
+### Create Session
+- **POST** `/api/campaigns/{id}/sessions`
+- A game can have at most 999 sessions (of any status); the 1000th is rejected with 409.
+
 ### Get Campaign
 - **GET** `/api/campaigns/{id}`
-- Returns: One campaign (same fields as the list) plus `played_sessions`, newest first, each with `number`, `date`, `time`, `duration`, `timezone` and `attendees` (users whose response was Accepted). Visible to every logged-in user; 404 if the game does not exist.
+- Returns: One campaign (same fields as the list) plus `played_sessions`, newest first, each with `number`, `date`, `time`, `duration`, `timezone` and `attendees` (the DM, always first, plus users whose response was Accepted). Played sessions are numbered chronologically by start instant. Visible to every logged-in user; 404 if the game does not exist.
 
 ### Sign Up
 - **POST** `/api/signup`

@@ -6,7 +6,7 @@
     <title>Waystone - Game</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=50">
+    <link rel="stylesheet" href="/static/styles.css?v=52">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -32,14 +32,19 @@
             <a class="game-crumb" :href="campaign ? '/campaigns#campaign-' + encodeURIComponent(campaign.id) : '/campaigns'">← All games</a>
 
             <p x-show="loading">Loading game...</p>
+            <div class="game-error" role="alert" x-show="loadError">
+                <p x-text="loadError"></p>
+                <button type="button" class="campaign-action-btn" @click="load()">Try again</button>
+            </div>
             <template x-if="notFound">
                 <p>This game could not be found. It may have been deleted.</p>
             </template>
 
             <template x-if="campaign">
                 <div>
-                    <section class="game-head" :class="'status-' + statusClass">
+                    <section class="game-head" :class="{ ['status-' + statusClass]: true, 'needs-action': needsAction }">
                         <div>
+                            <p class="pending-notice game-notice" x-show="pendingNotice"><span aria-hidden="true">✦</span> <span x-text="pendingNotice"></span></p>
                             <div class="game-kicker">
                                 <span class="game-type" :title="typeInfo.label + ': ' + typeInfo.description">
                                     <svg class="game-type-icon" viewBox="0 0 24 24" aria-hidden="true" x-html="typeIconPaths"></svg>
@@ -57,22 +62,24 @@
                             <p class="game-lede" x-text="campaign.summary"></p>
                         </div>
                         <div class="game-actions">
-                            <a class="campaign-action-btn" x-show="isMember" :href="'/campaigns?calendar=' + encodeURIComponent(campaign.id)">Calendar</a>
+                            <a class="campaign-action-btn" x-show="isMember" :href="'/campaigns?calendar=' + encodeURIComponent(campaign.id)"
+                               :title="unansweredCount > 0 ? unansweredCount + ' suggested session' + (unansweredCount === 1 ? '' : 's') + ' awaiting your response' : null"
+                               :aria-label="unansweredCount > 0 ? 'Calendar, ' + unansweredCount + ' awaiting your response' : null">Calendar<span class="campaign-action-count" x-show="unansweredCount > 0" x-text="unansweredCount"></span></a>
                             <template x-if="isDM">
-                                <a class="campaign-action-btn game-actions-count" :href="'/campaigns?signups=' + encodeURIComponent(campaign.id)"
+                                <a class="campaign-action-btn" :href="'/campaigns?signups=' + encodeURIComponent(campaign.id)"
                                    :title="pendingCount > 0 ? pendingCount + ' pending sign-up' + (pendingCount === 1 ? '' : 's') + ' awaiting your decision' : null"
                                    :aria-label="pendingCount > 0 ? 'Sign-ups, ' + pendingCount + ' pending' : null">Sign-ups<span class="campaign-action-count" x-show="pendingCount > 0" x-text="pendingCount"></span></a>
                             </template>
                             <template x-if="!isMember && currentUserId">
-                                <button type="button" class="campaign-action-btn" @click="toggleFollow()"
+                                <button type="button" class="campaign-action-btn" @click="toggleFollow()" :disabled="busy"
                                         :title="campaign.is_following ? 'Stop getting notifications for this game' : 'Get notified about status changes, sign-ups and sessions'"
                                         x-text="campaign.is_following ? 'Unfollow' : 'Follow'"></button>
                             </template>
                             <template x-if="!isDM && isPlayer">
-                                <button type="button" class="campaign-action-btn" title="Leave this game" @click="withdraw()">Leave</button>
+                                <button type="button" class="campaign-action-btn" title="Leave this game" :disabled="busy" @click="withdraw()">Leave</button>
                             </template>
                             <template x-if="!isMember && signupStatus === 'Pending'">
-                                <button type="button" class="campaign-action-btn" title="Withdraw your sign-up" @click="withdraw()">Withdraw</button>
+                                <button type="button" class="campaign-action-btn" title="Withdraw your sign-up" :disabled="busy" @click="withdraw()">Withdraw</button>
                             </template>
                             <template x-if="!isMember && signupStatus === 'Declined'">
                                 <button type="button" class="campaign-action-btn campaign-signup-btn" disabled aria-disabled="true">Declined</button>
@@ -81,10 +88,10 @@
                                 <button type="button" class="campaign-action-btn campaign-signup-btn" disabled aria-disabled="true">Removed</button>
                             </template>
                             <template x-if="!isMember && signupStatus !== 'Pending' && signupStatus !== 'Declined' && signupStatus !== 'Kicked'">
-                                <button type="button" class="campaign-action-btn campaign-signup-btn" :disabled="!campaign.sign_ups_open" :aria-disabled="!campaign.sign_ups_open" @click="signUp()">Sign-up</button>
+                                <button type="button" class="campaign-action-btn campaign-signup-btn" :disabled="!campaign.sign_ups_open || busy" :aria-disabled="!campaign.sign_ups_open" @click="signUp()">Sign-up</button>
                             </template>
                             <a class="campaign-action-btn" x-show="campaign.can_manage" :href="'/campaigns?edit=' + encodeURIComponent(campaign.id)">Edit</a>
-                            <button type="button" class="btn-danger" x-show="isAdmin" @click="deleteGame()">Delete game</button>
+                            <button type="button" class="btn-danger" x-show="isAdmin" :disabled="busy" @click="deleteGame()">Delete game</button>
                         </div>
                     </section>
 
@@ -118,7 +125,7 @@
                             <h2 id="chronicleHeading" class="section-header">The chronicle <span class="game-count" x-text="(campaign.played_sessions_count || 0) + ' session' + (campaign.played_sessions_count === 1 ? '' : 's') + ' played'"></span></h2>
 
                             <template x-if="campaign.next_session">
-                                <div class="game-next">
+                                <div class="game-next" :title="campaign.next_session.timezone">
                                     <span class="game-eyebrow">Next</span>
                                     <span x-text="formatDate(campaign.next_session.date) + ', ' + campaign.next_session.time"></span>
                                     <a x-show="isMember" :href="'/campaigns?calendar=' + encodeURIComponent(campaign.id)">Open calendar →</a>
@@ -129,20 +136,20 @@
                             <ol class="game-sessions" reversed x-show="(campaign.played_sessions || []).length > 0">
                                 <template x-for="s in visibleSessions" :key="s.id">
                                     <li class="game-session" :class="{ 'game-session--you': attendedByMe(s) }">
-                                        <span class="game-session-no" :aria-label="'Session ' + s.number" x-text="roman(s.number)"></span>
+                                        <span class="game-session-no"><span class="visually-hidden" x-text="'Session ' + s.number"></span><span aria-hidden="true" x-text="s.number"></span></span>
                                         <span>
                                             <span class="game-session-date" x-text="formatDate(s.date)"></span>
                                             <span class="game-session-meta" :title="s.timezone" x-text="sessionMeta(s)"></span>
                                         </span>
                                         <span class="game-attendees" x-show="s.attendees.length > 0" role="group" :aria-label="'Attended: ' + attendeeNames(s)">
                                             <template x-for="u in s.attendees" :key="u.id">
-                                                <span :class="{ 'game-attendee--dm': u.id === campaign.dm }" x-html="userAvatarHtml(u)"></span>
+                                                <span :class="{ 'game-attendee--dm': u.id === campaign.dm }" x-html="attendeeAvatar(u)"></span>
                                             </template>
                                         </span>
                                     </li>
                                 </template>
                             </ol>
-                            <button type="button" class="game-more" x-show="!showAll && (campaign.played_sessions || []).length > 5" @click="showAll = true" x-text="'Show all ' + campaign.played_sessions.length + ' sessions ↓'"></button>
+                            <button type="button" class="game-more" x-show="(campaign.played_sessions || []).length > 5" :aria-expanded="showAll" @click="showAll = !showAll" x-text="showAll ? 'Show fewer ↑' : 'Show all ' + campaign.played_sessions.length + ' sessions ↓'"></button>
                         </section>
                     </div>
 
@@ -172,7 +179,7 @@
     </div>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="/campaigns.js?v=45"></script>
-    <script src="/static/game.js?v=3"></script>
+    <script src="/campaigns.js?v=46"></script>
+    <script src="/static/game.js?v=4"></script>
 </body>
 </html>

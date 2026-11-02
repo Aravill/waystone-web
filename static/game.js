@@ -2,77 +2,55 @@
 // campaignStatusClass, userAvatarHtml, escapeHtml and getDefaultTimezone.
 
 // Basic Markdown, safe by construction: the whole input is HTML-escaped first, then only
-// whitelisted tags are produced. Supports paragraphs, **bold**, *italic*/_italic_, [text](url),
-// "- " / "1. " lists, "#" headings (rendered as h3/h4) and "> " quotes.
+// whitelisted tags are produced. Supports paragraphs, **bold** (may contain *italic*),
+// *italic*/_italic_, [text](url), "- " / "1. " lists (also right after a text line), "#" headings
+// (rendered as h3/h4) and "> " quotes. Every pattern is bounded, so rendering stays linear.
 function renderMarkdown(text) {
     const src = escapeHtml(String(text || '').replace(/\0/g, '').replace(/\r\n?/g, '\n'));
     const inline = (line) => {
         const links = [];
-        let out = line.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (m, label, url) => {
+        let out = line.replace(/\[([^\[\]\n]{1,300})\]\(((?:[^()\s]|\([^()\s]*\)){1,2000})\)/g, (m, label, url) => {
             if (!/^(https?:\/\/|mailto:)\S+$/i.test(url)) return m;
             links.push(`<a href="${url}" target="_blank" rel="noopener noreferrer nofollow">${label}</a>`);
             return `\0${links.length - 1}\0`;
         });
         out = out
-            .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*\*(?=[^\s*])([^\n]{1,1000}?)\*\*/g, '<strong>$1</strong>')
             .replace(/(^|[^*\w])\*([^*\s][^*\n]*?)\*(?![*\w])/g, '$1<em>$2</em>')
             .replace(/(^|[^\w])_([^_\s][^_\n]*?)_(?!\w)/g, '$1<em>$2</em>');
         return out.replace(/\0(\d+)\0/g, (m, i) => links[Number(i)]);
     };
+    const kindOf = (l) => /^[-*]\s+/.test(l) ? 'ul' : /^\d+\.\s+/.test(l) ? 'ol' : /^&gt;\s?/.test(l) ? 'quote' : 'text';
+    const strip = { ul: /^[-*]\s+/, ol: /^\d+\.\s+/, quote: /^&gt;\s?/ };
+    // A run of lines of one kind becomes one element, so a list may follow a text line directly.
+    const renderRun = (kind, lines) => {
+        if (kind === 'text') return `<p>${lines.map(inline).join('<br>')}</p>`;
+        const items = lines.map((l) => inline(l.replace(strip[kind], '')));
+        if (kind === 'quote') return '<blockquote>' + items.join('<br>') + '</blockquote>';
+        return `<${kind}>` + items.map((i) => `<li>${i}</li>`).join('') + `</${kind}>`;
+    };
     const blocks = src.split(/\n[ \t]*\n/).map((b) => b.trim()).filter(Boolean);
     return blocks.map((block) => {
-        const lines = block.split('\n');
-        if (lines.every((l) => /^[-*]\s+/.test(l))) {
-            return '<ul>' + lines.map((l) => `<li>${inline(l.replace(/^[-*]\s+/, ''))}</li>`).join('') + '</ul>';
-        }
-        if (lines.every((l) => /^\d+\.\s+/.test(l))) {
-            return '<ol>' + lines.map((l) => `<li>${inline(l.replace(/^\d+\.\s+/, ''))}</li>`).join('') + '</ol>';
-        }
-        if (lines.every((l) => /^&gt;\s?/.test(l))) {
-            return '<blockquote>' + lines.map((l) => inline(l.replace(/^&gt;\s?/, ''))).join('<br>') + '</blockquote>';
-        }
+        let lines = block.split('\n');
+        let out = '';
         const head = lines[0].match(/^(#{1,3})\s+(.*)$/);
         if (head) {
             const tag = head[1].length === 3 ? 'h4' : 'h3';
-            const rest = lines.slice(1);
-            return `<${tag}>${inline(head[2])}</${tag}>` + (rest.length ? `<p>${rest.map(inline).join('<br>')}</p>` : '');
+            out += `<${tag}>${inline(head[2])}</${tag}>`;
+            lines = lines.slice(1);
         }
-        return `<p>${lines.map(inline).join('<br>')}</p>`;
+        let run = [], kind = '';
+        for (const line of lines) {
+            const k = kindOf(line);
+            if (run.length && k !== kind) {
+                out += renderRun(kind, run);
+                run = [];
+            }
+            kind = k;
+            run.push(line);
+        }
+        return out + (run.length ? renderRun(kind, run) : '');
     }).join('');
-}
-
-function toRoman(n) {
-    const map = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
-    let out = '';
-    for (const [v, s] of map) {
-        while (n >= v) { out += s; n -= v; }
-    }
-    return out;
-}
-
-function parseDateLocal(dateStr) {
-    const [year, month, day] = String(dateStr).split('-').map(Number);
-    return new Date(year, month - 1, day);
-}
-
-function getSessionEndTime(session) {
-    const time = session?.time || '';
-    const duration = Number(session?.duration) || 0;
-    const [hour, minute] = String(time).split(':').map((part) => Number(part));
-    if (Number.isNaN(hour) || Number.isNaN(minute)) return time;
-    const totalMinutes = (hour * 60) + minute + duration;
-    const endHour = Math.floor((totalMinutes % (24 * 60)) / 60);
-    const endMinute = totalMinutes % 60;
-    return `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
-}
-
-function getDurationLabel(session) {
-    const total = Number(session?.duration) || 0;
-    const hours = Math.floor(total / 60);
-    const minutes = total % 60;
-    if (hours && minutes) return `${hours}h ${minutes}m`;
-    if (hours) return `${hours}h`;
-    return `${minutes}m`;
 }
 
 window.gamePage = function () {
@@ -85,6 +63,10 @@ window.gamePage = function () {
         loading: true,
         notFound: false,
         showAll: false,
+        busy: false, // an action request is in flight
+        loadError: '',
+        loadSeq: 0,
+        messageTimer: null,
         messageVisible: false,
         messageText: '',
         messageType: '',
@@ -108,26 +90,40 @@ window.gamePage = function () {
             }
             this.gameId = decodeURIComponent(location.pathname.split('/')[2] || '');
             await this.load();
+            if (new URLSearchParams(location.search).get('updated') === '1') {
+                this.showMessage('Game updated', 'success');
+                history.replaceState(null, '', location.pathname);
+            }
         },
 
         async load() {
+            const seq = ++this.loadSeq; // an older response must not overwrite a newer one
             try {
                 const response = await fetch(`/api/campaigns/${encodeURIComponent(this.gameId)}`);
+                if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+                const data = await response.json();
+                if (seq !== this.loadSeq) return;
                 if (response.status === 404) {
                     this.notFound = true;
+                    this.loadError = '';
                     this.campaign = null;
                     return;
                 }
                 if (!response.ok) {
-                    throw new Error('Failed to load game');
+                    this.loadError = data.error || 'Failed to load game';
+                    return;
                 }
-                this.campaign = await response.json();
+                this.campaign = data;
                 this.notFound = false;
+                this.loadError = '';
                 document.title = 'Waystone - ' + (this.campaign.title || 'Game');
             } catch (error) {
-                this.showMessage('Error loading game: ' + error.message, 'error');
+                if (seq === this.loadSeq) this.loadError = 'Could not load the game: ' + error.message;
             } finally {
-                this.loading = false;
+                if (seq === this.loadSeq) this.loading = false;
             }
         },
 
@@ -164,6 +160,17 @@ window.gamePage = function () {
         get signupStatus() {
             return this.campaign?.current_user_signup_status || '';
         },
+        get unansweredCount() {
+            return this.isPlayer ? (parseInt(this.campaign?.unanswered_sessions_count, 10) || 0) : 0;
+        },
+        get pendingNotice() {
+            if (this.unansweredCount > 0) return this.unansweredCount === 1 ? 'A session awaits thy reply' : `${this.unansweredCount} sessions await thy reply`;
+            if (this.pendingCount > 0) return `${this.pendingCount} sign-up${this.pendingCount === 1 ? '' : 's'} to review`;
+            return '';
+        },
+        get needsAction() {
+            return this.unansweredCount > 0 || this.pendingCount > 0;
+        },
         get pendingCount() {
             return this.isDM ? (parseInt(this.campaign?.pending_signups_count, 10) || 0) : 0;
         },
@@ -177,17 +184,22 @@ window.gamePage = function () {
             if (s.timezone && s.timezone !== getDefaultTimezone()) meta += ` · ${s.timezone}`;
             return meta;
         },
+        // The DM is marked in the name too, not by colour alone.
+        attendeeName(u) {
+            return (u.display_name || u.name || 'Unknown') + (u.id === this.campaign?.dm ? ' (DM)' : '');
+        },
         attendeeNames(s) {
-            return (s.attendees || []).map((u) => u.display_name || u.name || 'Unknown').join(', ');
+            return (s.attendees || []).map((u) => this.attendeeName(u)).join(', ');
+        },
+        attendeeAvatar(u) {
+            return userAvatarHtml({ ...u, display_name: this.attendeeName(u) });
         },
         attendedByMe(s) {
             return (s.attendees || []).some((u) => u.id === this.currentUserId);
         },
-        roman(n) {
-            return toRoman(n);
-        },
-
         async postAction(url, method, fallback, errorPrefix) {
+            if (this.busy) return;
+            this.busy = true;
             try {
                 const response = await fetch(url, { method });
                 if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
@@ -203,6 +215,8 @@ window.gamePage = function () {
                 await this.load();
             } catch (error) {
                 this.showMessage(`Error: ${error.message}`, 'error');
+            } finally {
+                this.busy = false;
             }
         },
 
@@ -216,6 +230,7 @@ window.gamePage = function () {
         },
 
         async withdraw() {
+            if (this.busy) return;
             const leaving = this.isPlayer;
             const title = this.campaign.title;
             const ok = await this.askConfirm(leaving
@@ -234,12 +249,14 @@ window.gamePage = function () {
         },
 
         async deleteGame() {
+            if (this.busy) return;
             const ok = await this.askConfirm({
                 title: 'Delete game',
                 message: `Delete "${this.campaign.title}"? This also deletes its sessions and sign-ups and cannot be undone.`,
                 confirmLabel: 'Delete'
             });
-            if (!ok) return;
+            if (!ok || this.busy) return;
+            this.busy = true;
             try {
                 const response = await fetch(`/api/campaigns/${encodeURIComponent(this.campaign.id)}`, { method: 'DELETE' });
                 if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
@@ -254,6 +271,8 @@ window.gamePage = function () {
                 window.location.href = '/campaigns'; // the game page no longer exists
             } catch (error) {
                 this.showMessage('Error deleting game: ' + error.message, 'error');
+            } finally {
+                this.busy = false;
             }
         },
 
@@ -287,7 +306,8 @@ window.gamePage = function () {
             this.messageText = text;
             this.messageType = type;
             this.messageVisible = true;
-            setTimeout(() => {
+            clearTimeout(this.messageTimer);
+            this.messageTimer = setTimeout(() => {
                 this.messageVisible = false;
             }, 5000);
         }
