@@ -6,7 +6,7 @@
     <title>Waystone - Profile</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=45">
+    <link rel="stylesheet" href="/static/styles.css?v=46">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -113,7 +113,7 @@
                         <div class="profile-campaigns">
                             <p class="profile-empty" x-show="dmCampaigns.length === 0">No games as DM.</p>
                             <template x-for="campaign in dmCampaigns" :key="campaign.id">
-                                <a :href="`/campaigns#campaign-${campaign.id}`" class="profile-campaign-row">
+                                <a :href="`/games/${campaign.id}`" class="profile-campaign-row">
                                     <span class="profile-campaign-title" x-text="campaign.title || 'Untitled'"></span>
                                     <span class="profile-status" :class="'status-' + statusClass(campaign.status)" x-text="campaign.status"></span>
                                 </a>
@@ -126,7 +126,7 @@
                         <div class="profile-campaigns">
                             <p class="profile-empty" x-show="playingCampaigns.length === 0">Not playing in any games.</p>
                             <template x-for="campaign in playingCampaigns" :key="campaign.id">
-                                <a :href="`/campaigns#campaign-${campaign.id}`" class="profile-campaign-row">
+                                <a :href="`/games/${campaign.id}`" class="profile-campaign-row">
                                     <span class="profile-campaign-title" x-text="campaign.title || 'Untitled'"></span>
                                     <span class="profile-status" :class="'status-' + statusClass(campaign.status)" x-text="campaign.status"></span>
                                 </a>

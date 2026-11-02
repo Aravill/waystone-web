@@ -208,7 +208,7 @@ function bannerFrame(now) {
     }
     requestAnimationFrame(bannerFrame);
 }
-requestAnimationFrame(bannerFrame);
+if (document.getElementById('campaignsList')) requestAnimationFrame(bannerFrame);
 
 // Banner order: those needing the user's action first, then by status. Array.sort is stable,
 // so ties keep the API's order.
@@ -240,6 +240,18 @@ function slideBanners(before) {
         el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
             { duration: 700, easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)' });
     }
+}
+
+// CSS class suffix for a campaign status (status-pitch, status-hiatus, ...).
+function campaignStatusClass(status) {
+    const statusMap = {
+        Pitch: 'pitch',
+        Ongoing: 'ongoing',
+        Finished: 'finished',
+        'On Hiatus': 'hiatus',
+        Cancelled: 'cancelled'
+    };
+    return statusMap[status] || String(status).toLowerCase().replace(/\s+/g, '-');
 }
 
 // Small square avatar: uploaded picture, or the default letter. Linked to the profile unless link is false.
@@ -396,6 +408,25 @@ window.campaignsPage = function () {
                 document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: 'start' });
             }
             await this.loadSystems();
+            this.openDeepLink();
+        },
+
+        // Links from the game page: ?calendar=ID, ?edit=ID or ?signups=ID open that dialog.
+        openDeepLink() {
+            const params = new URLSearchParams(location.search);
+            const find = (key) => this.campaigns.find((c) => c.id === params.get(key));
+            const cal = find('calendar'), edit = find('edit'), signups = find('signups');
+            if (cal) {
+                this.openCalendar(cal.id, cal.title, cal.dm === this.currentUserId, cal.first_unanswered_session_date || '');
+            } else if (edit?.can_manage) {
+                this.openEditModal(edit.id);
+            } else if (signups && signups.dm === this.currentUserId) {
+                this.openSignupsModal(signups.id, signups.title);
+            } else {
+                return;
+            }
+            const target = cal || edit || signups;
+            history.replaceState(null, '', '/campaigns#campaign-' + target.id);
         },
 
         async loadSystems() {
@@ -622,14 +653,7 @@ window.campaignsPage = function () {
                 } else signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-signup-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" ${disabled ? 'disabled aria-disabled="true"' : ''}>${label}</button>`;
             }
 
-            const statusMap = {
-                Pitch: 'pitch',
-                Ongoing: 'ongoing',
-                Finished: 'finished',
-                'On Hiatus': 'hiatus',
-                Cancelled: 'cancelled'
-            };
-            const statusClass = statusMap[status] || String(status).toLowerCase().replace(/\s+/g, '-');
+            const statusClass = campaignStatusClass(status);
 
             const typeInfo = CAMPAIGN_TYPES.find((t) => t.value === campaign?.type) || CAMPAIGN_TYPES.find((t) => t.value === 'Campaign');
             const typeTip = escapeHtml(`${typeInfo.label}: ${typeInfo.description}`);
@@ -678,7 +702,7 @@ window.campaignsPage = function () {
                             <span class="campaign-status-badge">${escapeHtml(status)}</span>
                         </div>
                         <div class="campaign-title-container">
-                            <h3 class="campaign-title">${escapeHtml(title)}</h3>
+                            <h3 class="campaign-title"><a href="/games/${encodeURIComponent(campaign?.id ?? '')}" class="campaign-title-link">${escapeHtml(title)}</a></h3>
                             ${systemHtml}
                         </div>
                         <p class="campaign-summary-text">${escapeHtml(summary)}</p>

@@ -6,7 +6,7 @@
     <title>Waystone - Games</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=45">
+    <link rel="stylesheet" href="/static/styles.css?v=46">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -75,6 +75,7 @@
                 <div class="form-group">
                     <label for="campaignDescription">Description *</label>
                     <textarea id="campaignDescription" name="description" rows="4" x-model="formData.description" required></textarea>
+                    <small class="form-hint">Markdown: **bold**, *italic*, [link](https://…), "- " lists; a blank line starts a new paragraph.</small>
                 </div>
                 <div class="form-group">
                     <label for="campaignType">Type</label>
@@ -503,6 +504,6 @@
     </div>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="campaigns.js?v=40"></script>
+    <script src="campaigns.js?v=41"></script>
 </body>
 </html>
