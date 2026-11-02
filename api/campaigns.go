@@ -26,9 +26,10 @@ func HandleCampaigns(w http.ResponseWriter, r *http.Request) {
 }
 
 type campaignSessionSummary struct {
-	next      *models.CampaignSession // closest confirmed session that hasn't ended
-	nextStart time.Time
-	played    int // confirmed sessions that have ended
+	next        *models.CampaignSession // closest confirmed session that hasn't ended
+	nextStart   time.Time
+	playedCount int                      // confirmed sessions that have ended
+	played      []models.CampaignSession // those sessions, in date/time order
 }
 
 // campaignSessionSummaries summarises each campaign's confirmed sessions.
@@ -58,11 +59,126 @@ func campaignSessionSummaries(campaigns []models.Campaign) (map[string]campaignS
 				summary.next, summary.nextStart = &session, start
 			}
 		} else {
-			summary.played++
+			summary.playedCount++
+			summary.played = append(summary.played, session)
 		}
 		result[session.CampaignID] = summary
 	}
 	return result, nil
+}
+
+// campaignViewer holds everything needed to enrich campaigns for one viewer.
+type campaignViewer struct {
+	userID         string
+	isAdmin        bool
+	users          map[string]*models.User
+	signups        map[string]models.CampaignSignup
+	followed       map[string]bool
+	pendingSignups map[string]int
+	unanswered     map[string]models.UnansweredSessions
+	sessions       map[string]campaignSessionSummary
+	systems        map[string]models.System
+}
+
+// loadCampaignViewer fetches the per-viewer data for campaigns. It returns an
+// error message (for a 500 response) or "".
+func loadCampaignViewer(r *http.Request, campaigns []models.Campaign) (*campaignViewer, string) {
+	// Fetch all users once to avoid N+1 queries
+	allUsers, err := db.GetAllUsers()
+	if err != nil {
+		return nil, "failed to retrieve users"
+	}
+
+	v := &campaignViewer{users: make(map[string]*models.User)}
+	v.userID, _ = r.Context().Value("user_id").(string)
+	if v.signups, err = db.GetCampaignSignupsByUser(v.userID); err != nil {
+		return nil, "failed to retrieve sign-ups"
+	}
+	if v.followed, err = db.GetFollowedCampaignIDs(v.userID); err != nil {
+		return nil, "failed to retrieve follows"
+	}
+	if v.pendingSignups, err = db.CountPendingSignupsForDM(v.userID); err != nil {
+		return nil, "failed to retrieve game counts"
+	}
+	if v.unanswered, err = db.GetUnansweredSessions(v.userID, time.Now().UTC().Format("2006-01-02")); err != nil {
+		return nil, "failed to retrieve game counts"
+	}
+	if v.sessions, err = campaignSessionSummaries(campaigns); err != nil {
+		return nil, "failed to retrieve sessions"
+	}
+	if v.systems, err = systemsByName(); err != nil {
+		return nil, "failed to retrieve systems"
+	}
+
+	// Create a map for O(1) user lookup
+	for i := range allUsers {
+		v.users[allUsers[i].ID] = &allUsers[i]
+	}
+	if currentUser, ok := v.users[v.userID]; ok && currentUser != nil {
+		v.isAdmin = currentUser.IsAdmin()
+	}
+	return v, ""
+}
+
+// enrich builds the API object for one campaign as seen by the viewer.
+func (v *campaignViewer) enrich(campaign models.Campaign) map[string]interface{} {
+	currentUserID := v.userID
+	campaignObj := map[string]interface{}{
+		"id":                         campaign.ID,
+		"title":                      campaign.Title,
+		"status":                     campaign.Status,
+		"type":                       campaign.Type,
+		"summary":                    campaign.Summary,
+		"description":                campaign.Description,
+		"dm":                         campaign.DM,
+		"players":                    campaign.Players,
+		"sign_ups_open":              campaign.SignUpsOpen,
+		"desired_player_count":       campaign.DesiredPlayerCount,
+		"system":                     campaign.System,
+		"system_logo_url":            v.systems[strings.ToLower(campaign.System)].LogoURL(),
+		"can_manage":                 v.isAdmin || (currentUserID != "" && campaign.DM == currentUserID),
+		"allowed_status_transitions": campaign.Status.AllowedTransitions(),
+	}
+	campaignObj["current_user_signup_status"] = string(v.signups[campaign.ID].Status)
+	campaignObj["is_following"] = v.followed[campaign.ID]
+
+	isPlayer := false
+	for _, p := range campaign.Players {
+		if p == currentUserID {
+			isPlayer = true
+			break
+		}
+	}
+	unansweredCount, firstUnanswered, pendingCount := 0, "", 0
+	if isPlayer {
+		u := v.unanswered[campaign.ID]
+		unansweredCount, firstUnanswered = u.Count, u.FirstDate
+	}
+	if currentUserID != "" && campaign.DM == currentUserID {
+		pendingCount = v.pendingSignups[campaign.ID]
+	}
+	campaignObj["unanswered_sessions_count"] = unansweredCount
+	campaignObj["first_unanswered_session_date"] = firstUnanswered
+	campaignObj["pending_signups_count"] = pendingCount
+	campaignObj["next_session"] = v.sessions[campaign.ID].next
+	campaignObj["played_sessions_count"] = v.sessions[campaign.ID].playedCount
+
+	// Add DM user display object if DM exists
+	if campaign.DM != "" {
+		if dmUser, ok := v.users[campaign.DM]; ok && dmUser != nil {
+			campaignObj["dm_user"] = userDisplayObject(dmUser)
+		}
+	}
+
+	// Add player user display objects
+	playerUsers := []map[string]interface{}{}
+	for _, playerID := range campaign.Players {
+		if playerUser, ok := v.users[playerID]; ok && playerUser != nil {
+			playerUsers = append(playerUsers, userDisplayObject(playerUser))
+		}
+	}
+	campaignObj["player_users"] = playerUsers
+	return campaignObj
 }
 
 func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
@@ -74,133 +190,72 @@ func HandleGetCampaigns(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `{"error": "failed to retrieve games"}`)
 		return
 	}
-
-	// Fetch all users once to avoid N+1 queries
-	allUsers, err := db.GetAllUsers()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to retrieve users"}`)
+	v, msg := loadCampaignViewer(r, campaigns)
+	if msg != "" {
+		writeJSONError(w, http.StatusInternalServerError, msg)
 		return
-	}
-
-	currentUserID, _ := r.Context().Value("user_id").(string)
-	userSignups, err := db.GetCampaignSignupsByUser(currentUserID)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to retrieve sign-ups"}`)
-		return
-	}
-
-	followed, err := db.GetFollowedCampaignIDs(currentUserID)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to retrieve follows"}`)
-		return
-	}
-
-	pendingSignups, err := db.CountPendingSignupsForDM(currentUserID)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to retrieve game counts"}`)
-		return
-	}
-	unanswered, err := db.GetUnansweredSessions(currentUserID, time.Now().UTC().Format("2006-01-02"))
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to retrieve game counts"}`)
-		return
-	}
-
-	sessionInfo, err := campaignSessionSummaries(campaigns)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to retrieve sessions"}`)
-		return
-	}
-
-	knownSystems, err := systemsByName()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"error": "failed to retrieve systems"}`)
-		return
-	}
-
-	// Create a map for O(1) user lookup
-	userMap := make(map[string]*models.User)
-	for i := range allUsers {
-		userMap[allUsers[i].ID] = &allUsers[i]
-	}
-
-	isAdmin := false
-	if currentUser, ok := userMap[currentUserID]; ok && currentUser != nil {
-		isAdmin = currentUser.IsAdmin()
 	}
 
 	// Build enriched campaign objects
 	enriched := []map[string]interface{}{}
 	for _, campaign := range campaigns {
-		campaignObj := map[string]interface{}{
-			"id":                         campaign.ID,
-			"title":                      campaign.Title,
-			"status":                     campaign.Status,
-			"type":                       campaign.Type,
-			"summary":                    campaign.Summary,
-			"description":                campaign.Description,
-			"dm":                         campaign.DM,
-			"players":                    campaign.Players,
-			"sign_ups_open":              campaign.SignUpsOpen,
-			"desired_player_count":       campaign.DesiredPlayerCount,
-			"system":                     campaign.System,
-			"system_logo_url":            knownSystems[strings.ToLower(campaign.System)].LogoURL(),
-			"can_manage":                 isAdmin || (currentUserID != "" && campaign.DM == currentUserID),
-			"allowed_status_transitions": campaign.Status.AllowedTransitions(),
-		}
-		campaignObj["current_user_signup_status"] = string(userSignups[campaign.ID].Status)
-		campaignObj["is_following"] = followed[campaign.ID]
-
-		isPlayer := false
-		for _, p := range campaign.Players {
-			if p == currentUserID {
-				isPlayer = true
-				break
-			}
-		}
-		unansweredCount, firstUnanswered, pendingCount := 0, "", 0
-		if isPlayer {
-			u := unanswered[campaign.ID]
-			unansweredCount, firstUnanswered = u.Count, u.FirstDate
-		}
-		if currentUserID != "" && campaign.DM == currentUserID {
-			pendingCount = pendingSignups[campaign.ID]
-		}
-		campaignObj["unanswered_sessions_count"] = unansweredCount
-		campaignObj["first_unanswered_session_date"] = firstUnanswered
-		campaignObj["pending_signups_count"] = pendingCount
-		campaignObj["next_session"] = sessionInfo[campaign.ID].next
-		campaignObj["played_sessions_count"] = sessionInfo[campaign.ID].played
-
-		// Add DM user display object if DM exists
-		if campaign.DM != "" {
-			if dmUser, ok := userMap[campaign.DM]; ok && dmUser != nil {
-				campaignObj["dm_user"] = userDisplayObject(dmUser)
-			}
-		}
-
-		// Add player user display objects
-		playerUsers := []map[string]interface{}{}
-		for _, playerID := range campaign.Players {
-			if playerUser, ok := userMap[playerID]; ok && playerUser != nil {
-				playerUsers = append(playerUsers, userDisplayObject(playerUser))
-			}
-		}
-		campaignObj["player_users"] = playerUsers
-
-		enriched = append(enriched, campaignObj)
+		enriched = append(enriched, v.enrich(campaign))
 	}
 
 	w.WriteHeader(http.StatusOK)
 	data, _ := json.Marshal(enriched)
 	w.Write(data)
+}
+
+// handleGetCampaign returns one campaign with its played sessions (newest
+// first) and who attended each. Visible to every logged-in user.
+func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string) {
+	campaign, _, ok := loadCampaignAndUser(w, r, campaignID)
+	if !ok {
+		return
+	}
+	v, msg := loadCampaignViewer(r, []models.Campaign{*campaign})
+	if msg != "" {
+		writeJSONError(w, http.StatusInternalServerError, msg)
+		return
+	}
+	obj := v.enrich(*campaign)
+
+	played := v.sessions[campaign.ID].played
+	ids := make([]string, 0, len(played))
+	for _, s := range played {
+		ids = append(ids, s.ID)
+	}
+	responses, err := db.GetSessionResponsesBySessionIDs(ids)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve sessions")
+		return
+	}
+
+	list := make([]map[string]interface{}, 0, len(played))
+	for i := len(played) - 1; i >= 0; i-- {
+		s := played[i]
+		attendees := []map[string]interface{}{}
+		for _, resp := range responses[s.ID] {
+			if resp.Participation != models.Accepted {
+				continue
+			}
+			if u, ok := v.users[resp.UserID]; ok && u != nil {
+				attendees = append(attendees, userDisplayObject(u))
+			}
+		}
+		list = append(list, map[string]interface{}{
+			"id":        s.ID,
+			"number":    i + 1,
+			"date":      s.Date,
+			"time":      s.Time,
+			"duration":  s.Duration,
+			"timezone":  s.Timezone,
+			"attendees": attendees,
+		})
+	}
+	obj["played_sessions"] = list
+	writeJSON(w, http.StatusOK, obj)
 }
 
 func HandleCreateCampaign(w http.ResponseWriter, r *http.Request) {
@@ -336,7 +391,7 @@ func loadManagedCampaign(w http.ResponseWriter, r *http.Request, campaignID stri
 	return campaign, true
 }
 
-// HandleCampaignActions handles /api/campaigns/{id} (PUT update, DELETE remove).
+// HandleCampaignActions handles /api/campaigns/{id} (GET one, PUT update, DELETE remove).
 func HandleCampaignActions(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/campaigns/"), "/")
 	if len(parts) != 1 || parts[0] == "" {
@@ -345,6 +400,8 @@ func HandleCampaignActions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
+	case http.MethodGet:
+		handleGetCampaign(w, r, parts[0])
 	case http.MethodPut:
 		handleUpdateCampaign(w, r, parts[0])
 	case http.MethodDelete:

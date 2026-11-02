@@ -103,6 +103,10 @@ Visit: **http://localhost:8080**
 - **GET** `/api/campaigns`
 - Returns: List of campaigns with title, status, summary, description, DM, players, and sign-up openness.
 
+### Get Campaign
+- **GET** `/api/campaigns/{id}`
+- Returns: One campaign (same fields as the list) plus `played_sessions`, newest first, each with `number`, `date`, `time`, `duration`, `timezone` and `attendees` (users whose response was Accepted). Visible to every logged-in user; 404 if the game does not exist.
+
 ### Sign Up
 - **POST** `/api/signup`
 - Body:
@@ -269,6 +273,7 @@ Additional custom roles can be added to the `models/roles.go` file as needed.
 | `GET /auth/current-user` | Yes | - | Get current user info with roles |
 | `POST /auth/logout` | Yes | - | Clear session and logout |
 | `GET /api/campaigns` | Yes | - | List campaigns |
+| `GET /api/campaigns/{id}` | Yes | - | One campaign with played sessions and attendees |
 | `/api/admin/users...` | Yes | admin | User management (see Admin API) |
 
 ### Role Assignment
