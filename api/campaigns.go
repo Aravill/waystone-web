@@ -452,8 +452,20 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "game updated"})
 }
 
+// handleDeleteCampaign is admin-only: DMs can edit their games but not delete
+// them, so a hijacked or malicious DM account can't wipe a game's history.
 func handleDeleteCampaign(w http.ResponseWriter, r *http.Request, campaignID string) {
-	if _, ok := loadManagedCampaign(w, r, campaignID); !ok {
+	_, userID, ok := loadCampaignAndUser(w, r, campaignID)
+	if !ok {
+		return
+	}
+	user, err := db.GetUserByID(userID)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve user")
+		return
+	}
+	if user == nil || !user.IsAdmin() {
+		writeJSONError(w, http.StatusForbidden, "only an admin can delete a game")
 		return
 	}
 	if err := db.DeleteCampaign(campaignID); err != nil {

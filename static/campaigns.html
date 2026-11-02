@@ -111,7 +111,7 @@
                 </template>
                 <div class="modal-actions">
                     <button type="submit" class="btn-create" x-text="editingCampaignId ? 'Save' : 'Create'"></button>
-                    <button type="button" class="btn-danger" x-show="editingCampaignId" @click="deleteCampaign()">Delete game</button>
+                    <button type="button" class="btn-danger" x-show="editingCampaignId && isAdmin" @click="deleteCampaign()">Delete game</button>
                     <button type="button" class="btn-cancel" @click="closeModal()">Cancel</button>
                 </div>
             </form>

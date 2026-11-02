@@ -274,6 +274,8 @@ Additional custom roles can be added to the `models/roles.go` file as needed.
 | `POST /auth/logout` | Yes | - | Clear session and logout |
 | `GET /api/campaigns` | Yes | - | List campaigns |
 | `GET /api/campaigns/{id}` | Yes | - | One campaign with played sessions and attendees |
+| `PUT /api/campaigns/{id}` | Yes | DM or admin | Update a campaign |
+| `DELETE /api/campaigns/{id}` | Yes | admin | Delete a campaign (DMs can't, to prevent malicious deletion) |
 | `/api/admin/users...` | Yes | admin | User management (see Admin API) |
 
 ### Role Assignment
