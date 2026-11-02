@@ -900,7 +900,15 @@ window.campaignsPage = function () {
             }
         },
 
-        async revokeGuestLink(userId) {
+        async revokeGuestLink(userId, name) {
+            const ok = await this.askConfirm({
+                title: 'Revoke guest link',
+                message: `Revoke the guest link for ${name}? The current link will stop working.`,
+                confirmLabel: 'Revoke'
+            });
+            if (!ok) {
+                return;
+            }
             try {
                 const response = await fetch(`/api/campaigns/${encodeURIComponent(this.signupsCampaignId)}/players/${encodeURIComponent(userId)}/guest-link`, {
                     method: 'DELETE'

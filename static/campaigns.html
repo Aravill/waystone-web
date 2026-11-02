@@ -404,7 +404,7 @@
                                     </select>
                                     <button type="button" class="btn-action" @click="createGuestLink(signup.user_id)" x-text="guestLinks[signup.user_id] ? 'Regenerate' : 'Guest link'"></button>
                                     <button type="button" class="btn-action" x-show="guestLinks[signup.user_id]" @click="copyGuestLink(signup.user_id)">Copy</button>
-                                    <button type="button" class="btn-action" x-show="guestLinks[signup.user_id]" @click="revokeGuestLink(signup.user_id)">Revoke</button>
+                                    <button type="button" class="btn-action" x-show="guestLinks[signup.user_id]" @click="revokeGuestLink(signup.user_id, signup.signup_user ? signup.signup_user.display_name : signup.user_id)">Revoke</button>
                                     <button type="button" class="btn-action signups-btn-kick" @click="kickPlayer(signup.user_id)">Kick</button>
                                 </div>
                             </li>
@@ -489,6 +489,6 @@
     </div>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="campaigns.js?v=36"></script>
+    <script src="campaigns.js?v=37"></script>
 </body>
 </html>
