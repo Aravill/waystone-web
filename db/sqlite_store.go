@@ -969,7 +969,7 @@ func (s *SQLiteStore) GetSessionsByCampaignIDs(campaignIDs []string, fromDate st
 		SELECT id, campaign_id, date, time, duration, status, timezone, created_at, updated_at
 		FROM campaign_sessions
 		WHERE campaign_id IN (%s) AND date >= ?
-		ORDER BY date ASC, time ASC
+		ORDER BY date ASC, time ASC, id ASC
 	`, placeholders)
 
 	rows, err := s.db.Query(query, args...)

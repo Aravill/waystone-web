@@ -10,6 +10,7 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 | `type-icons.png` | The three game-type marks, light and dark |
 | `campaigns-candlelight.png` | The same page in the dark theme |
 | `calendar.png` | Modal sheet, calendar grid, session chips, reply buttons |
+| `game-detail.html` | The game page: title block, the tale, the company margin, the chronicle of played sessions |
 | `banners.dc.html` | The banner redesign: three variants, see `BANNER_DESIGN_GUIDE.md` |
 
 ## Design Philosophy

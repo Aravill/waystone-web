@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waystone - Game</title>
+    <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+    <script src="/static/theme.js?v=4"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=52">
+    <link rel="stylesheet" href="/static/notifications.css?v=9">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
+</head>
+<body x-data="gamePage()">
+    <div class="header">
+        <div class="header-left">
+            <a href="/" class="logo">Waystone</a>
+        </div>
+        <nav class="nav-bar" aria-label="Main">
+            <a href="/" class="nav-item" data-page="dashboard">Home</a>
+            <a href="/campaigns" class="nav-item active" aria-current="page" data-page="campaigns">Games</a>
+            <a href="/profile" class="nav-item" data-page="profile">Profile</a>
+            <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
+        </nav>
+        <div class="header-right">
+            <span class="user-name" x-text="displayName"></span>
+            <button @click="handleLogout()" class="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <main>
+            <a class="game-crumb" :href="campaign ? '/campaigns#campaign-' + encodeURIComponent(campaign.id) : '/campaigns'">← All games</a>
+
+            <p x-show="loading">Loading game...</p>
+            <div class="game-error" role="alert" x-show="loadError">
+                <p x-text="loadError"></p>
+                <button type="button" class="campaign-action-btn" @click="load()">Try again</button>
+            </div>
+            <template x-if="notFound">
+                <p>This game could not be found. It may have been deleted.</p>
+            </template>
+
+            <template x-if="campaign">
+                <div>
+                    <section class="game-head" :class="{ ['status-' + statusClass]: true, 'needs-action': needsAction }">
+                        <div>
+                            <p class="pending-notice game-notice" x-show="pendingNotice"><span aria-hidden="true">✦</span> <span x-text="pendingNotice"></span></p>
+                            <div class="game-kicker">
+                                <span class="game-type" :title="typeInfo.label + ': ' + typeInfo.description">
+                                    <svg class="game-type-icon" viewBox="0 0 24 24" aria-hidden="true" x-html="typeIconPaths"></svg>
+                                    <span x-text="typeInfo.label"></span>
+                                </span>
+                                <template x-if="campaign.system_logo_url">
+                                    <img class="campaign-system-logo" :src="campaign.system_logo_url" :alt="campaign.system" :title="campaign.system">
+                                </template>
+                                <template x-if="!campaign.system_logo_url && campaign.system">
+                                    <span class="campaign-system-badge" x-text="campaign.system"></span>
+                                </template>
+                                <span class="campaign-status-badge" x-text="campaign.status"></span>
+                            </div>
+                            <h1 class="page-title"><span class="drop-cap" x-text="(campaign.title || '').charAt(0)"></span><span x-text="(campaign.title || '').slice(1)"></span></h1>
+                            <p class="game-lede" x-text="campaign.summary"></p>
+                        </div>
+                        <div class="game-actions">
+                            <a class="campaign-action-btn" x-show="isMember" :href="'/campaigns?calendar=' + encodeURIComponent(campaign.id)"
+                               :title="unansweredCount > 0 ? unansweredCount + ' suggested session' + (unansweredCount === 1 ? '' : 's') + ' awaiting your response' : null"
+                               :aria-label="unansweredCount > 0 ? 'Calendar, ' + unansweredCount + ' awaiting your response' : null">Calendar<span class="campaign-action-count" x-show="unansweredCount > 0" x-text="unansweredCount"></span></a>
+                            <template x-if="isDM">
+                                <a class="campaign-action-btn" :href="'/campaigns?signups=' + encodeURIComponent(campaign.id)"
+                                   :title="pendingCount > 0 ? pendingCount + ' pending sign-up' + (pendingCount === 1 ? '' : 's') + ' awaiting your decision' : null"
+                                   :aria-label="pendingCount > 0 ? 'Sign-ups, ' + pendingCount + ' pending' : null">Sign-ups<span class="campaign-action-count" x-show="pendingCount > 0" x-text="pendingCount"></span></a>
+                            </template>
+                            <template x-if="!isMember && currentUserId">
+                                <button type="button" class="campaign-action-btn" @click="toggleFollow()" :disabled="busy"
+                                        :title="campaign.is_following ? 'Stop getting notifications for this game' : 'Get notified about status changes, sign-ups and sessions'"
+                                        x-text="campaign.is_following ? 'Unfollow' : 'Follow'"></button>
+                            </template>
+                            <template x-if="!isDM && isPlayer">
+                                <button type="button" class="campaign-action-btn" title="Leave this game" :disabled="busy" @click="withdraw()">Leave</button>
+                            </template>
+                            <template x-if="!isMember && signupStatus === 'Pending'">
+                                <button type="button" class="campaign-action-btn" title="Withdraw your sign-up" :disabled="busy" @click="withdraw()">Withdraw</button>
+                            </template>
+                            <template x-if="!isMember && signupStatus === 'Declined'">
+                                <button type="button" class="campaign-action-btn campaign-signup-btn" disabled aria-disabled="true">Declined</button>
+                            </template>
+                            <template x-if="!isMember && signupStatus === 'Kicked'">
+                                <button type="button" class="campaign-action-btn campaign-signup-btn" disabled aria-disabled="true">Removed</button>
+                            </template>
+                            <template x-if="!isMember && signupStatus !== 'Pending' && signupStatus !== 'Declined' && signupStatus !== 'Kicked'">
+                                <button type="button" class="campaign-action-btn campaign-signup-btn" :disabled="!campaign.sign_ups_open || busy" :aria-disabled="!campaign.sign_ups_open" @click="signUp()">Sign-up</button>
+                            </template>
+                            <a class="campaign-action-btn" x-show="campaign.can_manage" :href="'/campaigns?edit=' + encodeURIComponent(campaign.id)">Edit</a>
+                            <button type="button" class="btn-danger" x-show="isAdmin" :disabled="busy" @click="deleteGame()">Delete game</button>
+                        </div>
+                    </section>
+
+                    <div class="game-folio">
+                        <section class="game-tale" aria-labelledby="taleHeading">
+                            <h2 id="taleHeading" class="section-header">The tale</h2>
+                            <div class="game-text" x-html="descriptionHtml"></div>
+                        </section>
+
+                        <aside class="game-company" aria-labelledby="companyHeading">
+                            <h2 id="companyHeading" class="section-header">The company</h2>
+                            <ul class="game-people">
+                                <li class="game-person game-person--dm" x-show="campaign.dm_user">
+                                    <span x-html="userAvatarHtml(campaign.dm_user)"></span>
+                                    <a :href="campaign.dm_user?.profile_url">
+                                        <span class="game-person-name"><span x-text="'♛ ' + (campaign.dm_user?.display_name || '')"></span><span class="game-you" x-show="isDM"> (you)</span></span>
+                                        <span class="game-person-role">Dungeon master</span>
+                                    </a>
+                                </li>
+                                <template x-for="p in campaign.player_users" :key="p.id">
+                                    <li class="game-person">
+                                        <span x-html="userAvatarHtml(p)"></span>
+                                        <a :href="p.profile_url"><span class="game-person-name"><span x-text="p.display_name"></span><span class="game-you" x-show="p.id === currentUserId"> (you)</span></span></a>
+                                    </li>
+                                </template>
+                            </ul>
+                            <p class="game-seats" x-text="seatsLabel"></p>
+                        </aside>
+
+                        <section class="game-chronicle" aria-labelledby="chronicleHeading">
+                            <h2 id="chronicleHeading" class="section-header">The chronicle <span class="game-count" x-text="(campaign.played_sessions_count || 0) + ' session' + (campaign.played_sessions_count === 1 ? '' : 's') + ' played'"></span></h2>
+
+                            <template x-if="campaign.next_session">
+                                <div class="game-next" :title="campaign.next_session.timezone">
+                                    <span class="game-eyebrow">Next</span>
+                                    <span x-text="formatDate(campaign.next_session.date) + ', ' + campaign.next_session.time"></span>
+                                    <a x-show="isMember" :href="'/campaigns?calendar=' + encodeURIComponent(campaign.id)">Open calendar →</a>
+                                </div>
+                            </template>
+
+                            <p x-show="(campaign.played_sessions || []).length === 0">No sessions played yet.</p>
+                            <ol class="game-sessions" reversed x-show="(campaign.played_sessions || []).length > 0">
+                                <template x-for="s in visibleSessions" :key="s.id">
+                                    <li class="game-session" :class="{ 'game-session--you': attendedByMe(s) }">
+                                        <span class="game-session-no"><span class="visually-hidden" x-text="'Session ' + s.number"></span><span aria-hidden="true" x-text="s.number"></span></span>
+                                        <span>
+                                            <span class="game-session-date" x-text="formatDate(s.date)"></span>
+                                            <span class="game-session-meta" :title="s.timezone" x-text="sessionMeta(s)"></span>
+                                        </span>
+                                        <span class="game-attendees" x-show="s.attendees.length > 0" role="group" :aria-label="'Attended: ' + attendeeNames(s)">
+                                            <template x-for="u in s.attendees" :key="u.id">
+                                                <span :class="{ 'game-attendee--dm': u.id === campaign.dm }" x-html="attendeeAvatar(u)"></span>
+                                            </template>
+                                        </span>
+                                    </li>
+                                </template>
+                            </ol>
+                            <button type="button" class="game-more" x-show="(campaign.played_sessions || []).length > 5" :aria-expanded="showAll" @click="showAll = !showAll" x-text="showAll ? 'Show fewer ↑' : 'Show all ' + campaign.played_sessions.length + ' sessions ↓'"></button>
+                        </section>
+                    </div>
+
+                    <p class="ornament" aria-hidden="true">❦ ❦ ❦</p>
+                </div>
+            </template>
+
+            <div id="message" class="message" :class="messageType" x-show="messageVisible" x-text="messageText"></div>
+        </main>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal confirm-modal" :class="{ 'modal-open': confirmDialog.open }" @click.self="closeConfirm(false)" @keydown.escape.window="confirmDialog.open && closeConfirm(false)" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+        <div class="modal-content confirm-modal-content">
+            <div class="modal-header">
+                <h2 id="confirmModalTitle" x-text="confirmDialog.title"></h2>
+                <button type="button" class="modal-close" @click="closeConfirm(false)" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-form">
+                <p class="confirm-modal-message" x-text="confirmDialog.message"></p>
+                <div class="modal-actions">
+                    <button type="button" class="btn-confirm-danger" @click="closeConfirm(true)" x-text="confirmDialog.confirmLabel"></button>
+                    <button type="button" class="btn-cancel" x-ref="confirmCancelBtn" @click="closeConfirm(false)">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/notifications.js?v=9"></script>
+    <script src="/campaigns.js?v=46"></script>
+    <script src="/static/game.js?v=4"></script>
+</body>
+</html>

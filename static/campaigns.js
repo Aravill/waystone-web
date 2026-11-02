@@ -187,7 +187,7 @@ function bannerFrame(now) {
             s,
             w: s.cloth.offsetWidth, h: s.cloth.offsetHeight,
             visible: r.bottom > -150 && r.top < window.innerHeight + 150,
-            hover: c.matches(':hover')
+            hover: c.classList.contains('on-cloth')
         });
     }
     for (const { s, w, h, visible, hover } of cards) {
@@ -208,7 +208,69 @@ function bannerFrame(now) {
     }
     requestAnimationFrame(bannerFrame);
 }
-requestAnimationFrame(bannerFrame);
+if (document.getElementById('campaignsList')) requestAnimationFrame(bannerFrame);
+
+// Clicking the banner cloth opens its game page; the empty corners around the
+// silhouette, the banner's own links and buttons and the medallion don't.
+// Keyboard users reach the page via the title link.
+function bannerOnCloth(card, event) {
+    const outline = card.querySelector('.banner-outline');
+    const ctm = outline?.getScreenCTM();
+    if (!ctm || !outline.isPointInFill) return true;
+    const pt = new DOMPoint(event.clientX, event.clientY).matrixTransform(ctm.inverse());
+    return outline.isPointInFill(pt);
+}
+function bannerGameUrl(event) {
+    const card = event.target.closest('.campaign-item');
+    if (!card || event.target.closest('a, button, input, select, textarea, label, [tabindex]')) return '';
+    if (!bannerOnCloth(card, event)) return '';
+    if (String(window.getSelection?.() || '')) return ''; // let people select text
+    return card.querySelector('.campaign-title-link')?.getAttribute('href') || '';
+}
+const bannerList = document.getElementById('campaignsList');
+// Hover (gust, outline colour, cursor) follows the cloth's silhouette, not the card's
+// rectangle: .on-cloth stands in for :hover. Only real mice count (touch has no hover).
+// Re-checked on scroll and after a re-render, since the page can move under a still pointer.
+// The medallion hotspot counts as cloth for hover.
+let hoverCard = null;
+let clothPointer = null;
+function updateClothHover() {
+    if (!bannerList) return;
+    const el = clothPointer && document.elementFromPoint(clothPointer.clientX, clothPointer.clientY);
+    const card = el && bannerList.contains(el) ? el.closest('.campaign-item') : null;
+    if (hoverCard && hoverCard !== card) hoverCard.classList.remove('on-cloth');
+    hoverCard = card;
+    if (card) card.classList.toggle('on-cloth', !!el.closest('.banner-type') || bannerOnCloth(card, clothPointer));
+}
+if (bannerList) {
+    bannerList.addEventListener('pointermove', (event) => {
+        if (event.pointerType !== 'mouse') return;
+        clothPointer = { clientX: event.clientX, clientY: event.clientY };
+        updateClothHover();
+    });
+    bannerList.addEventListener('pointerleave', (event) => {
+        if (event.pointerType !== 'mouse') return;
+        clothPointer = null;
+        updateClothHover();
+    });
+    bannerList.addEventListener('pointerdown', (event) => {
+        if (event.pointerType === 'mouse') return;
+        clothPointer = null;
+        updateClothHover();
+        bannerList.querySelectorAll('.on-cloth').forEach((c) => c.classList.remove('on-cloth'));
+    });
+    window.addEventListener('scroll', () => { if (clothPointer) updateClothHover(); }, { passive: true });
+    bannerList.addEventListener('click', (event) => {
+        const url = bannerGameUrl(event);
+        if (!url) return;
+        if (event.ctrlKey || event.metaKey || event.shiftKey) window.open(url, '_blank', 'noopener');
+        else window.location.href = url;
+    });
+    bannerList.addEventListener('auxclick', (event) => {
+        const url = event.button === 1 ? bannerGameUrl(event) : '';
+        if (url) window.open(url, '_blank', 'noopener');
+    });
+}
 
 // Banner order: those needing the user's action first, then by status. Array.sort is stable,
 // so ties keep the API's order.
@@ -240,6 +302,18 @@ function slideBanners(before) {
         el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
             { duration: 700, easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)' });
     }
+}
+
+// CSS class suffix for a campaign status (status-pitch, status-hiatus, ...).
+function campaignStatusClass(status) {
+    const statusMap = {
+        Pitch: 'pitch',
+        Ongoing: 'ongoing',
+        Finished: 'finished',
+        'On Hiatus': 'hiatus',
+        Cancelled: 'cancelled'
+    };
+    return statusMap[status] || String(status).toLowerCase().replace(/\s+/g, '-');
 }
 
 // Small square avatar: uploaded picture, or the default letter. Linked to the profile unless link is false.
@@ -280,6 +354,7 @@ window.campaignsPage = function () {
         systems: [],
         campaignTypes: CAMPAIGN_TYPES,
         editingCampaignId: '',
+        returnTo: '', // set when a dialog was opened by a game page link; closing it goes back there
         currentCalendarDate: new Date(),
         currentCampaignId: null,
         currentCampaignTitle: '',
@@ -396,6 +471,44 @@ window.campaignsPage = function () {
                 document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: 'start' });
             }
             await this.loadSystems();
+            this.openDeepLink();
+        },
+
+        // Links from the game page: ?calendar=ID, ?edit=ID or ?signups=ID open that dialog,
+        // and closing it returns to the game page.
+        openDeepLink() {
+            const params = new URLSearchParams(location.search);
+            const find = (key) => this.campaigns.find((c) => c.id === params.get(key));
+            const cal = find('calendar'), edit = find('edit'), signups = find('signups');
+            const target = cal
+                || (edit?.can_manage ? edit : null)
+                || (signups && signups.dm === this.currentUserId ? signups : null);
+            if (!target) {
+                if (['calendar', 'edit', 'signups'].some((key) => params.has(key))) {
+                    history.replaceState(null, '', '/campaigns');
+                    this.showMessage("Game not found or you can't open that dialog", 'error');
+                }
+                return;
+            }
+            this.returnTo = '/games/' + encodeURIComponent(target.id);
+            if (target === cal) {
+                this.openCalendar(cal.id, cal.title, cal.dm === this.currentUserId, cal.first_unanswered_session_date || '');
+            } else if (target === edit) {
+                this.openEditModal(edit.id);
+            } else {
+                this.openSignupsModal(signups.id, signups.title);
+            }
+            history.replaceState(null, '', '/campaigns#campaign-' + target.id);
+            document.getElementById('campaign-' + target.id)?.scrollIntoView({ block: 'start' });
+        },
+
+        // Leaves for the page that opened the dialog, if any. replace() keeps the history
+        // from growing: the list page with the dialog is not a stop worth going back to.
+        leaveToReturnPage() {
+            if (!this.returnTo) return;
+            const to = this.returnTo;
+            this.returnTo = '';
+            window.location.replace(to);
         },
 
         async loadSystems() {
@@ -447,6 +560,7 @@ window.campaignsPage = function () {
 
         closeModal() {
             this.modalOpen = false;
+            this.leaveToReturnPage();
         },
 
         handleModalBackdropClick(event) {
@@ -485,6 +599,13 @@ window.campaignsPage = function () {
                     return;
                 }
 
+                if (editing && this.returnTo) {
+                    // the game page shows "Game updated"
+                    const to = this.returnTo;
+                    this.returnTo = '';
+                    window.location.replace(to + '?updated=1');
+                    return;
+                }
                 this.showMessage(editing ? 'Game updated' : 'Game created successfully!', 'success');
                 this.closeModal();
                 await this.loadCampaigns();
@@ -532,6 +653,7 @@ window.campaignsPage = function () {
                     this.showMessage(data.error || 'Failed to delete game', 'error');
                     return;
                 }
+                this.returnTo = ''; // the game page is gone; stay on the list
                 this.closeModal();
                 this.showMessage(data.message || 'Game deleted', 'success');
                 await this.loadCampaigns();
@@ -555,6 +677,7 @@ window.campaignsPage = function () {
                     || (bannerStatusRank(a?.status) - bannerStatusRank(b?.status)));
                 await this.$nextTick();
                 slideBanners(before);
+                updateClothHover();
             } catch (error) {
                 if (quiet) {
                     console.error('Failed to refresh campaigns:', error);
@@ -622,14 +745,7 @@ window.campaignsPage = function () {
                 } else signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-signup-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" ${disabled ? 'disabled aria-disabled="true"' : ''}>${label}</button>`;
             }
 
-            const statusMap = {
-                Pitch: 'pitch',
-                Ongoing: 'ongoing',
-                Finished: 'finished',
-                'On Hiatus': 'hiatus',
-                Cancelled: 'cancelled'
-            };
-            const statusClass = statusMap[status] || String(status).toLowerCase().replace(/\s+/g, '-');
+            const statusClass = campaignStatusClass(status);
 
             const typeInfo = CAMPAIGN_TYPES.find((t) => t.value === campaign?.type) || CAMPAIGN_TYPES.find((t) => t.value === 'Campaign');
             const typeTip = escapeHtml(`${typeInfo.label}: ${typeInfo.description}`);
@@ -678,7 +794,7 @@ window.campaignsPage = function () {
                             <span class="campaign-status-badge">${escapeHtml(status)}</span>
                         </div>
                         <div class="campaign-title-container">
-                            <h3 class="campaign-title">${escapeHtml(title)}</h3>
+                            <h3 class="campaign-title"><a href="/games/${encodeURIComponent(campaign?.id ?? '')}" class="campaign-title-link">${escapeHtml(title)}</a></h3>
                             ${systemHtml}
                         </div>
                         <p class="campaign-summary-text">${escapeHtml(summary)}</p>
@@ -800,6 +916,7 @@ window.campaignsPage = function () {
 
         closeSignupsModal() {
             this.signupsModalOpen = false;
+            this.leaveToReturnPage();
         },
 
         handleSignupsBackdropClick(event) {
@@ -1007,6 +1124,7 @@ window.campaignsPage = function () {
             this.showCreateSessionModal = false;
             this.clearSelectedDay();
             this.sessionResponseCache = {};
+            this.leaveToReturnPage();
         },
 
         handleCalendarBackdropClick(event) {
@@ -1175,14 +1293,7 @@ window.campaignsPage = function () {
         },
 
         getSessionEndTime(session) {
-            const time = session?.time || '';
-            const duration = Number(session?.duration) || 0;
-            const [hour, minute] = String(time).split(':').map((part) => Number(part));
-            if (Number.isNaN(hour) || Number.isNaN(minute)) return time;
-            const totalMinutes = (hour * 60) + minute + duration;
-            const endHour = Math.floor((totalMinutes % (24 * 60)) / 60);
-            const endMinute = totalMinutes % 60;
-            return `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+            return getSessionEndTime(session);
         },
 
         getSessionTimeRange(session) {
@@ -1317,8 +1428,7 @@ window.campaignsPage = function () {
         },
 
         parseDateLocal(dateStr) {
-            const [year, month, day] = String(dateStr).split('-').map(Number);
-            return new Date(year, month - 1, day);
+            return parseDateLocal(dateStr);
         },
 
         formatDayHeading(date) {
@@ -1330,12 +1440,7 @@ window.campaignsPage = function () {
         },
 
         getDurationLabel(session) {
-            const total = Number(session?.duration) || 0;
-            const hours = Math.floor(total / 60);
-            const minutes = total % 60;
-            if (hours && minutes) return `${hours}h ${minutes}m`;
-            if (hours) return `${hours}h`;
-            return `${minutes}m`;
+            return getDurationLabel(session);
         },
 
         getSessionMeta(session) {
@@ -1516,6 +1621,32 @@ function getDefaultTimezone() {
     } catch (error) {
         return 'UTC';
     }
+}
+
+function parseDateLocal(dateStr) {
+    const [year, month, day] = String(dateStr).split('-').map(Number);
+    return new Date(year, month - 1, day);
+}
+
+// End time "HH:MM" of a session; a malformed start time is returned as is.
+function getSessionEndTime(session) {
+    const time = session?.time || '';
+    const duration = Number(session?.duration) || 0;
+    const [hour, minute] = String(time).split(':').map((part) => Number(part));
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return time;
+    const totalMinutes = (hour * 60) + minute + duration;
+    const endHour = Math.floor((totalMinutes % (24 * 60)) / 60);
+    const endMinute = totalMinutes % 60;
+    return `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+}
+
+function getDurationLabel(session) {
+    const total = Number(session?.duration) || 0;
+    const hours = Math.floor(total / 60);
+    const minutes = total % 60;
+    if (hours && minutes) return `${hours}h ${minutes}m`;
+    if (hours) return `${hours}h`;
+    return `${minutes}m`;
 }
 
 function getTimezoneOptions() {

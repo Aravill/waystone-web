@@ -27,7 +27,7 @@ This document describes what must-have features are to be implemented before pre
     - [x] Always one super admin role
     - [x] An admin / super admin can add or remove people from the access whitelist
     - [x] A super admin can make other people admins
-    - [x] Admins can remove any campaign
+    - [x] Admins can remove any campaign (only admins: DMs can edit but not delete their games)
     - [x] An admin can revoke whitelist access to a user (doesn't delete the account, just blocks their log-in)
     - [x] An admin can delete accounts
     - [x] Admin can add/remove players to games
@@ -46,6 +46,7 @@ This document describes what must-have features are to be implemented before pre
     - [x] Visually distinct campaign statuses
     - [x] Campaign types (and their visual distinction) - Campaign, Adventure, One-shot
     - [x] Game systems - admins manage known systems (optional logo); campaigns pick one or type a custom one; shown on the campaign card
+    - [x] Game page - full description (basic Markdown), company, chronicle of played sessions with attendees (visible to all users)
 - [x] Profile
     - [x] Standard operations
         - [x] Changing nicknames
