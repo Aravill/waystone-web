@@ -38,6 +38,10 @@ type Store interface {
 	GetCalendarToken(userID string) (string, error)
 	SetCalendarToken(userID, token string) error
 	GetUserIDByCalendarToken(token string) (string, error)
+	GetGuestTokens(campaignID string) (map[string]models.GuestToken, error)
+	SetGuestToken(campaignID, userID, token string, expiresAt time.Time) error
+	DeleteGuestToken(campaignID, userID string) error
+	GetGuestToken(token string) (campaignID, userID string, expiresAt time.Time, err error)
 	UpsertSessionResponse(response models.SessionResponse) error
 	GetSessionResponses(sessionID string) ([]models.SessionResponse, error)
 	GetSessionResponsesBySessionIDs(sessionIDs []string) (map[string][]models.SessionResponse, error)

@@ -116,6 +116,15 @@ func (s *SQLiteStore) initSchema() error {
 		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 
+	CREATE TABLE IF NOT EXISTS guest_tokens (
+		token TEXT PRIMARY KEY,
+		campaign_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		expires_at TEXT NOT NULL,
+		UNIQUE(campaign_id, user_id)
+	);
+
 	CREATE TABLE IF NOT EXISTS session_responses (
 		id TEXT PRIMARY KEY,
 		session_id TEXT NOT NULL,
@@ -800,7 +809,7 @@ func (s *SQLiteStore) AnonymizeUser(id string) error {
 		return ErrUserNotFound
 	}
 
-	for _, table := range []string{"campaign_signups", "campaign_follows", "calendar_tokens", "notifications"} {
+	for _, table := range []string{"campaign_signups", "campaign_follows", "calendar_tokens", "guest_tokens", "notifications"} {
 		if _, err := tx.Exec(`DELETE FROM `+table+` WHERE user_id = ?`, id); err != nil {
 			return err
 		}
@@ -1058,6 +1067,74 @@ func (s *SQLiteStore) GetUserIDByCalendarToken(token string) (string, error) {
 		return "", nil
 	}
 	return userID, err
+}
+
+// GetGuestTokens returns a campaign's guest links keyed by user ID.
+func (s *SQLiteStore) GetGuestTokens(campaignID string) (map[string]models.GuestToken, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(`SELECT user_id, token, expires_at FROM guest_tokens WHERE campaign_id = ?`, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	tokens := map[string]models.GuestToken{}
+	for rows.Next() {
+		var userID string
+		var t models.GuestToken
+		if err := rows.Scan(&userID, &t.Token, &t.ExpiresAt); err != nil {
+			return nil, err
+		}
+		tokens[userID] = t
+	}
+	return tokens, rows.Err()
+}
+
+func (s *SQLiteStore) SetGuestToken(campaignID, userID, token string, expiresAt time.Time) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if campaignID == "" || userID == "" || token == "" {
+		return fmt.Errorf("campaign id, user id and token cannot be empty")
+	}
+	_, err := s.db.Exec(`
+		INSERT INTO guest_tokens (token, campaign_id, user_id, created_at, expires_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(campaign_id, user_id) DO UPDATE SET token = excluded.token, created_at = excluded.created_at, expires_at = excluded.expires_at
+	`, token, campaignID, userID, time.Now().UTC().Format(time.RFC3339), expiresAt.UTC().Format(time.RFC3339))
+	return err
+}
+
+func (s *SQLiteStore) DeleteGuestToken(campaignID, userID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	_, err := s.db.Exec(`DELETE FROM guest_tokens WHERE campaign_id = ? AND user_id = ?`, campaignID, userID)
+	return err
+}
+
+// GetGuestToken resolves a guest token; the campaign ID is empty when it is unknown.
+func (s *SQLiteStore) GetGuestToken(token string) (string, string, time.Time, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	if token == "" {
+		return "", "", time.Time{}, nil
+	}
+	var campaignID, userID, expires string
+	err := s.db.QueryRow(`SELECT campaign_id, user_id, expires_at FROM guest_tokens WHERE token = ?`, token).Scan(&campaignID, &userID, &expires)
+	if err == sql.ErrNoRows {
+		return "", "", time.Time{}, nil
+	}
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+	expiresAt, err := time.Parse(time.RFC3339, expires)
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+	return campaignID, userID, expiresAt, nil
 }
 
 func (s *SQLiteStore) GetSessionByID(sessionID string) (*models.CampaignSession, error) {
@@ -1553,6 +1630,9 @@ func (s *SQLiteStore) DeleteCampaign(id string) error {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM notifications WHERE campaign_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM guest_tokens WHERE campaign_id = ?`, id); err != nil {
 		return err
 	}
 	res, err := tx.Exec(`DELETE FROM campaigns WHERE id = ?`, id)
