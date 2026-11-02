@@ -1,5 +1,14 @@
 [x-cloak] { display: none !important; }
 
+/* Short note under the page title on what Waystone is for */
+.home-intro {
+    max-width: 40rem;
+    margin-top: 1rem;
+    color: var(--ink);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+}
+
 /* Modules Grid: a row of waystones */
 .modules-grid {
     display: grid;
