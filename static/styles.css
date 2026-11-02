@@ -1957,15 +1957,24 @@ select option {
 }
 
 .guest-link-row {
-    padding: 0.75rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
     border-bottom: 1px solid var(--line);
 }
 
-.guest-link-head {
+.guest-link-info {
     display: flex;
-    justify-content: space-between;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.guest-link-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .guest-link-expiry {
@@ -1977,12 +1986,16 @@ select option {
     color: var(--rubric);
 }
 
-.guest-link-url {
-    display: block;
-    margin: 0.375rem 0;
+.guest-link-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+.guest-link-actions .btn-action {
+    min-height: 1.75rem;
+    padding: 0.125rem 0.5rem;
     font-size: 0.75rem;
-    overflow-wrap: anywhere;
-    user-select: all;
 }
 
 .panel-session {

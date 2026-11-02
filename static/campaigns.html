@@ -6,7 +6,7 @@
     <title>Waystone - Games</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=42">
+    <link rel="stylesheet" href="/static/styles.css?v=43">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -279,14 +279,14 @@
                                 <ul class="guest-links-list">
                                     <template x-for="p in currentCampaignPlayers" :key="p.id">
                                         <li class="guest-link-row">
-                                            <div class="guest-link-head">
+                                            <div class="guest-link-info">
                                                 <span class="guest-link-name" x-text="p.display_name"></span>
                                                 <span class="guest-link-expiry" :class="{ 'is-expired': isGuestLinkExpired(p.id) }" x-text="guestLinkExpiry(p.id)"></span>
                                             </div>
-                                            <code class="guest-link-url" x-show="guestLinks[p.id]" x-text="guestUrl(p.id)"></code>
-                                            <div class="session-actions">
-                                                <button type="button" class="btn-action" @click="createGuestLink(p.id)" x-text="guestLinks[p.id] ? 'Regenerate' : 'Generate link'"></button>
+                                            <div class="guest-link-actions">
+                                                <button type="button" class="btn-action" x-show="!guestLinks[p.id]" @click="createGuestLink(p.id)">Generate</button>
                                                 <button type="button" class="btn-action" x-show="guestLinks[p.id]" @click="copyGuestLink(p.id)">Copy</button>
+                                                <button type="button" class="btn-action" x-show="guestLinks[p.id]" title="Replace with a new link" @click="createGuestLink(p.id)">New</button>
                                                 <button type="button" class="btn-action btn-action-cancel" x-show="guestLinks[p.id]" @click="revokeGuestLink(p.id, p.display_name)">Revoke</button>
                                             </div>
                                         </li>
@@ -503,6 +503,6 @@
     </div>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="campaigns.js?v=38"></script>
+    <script src="campaigns.js?v=39"></script>
 </body>
 </html>

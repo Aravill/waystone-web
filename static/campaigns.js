@@ -886,8 +886,8 @@ window.campaignsPage = function () {
             const link = this.guestLinks[userId];
             if (!link) return 'no link';
             const when = new Date(link.expires_at);
-            const text = when.toLocaleString('default', { dateStyle: 'medium', timeStyle: 'short' });
-            return when <= new Date() ? `expired ${text}` : `valid until ${text}`;
+            const text = when.toLocaleString('default', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            return when <= new Date() ? `expired ${text}` : `until ${text}`;
         },
 
         async createGuestLink(userId) {
@@ -937,7 +937,7 @@ window.campaignsPage = function () {
                 await navigator.clipboard.writeText(this.guestUrl(userId));
                 this.showMessage('Link copied', 'success');
             } catch (error) {
-                this.showMessage('Copy failed - select and copy the link manually', 'error');
+                window.prompt('Copy this link:', this.guestUrl(userId));
             }
         },
 
