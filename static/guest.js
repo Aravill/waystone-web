@@ -1,5 +1,5 @@
 window.guestPage = () => ({
-    state: 'loading', // loading | ready | invalid | expired
+    state: 'loading', // loading | ready | invalid | expired | error
     token: '',
     campaignTitle: '',
     displayName: '',
@@ -27,7 +27,7 @@ window.guestPage = () => ({
             this.sessions = data.sessions || [];
             this.state = 'ready';
         } catch {
-            this.showMessage('failed to load sessions', 'error');
+            this.state = 'error';
         }
     },
 

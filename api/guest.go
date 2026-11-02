@@ -63,8 +63,8 @@ func HandleAdminCampaignActions(w http.ResponseWriter, r *http.Request) {
 			adminError(w, http.StatusNotFound, "player not found")
 			return
 		}
-		_ = db.DeleteGuestToken(campaignID, uid)
 		if applySignupStatus(w, campaignID, uid, models.SignupKicked, "player removed") != nil {
+			_ = db.DeleteGuestToken(campaignID, uid)
 			notify(caller.ID, []string{uid}, models.NotificationPlayerKicked, campaign, "", nil)
 		}
 
@@ -215,38 +215,38 @@ func guestHeaders(w http.ResponseWriter) {
 	w.Header().Set("Referrer-Policy", "no-referrer")
 }
 
-// resolveGuest validates a guest token and returns its campaign and user. On
+// resolveGuest validates a guest token and returns its campaign, user and expiry. On
 // failure it writes the error response and returns false. It never touches
 // the session or cookies.
-func resolveGuest(w http.ResponseWriter, token string) (*models.Campaign, *models.User, bool) {
+func resolveGuest(w http.ResponseWriter, token string) (*models.Campaign, *models.User, time.Time, bool) {
 	campaignID, userID, expiresAt, err := db.GetGuestToken(token)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "internal error")
-		return nil, nil, false
+		return nil, nil, time.Time{}, false
 	}
 	if campaignID == "" {
 		writeJSONError(w, http.StatusNotFound, "link is not valid")
-		return nil, nil, false
+		return nil, nil, time.Time{}, false
 	}
 	if !expiresAt.After(time.Now()) {
 		writeJSONError(w, http.StatusGone, "link has expired")
-		return nil, nil, false
+		return nil, nil, time.Time{}, false
 	}
 	user, err := db.GetUserByID(userID)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "internal error")
-		return nil, nil, false
+		return nil, nil, time.Time{}, false
 	}
 	campaign, err := db.GetCampaignByID(campaignID)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "internal error")
-		return nil, nil, false
+		return nil, nil, time.Time{}, false
 	}
 	if user == nil || user.Deleted || user.Blocked || campaign == nil || !isCampaignPlayer(campaign, userID) {
 		writeJSONError(w, http.StatusNotFound, "link is not valid")
-		return nil, nil, false
+		return nil, nil, time.Time{}, false
 	}
-	return campaign, user, true
+	return campaign, user, expiresAt, true
 }
 
 // HandleGuestPage serves the guest reply page at /r/{token}. The token is
@@ -286,11 +286,10 @@ func HandleGuestAPI(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGuestOverview(w http.ResponseWriter, token string) {
-	campaign, user, ok := resolveGuest(w, token)
+	campaign, user, expiresAt, ok := resolveGuest(w, token)
 	if !ok {
 		return
 	}
-	_, _, expiresAt, _ := db.GetGuestToken(token)
 
 	today := time.Now().UTC().Format("2006-01-02")
 	sessions, err := db.GetSessionsByCampaignIDs([]string{campaign.ID}, today)
@@ -323,7 +322,7 @@ func handleGuestOverview(w http.ResponseWriter, token string) {
 }
 
 func handleGuestRespond(w http.ResponseWriter, r *http.Request, token, sessionID string) {
-	campaign, user, ok := resolveGuest(w, token)
+	campaign, user, _, ok := resolveGuest(w, token)
 	if !ok {
 		return
 	}

@@ -35,6 +35,13 @@
             </div>
         </template>
 
+        <template x-if="state === 'error'">
+            <div>
+                <h1 class="page-title">Something went wrong</h1>
+                <p class="form-hint">Couldn't load the sessions. Try refreshing the page.</p>
+            </div>
+        </template>
+
         <template x-if="state === 'ready'">
             <div>
                 <h1 class="page-title" x-text="campaignTitle"></h1>
@@ -75,6 +82,6 @@
         </template>
     </main>
 
-    <script src="/static/guest.js?v=1"></script>
+    <script src="/static/guest.js?v=2"></script>
 </body>
 </html>
