@@ -25,6 +25,11 @@ func main() {
 	}
 	defer db.Close()
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	db.StartBackups(ctx)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = config.DefaultPort
@@ -42,9 +47,6 @@ func main() {
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    64 << 10,
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	go func() {
 		log.Printf("Server starting on http://localhost%s\n", srv.Addr)

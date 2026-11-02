@@ -69,6 +69,7 @@ type Store interface {
 	CountUnreadNotifications(userID string) (int, error)
 	MarkNotificationRead(userID, id string) error
 	MarkAllNotificationsRead(userID string) error
+	Backup(path string) error
 	Close() error
 }
 
@@ -84,6 +85,10 @@ func Initialize() error {
 		return err
 	}
 	return EnsureAdmin()
+}
+
+func Backup(path string) error {
+	return GetStore().Backup(path)
 }
 
 func GetStore() Store {

@@ -262,6 +262,14 @@ func (s *SQLiteStore) initSchema() error {
 	return nil
 }
 
+// Backup writes a consistent snapshot of the database to path (which must not exist).
+func (s *SQLiteStore) Backup(path string) error {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	_, err := s.db.Exec("VACUUM INTO ?", path)
+	return err
+}
+
 func (s *SQLiteStore) Close() error {
 	if s.db != nil {
 		return s.db.Close()
