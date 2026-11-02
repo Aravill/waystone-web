@@ -235,9 +235,13 @@ func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string
 	list := make([]map[string]interface{}, 0, len(played))
 	for i := len(played) - 1; i >= 0; i-- {
 		s := played[i]
+		// The DM runs every played session, so they always attend.
 		attendees := []map[string]interface{}{}
+		if dm, ok := v.users[campaign.DM]; ok && dm != nil {
+			attendees = append(attendees, userDisplayObject(dm))
+		}
 		for _, resp := range responses[s.ID] {
-			if resp.Participation != models.Accepted {
+			if resp.UserID == campaign.DM || resp.Participation != models.Accepted {
 				continue
 			}
 			if u, ok := v.users[resp.UserID]; ok && u != nil {

@@ -2683,6 +2683,10 @@ select option {
     border: 2px solid var(--verdigris);
 }
 
+.game-attendee--dm .user-avatar {
+    border-color: var(--rubric);
+}
+
 .game-session--you .game-session-date::after {
     content: " · you were there";
     color: var(--verdigris);

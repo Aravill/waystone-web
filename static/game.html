@@ -6,7 +6,7 @@
     <title>Waystone - Game</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=46">
+    <link rel="stylesheet" href="/static/styles.css?v=47">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -135,7 +135,7 @@
                                         </span>
                                         <span class="game-attendees" x-show="s.attendees.length > 0" role="group" :aria-label="'Attended: ' + attendeeNames(s)">
                                             <template x-for="u in s.attendees" :key="u.id">
-                                                <span x-html="userAvatarHtml(u)"></span>
+                                                <span :class="{ 'game-attendee--dm': u.id === campaign.dm }" x-html="userAvatarHtml(u)"></span>
                                             </template>
                                         </span>
                                     </li>
@@ -171,7 +171,7 @@
     </div>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="/campaigns.js?v=41"></script>
+    <script src="/campaigns.js?v=42"></script>
     <script src="/static/game.js?v=1"></script>
 </body>
 </html>
