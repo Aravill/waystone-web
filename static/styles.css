@@ -1932,6 +1932,74 @@ select option {
     margin: 0.5rem 0;
 }
 
+/* DM-only guest links in the month agenda */
+.guest-links {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+}
+
+.guest-links-ttl {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    margin: 0.5rem 0 0.75rem;
+}
+
+.guest-links-ttl select {
+    width: auto;
+    margin: 0;
+}
+
+.guest-links-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.guest-link-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.guest-link-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.guest-link-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.guest-link-expiry {
+    color: var(--muted);
+    font-size: 0.75rem;
+}
+
+.guest-link-expiry.is-expired {
+    color: var(--rubric);
+}
+
+.guest-link-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+.guest-link-actions .btn-action {
+    min-height: 1.75rem;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+}
+
 .panel-session {
     margin-bottom: 1rem;
     padding: 1rem;

@@ -7,6 +7,11 @@ window.adminUsersPage = function () {
         systems: [],
         newSystemName: '',
         searchQuery: '',
+        campaigns: [],
+        selectedCampaignId: '',
+        guestLinks: {},
+        newPlayerId: '',
+        ttlHours: 24,
         newUsername: '',
         newName: '',
         tempPassword: null,
@@ -25,6 +30,16 @@ window.adminUsersPage = function () {
             );
         },
 
+        get selectedCampaign() {
+            return this.campaigns.find(c => c.id === this.selectedCampaignId) || null;
+        },
+
+        get addablePlayers() {
+            const c = this.selectedCampaign;
+            if (!c) return [];
+            return this.users.filter(u => !u.blocked && u.id !== c.dm && !(c.players || []).includes(u.id));
+        },
+
         async init() {
             try {
                 const res = await fetch('/auth/current-user');
@@ -35,6 +50,7 @@ window.adminUsersPage = function () {
                 if (!this.isAdmin) { window.location.href = '/'; return; }
                 await this.loadUsers();
                 await this.loadSystems();
+                await this.loadCampaigns();
             } catch {
                 window.location.href = '/login.html';
             }
@@ -241,6 +257,89 @@ window.adminUsersPage = function () {
                 this.showMessage('failed to delete system', 'error');
             } finally {
                 this.loading = false;
+            }
+        },
+
+        async loadCampaigns() {
+            try {
+                const res = await fetch('/api/campaigns');
+                if (!res.ok) throw new Error('failed');
+                const data = await res.json();
+                this.campaigns = (Array.isArray(data) ? data : data.campaigns || []).map(c => ({ ...c, player_users: c.player_users || [], players: c.players || [] }));
+            } catch {
+                this.showMessage('failed to load games', 'error');
+            }
+        },
+
+        async loadGuestLinks() {
+            this.guestLinks = {};
+            this.newPlayerId = '';
+            if (!this.selectedCampaignId) return;
+            try {
+                const res = await fetch(`/api/campaigns/${this.selectedCampaignId}/guest-links`);
+                if (!res.ok) throw new Error('failed');
+                this.guestLinks = (await res.json()).links || {};
+            } catch {
+                this.showMessage('failed to load guest links', 'error');
+            }
+        },
+
+        guestUrl(userId) {
+            const link = this.guestLinks[userId];
+            return link ? `${window.location.origin}/r/${link.token}` : '';
+        },
+
+        isExpired(link) {
+            return new Date(link.expires_at) <= new Date();
+        },
+
+        formatExpiry(link) {
+            return link ? new Date(link.expires_at).toLocaleString('default', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+        },
+
+        async _campaignRequest(path, method, body, successMsg, errorMsg, admin = false) {
+            this.loading = true;
+            try {
+                const res = await fetch(`/api/${admin ? 'admin/' : ''}campaigns/${this.selectedCampaignId}/${path}`, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: body ? JSON.stringify(body) : undefined,
+                });
+                const data = await res.json();
+                if (!res.ok) { this.showMessage(data.error || errorMsg, 'error'); return; }
+                this.showMessage(successMsg, 'success');
+                await this.loadCampaigns();
+                await this.loadGuestLinks();
+            } catch {
+                this.showMessage(errorMsg, 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async addPlayer() {
+            if (!this.newPlayerId) return;
+            await this._campaignRequest('players', 'POST', { user_id: this.newPlayerId }, 'player added', 'failed to add player', true);
+        },
+
+        async removePlayer(userId) {
+            await this._campaignRequest(`players/${userId}`, 'DELETE', null, 'player removed', 'failed to remove player', true);
+        },
+
+        async createGuestLink(userId) {
+            await this._campaignRequest(`players/${userId}/guest-link`, 'POST', { ttl_hours: this.ttlHours }, 'guest link created', 'failed to create guest link');
+        },
+
+        async revokeGuestLink(userId) {
+            await this._campaignRequest(`players/${userId}/guest-link`, 'DELETE', null, 'guest link revoked', 'failed to revoke guest link');
+        },
+
+        async copyGuestLink(userId) {
+            try {
+                await navigator.clipboard.writeText(this.guestUrl(userId));
+                this.showMessage('link copied', 'success');
+            } catch {
+                this.showMessage('copy failed - select and copy it manually', 'error');
             }
         },
 

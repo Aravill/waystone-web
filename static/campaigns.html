@@ -6,7 +6,7 @@
     <title>Waystone - Games</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=42">
+    <link rel="stylesheet" href="/static/styles.css?v=44">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -262,6 +262,37 @@
                                 </button>
                             </template>
                             <p class="panel-empty" x-show="isCurrentUserDM">Select a day to suggest a session.</p>
+
+                            <section class="guest-links" x-show="isCurrentUserDM && currentCampaignPlayers.length > 0">
+                                <p class="modal-eyebrow">Guest links</p>
+                                <p class="panel-empty">Send a player a link to reply to this game's sessions without logging in.</p>
+                                <label class="guest-links-ttl">Link lasts
+                                    <select x-model.number="guestTtlHours">
+                                        <option value="1">1 hour</option>
+                                        <option value="24">1 day</option>
+                                        <option value="72">3 days</option>
+                                        <option value="168">1 week</option>
+                                        <option value="336">2 weeks</option>
+                                        <option value="720">30 days</option>
+                                    </select>
+                                </label>
+                                <ul class="guest-links-list">
+                                    <template x-for="p in currentCampaignPlayers" :key="p.id">
+                                        <li class="guest-link-row">
+                                            <div class="guest-link-info">
+                                                <span class="guest-link-name" x-text="p.display_name"></span>
+                                                <span class="guest-link-expiry" :class="{ 'is-expired': isGuestLinkExpired(p.id) }" x-text="guestLinkExpiry(p.id)"></span>
+                                            </div>
+                                            <div class="guest-link-actions">
+                                                <button type="button" class="btn-action" x-show="!guestLinks[p.id]" @click="createGuestLink(p.id)">Generate</button>
+                                                <button type="button" class="btn-action" x-show="guestLinks[p.id]" @click="copyGuestLink(p.id)">Copy</button>
+                                                <button type="button" class="btn-action" x-show="guestLinks[p.id]" title="Replace with a new link" @click="createGuestLink(p.id)">New</button>
+                                                <button type="button" class="btn-action btn-action-cancel" x-show="guestLinks[p.id]" @click="revokeGuestLink(p.id, p.display_name)">Revoke</button>
+                                            </div>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </section>
                         </div>
                     </template>
                 </aside>
@@ -472,6 +503,6 @@
     </div>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="campaigns.js?v=35"></script>
+    <script src="campaigns.js?v=39"></script>
 </body>
 </html>

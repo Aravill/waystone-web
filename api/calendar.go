@@ -1,8 +1,6 @@
 package api
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strings"
@@ -30,12 +28,11 @@ func HandleCalendarToken(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"token": token})
 	case http.MethodPost:
-		buf := make([]byte, 32)
-		if _, err := rand.Read(buf); err != nil {
+		token, err := newToken()
+		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "failed to generate token")
 			return
 		}
-		token := base64.RawURLEncoding.EncodeToString(buf)
 		if err := db.SetCalendarToken(userID, token); err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "failed to save calendar token")
 			return
