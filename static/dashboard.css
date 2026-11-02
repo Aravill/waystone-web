@@ -9,6 +9,11 @@
     line-height: 1.6;
 }
 
+/* Secondary button styles come from the shared base in styles.css */
+.discord-invite-btn {
+    margin-top: 1rem;
+}
+
 /* Modules Grid: a row of waystones */
 .modules-grid {
     display: grid;
