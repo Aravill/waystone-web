@@ -461,7 +461,9 @@ window.campaignsPage = function () {
                 this.showMessage('Title, summary and description are required', 'error');
                 return;
             }
-            if (desired_player_count !== '' && desired_player_count < 1) {
+            // x-model.number turns a cleared field into null, an untouched one stays ''
+            const unlimited = desired_player_count === '' || desired_player_count == null;
+            if (!unlimited && desired_player_count < 1) {
                 this.showMessage('Desired player count must be at least 1', 'error');
                 return;
             }
