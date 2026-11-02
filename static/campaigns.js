@@ -791,7 +791,6 @@ window.campaignsPage = function () {
             this.signupsCampaignId = campaignId;
             this.signupsCampaignTitle = campaignTitle;
             this.signups = [];
-            this.guestLinks = {};
             this.showDeclinedSignups = false;
             this.signupsModalOpen = true;
             await this.loadSignups();
@@ -819,7 +818,6 @@ window.campaignsPage = function () {
                 this.signupsAcceptedCount = data.accepted_count || 0;
                 this.signupsDesiredCount = parseInt(data.desired_player_count, 10) || 0;
                 this.signupsOpen = data.sign_ups_open === true;
-                await this.loadGuestLinks();
             } catch (error) {
                 this.showMessage('Error loading sign-ups: ' + error.message, 'error');
             }
@@ -857,7 +855,7 @@ window.campaignsPage = function () {
 
         async loadGuestLinks() {
             try {
-                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.signupsCampaignId)}/guest-links`);
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.currentCampaignId)}/guest-links`);
                 const data = await response.json();
                 if (!response.ok) {
                     this.showMessage(data.error || 'Failed to load guest links', 'error');
@@ -874,9 +872,19 @@ window.campaignsPage = function () {
             return link ? `${window.location.origin}/r/${link.token}` : '';
         },
 
+        get currentCampaignPlayers() {
+            const campaign = this.campaigns.find((c) => c.id === this.currentCampaignId);
+            return Array.isArray(campaign?.player_users) ? campaign.player_users : [];
+        },
+
+        isGuestLinkExpired(userId) {
+            const link = this.guestLinks[userId];
+            return !!link && new Date(link.expires_at) <= new Date();
+        },
+
         guestLinkExpiry(userId) {
             const link = this.guestLinks[userId];
-            if (!link) return '';
+            if (!link) return 'no link';
             const when = new Date(link.expires_at);
             const text = when.toLocaleString('default', { dateStyle: 'medium', timeStyle: 'short' });
             return when <= new Date() ? `expired ${text}` : `valid until ${text}`;
@@ -884,7 +892,7 @@ window.campaignsPage = function () {
 
         async createGuestLink(userId) {
             try {
-                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.signupsCampaignId)}/players/${encodeURIComponent(userId)}/guest-link`, {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.currentCampaignId)}/players/${encodeURIComponent(userId)}/guest-link`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ttl_hours: this.guestTtlHours })
@@ -910,7 +918,7 @@ window.campaignsPage = function () {
                 return;
             }
             try {
-                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.signupsCampaignId)}/players/${encodeURIComponent(userId)}/guest-link`, {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.currentCampaignId)}/players/${encodeURIComponent(userId)}/guest-link`, {
                     method: 'DELETE'
                 });
                 const data = await response.json();
@@ -981,7 +989,11 @@ window.campaignsPage = function () {
             this.selectedSession = null;
             this.pendingSessionAction = '';
             this.sessionResponseCache = {};
+            this.guestLinks = {};
             this.generateCalendarDays();
+            if (this.isCurrentUserDM) {
+                this.loadGuestLinks();
+            }
             await this.loadSessions();
             if (focus) {
                 await this.selectDay(focus);

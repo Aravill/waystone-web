@@ -6,7 +6,7 @@
     <title>Waystone - Games</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=41">
+    <link rel="stylesheet" href="/static/styles.css?v=42">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -262,6 +262,37 @@
                                 </button>
                             </template>
                             <p class="panel-empty" x-show="isCurrentUserDM">Select a day to suggest a session.</p>
+
+                            <section class="guest-links" x-show="isCurrentUserDM && currentCampaignPlayers.length > 0">
+                                <p class="modal-eyebrow">Guest links</p>
+                                <p class="panel-empty">Send a player a link to reply to this game's sessions without logging in.</p>
+                                <label class="guest-links-ttl">Link lasts
+                                    <select x-model.number="guestTtlHours">
+                                        <option value="1">1 hour</option>
+                                        <option value="24">1 day</option>
+                                        <option value="72">3 days</option>
+                                        <option value="168">1 week</option>
+                                        <option value="336">2 weeks</option>
+                                        <option value="720">30 days</option>
+                                    </select>
+                                </label>
+                                <ul class="guest-links-list">
+                                    <template x-for="p in currentCampaignPlayers" :key="p.id">
+                                        <li class="guest-link-row">
+                                            <div class="guest-link-head">
+                                                <span class="guest-link-name" x-text="p.display_name"></span>
+                                                <span class="guest-link-expiry" :class="{ 'is-expired': isGuestLinkExpired(p.id) }" x-text="guestLinkExpiry(p.id)"></span>
+                                            </div>
+                                            <code class="guest-link-url" x-show="guestLinks[p.id]" x-text="guestUrl(p.id)"></code>
+                                            <div class="session-actions">
+                                                <button type="button" class="btn-action" @click="createGuestLink(p.id)" x-text="guestLinks[p.id] ? 'Regenerate' : 'Generate link'"></button>
+                                                <button type="button" class="btn-action" x-show="guestLinks[p.id]" @click="copyGuestLink(p.id)">Copy</button>
+                                                <button type="button" class="btn-action btn-action-cancel" x-show="guestLinks[p.id]" @click="revokeGuestLink(p.id, p.display_name)">Revoke</button>
+                                            </div>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </section>
                         </div>
                     </template>
                 </aside>
@@ -386,25 +417,8 @@
                                 <div class="signups-item-info">
                                     <span class="signups-item-name" x-text="signup.signup_user ? signup.signup_user.display_name : signup.user_id"></span>
                                     <span class="signups-item-time" x-text="`signed up ${formatSignupTime(signup.created_at)}`"></span>
-                                    <template x-if="guestLinks[signup.user_id]">
-                                        <span class="signups-item-time">
-                                            <code style="user-select: all; overflow-wrap: anywhere;" x-text="guestUrl(signup.user_id)"></code>
-                                            <span x-text="guestLinkExpiry(signup.user_id)"></span>
-                                        </span>
-                                    </template>
                                 </div>
-                                <div class="signups-item-actions" style="flex-wrap: wrap; justify-content: flex-end;">
-                                    <select x-model.number="guestTtlHours" aria-label="Guest link lifetime" style="width: auto; margin: 0;">
-                                        <option value="1">1 hour</option>
-                                        <option value="24">1 day</option>
-                                        <option value="72">3 days</option>
-                                        <option value="168">1 week</option>
-                                        <option value="336">2 weeks</option>
-                                        <option value="720">30 days</option>
-                                    </select>
-                                    <button type="button" class="btn-action" @click="createGuestLink(signup.user_id)" x-text="guestLinks[signup.user_id] ? 'Regenerate' : 'Guest link'"></button>
-                                    <button type="button" class="btn-action" x-show="guestLinks[signup.user_id]" @click="copyGuestLink(signup.user_id)">Copy</button>
-                                    <button type="button" class="btn-action" x-show="guestLinks[signup.user_id]" @click="revokeGuestLink(signup.user_id, signup.signup_user ? signup.signup_user.display_name : signup.user_id)">Revoke</button>
+                                <div class="signups-item-actions">
                                     <button type="button" class="btn-action signups-btn-kick" @click="kickPlayer(signup.user_id)">Kick</button>
                                 </div>
                             </li>
@@ -489,6 +503,6 @@
     </div>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="campaigns.js?v=37"></script>
+    <script src="campaigns.js?v=38"></script>
 </body>
 </html>
