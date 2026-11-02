@@ -1,0 +1,33 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency: deploy
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Deploy latest main
+        run: |
+          cd /opt/waystone-web
+          git fetch origin main
+          # Keeps untracked .env, docker-compose.override.yml and backups/.
+          git reset --hard origin/main
+          # Build cache isn't touched by `image prune` and grows with every
+          # --build. Best-effort: a failed cleanup shouldn't block a deploy.
+          docker builder prune -f --filter until=168h || true
+          # No --profile prod: Caddy runs on its own host, not in this stack.
+          docker compose up -d --build --remove-orphans
+          docker image prune -f
+
+      - name: Check app is running
+        run: |
+          cd /opt/waystone-web
+          sleep 3
+          docker compose ps --status running | grep -q waystone-web || {
+            docker compose logs --tail=50 waystone-web
+            exit 1
+          }
