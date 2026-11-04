@@ -79,7 +79,11 @@ type Store interface {
 
 func Initialize() error {
 	var err error
-	sqlStore, err := NewSQLiteStore(config.DBPath)
+	path := os.Getenv("DB_PATH")
+	if path == "" {
+		path = config.DBPath
+	}
+	sqlStore, err := NewSQLiteStore(path)
 	if err != nil {
 		return fmt.Errorf("failed to initialize sqlite database: %w", err)
 	}

@@ -17,6 +17,7 @@ services:
       - SEED_DEMO_DATA=${SEED_DEMO_DATA:-}
       - BACKUP_DIR=${BACKUP_DIR:-/root/backups}
       - BACKUP_KEEP=${BACKUP_KEEP:-14}
+      - DB_PATH=${DB_PATH:-}
     restart: unless-stopped
     volumes:
       - waystone-data:/root/data
