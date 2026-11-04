@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waystone Calendar Days</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
+<style>
+/* Three proposals for the calendar day cell: the session fills the whole day.
+   Every size inside a cell scales with the cell (container query units), because the real
+   grid goes from ~130px on a big monitor through ~95px on a laptop to ~50px on a phone.
+   Tokens are STYLE_GUIDE.md's. */
+:root {
+    --bg: #F2EAD8; --folio: #E6DBC2; --ink: #2B241C; --muted: #6B5E4B;
+    --line: rgba(43, 36, 28, 0.4);
+    --rubric: #8E2A1E; --verdigris: #355E52; --ochre: #7A5A12;
+    --text: 'Courier Prime', 'Courier New', monospace;
+    --display: 'IM Fell English SC', Georgia, serif;
+    --cell: 130px;
+    color-scheme: light;
+}
+:root[data-theme="dark"] {
+    --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+    --line: rgba(232, 220, 196, 0.3);
+    --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
+    color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 1rem/1.6 var(--text); }
+h1, h2, h3, p { margin: 0; font-weight: 400; }
+main { max-width: 88rem; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+.eyebrow { color: var(--muted); font-size: .75rem; letter-spacing: 3px; text-transform: uppercase; }
+h1 { font: 2.25rem/1.2 var(--display); }
+.lead { max-width: 46rem; margin-top: .5rem; color: var(--muted); font-size: .875rem; }
+
+/* Mock-up controls (not part of the design) */
+.controls { display: flex; flex-wrap: wrap; gap: 1.5rem; margin: 1.5rem 0; padding: .75rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.control { display: flex; flex-wrap: wrap; align-items: center; gap: .375rem; }
+.control > span { margin-right: .375rem; color: var(--muted); font-size: .75rem; letter-spacing: 2px; text-transform: uppercase; }
+.control button { min-height: 2.5rem; padding: 0 .75rem; background: none; border: 1px solid var(--line); color: var(--ink); font: .75rem var(--text); letter-spacing: 2px; text-transform: uppercase; cursor: pointer; }
+.control button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+button:focus-visible { outline: 2px solid var(--rubric); outline-offset: 2px; }
+
+/* Variant picker */
+.picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 1.75rem; margin-bottom: 2.5rem; }
+.pick { display: flex; flex-direction: column; gap: .75rem; padding: 1.25rem 1.375rem; background: none; border: 1px solid var(--line); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color .15s; }
+.pick:hover { background: var(--folio); }
+.pick[aria-pressed="true"] { border-color: var(--rubric); outline: 1px solid var(--rubric); }
+.pick h2 { font: 1.6875rem/1.2 var(--display); }
+.pick h2 b { font-weight: 400; color: var(--rubric); }
+.pick p { font-size: .875rem; line-height: 1.5; }
+.pick .good { color: var(--verdigris); }
+.pick .bad { color: var(--muted); }
+.samples { display: flex; gap: .75rem; }
+.samples .day { width: 8.125rem; border: 1px solid var(--line); }
+
+/* The modal */
+.sheet { display: flex; flex-direction: column; border: 1px solid var(--ink); outline: 1px solid var(--ink); outline-offset: 5px; margin: 6px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1.25rem 1.5rem; border-bottom: 3px double var(--ink); }
+.sheet-head h3 { font: 2rem/1.2 var(--display); }
+.sync { color: var(--rubric); font-size: .8125rem; letter-spacing: 2px; text-transform: uppercase; text-decoration: underline; text-underline-offset: 4px; }
+.body { display: flex; flex-wrap: wrap; gap: 1.75rem; padding: 1.5rem; }
+.month { flex: 0 1 auto; max-width: 100%; }
+.month-nav { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1rem; margin-bottom: .75rem; }
+.month-nav .name { font: 1.625rem var(--display); }
+.nav-btn { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border: 1px solid var(--line); }
+.legend { display: flex; flex-wrap: wrap; gap: .875rem; margin-left: auto; color: var(--muted); font-size: .75rem; }
+.legend i { display: inline-block; width: .625rem; height: .625rem; margin-right: .375rem; border: 1px solid var(--ink); vertical-align: -1px; }
+.legend .l-conf { background: var(--verdigris); border-color: var(--verdigris); }
+.legend .l-sugg { border-style: dashed; }
+.legend .l-canc { border-color: var(--muted); }
+.legend s { text-decoration: line-through; }
+
+.grid { display: grid; grid-template-columns: repeat(7, var(--cell)); border-left: 1px solid var(--line); }
+.dow { padding: .5rem 0; border-bottom: 1px solid var(--ink); color: var(--muted); font-size: .75rem; letter-spacing: 2px; text-align: center; text-transform: uppercase; }
+.grid .day { border-width: 0 1px 1px 0; border-style: solid; border-color: var(--line); }
+.reply-key { display: flex; flex-wrap: wrap; gap: .25rem 1rem; margin-top: .625rem; color: var(--muted); font-size: .75rem; }
+
+/* ---------- The day cell ---------- */
+.day { position: relative; container-type: inline-size; aspect-ratio: 1; min-width: 0; background: var(--bg); cursor: pointer; transition: background-color .15s; overflow: hidden; }
+.day:hover { background: var(--folio); }
+.day.other { opacity: .35; cursor: default; }
+.day.other:hover { background: var(--bg); }
+.day.selected { background: var(--folio); outline: 2px solid var(--rubric); outline-offset: -2px; z-index: 1; }
+
+.num { display: block; font-size: clamp(.8125rem, 11cqw, 1rem); line-height: 1.2; color: var(--ink); }
+.day > .num { padding: 5cqw; }
+.day.today .num { font-weight: 700; text-decoration: underline; }
+
+/* The session IS the day: a frame inset from the hairlines, holding the day number too */
+.ev { position: absolute; inset: 2cqw; display: flex; flex-direction: column; gap: 2cqw; padding: 3.5cqw 4cqw; border: 1px dashed var(--ink); }
+.st-Confirmed .ev { border: 1px solid var(--verdigris); background: color-mix(in srgb, var(--verdigris) 14%, var(--bg)); }
+.st-Cancelled .ev { border: 1px solid var(--muted); color: var(--muted); }
+.st-Cancelled .num { color: var(--muted); }
+
+.time { font-size: clamp(.6875rem, 12cqw, 1rem); line-height: 1.2; white-space: nowrap; }
+.st-Cancelled .time { text-decoration: line-through; }
+.t-short { display: none; }
+.cancelled-word { font-size: clamp(.6875rem, 11cqw, .875rem); line-height: 1.2; }
+
+.g { display: inline-block; width: 1em; height: 1em; vertical-align: -.125em; fill: none; stroke: currentColor; stroke-width: 2.25; stroke-linecap: square; }
+.yes { color: var(--verdigris); }
+.maybe { color: var(--ochre); }
+.no { color: var(--rubric); }
+.wait { color: var(--rubric); }
+
+/* A: Ledger. Four columns, glyph over a large figure */
+.tally { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: auto; padding-top: 2cqw; border-top: 1px solid var(--line); text-align: center; }
+.st-Confirmed .tally { border-top-color: var(--verdigris); }
+.tally > div { display: flex; flex-direction: column; align-items: center; font-size: clamp(.6875rem, 11cqw, .875rem); line-height: 1.15; }
+.tally > div + div { border-left: 1px solid var(--line); }
+.tally b { font-size: clamp(.875rem, 18cqw, 1.5rem); font-weight: 700; line-height: 1.1; }
+.tally .zero { color: var(--muted); opacity: .55; }
+.tally .zero b { font-weight: 400; }
+
+/* B: Roll. One seat per player: same fill and border language as the calendar avatars */
+.roll { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); grid-auto-rows: 1fr; gap: 2.5cqw; margin-top: 1cqw; }
+.seat { display: grid; place-items: center; min-height: 0; border: 1px solid currentColor; font: 700 clamp(.75rem, 13cqw, 1.125rem)/1 var(--text); font-style: normal; }
+.seat.yes { background: var(--verdigris); border-color: var(--verdigris); color: var(--bg); }
+.seat.maybe { border: 2px dashed var(--ochre); }
+.seat.no { opacity: .75; }
+.seat.wait { border: 2px dotted var(--muted); color: var(--muted); }
+
+/* C: Verdict. The answer to "does this day work" is the headline */
+.hero { flex: 1; display: flex; align-items: center; gap: 2cqw; color: var(--verdigris); font-size: clamp(.9375rem, 30cqw, 2.5rem); font-weight: 700; line-height: 1; white-space: nowrap; }
+.hero small { color: var(--muted); font-size: .55em; font-weight: 400; }
+.rest { display: flex; gap: 5cqw; font-size: clamp(.6875rem, 11.5cqw, .9375rem); line-height: 1.2; white-space: nowrap; }
+.rest .zero { display: none; }
+.v-C .st-Confirmed .ev { background: var(--verdigris); border-color: var(--verdigris); color: var(--bg); }
+.v-C .st-Confirmed .num,
+.v-C .st-Confirmed .hero,
+.v-C .st-Confirmed .hero small,
+.v-C .st-Confirmed .rest span { color: var(--bg); }
+
+/* Strong candidate: a suggestion with over 70% accepted. The suggested dashes start marching.
+   The dashes go still under reduced motion; the frame colour and the mark still say it. */
+.candidate .ev { border-color: transparent; }
+.march { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); overflow: visible; pointer-events: none; }
+.march rect { x: .75px; y: .75px; width: calc(100% - 1.5px); height: calc(100% - 1.5px); fill: none; stroke: var(--verdigris); stroke-width: 1.5px; stroke-dasharray: 5 3; animation: march 1.6s linear infinite; }
+@keyframes march { to { stroke-dashoffset: -8; } }
+@media (prefers-reduced-motion: reduce) { .march rect { animation: none; } }
+.candidate-mark { position: absolute; top: 3cqw; right: 4cqw; color: var(--rubric); font-size: clamp(.8125rem, 12cqw, 1.125rem); line-height: 1; }
+.candidate-note { color: var(--verdigris); font-size: .8125rem; font-weight: 700; line-height: 1.4; }
+.candidate-note span { color: var(--rubric); }
+.legend .l-cand { color: var(--rubric); }
+
+/* Narrow cells (phone, or a very short window): start time and the key number only */
+@container (max-width: 91px) {
+    .ev { inset: 1px; gap: 1px; padding: 2px 3px; }
+    .ev .num { font-size: .75rem; line-height: 1.1; }
+    .time { font-size: .6875rem; }
+    .v-B .ev:has(.roll) .time { display: none; }
+    .t-full { display: none; }
+    .t-short { display: inline; }
+    .cancelled-word { display: none; }
+    .tally { grid-template-columns: 1fr 1fr; gap: 0; padding-top: 1px; }
+    .tally > div { flex-direction: row; justify-content: center; gap: 1px; font-size: .625rem; }
+    .tally .maybe, .tally .no { display: none; }
+    .tally b { font-size: .75rem; }
+    .tally .wait { border-left: 1px solid var(--line); }
+    .roll { gap: 2px; }
+    .seat { font-size: 0; }
+    .seat .g { display: none; }
+    .seat.maybe, .seat.wait { border-width: 1px; }
+    .hero { font-size: .9375rem; }
+    .hero small { font-size: .6875rem; }
+    .rest { display: none; }
+}
+
+/* Panel (context only, unchanged) */
+.panel { flex: 1 1 18rem; min-width: 15rem; padding-left: 1.75rem; border-left: 1px solid var(--ink); }
+.panel h4 { margin: .125rem 0 .75rem; font: 400 1.5rem/1.3 var(--display); }
+.panel .drop { color: var(--rubric); font-size: 2.125rem; }
+.panel-card { display: flex; flex-direction: column; gap: .625rem; padding: 1rem; border: 1px solid var(--rubric); font-size: .875rem; }
+.panel-card .row { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.panel-card .tag { padding: 2px 6px; border: 1px dashed var(--ink); font-size: .6875rem; letter-spacing: 2px; text-transform: uppercase; }
+.replies { display: grid; grid-template-columns: repeat(3, 1fr); gap: .375rem; }
+.replies span { display: grid; place-items: center; min-height: 2.75rem; border: 1px solid currentColor; font-size: .75rem; letter-spacing: 2px; text-transform: uppercase; }
+
+/* Who replied how: three proposals. Names are always visible, never only on hover */
+.panel-inner { display: flex; flex-direction: column; min-width: 0; }
+.pick .panel-inner { margin-top: .25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.panel-card.needs { border-color: var(--rubric); }
+.panel-card:not(.needs) { border-color: var(--line); }
+.panel-card .tag.st-Confirmed { border: 1px solid var(--verdigris); color: var(--verdigris); }
+.panel-card .tag.st-Cancelled { border: 1px solid var(--muted); color: var(--muted); text-decoration: line-through; }
+.panel-meta { color: var(--muted); font-size: .8125rem; line-height: 1.4; }
+.panel-meta b { color: var(--rubric); }
+.notice { color: var(--rubric); font-size: .75rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+.empty { color: var(--muted); font-size: .875rem; }
+
+.av { display: grid; place-items: center; flex: none; width: 1.875rem; height: 1.875rem; background: var(--folio); border: 2px solid var(--verdigris); color: var(--rubric); font: 1rem/1 var(--display); }
+.av.maybe { border: 2px dashed var(--ochre); }
+.av.no { border-color: var(--rubric); opacity: .6; }
+.av.wait { border: 2px dotted var(--muted); }
+.who { min-width: 0; color: var(--ink); font-size: .9375rem; line-height: 1.25; overflow-wrap: anywhere; }
+
+/* 1: Groups. A heading per reply, one person per row */
+.groups { display: flex; flex-direction: column; gap: .75rem; }
+.group-head { display: flex; justify-content: space-between; gap: .5rem; padding-bottom: .25rem; border-bottom: 1px solid currentColor; font-size: .875rem; font-weight: 700; line-height: 1.3; }
+.person { display: flex; align-items: center; gap: .625rem; margin-top: .375rem; }
+
+/* 2: Roll call. One table, one row per player, the reply in its own column */
+.roster { display: flex; flex-direction: column; }
+.roster .person { margin: 0; padding: .375rem 0; border-bottom: 1px solid var(--line); }
+.roster .person:last-child { border-bottom: none; }
+.roster .who { flex: 1; }
+.roster .said { flex: none; width: 6rem; font-size: .8125rem; font-weight: 700; line-height: 1.2; }
+
+/* 3: Paragraphs. No avatars, just names under each reply: the shortest of the three */
+.lines { display: flex; flex-direction: column; gap: .625rem; }
+.line-head { font-size: .875rem; font-weight: 700; line-height: 1.3; }
+.line-names { margin-top: .125rem; padding-left: 1.3em; }
+
+/* Phone-sized preview: panel drops under the month */
+.is-phone .sheet { max-width: 23.4375rem; }
+.is-phone .sheet-head { padding: .75rem; }
+.is-phone .sheet-head h3 { font-size: 1.5rem; }
+.is-phone .sync { display: none; }
+.is-phone .body { padding: .75rem; display: block; }
+.is-phone .panel { margin-top: 1rem; padding: 1rem 0 0; border-left: none; border-top: 1px solid var(--ink); }
+.is-phone .legend { margin-left: 0; }
+.is-phone .dow { font-size: .6875rem; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<main id="page">
+    <p class="eyebrow">Návrh · pravý panel kalendáře</p>
+    <h1>Kdo odpověděl jak</h1>
+    <p class="lead">Dnes panel ukazuje jen avatary a jméno je vidět až po najetí myší, na mobilu vůbec. Tady jsou jména vidět vždy. Kalendář je ve variantě A. Kliknutím na den v kalendáři se změní všechny tři panely; je tam i dlouhé jméno a potvrzený 7. a zrušený 8. listopad. Hráči jsou vymyšlení, stejně jako 13. listopad (5 ze 6, běžící rámeček) a 20. listopad (4 ze 6, těsně pod hranicí 70 %).</p>
+
+    <div class="controls">
+        <div class="control" id="themes"><span>Motiv</span></div>
+        <div class="control" id="sizes"><span>Velikost dne</span></div>
+        <div class="control" id="days"><span>Den</span></div>
+    </div>
+
+    <div class="picker" id="picker"></div>
+
+    <div class="sheet" id="sheet">
+        <div class="sheet-head">
+            <div>
+                <p class="eyebrow">Calendar of sessions</p>
+                <h3>All That Glitters</h3>
+            </div>
+            <span class="sync">Sync to calendar →</span>
+        </div>
+        <div class="body">
+            <div class="month">
+                <div class="month-nav">
+                    <span class="nav-btn" aria-hidden="true">‹</span>
+                    <span class="name">November 2026</span>
+                    <span class="nav-btn" aria-hidden="true">›</span>
+                    <div class="legend">
+                        <span><i class="l-conf"></i>confirmed</span>
+                        <span><i class="l-sugg"></i>suggested</span>
+                        <span><span class="l-cand" aria-hidden="true">✦</span> strong candidate</span>
+                        <span><i class="l-canc"></i><s>cancelled</s></span>
+                    </div>
+                </div>
+                <div class="grid" id="grid"></div>
+                <div class="reply-key" id="key"></div>
+            </div>
+            <aside class="panel" id="panel"></aside>
+        </div>
+    </div>
+</main>
+
+<script>
+const YES = '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13l5 6L20 5"/></svg>';
+const NO = '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>';
+const GLYPHS = { yes: YES, maybe: '?', no: NO, wait: '…' };
+const KINDS = ['yes', 'maybe', 'no', 'wait'];
+
+// r: [accepted, tentative, declined, awaiting]
+const SESSIONS = {
+    7: { st: 'Confirmed', t: ['17:00', '21:00'], r: [5, 1, 0, 0] },
+    8: { st: 'Cancelled', t: ['16:00', '20:00'], r: [3, 1, 1, 1] },
+    13: { st: 'Suggested', t: ['18:00', '22:00'], r: [5, 1, 0, 0] },
+    14: { st: 'Suggested', t: ['16:00', '20:00'], r: [2, 0, 2, 2] },
+    15: { st: 'Suggested', t: ['16:00', '20:00'], r: [1, 2, 1, 2] },
+    20: { st: 'Suggested', t: ['18:00', '22:00'], r: [4, 0, 1, 1] },
+    21: { st: 'Suggested', t: ['16:00', '20:00'], r: [3, 0, 1, 2] },
+    22: { st: 'Suggested', t: ['16:00', '20:00'], r: [2, 1, 1, 2] },
+    28: { st: 'Suggested', t: ['16:00', '20:00'], r: [2, 0, 2, 2] },
+    29: { st: 'Suggested', t: ['16:00', '20:00'], r: [1, 1, 2, 2] },
+};
+
+const VARIANTS = {
+    A: {
+        name: 'Účetní kniha',
+        pitch: 'Čas na jeden řádek, pod ním čtyři sloupce s velkými čísly. Čekající jsou nově čtvrtý sloupec místo rohové krabičky.',
+        good: 'Nejvěrnější dnešku, přesná čísla bez přemýšlení.',
+        bad: 'Pořád se čtou čísla, den od dne se nezorientuješ pohledem.',
+    },
+    B: {
+        name: 'Prezenčka',
+        pitch: 'Jeden čtvereček na hráče, plný pro ano, čárkovaný pro možná, tečkovaný pro čekající. Žádná čísla.',
+        good: 'Rozdíl mezi dny vidíš z pohledu, drží se i na mobilu.',
+        bad: 'Ve větší skupině se čtverečky zmenšují a musíš počítat. Na mobilu se nevejde čas.',
+    },
+    C: {
+        name: 'Verdikt',
+        pitch: 'Hlavní je počet ano z celkového počtu. Zbytek je drobně pod ním a potvrzený den je celý vyplněný.',
+        good: 'Nejrychlejší odpověď na otázku „který den to vyjde“.',
+        bad: 'Odchyluje se od průhledných čipů v guide a na mobilu ukáže jen ano.',
+    },
+};
+
+const PLAYERS = ['Mira', 'Tobin', 'Bartholomew Thistlewood', 'Sable', 'Wren', 'Ysolde'];
+
+const PANELS = {
+    1: {
+        name: 'Skupiny',
+        pitch: 'Nadpis pro každou odpověď a pod ním lidé po řádcích. Nejlepší na otázku „kdo přijde“.',
+    },
+    2: {
+        name: 'Listina',
+        pitch: 'Jedna tabulka, řádek na hráče a odpověď ve vlastním sloupci. Nejlepší na otázku „jak odpověděl X“.',
+    },
+    3: {
+        name: 'Odstavce',
+        pitch: 'Jména za sebou pod každou odpovědí, bez avatarů. Nejkratší, takže tlačítka zůstanou blízko.',
+    },
+};
+const REPLY_LABELS = { yes: 'Accepted', maybe: 'Tentative', no: 'Declined', wait: 'Awaiting' };
+
+const state = { variant: 'A', panel: 2, day: 21, theme: 'light', size: window.innerWidth >= 1280 ? 130 : 95 };
+
+// Hand the fixed players out over the day's reply counts, shifted a little per day
+function groupsFor(n, s) {
+    let next = n % PLAYERS.length;
+    return KINDS.map((kind, i) => {
+        const names = [];
+        for (let c = 0; c < s.r[i]; c++) names.push(PLAYERS[next++ % PLAYERS.length]);
+        return { kind, label: REPLY_LABELS[kind], names };
+    }).filter((g) => g.names.length > 0);
+}
+
+function personHtml(kind, name, extra = '') {
+    return `<div class="person"><span class="av ${kind}" aria-hidden="true">${name[0]}</span><span class="who">${name}</span>${extra}</div>`;
+}
+
+function repliesHtml(panel, groups) {
+    if (panel === 1) {
+        return `<div class="groups">${groups.map((g) => `<div>
+            <div class="group-head ${g.kind}"><span>${GLYPHS[g.kind]} ${g.label}</span><span>${g.names.length}</span></div>
+            ${g.names.map((name) => personHtml(g.kind, name)).join('')}
+        </div>`).join('')}</div>`;
+    }
+    if (panel === 2) {
+        return `<div class="roster">${groups.flatMap((g) => g.names.map((name) =>
+            personHtml(g.kind, name, `<span class="said ${g.kind}">${GLYPHS[g.kind]} ${g.label}</span>`))).join('')}</div>`;
+    }
+    return `<div class="lines">${groups.map((g) => `<div>
+        <div class="line-head ${g.kind}">${GLYPHS[g.kind]} ${g.label} (${g.names.length})</div>
+        <div class="who line-names">${g.names.join(' · ')}</div>
+    </div>`).join('')}</div>`;
+}
+
+function panelHtml(panel) {
+    const date = new Date(2026, 10, state.day);
+    const weekday = date.toLocaleDateString('en-GB', { weekday: 'long' });
+    const heading = `<div class="eyebrow">Selected day</div>
+        <h4><span class="drop">${weekday[0]}</span>${weekday.slice(1)}, ${state.day} November</h4>`;
+    const s = SESSIONS[state.day];
+    if (!s) return `${heading}<div class="empty">No sessions on this day.</div>`;
+    const reply = s.st === 'Cancelled' ? '' : `<div class="notice">✦ Thy reply</div>
+        <div class="replies"><span class="yes">Aye</span><span class="maybe">Perhaps</span><span class="no">Nay</span></div>`;
+    return `${heading}<div class="panel-card${s.st === 'Suggested' ? ' needs' : ''}">
+        <div class="row"><b>${s.t[0]}–${s.t[1]}</b><span class="tag st-${s.st}">${s.st}</span></div>
+        <div class="panel-meta">Proposed by <b>♛ Aldric</b></div>
+        ${isCandidate(s) ? `<div class="candidate-note"><span aria-hidden="true">✦</span> Strong candidate: ${s.r[0]} of ${s.r.reduce((a, b) => a + b, 0)} accepted</div>` : ''}
+        ${repliesHtml(panel, groupsFor(state.day, s))}
+        ${reply}
+    </div>`;
+}
+
+// Over 70% of all the game's players, so anyone still awaiting counts against it
+function isCandidate(s) {
+    const total = s.r.reduce((a, b) => a + b, 0);
+    return s.st === 'Suggested' && total > 0 && s.r[0] / total > 0.7;
+}
+
+function timeHtml(s) {
+    return `<div class="time"><span class="t-full">${s.t[0]}–${s.t[1]}</span><span class="t-short">${s.t[0]}</span></div>`;
+}
+
+function bodyHtml(variant, s) {
+    if (s.st === 'Cancelled') return `${timeHtml(s)}<div class="cancelled-word">cancelled</div>`;
+    const total = s.r.reduce((a, b) => a + b, 0);
+    if (variant === 'A') {
+        const cols = KINDS.map((k, i) => `<div class="${k}${s.r[i] ? '' : ' zero'}"><span>${GLYPHS[k]}</span><b>${s.r[i]}</b></div>`);
+        return `${timeHtml(s)}<div class="tally">${cols.join('')}</div>`;
+    }
+    if (variant === 'B') {
+        const seats = KINDS.flatMap((k, i) => Array(s.r[i]).fill(`<i class="seat ${k}">${GLYPHS[k]}</i>`));
+        return `${timeHtml(s)}<div class="roll" style="--cols:${Math.ceil(total / 2)}">${seats.join('')}</div>`;
+    }
+    const rest = KINDS.slice(1).map((k) => {
+        const n = s.r[KINDS.indexOf(k)];
+        return `<span class="${k}${n ? '' : ' zero'}">${GLYPHS[k]}${n}</span>`;
+    });
+    return `<div class="hero">${YES}<span>${s.r[0]}<small>/${total}</small></span></div>${timeHtml(s)}<div class="rest">${rest.join('')}</div>`;
+}
+
+function dayHtml(variant, n, opts = {}) {
+    const s = opts.other ? null : SESSIONS[n];
+    const cls = ['day', opts.other && 'other', opts.today && 'today', opts.selected && 'selected', s && `st-${s.st}`, s && isCandidate(s) && 'candidate'].filter(Boolean).join(' ');
+    const inner = s ? `<div class="ev">${s && isCandidate(s) ? '<svg class="march" aria-hidden="true"><rect/></svg><span class="candidate-mark" title="Strong candidate">✦</span>' : ''}<span class="num">${n}</span>${bodyHtml(variant, s)}</div>` : `<span class="num">${n}</span>`;
+    return `<div class="${cls}"${opts.other ? '' : ` data-day="${n}"`}>${inner}</div>`;
+}
+
+function renderGrid() {
+    const heads = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => `<div class="dow">${d}</div>`);
+    const cells = [];
+    for (let n = 26; n <= 31; n++) cells.push(dayHtml(state.variant, n, { other: true }));
+    for (let n = 1; n <= 30; n++) cells.push(dayHtml(state.variant, n, { today: n === 4, selected: n === state.day }));
+    for (let n = 1; n <= 6; n++) cells.push(dayHtml(state.variant, n, { other: true }));
+    document.getElementById('grid').innerHTML = heads.join('') + cells.join('');
+    document.getElementById('sheet').className = `sheet v-${state.variant}`;
+    document.getElementById('key').innerHTML =
+        `<span class="yes">${YES} aye</span><span class="maybe">? perhaps</span><span class="no">${NO} nay</span><span class="wait">… awaiting</span>`;
+}
+
+function renderPicker() {
+    document.getElementById('picker').innerHTML = Object.entries(PANELS).map(([key, v]) => `
+        <button type="button" class="pick" data-panel="${key}" aria-pressed="${state.panel === Number(key)}">
+            <h2><b>${key}</b> · ${v.name}</h2>
+            <p>${v.pitch}</p>
+            <div class="panel-inner">${panelHtml(Number(key))}</div>
+        </button>`).join('');
+    document.getElementById('panel').innerHTML = `<div class="panel-inner">${panelHtml(state.panel)}</div>`;
+}
+
+function renderControls() {
+    const themes = [['light', 'Parchment'], ['dark', 'Candlelight']];
+    const sizes = [[130, 'Monitor 130'], [95, 'Notebook 95'], [50, 'Mobil 50']];
+    const buttons = (list, key) => list.map(([v, label]) =>
+        `<button type="button" data-${key}="${v}" aria-pressed="${String(state[key]) === String(v)}">${label}</button>`).join('');
+    document.getElementById('themes').innerHTML = `<span>Motiv</span>${buttons(themes, 'theme')}`;
+    document.getElementById('sizes').innerHTML = `<span>Velikost dne</span>${buttons(sizes, 'size')}`;
+    document.getElementById('days').innerHTML = `<span>Den</span>${buttons([['A', 'A'], ['B', 'B'], ['C', 'C']], 'variant')}`;
+}
+
+function render() {
+    document.documentElement.dataset.theme = state.theme;
+    document.documentElement.style.setProperty('--cell', `${state.size}px`);
+    document.getElementById('page').classList.toggle('is-phone', state.size === 50);
+    renderControls();
+    renderPicker();
+    renderGrid();
+}
+
+document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-variant],[data-theme],[data-size],[data-panel],[data-day]');
+    if (!el || el === document.documentElement) return;
+    if (el.dataset.variant) state.variant = el.dataset.variant;
+    if (el.dataset.theme) state.theme = el.dataset.theme;
+    if (el.dataset.size) state.size = Number(el.dataset.size);
+    if (el.dataset.panel) state.panel = Number(el.dataset.panel);
+    if (el.dataset.day) state.day = Number(el.dataset.day);
+    render();
+});
+
+document.addEventListener('DOMContentLoaded', render);
+</script>
+</body>
+</html>

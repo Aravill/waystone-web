@@ -9,7 +9,8 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 | `campaigns-parchment.png` | Header, nav, page title, game card grid (light) |
 | `type-icons.png` | The three game-type marks, light and dark |
 | `campaigns-candlelight.png` | The same page in the dark theme |
-| `calendar.png` | Modal sheet, calendar grid, session chips, reply buttons |
+| `calendar.png` | Modal sheet, calendar grid, reply buttons (its session chips are superseded by `calendar-days.html`) |
+| `calendar-days.html` | Calendar redesign: the Ledger day cell, the Roll call panel, the strong candidate frame (variant A and panel 2 are the chosen ones) |
 | `game-detail.html` | The game page: title block, the tale, the company margin, the chronicle of played sessions |
 | `banners.dc.html` | The banner redesign: three variants, see `BANNER_DESIGN_GUIDE.md` |
 
@@ -276,17 +277,26 @@ The paths live in `TYPE_ICON_PATHS` in `campaigns.js`. The Adventure shield path
 | Declined | `✗` | `--rubric` | Nay |
 | Awaiting | `…` | `--rubric` | (none) |
 
+In the calendar `✓` and `✗` are inline SVG (`REPLY_GLYPHS` in `campaigns.js`), because the text glyph falls back to a font where the check reads like a root sign.
+
 Reply buttons sit in a 3-column grid, min-height 44px. The user's current reply is filled with its colour (`color: var(--bg)`), the others are outlined.
 
-Calendar session chips (11px text, `padding: 3px 5px`):
+Calendar day frames (the session fills the day; sizes scale with the cell in `cqw`):
 
 | Session | Style |
 |---------|-------|
-| Confirmed | `1px solid var(--verdigris)`, verdigris text, faint verdigris fill |
-| Suggested | `1px dashed var(--ink)` |
-| Cancelled | `1px solid var(--muted)`, muted text, struck through, no counts |
+| Confirmed | Solid `--verdigris` frame, 10% tint mixed with `--bg` |
+| Suggested | Dashed `--ink` frame |
+| Strong candidate | Verdigris marching dashes plus a `✦` in `--rubric` |
+| Cancelled | `--muted` frame, struck time, the word "cancelled", no counts |
 
-Calendar grid: hairline cells, out-of-month days at 35% ink, selected day `background: var(--folio)` with a `2px solid var(--rubric)` inset outline. Days are square, and the month is sized to fit the modal's height. A legend (■ confirmed · ▢ suggested · ~~cancelled~~) sits right of the month name. A day's "awaiting a reply" count shows only when it is above zero, as a small rubric box in the corner.
+`.chip-*` remains for the status tags in the day panel and the agenda rows.
+
+Calendar grid: hairline cells, out-of-month days at 35% ink, selected day `background: var(--folio)` with a `2px solid var(--rubric)` inset outline. Days are square, and the month is sized to fit the modal's height. A day with a session holds a frame inset from the hairlines: the day number, the start-end time and a four-column tally (accepted, tentative, declined, awaiting) with a hairline above it. Sizes are in `cqw`, so they scale with the cell. Narrow cells (≤ 85px) show only the start time, accepted and awaiting. The first planned session fills the cell and the rest show as "+N more". Zero counts stay at full `--muted` at weight 400, never reduced opacity (that drops the contrast below 4.5:1). The legend (■ confirmed · ▢ suggested · ~~cancelled~~) sits right of the month name, and a reply key (✓ aye · ? perhaps · ✗ nay · … awaiting · ✦ strong candidate) sits under the grid.
+
+Strong candidate: a Suggested session whose accepted players are over 70% of all players. Awaiting players count in the total, and exactly 70% does not qualify. The panel says it in a line ("Strong candidate: 5 of 6 accepted"), and so do the cell's `aria-label` and `title`.
+
+Roll call (day panel): one row per player, ordered Accepted, Tentative, Declined, Awaiting. Each row has the avatar with its reply-coded border, the name, which wraps and never truncates, and a fixed-width reply column.
 
 The day panel heading has an eyebrow ("Selected day" / "Month agenda") over a display-face heading. A suggestion the viewer hasn't answered gets a `--rubric` frame, like a card that needs action.
 
@@ -321,9 +331,9 @@ Each module is a waystone: an absolutely positioned SVG (`viewBox 0 0 320 420`, 
 
 Square (no radius), `1px solid var(--line)` frame, `object-fit: cover`. Everyone has one: without an upload the avatar is the first letter of the display name (nickname → name → username), in the display face in `--rubric` on `--folio`. The API sends it as `avatar_letter` next to `avatar_url` on every user object.
 
-- **In lists** (game-card players, calendar replies): 30px avatars in place of names, linked to the profile, with the name as `title` and `aria-label`. Built by `userAvatarHtml()` in `campaigns.js`.
+- **In lists** (game-card players): 30px avatars in place of names, linked to the profile, with the name as `title` and `aria-label`. Built by `userAvatarHtml()` in `campaigns.js`.
 - **Next to a name** (sign-ups dialog): same 30px avatar, not linked.
-- **Calendar replies**: a 2px border shows the reply. Accepted is solid `--verdigris`, Tentative dashed `--ochre`, Declined solid `--rubric` at 60% opacity, Awaiting dotted `--muted`.
+- **Calendar replies** (the Roll call, beside the name): a 2px border shows the reply. Accepted is solid `--verdigris`, Tentative dashed `--ochre`, Declined solid `--rubric` at 60% opacity, Awaiting dotted `--muted`.
 - **Profile**: the large avatar keeps its own size.
 
 ### Ornaments
@@ -337,7 +347,7 @@ Square (no radius), `1px solid var(--line)` frame, `object-fit: cover`. Everyone
 
 ## Interactions
 
-- Transitions: `0.15s` on colour, background and border only. No transforms, no shadows, no glow (banners excepted, see `BANNER_DESIGN_GUIDE.md`).
+- Transitions: `0.15s` on colour, background and border only. No transforms, no shadows, no glow (banners excepted, see `BANNER_DESIGN_GUIDE.md`). The one continuous animation outside banners is the strong candidate's marching dashes (1.6s, stopped under `prefers-reduced-motion`).
 - Hover changes fill or colour (see Buttons). Links underline.
 - Focus: every focusable element shows `outline: 2px solid var(--rubric); outline-offset: 2px` on `:focus-visible`. Inputs use the rubric underline instead.
 - Touch targets ≥ 40px, ≥ 44px for primary and reply buttons.
@@ -352,6 +362,7 @@ Square (no radius), `1px solid var(--line)` frame, `object-fit: cover`. Everyone
 ✅ Pair every state colour with a glyph, border style or strikethrough
 ✅ Square corners, hairlines, double rules
 ✅ Check both themes and phone width
+✅ Stop any continuous animation under `prefers-reduced-motion` and keep the state readable without it
 
 ❌ No border-radius (except the unread dot), shadows, glows, gradients or textures (banners excepted, see `BANNER_DESIGN_GUIDE.md`)
 ❌ No parchment/scroll images, wax seals or fake aging
@@ -405,4 +416,4 @@ Reference CSS with a version query (`styles.css?v=N`) and bump `N` whenever the 
 ---
 
 **Version**: 2.0 (Scriptorium), replacing 1.0 (terminal/cyberpunk)
-**Last updated**: 2026-10-29
+**Last updated**: 2026-11-04
