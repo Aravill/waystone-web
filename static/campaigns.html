@@ -6,7 +6,7 @@
     <title>Waystone - Games</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=52">
+    <link rel="stylesheet" href="/static/styles.css?v=53">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -176,24 +176,38 @@
                                  @click="selectDay(day)"
                                  @keydown.enter.prevent="selectDay(day)"
                                  @keydown.space.prevent="selectDay(day)">
-                                <span class="day-pending-total"
-                                      x-show="hasPlannedSession(day) && getPendingResponsesForDay(day) > 0"
-                                      x-text="getPendingResponsesForDay(day)"
-                                      :title="`${getPendingResponsesForDay(day)} awaiting a reply`"></span>
-                                <div class="day-number" x-text="day.getDate()"></div>
+                                <div class="day-number" x-show="!hasSession(day)" x-text="day.getDate()"></div>
                                 <template x-for="s in getCellSessions(day)" :key="s.id">
-                                    <div class="day-chip" :class="`chip-${s.status}`" :title="getSessionTimeRange(s)">
-                                        <div class="day-chip-time" x-text="getSessionTimeRange(s)"></div>
-                                        <div class="day-chip-counts" x-show="s.status !== 'Cancelled'">
-                                            <span class="count-accepted" x-text="getAcceptedReaction(s)"></span>
-                                            <span class="count-tentative" x-text="getTentativeReaction(s)"></span>
-                                            <span class="count-declined" x-text="getDeclinedReaction(s)"></span>
+                                    <div class="day-frame" :class="`frame-${s.status}${isStrongCandidate(s) ? ' is-candidate' : ''}`">
+                                        <svg class="day-march" aria-hidden="true" x-show="isStrongCandidate(s)"><rect/></svg>
+                                        <span class="day-candidate-mark" aria-hidden="true" x-show="isStrongCandidate(s)">✦</span>
+                                        <div class="day-frame-head">
+                                            <span class="day-number" x-text="day.getDate()"></span>
+                                            <span class="day-overflow" x-show="getCellOverflow(day) > 0">+<span x-text="getCellOverflow(day)"></span><span class="day-overflow-word"> more</span></span>
+                                        </div>
+                                        <div class="day-time">
+                                            <span class="day-time-full" x-text="getSessionTimeRange(s)"></span>
+                                            <span class="day-time-short" x-text="s.time"></span>
+                                        </div>
+                                        <div class="day-cancelled-word" x-show="s.status === 'Cancelled'">cancelled</div>
+                                        <div class="day-tally" x-show="s.status !== 'Cancelled'">
+                                            <template x-for="c in getTally(s)" :key="c.kind">
+                                                <div :class="`reply-${c.kind}${c.n ? '' : ' tally-zero'}`">
+                                                    <span x-html="replyGlyph(c.kind)"></span><b x-text="c.n"></b>
+                                                </div>
+                                            </template>
                                         </div>
                                     </div>
                                 </template>
-                                <div class="day-overflow" x-show="getCellOverflow(day) > 0" x-text="`+${getCellOverflow(day)} more`"></div>
                             </div>
                         </template>
+                    </div>
+                    <div class="calendar-reply-key">
+                        <span class="reply-accepted" x-html="replyGlyph('accepted') + ' aye'"></span>
+                        <span class="reply-tentative">? perhaps</span>
+                        <span class="reply-declined" x-html="replyGlyph('declined') + ' nay'"></span>
+                        <span class="reply-awaiting">… awaiting</span>
+                        <span><span class="legend-star" aria-hidden="true">✦</span> strong candidate</span>
                     </div>
                 </div>
 
@@ -212,12 +226,16 @@
                                     </div>
                                     <div class="panel-session-meta" x-text="getSessionMeta(s)"></div>
 
-                                    <template x-for="group in getResponseGroups(s)" :key="group.label">
-                                        <div class="panel-response-group" x-show="group.users.length > 0">
-                                            <span class="panel-response-label" :class="group.cls" x-text="`${group.label} (${group.users.length})`"></span>
-                                            <span class="panel-response-avatars" :class="`avatars-${group.cls}`" x-html="group.users.map((u) => avatarHtml(u)).join('')"></span>
-                                        </div>
-                                    </template>
+                                    <p class="panel-candidate" x-show="isStrongCandidate(s)"><span class="panel-candidate-mark" aria-hidden="true">✦</span> <span x-text="getCandidateNote(s)"></span></p>
+                                    <div class="roster" x-show="getRoster(s).length > 0">
+                                        <template x-for="row in getRoster(s)" :key="row.key">
+                                            <div class="roster-row" :class="`avatars-${row.cls}`">
+                                                <span class="roster-avatar" x-html="avatarHtml(row.user)"></span>
+                                                <span class="roster-name" x-text="row.user.display_name || row.user.name || 'Unknown'"></span>
+                                                <span class="roster-said" :class="`reply-${row.kind}`"><span x-html="replyGlyph(row.kind)"></span> <span x-text="row.label"></span></span>
+                                            </div>
+                                        </template>
+                                    </div>
 
                                     <div class="player-responses" x-show="!isCurrentUserDM && s.status !== 'Cancelled'">
                                         <p class="pending-notice"><span aria-hidden="true">✦</span> Thy reply</p>
@@ -504,6 +522,6 @@
     </div>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="campaigns.js?v=46"></script>
+    <script src="campaigns.js?v=47"></script>
 </body>
 </html>
