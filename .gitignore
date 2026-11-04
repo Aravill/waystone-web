@@ -13,3 +13,7 @@ ai-notes
 .github/worktrees
 .claude/worktrees
 backups
+node_modules
+test-results
+playwright-report
+e2e/.tmp

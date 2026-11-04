@@ -8,11 +8,11 @@ Waystone Web: Go (stdlib `net/http`, SQLite via `modernc.org/sqlite`, local user
 
 - `.env.example` must list every env var the code reads (`os.Getenv`), with required/optional and defaults. Update it whenever you add, rename, or remove one, and keep `docker-compose.yml`'s `environment:` in sync.
 - Run locally: `go run main.go` → http://localhost:8080. Set `SESSION_SECRET` (required, ≥32 chars, e.g. `openssl rand -base64 32`; the server exits without it) and `ADMIN_PASSWORD` per `.env.example`; without `ADMIN_PASSWORD` the server starts but the admin can't log in. Add `SEED_DEMO_DATA=1` to get demo users/campaigns/sessions on an empty DB (users `testy`/`roy`/`adam`/`simon`, password in `config.InitialPasswords`); off by default, local dev only.
-- Verify changes: `go build ./... && go vet ./...`. There are no tests or linters; do not add tests unless explicitly asked.
+- Verify changes: `go build ./... && go vet ./...`. Frontend E2E tests use Playwright in `e2e/`: `npm ci`, `npx playwright install chromium` (once), `npm run test:e2e`. They start their own server on port 18080 with a throwaway DB in `e2e/.tmp` (via `DB_PATH`) and never touch `./data`. PRs to `main` can't merge unless the `playwright` check (`.github/workflows/e2e.yml`) passes. There are no Go tests or linters; add E2E tests only for stable, high-value flows.
 - `./deploy.sh` deploys production (app + Caddy HTTPS for waystone.aravill.org via `docker compose --profile prod up -d --build`) and keeps the data volume; never run `docker compose down -v` against data worth keeping (it wipes the SQLite volume). SQLite snapshots go to `./backups` (`BACKUP_DIR`).
 - For local Docker testing use `/deploy-local` (`up`/`down`/`status`), not `docker compose up`: plain compose names the project after the folder, so every worktree leaves its own image and volume behind.
 - Static files are copied into the Docker image, so frontend changes need `docker-compose build --no-cache`.
-- Local DB lives at `./data/waystone.db` (gitignored).
+- Local DB lives at `./data/waystone.db` (gitignored); `DB_PATH` overrides it.
 
 ## Architecture gotchas
 
@@ -24,6 +24,7 @@ Waystone Web: Go (stdlib `net/http`, SQLite via `modernc.org/sqlite`, local user
 - When changing `models/user.go`, update seed data in `config/config.go` and keep `SaveUser` and the `SELECT`/`Scan` sites in `db/sqlite_store.go` in sync.
 - The `ADMIN_USERNAME` user is env-managed: password reset from `.env` on every start; can't be blocked, deleted or demoted.
 - The session cookie is `Secure` by default (`SESSION_COOKIE_SECURE`): fine on `http://localhost`, but over plain HTTP on a LAN IP login returns 200 and the cookie silently never sticks; set it to `false` there.
+- The Calendar button focuses the first unanswered session's month, so tests use `openCalendar`/`goToMonth` helpers, not `page.clock`.
 
 ## Conventions
 
