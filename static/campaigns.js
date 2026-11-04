@@ -328,6 +328,14 @@ function userAvatarHtml(user, link = true) {
     return `<a href="${escapeHtml(href)}" class="user-avatar-link" title="${escapeHtml(name)}" aria-label="${escapeHtml(name)}">${inner}</a>`;
 }
 
+// Reply glyphs for the calendar. The check and cross are inline SVG: the text glyphs fall back to a font where the check reads like a root sign.
+const REPLY_GLYPHS = {
+    accepted: '<svg class="reply-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13l5 6L20 5"/></svg>',
+    tentative: '?',
+    declined: '<svg class="reply-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>',
+    awaiting: '…'
+};
+
 // Campaigns Alpine component
 window.campaignsPage = function () {
     return {
@@ -1265,10 +1273,6 @@ window.campaignsPage = function () {
             return this.sessionMap[dateStr]?.primary || null;
         },
 
-        getPendingResponsesForDay(date) {
-            return this.getPlannedSessionsForDay(date).reduce((total, session) => total + (Number(session?.pending_count) || 0), 0);
-        },
-
         getDayStatusClass(date) {
             const primarySession = this.getPrimarySessionForDay(date);
             if (!primarySession) return '';
@@ -1279,17 +1283,21 @@ window.campaignsPage = function () {
         },
 
         getDayTitle(date) {
-            if (!this.isHistoricalDay(date)) return '';
-            return this.isCurrentUserDM
+            const summary = this.getDaySummary(date);
+            if (!this.isHistoricalDay(date)) return summary;
+            return `${summary}. ${this.isCurrentUserDM
                 ? 'Previously planned session is inactive. Click to suggest a new one.'
-                : 'Previously planned session is inactive.';
+                : 'Previously planned session is inactive.'}`;
         },
 
         getDayAriaLabel(date) {
-            if (!this.isHistoricalDay(date)) return '';
-            return this.isCurrentUserDM
+            const summary = this.getDaySummary(date);
+            if (!summary) return '';
+            const head = this.formatDayHeading(date);
+            if (!this.isHistoricalDay(date)) return `${head}. ${summary}`;
+            return `${head}. ${summary}. ${this.isCurrentUserDM
                 ? 'Previously planned session is inactive. Select this day to suggest a new session.'
-                : 'Previously planned session is inactive.';
+                : 'Previously planned session is inactive.'}`;
         },
 
         getSessionEndTime(session) {
@@ -1302,16 +1310,56 @@ window.campaignsPage = function () {
             return `${startTime}-${endTime}`;
         },
 
-        getAcceptedReaction(session) {
-            return `✓${session?.accepted_count || 0}`;
+        getSessionCounts(session) {
+            const accepted = Number(session?.accepted_count) || 0;
+            const tentative = Number(session?.tentative_count) || 0;
+            const declined = Number(session?.declined_count) || 0;
+            const awaiting = Number(session?.pending_count) || 0;
+            return { accepted, tentative, declined, awaiting, total: accepted + tentative + declined + awaiting };
         },
 
-        getDeclinedReaction(session) {
-            return `✗${session?.declined_count || 0}`;
+        getTally(session) {
+            const c = this.getSessionCounts(session);
+            return [
+                { kind: 'accepted', n: c.accepted },
+                { kind: 'tentative', n: c.tentative },
+                { kind: 'declined', n: c.declined },
+                { kind: 'awaiting', n: c.awaiting }
+            ];
         },
 
-        getTentativeReaction(session) {
-            return `?${session?.tentative_count || 0}`;
+        // A suggestion with over 70% of all players accepted (awaiting players count; exactly 70% does not).
+        isStrongCandidate(session) {
+            const c = this.getSessionCounts(session);
+            return session?.status === 'Suggested' && c.total > 0 && c.accepted * 10 > c.total * 7;
+        },
+
+        getCandidateNote(session) {
+            const c = this.getSessionCounts(session);
+            return `Strong candidate: ${c.accepted} of ${c.total} accepted`;
+        },
+
+        getDaySummary(date) {
+            const s = this.getPrimarySessionForDay(date);
+            if (!s) return '';
+            const parts = [`${s.status} ${this.getSessionTimeRange(s)}`];
+            if (s.status !== 'Cancelled') {
+                const c = this.getSessionCounts(s);
+                parts[0] += `: ${c.accepted} accepted, ${c.tentative} tentative, ${c.declined} declined, ${c.awaiting} awaiting`;
+            }
+            if (this.isStrongCandidate(s)) parts.push('Strong candidate');
+            const more = this.getCellOverflow(date);
+            if (more > 0) parts.push(`+${more} more session${more === 1 ? '' : 's'}`);
+            return parts.join('. ');
+        },
+
+        replyGlyph(kind) {
+            return REPLY_GLYPHS[kind] || '';
+        },
+
+        getRoster(session) {
+            return this.getResponseGroups(session).flatMap((g) => g.users.map((user, i) =>
+                ({ key: `${g.kind}-${user.id || i}`, user, label: g.label, cls: g.cls, kind: g.kind })));
         },
 
         // True when the user owes this game a reply: unanswered sessions (player) or pending sign-ups (DM).
@@ -1416,11 +1464,12 @@ window.campaignsPage = function () {
         },
 
         getCellSessions(date) {
-            return this.sortedByTime(this.getSessionsForDay(date)).slice(0, 2);
+            const s = this.getPrimarySessionForDay(date);
+            return s ? [s] : [];
         },
 
         getCellOverflow(date) {
-            return Math.max(0, this.getSessionsForDay(date).length - 2);
+            return Math.max(0, this.getSessionsForDay(date).length - 1);
         },
 
         getSelectedDaySessions() {
@@ -1456,10 +1505,10 @@ window.campaignsPage = function () {
                 .filter((entry) => entry?.participation === participation)
                 .map((entry) => entry.user || { display_name: 'Unknown' });
             return [
-                { label: 'Accepted', cls: 'participation-accepted', users: byStatus('Accepted') },
-                { label: 'Tentative', cls: 'participation-tentative', users: byStatus('Tentative') },
-                { label: 'Declined', cls: 'participation-declined', users: byStatus('Declined') },
-                { label: 'Awaiting', cls: 'participation-pending', users: details.pending }
+                { kind: 'accepted', label: 'Accepted', cls: 'participation-accepted', users: byStatus('Accepted') },
+                { kind: 'tentative', label: 'Tentative', cls: 'participation-tentative', users: byStatus('Tentative') },
+                { kind: 'declined', label: 'Declined', cls: 'participation-declined', users: byStatus('Declined') },
+                { kind: 'awaiting', label: 'Awaiting', cls: 'participation-pending', users: details.pending }
             ];
         },
 
