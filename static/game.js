@@ -347,7 +347,7 @@ window.gamePage = function () {
         // On a stacked layout the panel sits below the list, so bring it into view.
         revealPanel() {
             if (window.matchMedia('(max-width: 900px)').matches) {
-                this.$nextTick(() => document.getElementById('gamePanel')?.scrollIntoView({ block: 'start' }));
+                this.$nextTick(() => document.querySelector('.game-panel-states')?.scrollIntoView({ block: 'start' }));
             }
         },
 

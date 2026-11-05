@@ -167,7 +167,7 @@ The drop cap is optional and goes on the page h1, except on the game page, whose
 
 ### Game page: the tale and the ledger
 
-The game page is the calendar modal's sheet (double frame, `3px double` head rule) with the tale and the chronicle on the left and a session panel on the right, split by an ink rule. In the chronicle, **Ahead** reuses the calendar's `.day-frame` cells (a button per upcoming session, tally for members only), and **Played** is one `<li>` per session holding a full-width row button, so later elements can sit under it. Both select into the panel, which reuses the calendar panel's card, roster and reply buttons. Player avatars in a button are never links.
+The game page is the calendar modal's sheet (double frame, `3px double` head rule) with the tale and the chronicle on the left and a session panel on the right, split by an ink rule. In the chronicle, **Ahead** reuses the calendar's `.day-frame` cells (a button per upcoming session, tally for members only), and **Played** is one `<li>` per session holding a full-width row button, so later elements can sit under it. Both select into the panel, which reuses the calendar panel's card, roster and reply buttons. Player avatars in a button are never links. When the layout stacks (≤ 900px), the actions move to the top of the sheet, above the tale, and the panel's session details and company sit below the chronicle. The actions keep their place in the DOM, so on a stacked layout with a keyboard they come after the chronicle in tab order.
 
 ### Buttons
 

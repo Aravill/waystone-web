@@ -3084,17 +3084,33 @@ button.game-cell:hover {
         flex-direction: column;
     }
 
-    .game-panel {
-        flex: none;
-        padding: 1.5rem 0 0;
-        border-left: 0;
-        border-top: 1px solid var(--ink);
+    /* Stacked: the panel's parts join the layout, so the actions can sit above the tale */
+    .game-panel,
+    .game-panel-inner {
+        display: contents;
     }
 
-    .game-panel-inner {
-        position: static;
-        max-height: none;
-        overflow-y: visible;
+    .game-foot {
+        order: -2;
+        padding: 0 0 1.5rem;
+        border-top: 0;
+        border-bottom: 1px solid var(--ink);
+    }
+
+    /* Stuck to the viewport: actions and replies are now far apart on the page */
+    .game-panel .message {
+        order: -1;
+        position: sticky;
+        top: 0.5rem;
+        z-index: 1;
+        margin-top: 0;
+        background: var(--bg);
+    }
+
+    .game-panel-states {
+        order: 1;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--ink);
     }
 
     .game-ahead-grid {
