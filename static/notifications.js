@@ -47,7 +47,7 @@
                     const response = await fetch('/api/notifications/unread-count');
                     if (response.status === 401) {
                         // Session revoked (e.g. password changed elsewhere).
-                        window.location.href = '/login.html';
+                        window.redirectToLogin();
                         return;
                     }
                     if (!response.ok) return;

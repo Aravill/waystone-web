@@ -57,3 +57,34 @@ test('a fresh session lasts 30 days and is not reissued on every page', async ({
   expect(res.ok()).toBeTruthy();
   expect(res.headers()['set-cookie']).toBeUndefined();
 });
+
+test('a session that dies in an open tab returns to that page after login', async ({ page, context }) => {
+  await page.goto('/login.html');
+  await page.getByLabel('Username').fill('testy');
+  await page.getByLabel('Password').fill(env.DEMO_PASSWORD);
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible();
+  await page.goto('/profile?from=test');
+  await expect(page.locator('.notif-btn')).toBeVisible();
+
+  await context.clearCookies();
+  // Coming back to the tab rechecks the unread count, which finds the dead session.
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect(page).toHaveURL(/\/login\.html\?next=%2Fprofile%3Ffrom%3Dtest$/);
+
+  await page.getByLabel('Username').fill('testy');
+  await page.getByLabel('Password').fill(env.DEMO_PASSWORD);
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await expect(page).toHaveURL(/\/profile\?from=test$/);
+});
+
+test('logging out does not set a return address', async ({ page }) => {
+  await page.goto('/login.html');
+  await page.getByLabel('Username').fill('testy');
+  await page.getByLabel('Password').fill(env.DEMO_PASSWORD);
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible();
+  await page.goto('/campaigns');
+  await page.getByRole('button', { name: 'Logout' }).click();
+  await expect(page).toHaveURL(/\/login\.html$/);
+});

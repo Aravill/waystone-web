@@ -41,7 +41,7 @@ window.adminUsersPage = function () {
         async init() {
             try {
                 const res = await fetch('/auth/current-user');
-                if (!res.ok) { window.location.href = '/login.html'; return; }
+                if (!res.ok) { window.redirectToLogin(); return; }
                 const user = await res.json();
                 this.displayName = user.display_name || user.username;
                 this.isAdmin = (user.roles || []).includes('admin');
@@ -50,7 +50,7 @@ window.adminUsersPage = function () {
                 await this.loadSystems();
                 await this.loadCampaigns();
             } catch {
-                window.location.href = '/login.html';
+                window.redirectToLogin();
             }
         },
 
