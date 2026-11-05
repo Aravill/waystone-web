@@ -140,7 +140,7 @@
                             </td>
                             <td>
                                 <div style="display: flex; gap: 0.375rem; flex-wrap: wrap;">
-                                    <button x-show="!user.is_env_admin" @click="confirmAction(user.must_change_password ? 'new invite' : 'reset password', (user.must_change_password ? 'create a new invite for ' : 'reset password for ') + user.username + '? their current password stops working and a new invite link is created.', () => resetPassword(user))" class="action-btn" x-text="user.must_change_password ? 'new invite' : 'reset password'"></button>
+                                    <button x-show="!user.is_env_admin" @click="confirmAction(user.must_change_password ? 'new invite' : 'reset password', (user.must_change_password ? 'create a new invite for ' + user.username + '? any earlier invite or temporary password stops working.' : 'reset password for ' + user.username + '? their current password stops working and a new invite link is created.'), () => resetPassword(user))" class="action-btn" x-text="user.must_change_password ? 'new invite' : 'reset password'"></button>
                                     <button x-show="!user.blocked && !user.is_env_admin" @click="confirmAction('block user', 'block ' + user.username + '?', () => blockUser(user.id))" class="action-btn danger">block</button>
                                     <button x-show="user.blocked" @click="unblockUser(user.id)" class="action-btn">unblock</button>
                                     <button x-show="!user.roles || !user.roles.includes('admin')" @click="confirmAction('make admin', 'promote ' + user.username + ' to admin?', () => makeAdmin(user.id))" class="action-btn">make admin</button>
@@ -259,6 +259,6 @@
     </main>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="/admin-users.js?v=6"></script>
+    <script src="/admin-users.js?v=7"></script>
 </body>
 </html>

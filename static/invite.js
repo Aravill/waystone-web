@@ -11,7 +11,12 @@ window.invitePage = () => ({
     messageType: '',
 
     async init() {
-        this.token = decodeURIComponent(location.pathname.split('/invite/')[1] || '').split('/')[0];
+        try {
+            this.token = decodeURIComponent(location.pathname.split('/invite/')[1] || '').split('/')[0];
+        } catch {
+            this.state = 'invalid'; // a mangled link
+            return;
+        }
         await this.load();
     },
 

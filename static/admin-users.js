@@ -77,7 +77,11 @@ window.adminUsersPage = function () {
                     body: JSON.stringify({ username: this.newUsername, name: this.newName }),
                 });
                 const data = await res.json();
-                if (!res.ok) { this.showMessage(data.error || 'failed to add user', 'error'); return; }
+                if (!res.ok) {
+                    this.showMessage(data.error || 'failed to add user', 'error');
+                    await this.loadUsers(); // the user may exist even though the invite failed
+                    return;
+                }
                 this.newUsername = '';
                 this.newName = '';
                 this.invite = { username: data.user.username, url: `${window.location.origin}/invite/${data.invite_token}` };
