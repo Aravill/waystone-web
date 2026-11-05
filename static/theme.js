@@ -40,5 +40,17 @@
 
         render();
         header.prepend(btn);
+
+        // Version footer: decorative, so any failure (e.g. 403 during a forced password change) is ignored.
+        fetch('/api/version')
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+                if (!data || !data.version) return;
+                const p = document.createElement('p');
+                p.className = 'app-version';
+                p.textContent = data.version;
+                document.body.appendChild(p);
+            })
+            .catch(() => { /* no version footer */ });
     });
 })();
