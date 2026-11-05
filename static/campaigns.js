@@ -381,6 +381,12 @@ window.campaignsPage = function () {
         },
         timezoneOptions: getTimezoneOptions(),
         sessionResponseCache: {},
+        sessionClipboard: null,
+        pasteSelection: {},
+        pasteNote: { text: '', type: '' },
+        pasteSubmitting: false,
+        sessionsMonth: '',
+        sessionsLoadSeq: 0,
         signupsModalOpen: false,
         signupsCampaignId: '',
         signupsCampaignTitle: '',
@@ -1026,6 +1032,7 @@ window.campaignsPage = function () {
             this.selectedSession = null;
             this.pendingSessionAction = '';
             this.sessionResponseCache = {};
+            this.clearClipboard();
             this.generateCalendarDays();
             await this.loadSessions();
             if (focus) {
@@ -1036,6 +1043,7 @@ window.campaignsPage = function () {
         closeCalendarModal() {
             this.calendarModalOpen = false;
             this.showCreateSessionModal = false;
+            this.clearClipboard();
             this.clearSelectedDay();
             this.sessionResponseCache = {};
             this.leaveToReturnPage();
@@ -1114,18 +1122,23 @@ window.campaignsPage = function () {
         async loadSessions() {
             const year = this.currentCalendarDate.getFullYear();
             const month = String(this.currentCalendarDate.getMonth() + 1).padStart(2, '0');
+            const seq = ++this.sessionsLoadSeq;
             try {
                 const response = await fetch(`/api/campaigns/${this.currentCampaignId}/sessions?month=${year}-${month}`);
                 if (!response.ok) {
                     throw new Error('Failed to load sessions');
                 }
                 const data = await response.json();
+                if (seq !== this.sessionsLoadSeq) return;
                 this.sessions = Array.isArray(data) ? data : [];
                 this.buildSessionMap();
+                this.sessionsMonth = `${year}-${month}`;
             } catch (error) {
+                if (seq !== this.sessionsLoadSeq) return;
                 this.showMessage('Error loading sessions: ' + error.message, 'error');
                 this.sessions = [];
                 this.sessionMap = {};
+                this.sessionsMonth = '';
             }
         },
 
@@ -1189,6 +1202,7 @@ window.campaignsPage = function () {
         },
 
         getDayTitle(date) {
+            if (this.sessionClipboard && this.isCurrentMonth(date)) return this.getPasteDayLabel(date);
             const summary = this.getDaySummary(date);
             if (!this.isHistoricalDay(date)) return summary;
             return `${summary}. ${this.isCurrentUserDM
@@ -1197,6 +1211,7 @@ window.campaignsPage = function () {
         },
 
         getDayAriaLabel(date) {
+            if (this.sessionClipboard && this.isCurrentMonth(date)) return this.getPasteDayLabel(date);
             const summary = this.getDaySummary(date);
             if (!summary) return '';
             const head = this.formatDayHeading(date);
@@ -1204,6 +1219,12 @@ window.campaignsPage = function () {
             return `${head}. ${summary}. ${this.isCurrentUserDM
                 ? 'Previously planned session is inactive. Select this day to suggest a new session.'
                 : 'Previously planned session is inactive.'}`;
+        },
+
+        getPasteDayLabel(date) {
+            const head = this.formatDayHeading(date);
+            if (this.pasteSelection[this.formatDateLocal(date)]) return `Remove ${head} from paste`;
+            return this.getPasteBlockReason(date) || `Paste session on ${head}`;
         },
 
         getSessionEndTime(session) {
@@ -1341,6 +1362,120 @@ window.campaignsPage = function () {
                 timezone: getDefaultTimezone()
             };
             this.showCreateSessionModal = true;
+        },
+
+        copySession(session) {
+            if (!this.isCurrentUserDM || !session) return;
+            this.sessionClipboard = {
+                time: session.time,
+                duration: session.duration,
+                timezone: session.timezone || getDefaultTimezone()
+            };
+            this.pasteSelection = {};
+            this.pasteNote = { text: '', type: '' };
+            // Read refs first: clearSelectedDay removes the Copy button, and $refs resolves from it.
+            const { pasteCancel, calendarMain, dayPanel } = this.$refs;
+            this.clearSelectedDay();
+            this.$nextTick(() => {
+                // x-show reveals the bar a frame later, and a hidden button can't take focus.
+                requestAnimationFrame(() => setTimeout(() => {
+                    if (dayPanel) dayPanel.scrollTop = 0;
+                    pasteCancel?.focus({ preventScroll: true });
+                    if (window.matchMedia('(max-width: 768px)').matches) {
+                        calendarMain?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }));
+            });
+        },
+
+        clearClipboard() {
+            this.sessionClipboard = null;
+            this.pasteSelection = {};
+            this.pasteNote = { text: '', type: '' };
+        },
+
+        getPasteBlockReason(date) {
+            const year = this.currentCalendarDate.getFullYear();
+            const month = String(this.currentCalendarDate.getMonth() + 1).padStart(2, '0');
+            if (this.sessionsMonth !== `${year}-${month}`) return "This month's sessions have not loaded yet";
+            if (this.formatDateLocal(date) < this.formatDateLocal(new Date())) return 'That day is in the past';
+            if (this.hasPlannedSession(date)) return 'That day already has a session';
+            return '';
+        },
+
+        handleDayActivate(date) {
+            if (this.sessionClipboard) {
+                this.togglePasteDay(date);
+            } else {
+                this.selectDay(date);
+            }
+        },
+
+        togglePasteDay(date) {
+            if (!this.isCurrentMonth(date) || this.pasteSubmitting) return;
+            const key = this.formatDateLocal(date);
+            if (this.pasteSelection[key]) {
+                delete this.pasteSelection[key];
+                this.pasteNote = { text: '', type: '' };
+                return;
+            }
+            const reason = this.getPasteBlockReason(date);
+            if (reason) {
+                this.pasteNote = { text: reason, type: 'error' };
+                return;
+            }
+            this.pasteSelection[key] = true;
+            this.pasteNote = { text: '', type: '' };
+        },
+
+        get pasteCount() {
+            return Object.keys(this.pasteSelection).length;
+        },
+
+        async submitPaste() {
+            if (this.pasteSubmitting || this.pasteCount === 0) return;
+            const clip = this.sessionClipboard;
+            if (!clip) return;
+            const campaignId = this.currentCampaignId;
+            const keys = Object.keys(this.pasteSelection).sort();
+            let done = 0;
+            let failed = 0;
+            let lastError = '';
+            this.pasteSubmitting = true;
+            try {
+                for (const key of keys) {
+                    try {
+                        const response = await fetch(`/api/campaigns/${campaignId}/sessions`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ date: key, time: clip.time, duration: clip.duration, timezone: clip.timezone })
+                        });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok) {
+                            failed++;
+                            lastError = data.error || 'Failed to create session';
+                            continue;
+                        }
+                        done++;
+                        if (this.sessionClipboard === clip) delete this.pasteSelection[key];
+                    } catch (error) {
+                        failed++;
+                        lastError = error.message;
+                    }
+                }
+            } finally {
+                this.pasteSubmitting = false;
+            }
+            await this.loadSessions();
+            await this.loadDayResponses();
+            if (failed === 0) {
+                if (this.sessionClipboard === clip) this.clearClipboard();
+                this.showMessage(`Pasted to ${done} ${done === 1 ? 'day' : 'days'}`, 'success');
+                return;
+            }
+            const text = `Pasted ${done}, ${failed} failed: ${lastError}`;
+            if (this.sessionClipboard === clip) this.pasteNote = { text, type: 'error' };
+            this.showMessage(text, 'error');
         },
 
         async loadDayResponses() {
