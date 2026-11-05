@@ -4,16 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
-    <title>Reply — Waystone</title>
+    <title>Set your password — Waystone</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
     <link rel="stylesheet" href="/static/styles.css?v=54">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
     <style>
         [x-cloak] { display: none !important; }
-        .guest-sessions { display: flex; flex-direction: column; gap: 1rem; margin-top: 1.5rem; }
-        .guest-date { font-family: var(--font-display); font-size: 1.25rem; color: var(--ink); }
-        .guest-counts { color: var(--muted); font-size: 0.875rem; margin-top: 0.5rem; }
+        .password-rules { list-style: none; margin: 10px 0 0; padding: 0; font-size: 0.85em; color: var(--muted); }
+        .password-rules li { margin-bottom: 4px; }
+        .password-rules li.ok { color: var(--verdigris); }
     </style>
 </head>
 <body x-data="guestPage()" x-cloak>
@@ -25,63 +25,52 @@
         <template x-if="state === 'invalid'">
             <div>
                 <h1 class="page-title">Link not valid</h1>
-                <p class="form-hint">This link is not valid. Ask your DM for a new one.</p>
+                <p class="form-hint">This link is no longer valid. If you've already set your password, log in with it. Otherwise ask your DM for a new link.</p>
+                <p class="form-hint"><a href="/login.html">Go to login</a></p>
             </div>
         </template>
         <template x-if="state === 'expired'">
             <div>
                 <h1 class="page-title">Link expired</h1>
-                <p class="form-hint">The link you're using has expired. Ask your DM to generate a new one for you.</p>
+                <p class="form-hint">This link has expired. Ask your DM to generate a new one for you.</p>
             </div>
         </template>
 
         <template x-if="state === 'error'">
             <div>
                 <h1 class="page-title">Something went wrong</h1>
-                <p class="form-hint">Couldn't load the sessions. Try refreshing the page.</p>
+                <p class="form-hint">Couldn't load this page. Try refreshing.</p>
             </div>
         </template>
 
         <template x-if="state === 'ready'">
             <div>
-                <h1 class="page-title" x-text="campaignTitle"></h1>
-                <p class="form-hint" x-text="'Replying as ' + displayName"></p>
-                <p class="form-hint" x-text="'Link valid until ' + formatExpiry()"></p>
-
-                <p class="panel-empty" x-show="sessions.length === 0">No upcoming sessions.</p>
-
-                <div class="guest-sessions">
-                    <template x-for="s in sessions" :key="s.id">
-                        <div class="panel-session">
-                            <div class="guest-date" x-text="formatAgendaDate(s)"></div>
-                            <div class="panel-session-head">
-                                <span class="panel-session-time" x-text="getSessionTimeRange(s)"></span>
-                                <span class="panel-status-tag" :class="`chip-${s.status}`" x-text="s.status"></span>
-                            </div>
-                            <div class="panel-session-meta" x-text="getSessionMeta(s)"></div>
-                            <div class="guest-counts" x-text="getCounts(s)"></div>
-
-                            <div class="player-responses" x-show="s.status !== 'Cancelled'">
-                                <p class="pending-notice"><span aria-hidden="true">✦</span> Thy reply</p>
-                                <div class="session-actions session-replies">
-                                    <button type="button" class="btn-response btn-response--accepted"
-                                            :class="{ 'selected': s.current_user_participation === 'Accepted' }"
-                                            @click="respond('Accepted', s)">Aye</button>
-                                    <button type="button" class="btn-response btn-response--tentative"
-                                            :class="{ 'selected': s.current_user_participation === 'Tentative' }"
-                                            @click="respond('Tentative', s)">Perhaps</button>
-                                    <button type="button" class="btn-response btn-response--declined"
-                                            :class="{ 'selected': s.current_user_participation === 'Declined' }"
-                                            @click="respond('Declined', s)">Nay</button>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-                </div>
+                <h1 class="page-title"><span class="drop-cap">S</span>et your password</h1>
+                <p class="form-hint" x-text="'Welcome, ' + displayName + '. Choose a password to reach the calendar for ' + campaignTitle + '.'"></p>
+                <p class="form-hint" style="margin-bottom: 1.5rem;" x-text="'Your username is ' + username + '. You\'ll use it with this password to log in from now on.'"></p>
+                <form @submit.prevent="submit()">
+                    <input type="text" :value="username" autocomplete="username" readonly tabindex="-1" aria-hidden="true"
+                        style="position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden;">
+                    <div class="form-group">
+                        <label for="newPassword">New password</label>
+                        <input id="newPassword" type="password" x-model="newPassword" autocomplete="new-password" minlength="10" required aria-describedby="passwordRules">
+                        <ul id="passwordRules" class="password-rules">
+                            <template x-for="rule in rules()" :key="rule.text">
+                                <li :class="rule.ok ? 'ok' : ''"><span x-text="rule.ok ? '[x]' : '[ ]'"></span> <span x-text="rule.text"></span></li>
+                            </template>
+                        </ul>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm new password</label>
+                        <input id="confirmPassword" type="password" x-model="confirmPassword" autocomplete="new-password" minlength="10" required>
+                    </div>
+                    <button type="submit" class="submit-btn" :disabled="saving">Set password</button>
+                </form>
             </div>
         </template>
     </main>
 
-    <script src="/static/guest.js?v=2"></script>
+    <script src="/change-password.js?v=4"></script>
+    <script src="/static/guest.js?v=3"></script>
 </body>
 </html>

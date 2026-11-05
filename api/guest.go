@@ -5,11 +5,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+	"waystone-web/auth"
 	"waystone-web/db"
+	"waystone-web/middleware"
 	"waystone-web/models"
 )
 
@@ -148,7 +151,24 @@ func HandleCampaignGuestLinks(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusInternalServerError, "failed to load guest links")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]interface{}{"links": links})
+		needsSetup := []string{}
+		for _, pid := range campaign.Players {
+			u, err := db.GetUserByID(pid)
+			if err != nil {
+				writeJSONError(w, http.StatusInternalServerError, "failed to load guest links")
+				return
+			}
+			if u != nil && u.MustChangePassword && !u.IsAdmin() && !u.Deleted && !u.Blocked {
+				needsSetup = append(needsSetup, pid)
+			}
+		}
+		filtered := map[string]models.GuestToken{}
+		for _, pid := range needsSetup {
+			if l, ok := links[pid]; ok {
+				filtered[pid] = l
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{"links": filtered, "needs_setup": needsSetup})
 	case len(parts) == 4 && parts[1] == "players" && parts[3] == "guest-link":
 		switch r.Method {
 		case http.MethodPost:
@@ -195,6 +215,14 @@ func createGuestLink(w http.ResponseWriter, r *http.Request, campaign *models.Ca
 		writeJSONError(w, http.StatusConflict, "user is not an active player of this game")
 		return
 	}
+	if user.IsAdmin() {
+		writeJSONError(w, http.StatusConflict, "guest links are not available for admin accounts")
+		return
+	}
+	if !user.MustChangePassword {
+		writeJSONError(w, http.StatusConflict, "this player has already set a password")
+		return
+	}
 
 	token, err := newToken()
 	if err != nil {
@@ -217,7 +245,8 @@ func guestHeaders(w http.ResponseWriter) {
 
 // resolveGuest validates a guest token and returns its campaign, user and expiry. On
 // failure it writes the error response and returns false. It never touches
-// the session or cookies.
+// the session or cookies. Only players who still must set a password (and are
+// not admins) have valid links.
 func resolveGuest(w http.ResponseWriter, token string) (*models.Campaign, *models.User, time.Time, bool) {
 	campaignID, userID, expiresAt, err := db.GetGuestToken(token)
 	if err != nil {
@@ -242,7 +271,7 @@ func resolveGuest(w http.ResponseWriter, token string) (*models.Campaign, *model
 		writeJSONError(w, http.StatusInternalServerError, "internal error")
 		return nil, nil, time.Time{}, false
 	}
-	if user == nil || user.Deleted || user.Blocked || campaign == nil || !isCampaignPlayer(campaign, userID) {
+	if user == nil || user.Deleted || user.Blocked || !user.MustChangePassword || user.IsAdmin() || campaign == nil || !isCampaignPlayer(campaign, userID) {
 		writeJSONError(w, http.StatusNotFound, "link is not valid")
 		return nil, nil, time.Time{}, false
 	}
@@ -261,7 +290,7 @@ func HandleGuestPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleGuestAPI handles GET /api/guest/{token} and
-// POST /api/guest/{token}/sessions/{sid}/responses.
+// POST /api/guest/{token}/password.
 func HandleGuestAPI(w http.ResponseWriter, r *http.Request) {
 	guestHeaders(w)
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/guest/"), "/")
@@ -274,12 +303,12 @@ func HandleGuestAPI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		handleGuestOverview(w, token)
-	case len(parts) == 4 && parts[1] == "sessions" && parts[3] == "responses":
+	case len(parts) == 2 && parts[1] == "password":
 		if r.Method != http.MethodPost {
 			writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
-		handleGuestRespond(w, r, token, parts[2])
+		handleGuestSetPassword(w, r, token)
 	default:
 		writeJSONError(w, http.StatusNotFound, "not found")
 	}
@@ -290,54 +319,57 @@ func handleGuestOverview(w http.ResponseWriter, token string) {
 	if !ok {
 		return
 	}
-
-	today := time.Now().UTC().Format("2006-01-02")
-	sessions, err := db.GetSessionsByCampaignIDs([]string{campaign.ID}, today)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to load sessions")
-		return
-	}
-	ids := make([]string, 0, len(sessions))
-	for _, s := range sessions {
-		ids = append(ids, s.ID)
-	}
-	responses, err := db.GetSessionResponsesBySessionIDs(ids)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to load responses")
-		return
-	}
-	for i := range sessions {
-		applySessionCounts(&sessions[i], campaign, responses[sessions[i].ID], user.ID)
-	}
-	if sessions == nil {
-		sessions = []models.CampaignSession{}
-	}
-
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"campaign":   map[string]string{"id": campaign.ID, "title": campaign.Title},
-		"user":       map[string]string{"display_name": user.DisplayName()},
+		"user":       map[string]string{"username": user.Username, "display_name": user.DisplayName()},
 		"expires_at": expiresAt.UTC().Format(time.RFC3339),
-		"sessions":   sessions,
 	})
 }
 
-func handleGuestRespond(w http.ResponseWriter, r *http.Request, token, sessionID string) {
+func handleGuestSetPassword(w http.ResponseWriter, r *http.Request, token string) {
 	campaign, user, _, ok := resolveGuest(w, token)
 	if !ok {
 		return
 	}
-	_, session, err := validateSessionCampaign(campaign.ID, sessionID)
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	var body struct {
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if v := auth.PasswordPolicyViolations(body.NewPassword, user.Username); len(v) > 0 {
+		writeJSONError(w, http.StatusBadRequest, "new "+auth.PasswordPolicyError(v))
+		return
+	}
+	if user.PasswordHash != "" && auth.CheckPassword(user.PasswordHash, body.NewPassword) {
+		writeJSONError(w, http.StatusBadRequest, "new password must differ from the temporary one")
+		return
+	}
+	hash, err := auth.HashPassword(body.NewPassword)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve session")
+		writeJSONError(w, http.StatusInternalServerError, "failed to hash password")
 		return
 	}
-	if session == nil {
-		writeJSONError(w, http.StatusNotFound, "session not found")
+	set, err := db.SetInitialPassword(user.ID, hash)
+	if err != nil {
+		log.Printf("guest: failed to set password: %v", err)
+		writeJSONError(w, http.StatusInternalServerError, "failed to save password")
 		return
 	}
-	if session.Status == models.SessionCancelled {
-		writeJSONError(w, http.StatusConflict, "session is cancelled")
+	if !set {
+		writeJSONError(w, http.StatusNotFound, "link is not valid")
 		return
 	}
-	writeSessionResponse(w, r, sessionID, user.ID)
+
+	// Replace any other session in this browser with the new user's.
+	updated, err := db.GetUserByID(user.ID)
+	if err != nil || updated == nil {
+		log.Printf("guest: failed to reload user: %v", err)
+	} else if err := middleware.SetSession(w, r, updated); err != nil {
+		log.Printf("guest: failed to start session: %v", err)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "password set", "campaign_id": campaign.ID})
 }
