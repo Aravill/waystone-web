@@ -138,8 +138,8 @@ func buildCalendarFeed(sessions []models.CampaignSession, campaignByID map[strin
 
 	for _, session := range sessions {
 		campaign := campaignByID[session.CampaignID]
-		if campaign == nil {
-			continue
+		if campaign == nil || session.Manual {
+			continue // sessions recorded by hand are chronicle-only
 		}
 		isDM := campaign.DM == userID
 		if session.Status == models.SessionSuggested && !isDM && session.CurrentUserParticipation == models.Declined {

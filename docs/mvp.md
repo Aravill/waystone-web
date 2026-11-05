@@ -7,6 +7,7 @@ This document describes what must-have features are to be implemented before pre
     - [x] Players can react with confirm / reject / tentative the dates
     - [x] DM can see who reacted how
     - [x] Dates can be cancelled
+    - [x] DM can copy a session and paste it onto several days at once
     - [x] Calendar sync - the players & DM can import events into their google calendar
 - [x] Signing up
     - [x] Users can sign up for campaigns if sign-ups are open
@@ -38,7 +39,7 @@ This document describes what must-have features are to be implemented before pre
         - [x] Deleting
     - [x] Switching states according to the state transition map
     - [x] Removing active players
-    - [x] DMs can issue expiring guest links so unregistered players can reply to sessions
+    - [x] Admins can issue one-time invite links so players set their own password
     - [x] Opening / Closing sign-ups
     - [x] Toggling sign-up auto close and auto open - not needed: disabled by leaving the desired player count blank, and bypassed by manual opening/closing of sign-ups
     - [x] Campaign grid view
@@ -46,7 +47,9 @@ This document describes what must-have features are to be implemented before pre
     - [x] Visually distinct campaign statuses
     - [x] Campaign types (and their visual distinction) - Campaign, Adventure, One-shot
     - [x] Game systems - admins manage known systems (optional logo); campaigns pick one or type a custom one; shown on the campaign card
-    - [x] Game page - full description (basic Markdown), company, chronicle of played sessions with attendees (visible to all users)
+    - [x] Game page - sheet with the full description (basic Markdown), the chronicle (upcoming sessions as calendar cells, played sessions with attendees) and a side panel for the selected session or the company (visible to all users; replies and rolls are for members)
+    - [x] Reply to suggested sessions from the game page
+    - [x] DMs record past sessions by hand (optional times, ticked attendees, named guests), edit and delete them
 - [x] Profile
     - [x] Standard operations
         - [x] Changing nicknames

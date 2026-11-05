@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Waystone game page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&amp;family=IM+Fell+English+SC&amp;family=UnifrakturMaguntia&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#8E2A1E}a:hover{color:#2B241C}
+.ws{--bg:#F2EAD8;--folio:#E6DBC2;--ink:#2B241C;--muted:#6B5E4B;--line:rgba(43,36,28,.4);--rubric:#8E2A1E;--verdigris:#355E52;--ochre:#7A5A12;--text:'Courier Prime','Courier New',monospace;--display:'IM Fell English SC',Georgia,serif;--black:'UnifrakturMaguntia','IM Fell English SC',serif;
+  min-height:100vh;box-sizing:border-box;padding:0 24px 56px;background:var(--bg);color:var(--ink);font-family:var(--text);font-size:16px;line-height:1.6}
+.ws.dark{--bg:#16120E;--folio:#2A231B;--ink:#E8DCC4;--muted:#A8997F;--line:rgba(232,220,196,.3);--rubric:#D9735C;--verdigris:#7FB09E;--ochre:#D4A94A}
+.ws *{box-sizing:border-box}
+.ws a{color:var(--rubric);text-underline-offset:4px}
+.ws :focus-visible{outline:2px solid var(--rubric);outline-offset:2px}
+.ws p,.ws h1,.ws h2,.ws h3,.ws ul{margin:0;padding:0}
+
+/* Site header, unchanged */
+.site{max-width:80rem;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;padding:28px 0 18px;border-bottom:3px double var(--ink)}
+.ws a.logo{font-family:var(--black);font-size:34px;line-height:1;color:var(--ink);text-decoration:none}
+.nav{display:flex;flex-wrap:wrap;gap:28px}
+.ws .nav a{padding:8px 0;color:var(--muted);text-decoration:none;font-size:14px;letter-spacing:2px;text-transform:uppercase;border-bottom:2px solid transparent}
+.ws .nav a.active{color:var(--ink);border-bottom-color:var(--rubric)}
+.site-right{display:flex;align-items:center;gap:16px;font-size:14px}
+
+/* The sheet: the calendar modal's double frame, sitting on the page */
+.sheet{max-width:80rem;margin:32px auto 0;background:var(--bg);border:1px solid var(--ink);outline:1px solid var(--ink);outline-offset:5px}
+.sheet-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:16px;padding:20px 24px;border-bottom:3px double var(--ink)}
+.title-block{flex:1 1 30rem;min-width:0}
+.eyebrow{color:var(--muted);font-size:12px;letter-spacing:3px;text-transform:uppercase}
+.kicker{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.type-icon{width:24px;height:24px;flex:none;fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.badge{padding:2px 8px;border:1px solid currentColor;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--verdigris)}
+.ws h1{font-family:var(--display);font-weight:400;font-size:44px;line-height:1.1;margin:14px 0 10px;text-wrap:balance}
+.drop{font-family:var(--black);color:var(--rubric);font-size:56px;line-height:.8}
+.lede{max-width:64ch;color:var(--muted)}
+.pending{margin-top:16px;color:var(--rubric);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase}
+.head-actions{display:flex;align-items:center;gap:16px}
+.close{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border:1px solid var(--line);font-size:24px;line-height:1;transition:background-color .15s,color .15s,border-color .15s}
+.ws a.close{color:var(--ink);text-decoration:none}
+.ws a.close:hover{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+/* Two panes, split by the calendar's ink rule */
+.layout{display:flex;gap:28px;padding:24px}
+.main{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:32px}
+.panel{flex:0 0 23.75rem;min-width:0;padding-left:28px;border-left:1px solid var(--ink)}
+.panel-inner{position:sticky;top:24px;display:flex;flex-direction:column;gap:16px}
+.ws h2{font-family:var(--display);font-weight:400;font-size:24px;line-height:1.2;color:var(--rubric)}
+.tale{display:flex;flex-direction:column;gap:12px}
+.tale-text{max-width:65ch;display:flex;flex-direction:column;gap:16px}
+
+/* The ledger: sessions as calendar cells */
+.ledger-nav{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px;margin-bottom:12px}
+.count{color:var(--muted);font-size:12px;letter-spacing:3px;text-transform:uppercase}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin-left:auto;color:var(--muted);font-size:12px}
+.lg{display:inline-flex;align-items:center;gap:6px}
+.lg i{width:10px;height:10px;border:1px solid var(--ink)}
+.lg-confirmed i{border-color:var(--verdigris);background:var(--verdigris)}
+.lg-suggested i{border-style:dashed}
+.chronicle{padding-top:32px;border-top:1px solid var(--ink)}
+.ledger-label{padding:8px;border-bottom:1px solid var(--ink);text-align:center;color:var(--muted);font-size:12px;letter-spacing:2px;text-transform:uppercase}
+.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-left:1px solid var(--line)}
+.grid + .ledger-label{margin-top:16px}
+.cell{position:relative;display:block;aspect-ratio:1;min-width:0;padding:0;container-type:inline-size;overflow:hidden;background:var(--bg);border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--ink);font:inherit;text-align:left}
+button.cell{cursor:pointer;transition:background-color .15s}
+button.cell:hover{background:var(--folio)}
+.cell:focus-visible{outline-offset:-2px}
+.cell.is-selected,.cell.is-selected:hover{background:var(--folio);outline:2px solid var(--rubric);outline-offset:-2px}
+.frame{position:absolute;inset:2cqw;display:flex;flex-direction:column;gap:1cqw;padding:3.5cqw 5cqw;border:1px solid var(--line)}
+.frame-Confirmed{border-color:var(--verdigris);background:color-mix(in srgb,var(--verdigris) 10%,var(--bg))}
+.frame-Suggested{border:1px dashed var(--ink)}
+.frame-candidate{border-color:transparent}
+.cdate{font-size:clamp(11px,11.5cqw,14px);line-height:1.2;white-space:nowrap}
+.ctime{font-size:clamp(11px,10cqw,12.5px);line-height:1.2;color:var(--muted);white-space:nowrap}
+.tally{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;margin-top:auto;padding-top:2cqw;border-top:1px solid var(--line);text-align:center}
+.frame-Confirmed .tally{border-top-color:var(--verdigris)}
+.tly{display:flex;align-items:center;justify-content:center;gap:2px;font-size:clamp(11px,11cqw,14px);line-height:1.2}
+.tly + .tly{border-left:1px solid var(--line)}
+.tly b{font-weight:700}
+.tly.zero{color:var(--muted)}
+.tly.zero b{font-weight:400}
+.g{display:inline-block;width:1em;height:1em;flex:none;fill:none;stroke:currentColor;stroke-width:2.25;stroke-linecap:square;vertical-align:-.125em}
+.yes{color:var(--verdigris)}.maybe{color:var(--ochre)}.no-r,.wait{color:var(--rubric)}
+.mark{position:absolute;top:3cqw;right:5cqw;color:var(--rubric);font-size:clamp(13px,12cqw,18px);line-height:1}
+.march{position:absolute;inset:-1px;width:calc(100% + 2px);height:calc(100% + 2px);overflow:visible;pointer-events:none}
+.march rect{x:.75px;y:.75px;width:calc(100% - 1.5px);height:calc(100% - 1.5px);fill:none;stroke:var(--verdigris);stroke-width:1.5px;stroke-dasharray:5 3;animation:march 1.6s linear infinite}
+@keyframes march{to{stroke-dashoffset:-8}}
+@media (prefers-reduced-motion:reduce){.march rect{animation:none}}
+.key{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:10px;color:var(--muted);font-size:12px}
+.key .g,.key span{vertical-align:-.125em}
+
+/* Played: one row per session, so later elements can sit under its button */
+.played-nav{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:0 12px;margin-top:32px;border-bottom:1px solid var(--ink)}
+.played-nav .ledger-label{border-bottom:0;grid-column:2}
+.link-btn{min-height:40px;padding:0;background:none;border:0;color:var(--rubric);font:inherit;font-size:14px;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
+.played-nav .link-btn{justify-self:end}
+.entries{list-style:none}
+.entry{display:grid;grid-template-columns:3.25rem minmax(0,1fr) auto;gap:8px 12px;width:100%;padding:14px 12px 14px 8px;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;text-align:left;cursor:pointer;transition:background-color .15s}
+.entry:hover{background:var(--folio)}
+.entry:focus-visible{outline-offset:-2px}
+.entry.is-selected,.entry.is-selected:hover{background:var(--folio);outline:2px solid var(--rubric);outline-offset:-2px}
+.entry-no{font-family:var(--text);font-variant-numeric:tabular-nums;font-size:22px;line-height:1.1;color:var(--rubric)}
+.entry-date{display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px}
+.entry-meta{display:block;color:var(--muted);font-size:14px}
+.attendees{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px}
+.show-all{margin-top:4px}
+
+.field{display:flex;flex-direction:column;gap:6px}
+.field label,.field .field-label{color:var(--muted);font-size:12px;letter-spacing:2px;text-transform:uppercase}
+.field input{width:100%;padding:10px 2px;background:transparent;border:0;border-bottom:1px solid var(--ink);color:var(--ink);font:inherit;color-scheme:light}
+.ws.dark .field input{color-scheme:dark}
+.field input:focus-visible{outline:0;border-bottom:2px solid var(--rubric);padding-bottom:9px}
+.field-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.hint{color:var(--muted);font-size:13px;line-height:1.4}
+.form-error{color:var(--rubric);font-size:14px}
+.checks{list-style:none;display:flex;flex-direction:column}
+.check{display:flex;align-items:center;gap:8px;min-height:40px;border-bottom:1px solid var(--line);cursor:pointer}
+.check:last-child{border-bottom:0}
+.check input{width:18px;height:18px;flex:none;margin:0;accent-color:var(--ink)}
+.form-btns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+
+/* The panel: same anatomy as the calendar's day panel */
+.panel h3{font-family:var(--display);font-weight:400;font-size:24px;line-height:1.25;color:var(--ink)}
+.panel .drop{font-size:34px}
+.card{padding:16px;border:1px solid var(--line)}
+.card.awaits{border-color:var(--rubric)}
+.card-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
+.card-time{font-weight:700}
+.tag{padding:2px 6px;border:1px solid;font-size:11px;letter-spacing:2px;text-transform:uppercase}
+.tag-Confirmed{color:var(--verdigris)}
+.tag-Suggested{color:var(--ink);border-style:dashed}
+.tag-Played,.tag-hand{color:var(--muted)}
+.card-meta{margin:4px 0 12px;color:var(--muted);font-size:13px}
+.candidate{margin:0 0 10px;color:var(--verdigris);font-size:13px;font-weight:700;line-height:1.4}
+.candidate span{color:var(--rubric)}
+.roster{list-style:none;display:flex;flex-direction:column}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:6px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.av{display:grid;place-items:center;flex:none;width:30px;height:30px;background:var(--folio);border:1px solid var(--line);font-family:var(--display);font-size:16px;line-height:1;color:var(--rubric)}
+.av-yes{border:2px solid var(--verdigris)}
+.av-maybe{border:2px dashed var(--ochre)}
+.av-no-r{border:2px solid color-mix(in srgb,var(--rubric) 60%,var(--bg))}
+.av-wait{border:2px dotted var(--muted)}
+.name{flex:1 1 5rem;min-width:0;font-size:15px;line-height:1.25;overflow-wrap:break-word}
+.ws a.name{color:var(--ink);text-decoration:none}
+.ws a.name:hover{text-decoration:underline}
+.name.dm{font-weight:700}
+.ws a.name.dm{color:var(--rubric)}
+.you{color:var(--muted);font-weight:400}
+.said{flex:none;width:5.75rem;font-size:13px;white-space:nowrap}
+.said.muted{color:var(--muted)}
+.seats{padding-top:12px;margin-top:6px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+.reply{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.reply .pending{margin:0 0 8px}
+.replies{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 12px;background:none;border:1px solid var(--line);color:var(--ink);font-family:var(--text);font-size:13px;letter-spacing:2px;text-transform:uppercase;text-decoration:none;cursor:pointer;transition:background-color .15s,color .15s,border-color .15s}
+.ws a.btn{color:var(--ink);text-decoration:none}
+.btn:hover,.ws a.btn:hover{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn-primary{min-height:44px;background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn-primary:hover{opacity:.85}
+.btn-danger,.ws a.btn-danger{color:var(--rubric);border-color:var(--rubric)}
+.btn-danger:hover,.ws a.btn-danger:hover{background:var(--rubric);border-color:var(--rubric);color:var(--bg)}
+.rp{min-height:44px;padding:0 4px;letter-spacing:1px}
+.rp-yes{color:var(--verdigris);border-color:var(--verdigris)}
+.rp-maybe{color:var(--ochre);border-color:var(--ochre)}
+.rp-no{color:var(--rubric);border-color:var(--rubric)}
+.rp-yes:hover,.rp-yes.on{background:var(--verdigris);border-color:var(--verdigris);color:var(--bg)}
+.rp-maybe:hover,.rp-maybe.on{background:var(--ochre);border-color:var(--ochre);color:var(--bg)}
+.rp-no:hover,.rp-no.on{background:var(--rubric);border-color:var(--rubric);color:var(--bg)}
+.back{width:100%;font-size:12px}
+.foot{display:flex;flex-direction:column;gap:8px;padding-top:16px;border-top:1px solid var(--ink)}
+.foot-btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(6.5rem,1fr));gap:8px}
+.tab{position:absolute;top:-8px;right:-1px;min-width:18px;padding:0 4px;background:var(--rubric);color:var(--bg);font-size:11px;line-height:16px;letter-spacing:0;text-align:center}
+.ornament{margin-top:24px;text-align:center;color:var(--muted);letter-spacing:12px}
+
+.filler{display:block}
+@media (max-width:1180px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}.filler{display:none}.panel{flex-basis:20rem}}
+@media (max-width:900px){.layout{flex-direction:column}.panel{flex:none;padding:24px 0 0;border-left:0;border-top:1px solid var(--ink)}.panel-inner{position:static}.grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media (max-width:768px){.ws{padding:0 16px 40px}.ws h1{font-size:34px}.sheet{margin-top:24px}.sheet-head,.layout{padding:16px}.site{padding-top:16px}.nav{gap:16px}}
+@media (max-width:560px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.legend{margin-left:0}.played-nav{grid-template-columns:1fr}.played-nav .ledger-label{grid-column:1}.played-nav .link-btn{justify-self:center}.entry{grid-template-columns:2.5rem minmax(0,1fr)}.attendees{grid-column:2;justify-content:flex-start}}
+</style>
+</helmet>
+
+<div class="ws {{themeClass}}">
+  <header class="site">
+    <a href="#" class="logo">Waystone</a>
+    <nav class="nav" aria-label="Main">
+      <a href="#">Home</a>
+      <a href="#" class="active" aria-current="page">Games</a>
+      <a href="#">Profile</a>
+    </nav>
+    <div class="site-right"><span>{{viewerName}}</span><button class="btn" type="button">Logout</button></div>
+  </header>
+
+  <main class="sheet">
+    <div class="sheet-head">
+      <div class="title-block">
+        <div class="kicker">
+          <svg class="type-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="1.8" r="0.9"></circle><path d="M12 2.7 V4"></path><path d="M8 4 H16"></path><path d="M9 4 V14.5 L12 12 L15 14.5 V4"></path><path d="M12 12 V22.5"></path><path d="M2.5 3 V15"></path><path d="M0.8 15 H4.2"></path><path d="M2.5 15 V18.6"></path><circle cx="2.5" cy="19.7" r="1"></circle><path d="M21.5 3 V15"></path><path d="M19.8 15 H23.2"></path><path d="M21.5 15 V18.6"></path><circle cx="21.5" cy="19.7" r="1"></circle></svg>
+          <span class="eyebrow">Campaign · D&amp;D 5e</span>
+          <span class="badge">● Ongoing</span>
+        </div>
+        <h1>The Sunken Crown</h1>
+        <p class="lede">A drowned kingdom stirs beneath the Saltmarsh. Someone is diving for its crown, and the tide is turning red.</p>
+        <sc-if value="{{hasNotice}}" hint-placeholder-val="{{ true }}"><p class="pending"><span aria-hidden="true">✦</span> {{notice}}</p></sc-if>
+      </div>
+      <div class="head-actions">
+        <sc-if value="{{isMember}}" hint-placeholder-val="{{ true }}"><a href="#">Open calendar →</a></sc-if>
+        <a href="#" class="close" aria-label="Back to all games" title="Back to all games">×</a>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div class="main">
+        <section class="tale" aria-labelledby="tale-h">
+          <h2 id="tale-h">§ The tale</h2>
+          <div class="tale-text">
+            <p>Three hundred years ago the kingdom of Ys slid beneath the waves in a single night. The fishermen of Saltmarsh still pull up coral-crusted coins in their nets, and nobody asks where they come from.</p>
+            <p>This spring the coins stopped. Instead the nets bring up bodies, every one of them wearing a circlet of black pearl. The town council wants it quiet. The temple of the Tide Mother wants it stopped.</p>
+            <p>We play every other Thursday evening, roughly three hours. Levels 3 to 12, milestone levelling. New players welcome; I'll help with characters.</p>
+          </div>
+        </section>
+
+        <section class="chronicle" aria-labelledby="chron-h">
+          <div class="ledger-nav">
+            <h2 id="chron-h">§ The chronicle</h2>
+            <span class="count">{{playedCount}} sessions played</span>
+            <div class="legend">
+              <span class="lg lg-confirmed"><i></i>confirmed</span>
+              <span class="lg lg-suggested"><i></i>suggested</span>
+            </div>
+          </div>
+
+          <div class="ledger-label">Ahead</div>
+          <div class="grid">
+            <sc-for list="{{ahead}}" as="c" hint-placeholder-count="3">
+              <button type="button" class="cell {{c.selCls}}" aria-pressed="{{c.pressed}}" aria-label="{{c.aria}}" title="{{c.aria}}" onClick="{{c.pick}}">
+                <span class="frame frame-{{c.status}} {{c.candCls}}">
+                  <sc-if value="{{c.isCandidate}}" hint-placeholder-val="{{ false }}"><svg class="march" aria-hidden="true"><rect></rect></svg><span class="mark" aria-hidden="true">✦</span></sc-if>
+                  <sc-if value="{{c.awaitsMe}}" hint-placeholder-val="{{ false }}"><span class="mark" aria-hidden="true">…</span></sc-if>
+                  <span class="cdate"><b>{{c.short}}</b></span>
+                  <span class="ctime">{{c.range}}</span>
+                  <span class="tally">
+                    <sc-for list="{{c.tally}}" as="t" hint-placeholder-count="4">
+                      <span class="tly {{t.cls}}"><svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.glyph}}"></path></svg><b>{{t.n}}</b></span>
+                    </sc-for>
+                  </span>
+                </span>
+              </button>
+            </sc-for>
+            <sc-for list="{{aheadBlanks}}" as="b" hint-placeholder-count="4"><div class="cell filler" aria-hidden="true"></div></sc-for>
+          </div>
+
+          <div class="key">
+            <span><svg class="g yes" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 6L20 6"></path></svg> aye</span>
+            <span>? perhaps</span>
+            <span><svg class="g no-r" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg> nay</span>
+            <span>… awaiting</span>
+            <span>✦ strong candidate</span>
+          </div>
+
+          <div class="played-nav">
+            <div class="ledger-label">Played</div>
+            <sc-if value="{{isDm}}" hint-placeholder-val="{{ false }}"><button type="button" class="link-btn" onClick="{{startRecording}}">+ Record a past session</button></sc-if>
+          </div>
+          <ol class="entries" reversed>
+            <sc-for list="{{played}}" as="e" hint-placeholder-count="5">
+              <li>
+                <button type="button" class="entry {{e.selCls}}" aria-pressed="{{e.pressed}}" aria-label="{{e.aria}}" onClick="{{e.pick}}">
+                  <span class="entry-no" aria-hidden="true">{{e.no}}</span>
+                  <span>
+                    <span class="entry-date">{{e.date}}<sc-if value="{{e.isHand}}" hint-placeholder-val="{{ false }}"><span class="tag tag-hand" title="Added by the DM, not from the calendar">By hand</span></sc-if></span>
+                    <span class="entry-meta">{{e.meta}}</span>
+                  </span>
+                  <span class="attendees" aria-hidden="true">
+                    <sc-for list="{{e.attendees}}" as="a" hint-placeholder-count="4"><span class="av" title="{{a}}">{{a}}</span></sc-for>
+                  </span>
+                </button>
+              </li>
+            </sc-for>
+          </ol>
+          <sc-if value="{{canShowAll}}" hint-placeholder-val="{{ true }}"><button type="button" class="link-btn show-all" onClick="{{toggleAll}}">{{showAllLabel}}</button></sc-if>
+        </section>
+      </div>
+
+      <aside class="panel" aria-live="polite">
+        <div class="panel-inner">
+          <sc-if value="{{hasSel}}" hint-placeholder-val="{{ true }}">
+            <div>
+              <p class="eyebrow">{{sel.eyebrow}}</p>
+              <h3><span class="drop">{{sel.first}}</span>{{sel.rest}}</h3>
+            </div>
+            <div class="card {{sel.cardCls}}">
+              <div class="card-head">
+                <span class="card-time">{{sel.range}}</span>
+                <span class="tag {{sel.tagCls}}">{{sel.status}}</span>
+              </div>
+              <p class="card-meta">{{sel.meta}}</p>
+              <sc-if value="{{sel.isCandidate}}" hint-placeholder-val="{{ false }}"><p class="candidate"><span aria-hidden="true">✦</span> Strong candidate: {{sel.yesCount}} of 4 accepted</p></sc-if>
+              <ul class="roster">
+                <sc-for list="{{sel.roster}}" as="r" hint-placeholder-count="4">
+                  <li class="row">
+                    <span class="av av-{{r.kind}}" aria-hidden="true">{{r.letter}}</span>
+                    <a href="#" class="name {{r.nameCls}}">{{r.name}} <span class="you">{{r.youText}}</span></a>
+                    <span class="said {{r.kind}}"><svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="{{r.glyph}}"></path></svg> {{r.label}}</span>
+                  </li>
+                </sc-for>
+              </ul>
+              <sc-if value="{{showReply}}" hint-placeholder-val="{{ true }}">
+                <div class="reply">
+                  <p class="pending"><span aria-hidden="true">✦</span> Thy reply</p>
+                  <div class="replies">
+                    <button type="button" class="btn rp rp-yes {{replyOn.yes}}" onClick="{{replyYes}}">Aye</button>
+                    <button type="button" class="btn rp rp-maybe {{replyOn.maybe}}" onClick="{{replyMaybe}}">Perhaps</button>
+                    <button type="button" class="btn rp rp-no {{replyOn.no}}" onClick="{{replyNo}}">Nay</button>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{showDmUpcoming}}" hint-placeholder-val="{{ false }}">
+                <div class="reply">
+                  <div class="replies">
+                    <sc-if value="{{sel.isSuggested}}" hint-placeholder-val="{{ true }}"><button type="button" class="btn">Confirm</button></sc-if>
+                    <button type="button" class="btn">Cancel</button>
+                    <button type="button" class="btn">Copy</button>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{showDmHand}}" hint-placeholder-val="{{ false }}">
+                <div class="reply">
+                  <div class="form-btns">
+                    <button type="button" class="btn">Edit</button>
+                    <button type="button" class="btn btn-danger">Delete</button>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+            <button type="button" class="btn back" onClick="{{showCompany}}">Show the company</button>
+          </sc-if>
+
+          <sc-if value="{{noSel}}" hint-placeholder-val="{{ false }}">
+            <div>
+              <p class="eyebrow">Who rides</p>
+              <h3><span class="drop">T</span>he company</h3>
+            </div>
+            <ul class="roster">
+              <sc-for list="{{company}}" as="r" hint-placeholder-count="5">
+                <li class="row">
+                  <span class="av" aria-hidden="true">{{r.letter}}</span>
+                  <a href="#" class="name {{r.nameCls}}">{{r.name}} <span class="you">{{r.youText}}</span></a>
+                  <span class="said muted">{{r.detail}}</span>
+                </li>
+              </sc-for>
+            </ul>
+            <p class="seats">4 / 5 seats · sign-ups {{signupsWord}}</p>
+          </sc-if>
+
+          <sc-if value="{{recording}}" hint-placeholder-val="{{ false }}">
+            <div>
+              <p class="eyebrow">Off the calendar</p>
+              <h3><span class="drop">R</span>ecord a past session</h3>
+            </div>
+            <p class="hint">For games played away from Waystone, or never put on the calendar. It takes its place in the chronicle by date.</p>
+            <div class="field">
+              <label for="rec-date">Date</label>
+              <input id="rec-date" type="date" max="2026-11-05" value="{{form.date}}" onChange="{{setDate}}">
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="rec-start">Start (optional)</label>
+                <input id="rec-start" type="time" value="{{form.start}}" onChange="{{setStart}}">
+              </div>
+              <div class="field">
+                <label for="rec-end">End (optional)</label>
+                <input id="rec-end" type="time" value="{{form.end}}" onChange="{{setEnd}}">
+              </div>
+            </div>
+            <div class="field">
+              <span class="field-label">Who was there</span>
+              <div class="checks">
+                <sc-for list="{{formPeople}}" as="p" hint-placeholder-count="5">
+                  <label class="check">
+                    <input type="checkbox" checked="{{p.checked}}" onChange="{{p.toggle}}">
+                    <span class="av" aria-hidden="true">{{p.letter}}</span>
+                    <span class="name {{p.nameCls}}">{{p.label}}</span>
+                  </label>
+                </sc-for>
+              </div>
+            </div>
+            <sc-if value="{{hasFormError}}" hint-placeholder-val="{{ false }}"><p class="form-error" role="alert">✗ {{form.error}}</p></sc-if>
+            <div class="form-btns">
+              <button type="button" class="btn btn-primary" onClick="{{saveRecord}}">Record</button>
+              <button type="button" class="btn" onClick="{{cancelRecord}}">Cancel</button>
+            </div>
+          </sc-if>
+
+          <div class="foot">
+            <sc-if value="{{isPlayer}}" hint-placeholder-val="{{ true }}">
+              <div class="foot-btns">
+                <a href="#" class="btn">Calendar<sc-if value="{{hasUnanswered}}" hint-placeholder-val="{{ true }}"><span class="tab">{{unanswered}}</span></sc-if></a>
+                <button type="button" class="btn">Leave</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{isDm}}" hint-placeholder-val="{{ false }}">
+              <div class="foot-btns">
+                <a href="#" class="btn">Calendar</a>
+                <a href="#" class="btn">Sign-ups<span class="tab">3</span></a>
+                <a href="#" class="btn">Edit</a>
+              </div>
+            </sc-if>
+            <sc-if value="{{isVisitor}}" hint-placeholder-val="{{ false }}">
+              <button type="button" class="btn btn-primary">Sign-up</button>
+              <button type="button" class="btn">Follow</button>
+            </sc-if>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+  <p class="ornament" aria-hidden="true">❦ ❦ ❦</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"viewer":{"editor":"enum","options":["player","dm","visitor"],"default":"player"},"$preview":{"width":1360,"height":1320}}'>
+var GLYPH = {
+  yes: 'M5 12l5 6L20 6',
+  maybe: 'M8 8a4 4 0 1 1 6.5 3.1c-1.6 1.2-2.5 2-2.5 3.9M12 19.5v.5',
+  'no-r': 'M6 6l12 12M18 6L6 18',
+  wait: 'M5 17h.5M12 17h.5M19 17h.5'
+};
+var LABEL = { yes: 'Aye', maybe: 'Perhaps', 'no-r': 'Nay', wait: 'Awaiting' };
+var PLAYERS = ['Mira', 'Tobin', 'Wren', 'Sable'];
+var TODAY = '2026-11-05';
+var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+var EMPTY_FORM = { date: '', start: '', end: '', absent: [], error: '' };
+// Numbers aren't stored: a session's number is its place by date, so a late entry renumbers the rest.
+var PLAYED = [
+  { id: 'p11', iso: '2026-10-29', range: '19:00–22:00', len: '3 h', absent: [] },
+  { id: 'p10', iso: '2026-10-15', range: '19:00–22:30', len: '3½ h', absent: ['Wren'] },
+  { id: 'p9', iso: '2026-10-01', hand: true, absent: [] },
+  { id: 'p8', iso: '2026-09-17', range: '19:00–22:00', len: '3 h', absent: ['Sable'] },
+  { id: 'p7', iso: '2026-09-03', range: '19:00–22:00', len: '3 h', absent: ['Tobin'] },
+  { id: 'p6', iso: '2026-08-20', range: '19:00–22:30', len: '3½ h', absent: [] },
+  { id: 'p5', iso: '2026-08-06', range: '19:00–22:00', len: '3 h', absent: ['Wren', 'Tobin'] },
+  { id: 'p4', iso: '2026-07-23', range: '19:00–22:00', len: '3 h', absent: ['Mira'] },
+  { id: 'p3', iso: '2026-07-09', range: '19:00–22:00', len: '3 h', absent: [] },
+  { id: 'p2', iso: '2026-06-25', hand: true, absent: ['Sable'] },
+  { id: 'p1', iso: '2026-06-11', hand: true, absent: [] }
+];
+
+function parts(iso) {
+  var d = new Date(iso + 'T12:00:00');
+  return { wd: WEEKDAYS[d.getDay()], d: d.getDate(), m: MONTHS[d.getMonth()], y: d.getFullYear() };
+}
+function lengthLabel(start, end) {
+  var mins = (+end.slice(0, 2) * 60 + +end.slice(3)) - (+start.slice(0, 2) * 60 + +start.slice(3));
+  var h = Math.floor(mins / 60), half = mins % 60 >= 30;
+  return (h > 0 ? h : '') + (half ? '½' : '') + ' h';
+}
+function timeMeta(s) {
+  if (!s.range) return 'Time not recorded';
+  return s.len ? s.range + ' · ' + s.len : s.range;
+}
+var AHEAD = [
+  { id: 'nov12', wd: 'Thursday', d: 12, m: 'November', range: '19:00–22:00', len: '3 h', status: 'Confirmed', replies: { Mira: 'yes', Tobin: 'yes', Wren: 'yes', Sable: 'maybe' } },
+  { id: 'nov19', wd: 'Thursday', d: 19, m: 'November', range: '19:00–22:00', len: '3 h', status: 'Suggested', replies: { Mira: 'yes', Tobin: 'maybe', Wren: 'wait', Sable: 'no-r' } },
+  { id: 'nov28', wd: 'Saturday', d: 28, m: 'November', range: '15:00–19:00', len: '4 h', status: 'Suggested', replies: { Mira: 'yes', Tobin: 'wait', Wren: 'yes', Sable: 'yes' } }
+];
+var ORDER = { yes: 0, maybe: 1, 'no-r': 2, wait: 3 };
+
+function shortDate(s) { return s.wd.slice(0, 3) + ' ' + s.d + ' ' + s.m.slice(0, 3); }
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { selected: undefined, replies: {}, showAll: false, recording: false, form: EMPTY_FORM, added: [] };
+  }
+
+  repliesFor(s) {
+    var mine = this.state.replies[s.id];
+    return mine ? Object.assign({}, s.replies, { Wren: mine }) : s.replies;
+  }
+
+  renderVals() {
+    var self = this;
+    var viewer = this.props.viewer ?? 'player';
+    var isPlayer = viewer === 'player', isDm = viewer === 'dm', isVisitor = viewer === 'visitor';
+    var youName = isPlayer ? 'Wren' : isDm ? 'Aldric' : '';
+    var visibleAhead = isVisitor ? AHEAD.slice(0, 1) : AHEAD;
+
+    function count(reps, kind) { return PLAYERS.filter(function (p) { return reps[p] === kind; }).length; }
+    function isStrong(s, reps) { return s.status === 'Suggested' && count(reps, 'yes') / PLAYERS.length > 0.7; }
+    var awaiting = isPlayer ? visibleAhead.filter(function (s) { return self.repliesFor(s).Wren === 'wait'; }) : [];
+
+    // Like the calendar: open on the first session awaiting a reply, otherwise on the company.
+    var selId = this.state.selected;
+    if (selId === undefined) selId = awaiting.length ? awaiting[0].id : null;
+    var sessions = PLAYED.concat(this.state.added).map(function (s) {
+      return Object.assign({}, s, parts(s.iso));
+    }).sort(function (a, b) { return a.iso < b.iso ? 1 : a.iso > b.iso ? -1 : 0; });
+    sessions.forEach(function (s, i) { s.no = sessions.length - i; });
+
+    var allIds = visibleAhead.map(function (s) { return s.id; }).concat(sessions.map(function (s) { return s.id; }));
+    if (selId && allIds.indexOf(selId) < 0) selId = null;
+    var recording = isDm && this.state.recording;
+    if (recording) selId = null;
+
+    function revealPanel() {
+      if (window.matchMedia('(max-width: 900px)').matches) {
+        requestAnimationFrame(function () {
+          var el = document.querySelector('.panel');
+          if (el) el.scrollIntoView({ block: 'start' });
+        });
+      }
+    }
+    function pick(id) { return function () { self.setState({ selected: id, recording: false }); revealPanel(); }; }
+
+    var ahead = visibleAhead.map(function (s) {
+      var reps = self.repliesFor(s);
+      var strong = isStrong(s, reps);
+      var tally = ['yes', 'maybe', 'no-r', 'wait'].map(function (k) {
+        var n = count(reps, k);
+        return { glyph: GLYPH[k], n: n, cls: n === 0 ? 'zero' : k };
+      });
+      return {
+        status: s.status, short: shortDate(s), range: s.range, tally: tally,
+        isCandidate: strong, candCls: strong ? 'frame-candidate' : '',
+        awaitsMe: isPlayer && reps.Wren === 'wait',
+        selCls: selId === s.id ? 'is-selected' : '', pressed: selId === s.id ? 'true' : 'false',
+        aria: s.status + ' session, ' + shortDate(s) + ', ' + s.range + (strong ? ', strong candidate' : ''),
+        pick: pick(s.id)
+      };
+    });
+
+    var everyone = ['Aldric'].concat(PLAYERS);
+    var visibleSessions = this.state.showAll ? sessions : sessions.slice(0, 5);
+    var played = visibleSessions.map(function (s) {
+      var there = everyone.filter(function (n) { return s.absent.indexOf(n) < 0; });
+      return {
+        no: s.no, date: s.wd.slice(0, 3) + ' ' + s.d + ' ' + s.m.slice(0, 3) + ' ' + s.y,
+        meta: timeMeta(s), isHand: !!s.hand,
+        attendees: there.map(function (n) { return n.charAt(0); }),
+        selCls: selId === s.id ? 'is-selected' : '', pressed: selId === s.id ? 'true' : 'false',
+        aria: 'Session ' + s.no + ', ' + s.wd + ' ' + s.d + ' ' + s.m + ', ' + there.length + ' there',
+        pick: pick(s.id)
+      };
+    });
+
+    function row(name, kind, label) {
+      return {
+        name: name, letter: name.charAt(0), kind: kind, glyph: GLYPH[kind], label: label,
+        nameCls: name === 'Aldric' ? 'dm' : '', youText: name === youName ? '(you)' : ''
+      };
+    }
+
+    var sel = null, showReply = false, showDmUpcoming = false, showDmHand = false, replyOn = { yes: '', maybe: '', no: '' };
+    var ps = selId ? sessions.filter(function (s) { return s.id === selId; })[0] : null;
+    if (ps) {
+      var names = everyone;
+      var there = names.filter(function (n) { return ps.absent.indexOf(n) < 0; });
+      var heading = ps.wd + ', ' + ps.d + ' ' + ps.m;
+      showDmHand = isDm && !!ps.hand;
+      sel = {
+        eyebrow: 'Session ' + ps.no, first: heading.charAt(0), rest: heading.slice(1),
+        range: ps.range || 'Time not recorded', status: ps.hand ? 'By hand' : 'Played', tagCls: ps.hand ? 'tag-hand' : 'tag-Played',
+        meta: (ps.len ? ps.len + ' · ' : '') + there.length + ' of ' + names.length + ' at the table' + (ps.hand ? ' · added by ♛ Aldric' : ''),
+        cardCls: '', isCandidate: false, isSuggested: false, yesCount: 0,
+        roster: there.map(function (n) { return row(n === 'Aldric' ? '♛ Aldric' : n, 'yes', 'There'); })
+          .concat(ps.absent.map(function (n) { return row(n, 'no-r', 'Absent'); }))
+      };
+      sel.roster.forEach(function (r) {
+        var bare = r.name.replace('♛ ', '');
+        r.letter = bare.charAt(0);
+        r.nameCls = bare === 'Aldric' ? 'dm' : '';
+        r.youText = bare === youName ? '(you)' : '';
+      });
+    } else if (selId) {
+      var s = AHEAD.filter(function (x) { return x.id === selId; })[0];
+      var reps = this.repliesFor(s);
+      var heading2 = s.wd + ', ' + s.d + ' ' + s.m;
+      var isNext = s.id === 'nov12';
+      var awaitsMe = isPlayer && reps.Wren === 'wait';
+      sel = {
+        eyebrow: isNext ? 'The next session' : 'Suggested session',
+        first: heading2.charAt(0), rest: heading2.slice(1),
+        range: s.range, status: s.status, tagCls: 'tag-' + s.status,
+        meta: isNext ? s.len + ' · proposed by ♛ Aldric' : s.len + ' · proposed by ♛ Aldric',
+        cardCls: awaitsMe ? 'awaits' : '',
+        isCandidate: isStrong(s, reps), isSuggested: s.status === 'Suggested', yesCount: count(reps, 'yes'),
+        roster: PLAYERS.slice().sort(function (a, b) { return ORDER[reps[a]] - ORDER[reps[b]]; })
+          .map(function (n) { return row(n, reps[n], LABEL[reps[n]]); })
+      };
+      showReply = isPlayer;
+      showDmUpcoming = isDm;
+      replyOn = { yes: reps.Wren === 'yes' ? 'on' : '', maybe: reps.Wren === 'maybe' ? 'on' : '', no: reps.Wren === 'no-r' ? 'on' : '' };
+    }
+
+    function answer(kind) {
+      return function () {
+        var r = Object.assign({}, self.state.replies);
+        r[selId] = kind;
+        self.setState({ replies: r, selected: selId });
+      };
+    }
+
+    var attendance = PLAYERS.map(function (n) {
+      var c = sessions.filter(function (s) { return s.absent.indexOf(n) < 0; }).length;
+      return { name: n, letter: n.charAt(0), nameCls: '', youText: n === youName ? '(you)' : '', detail: c + ' of ' + sessions.length };
+    });
+
+    var form = this.state.form;
+    function setField(field) {
+      return function (e) {
+        var next = Object.assign({}, self.state.form, { error: '' });
+        next[field] = e.target.value;
+        self.setState({ form: next });
+      };
+    }
+    var formPeople = everyone.map(function (n) {
+      return {
+        label: n === 'Aldric' ? '♛ Aldric' : n, letter: n.charAt(0), nameCls: n === 'Aldric' ? 'dm' : '', checked: form.absent.indexOf(n) < 0,
+        toggle: function () {
+          var f = self.state.form;
+          var absent = f.absent.indexOf(n) < 0 ? f.absent.concat([n]) : f.absent.filter(function (x) { return x !== n; });
+          self.setState({ form: Object.assign({}, f, { absent: absent }) });
+        }
+      };
+    });
+    function saveRecord() {
+      var f = self.state.form;
+      var error = !f.date ? 'Choose a date.'
+        : f.date > TODAY ? 'The date must not be in the future.'
+        : f.start && f.end && f.end <= f.start ? 'The end time must be after the start time.'
+        : f.absent.length === everyone.length ? 'Choose at least one person who was there.' : '';
+      if (error) { self.setState({ form: Object.assign({}, f, { error: error }) }); return; }
+      var id = 'x' + (self.state.added.length + 1);
+      var entry = {
+        id: id, iso: f.date, hand: true, absent: f.absent,
+        range: f.start ? (f.end ? f.start + '–' + f.end : f.start) : '',
+        len: f.start && f.end ? lengthLabel(f.start, f.end) : '',
+      };
+      self.setState({ added: self.state.added.concat([entry]), recording: false, form: EMPTY_FORM, selected: id, showAll: true });
+    }
+    var company = [{ name: '♛ Aldric', letter: 'A', nameCls: 'dm', youText: isDm ? '(you)' : '', detail: 'Dungeon master' }].concat(attendance);
+
+    var unanswered = awaiting.length;
+    var notice = isDm ? '3 sign-ups to review'
+      : unanswered === 1 ? 'A session awaits thy reply'
+      : unanswered > 1 ? unanswered + ' sessions await thy reply' : '';
+
+    return {
+      themeClass: this.props.dark ? 'dark' : '',
+      viewerName: isPlayer ? 'Wren' : isDm ? 'Aldric' : 'Corin',
+      isPlayer: isPlayer, isDm: isDm, isVisitor: isVisitor, isMember: isPlayer || isDm,
+      hasNotice: !!notice, notice: notice,
+      ahead: ahead, played: played,
+      aheadBlanks: new Array(7 - visibleAhead.length).fill(0).map(function (_, i) { return { i: i }; }),
+      playedCount: sessions.length,
+      canShowAll: sessions.length > 5,
+      showAllLabel: this.state.showAll ? 'Show fewer ↑' : 'Show all ' + sessions.length + ' sessions ↓',
+      toggleAll: function () { self.setState({ showAll: !self.state.showAll }); },
+      hasSel: !!sel, noSel: !sel && !recording, sel: sel || {},
+      recording: recording, form: form, formPeople: formPeople, hasFormError: !!form.error,
+      setDate: setField('date'), setStart: setField('start'), setEnd: setField('end'),
+      saveRecord: saveRecord,
+      startRecording: function () { self.setState({ recording: true, selected: null, form: EMPTY_FORM }); revealPanel(); },
+      cancelRecord: function () { self.setState({ recording: false, form: EMPTY_FORM }); },
+      showReply: showReply, showDmUpcoming: showDmUpcoming, showDmHand: showDmHand, replyOn: replyOn,
+      replyYes: answer('yes'), replyMaybe: answer('maybe'), replyNo: answer('no-r'),
+      showCompany: function () { self.setState({ selected: null }); },
+      company: company,
+      signupsWord: isVisitor ? 'open' : 'closed',
+      unanswered: unanswered, hasUnanswered: unanswered > 0
+    };
+  }
+}
+</script>
+</body>
+</html>

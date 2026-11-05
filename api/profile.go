@@ -140,9 +140,11 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		now := time.Now()
 		for _, session := range accepted {
-			start, ok := sessionStart(session)
-			if !ok || start.Add(time.Duration(session.Duration)*time.Minute).After(now) {
-				continue
+			if !session.Manual { // by-hand sessions are past by construction and may have no time
+				start, ok := sessionStart(session)
+				if !ok || start.Add(time.Duration(session.Duration)*time.Minute).After(now) {
+					continue
+				}
 			}
 			sessionsPlayed++
 			playedCampaigns[session.CampaignID] = true

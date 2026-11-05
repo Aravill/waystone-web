@@ -6,6 +6,9 @@ import (
 	"waystone-web/models"
 )
 
+// Version is the deployed release; set at build time via -ldflags "-X waystone-web/config.Version=...".
+var Version = "dev"
+
 const (
 	DBPath      = "./data/waystone.db"
 	DefaultPort = "8080"

@@ -9,12 +9,10 @@ window.adminUsersPage = function () {
         searchQuery: '',
         campaigns: [],
         selectedCampaignId: '',
-        guestLinks: {},
         newPlayerId: '',
-        ttlHours: 24,
         newUsername: '',
         newName: '',
-        tempPassword: null,
+        invite: null,
         confirmModal: { visible: false, title: '', message: '', onConfirm: null },
         messageVisible: false,
         messageText: '',
@@ -79,10 +77,14 @@ window.adminUsersPage = function () {
                     body: JSON.stringify({ username: this.newUsername, name: this.newName }),
                 });
                 const data = await res.json();
-                if (!res.ok) { this.showMessage(data.error || 'failed to add user', 'error'); return; }
+                if (!res.ok) {
+                    this.showMessage(data.error || 'failed to add user', 'error');
+                    await this.loadUsers(); // the user may exist even though the invite failed
+                    return;
+                }
                 this.newUsername = '';
                 this.newName = '';
-                this.tempPassword = { username: data.user.username, password: data.temp_password };
+                this.invite = { username: data.user.username, url: `${window.location.origin}/invite/${data.invite_token}` };
                 this.showMessage('user added', 'success');
                 await this.loadUsers();
             } catch {
@@ -114,8 +116,8 @@ window.adminUsersPage = function () {
                 const res = await fetch(`/api/admin/users/${user.id}/reset-password`, { method: 'POST' });
                 const data = await res.json();
                 if (!res.ok) { this.showMessage(data.error || 'failed to reset password', 'error'); return; }
-                this.tempPassword = { username: user.username, password: data.temp_password };
-                this.showMessage('password reset', 'success');
+                this.invite = { username: user.username, url: `${window.location.origin}/invite/${data.invite_token}` };
+                this.showMessage('invite created', 'success');
                 await this.loadUsers();
             } catch {
                 this.showMessage('failed to reset password', 'error');
@@ -124,10 +126,10 @@ window.adminUsersPage = function () {
             }
         },
 
-        async copyTempPassword() {
+        async copyInvite() {
             try {
-                await navigator.clipboard.writeText(this.tempPassword.password);
-                this.showMessage('password copied', 'success');
+                await navigator.clipboard.writeText(this.invite.url);
+                this.showMessage('invite link copied', 'success');
             } catch {
                 this.showMessage('copy failed - select and copy it manually', 'error');
             }
@@ -271,32 +273,6 @@ window.adminUsersPage = function () {
             }
         },
 
-        async loadGuestLinks() {
-            this.guestLinks = {};
-            this.newPlayerId = '';
-            if (!this.selectedCampaignId) return;
-            try {
-                const res = await fetch(`/api/campaigns/${this.selectedCampaignId}/guest-links`);
-                if (!res.ok) throw new Error('failed');
-                this.guestLinks = (await res.json()).links || {};
-            } catch {
-                this.showMessage('failed to load guest links', 'error');
-            }
-        },
-
-        guestUrl(userId) {
-            const link = this.guestLinks[userId];
-            return link ? `${window.location.origin}/r/${link.token}` : '';
-        },
-
-        isExpired(link) {
-            return new Date(link.expires_at) <= new Date();
-        },
-
-        formatExpiry(link) {
-            return link ? new Date(link.expires_at).toLocaleString('default', { dateStyle: 'medium', timeStyle: 'short' }) : '';
-        },
-
         async _campaignRequest(path, method, body, successMsg, errorMsg, admin = false) {
             this.loading = true;
             try {
@@ -309,7 +285,7 @@ window.adminUsersPage = function () {
                 if (!res.ok) { this.showMessage(data.error || errorMsg, 'error'); return; }
                 this.showMessage(successMsg, 'success');
                 await this.loadCampaigns();
-                await this.loadGuestLinks();
+                this.newPlayerId = '';
             } catch {
                 this.showMessage(errorMsg, 'error');
             } finally {
@@ -324,23 +300,6 @@ window.adminUsersPage = function () {
 
         async removePlayer(userId) {
             await this._campaignRequest(`players/${userId}`, 'DELETE', null, 'player removed', 'failed to remove player', true);
-        },
-
-        async createGuestLink(userId) {
-            await this._campaignRequest(`players/${userId}/guest-link`, 'POST', { ttl_hours: this.ttlHours }, 'guest link created', 'failed to create guest link');
-        },
-
-        async revokeGuestLink(userId) {
-            await this._campaignRequest(`players/${userId}/guest-link`, 'DELETE', null, 'guest link revoked', 'failed to revoke guest link');
-        },
-
-        async copyGuestLink(userId) {
-            try {
-                await navigator.clipboard.writeText(this.guestUrl(userId));
-                this.showMessage('link copied', 'success');
-            } catch {
-                this.showMessage('copy failed - select and copy it manually', 'error');
-            }
         },
 
         async _postAction(id, action, successMsg, errorMsg) {

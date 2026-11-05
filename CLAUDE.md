@@ -17,13 +17,17 @@ Waystone Web: Go (stdlib `net/http`, SQLite via `modernc.org/sqlite`, local user
 ## Architecture gotchas
 
 - Routes are registered in `api/router.go` (not `main.go`, despite the README). `/` is auth-wrapped and serves `dashboard.html`, so every root-level JS/CSS file a page loads must get its own `http.HandleFunc` entry there, or be referenced under `/static/...`.
+- App version is baked in at build via ldflags (`config.Version`, `APP_VERSION` build arg). The Deploy workflow computes it from the PR-title prefix (`feat/` bumps minor, else patch) and tags after a successful deploy, so keep the `feat/` prefix accurate.
 - DB access goes through the `Store` interface in `db/store.go`: add the method to the interface, implement it on the SQLite store, and expose a package-level wrapper in `db/` that calls `GetStore()`.
 - Protect routes with `middleware.AuthMiddleware`; use `middleware.GetSession()` / `ClearSession()` for session state.
+- Accounts start with no password (`password_hash=''`, `must_change_password=1`). Admin create and reset call `issueInvite`, which returns a one-time token valid for 7 days; only its SHA-256 hash is stored in `password_invites`, one per user. `/invite/` and `/api/invite/` are public, outside `AuthMiddleware`. An invite is valid because its row exists, never because of `must_change_password`, and `/change-password` only remains for users still holding an old temporary password.
+- `AuthMiddleware` adds `?next=<page>` when redirecting a logged-out page request, and `login.html` only follows it if it's same-origin. Page loads (not API calls) renew the session cookie at most once a day via `renewed_at`.
 - User display name precedence: `Nickname` → `Name` → `Username` (`User.DisplayName()`). API responses that reference users keep raw IDs and add enriched `*_user` / `*_users` objects (mirror the campaigns API).
 - Session responses are one per `(session_id, user_id)` (upsert); pending players are computed from the campaign's player list.
 - When changing `models/user.go`, update seed data in `config/config.go` and keep `SaveUser` and the `SELECT`/`Scan` sites in `db/sqlite_store.go` in sync.
 - The `ADMIN_USERNAME` user is env-managed: password reset from `.env` on every start; can't be blocked, deleted or demoted.
 - The session cookie is `Secure` by default (`SESSION_COOKIE_SECURE`): fine on `http://localhost`, but over plain HTTP on a LAN IP login returns 200 and the cookie silently never sticks; set it to `false` there.
+- Sessions with `manual=1` (the DM's "Record a past session") are chronicle-only: excluded from the month view and ICS, no replies or notifications, and may have `time=''` so `sessionStart` fails; check `Manual` before calling it.
 - The Calendar button focuses the first unanswered session's month, so tests use `openCalendar`/`goToMonth` helpers, not `page.clock`.
 
 ## Conventions

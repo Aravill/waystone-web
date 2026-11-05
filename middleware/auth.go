@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gorilla/sessions"
 	"waystone-web/db"
@@ -21,6 +23,8 @@ var sessionStore sessions.Store
 const (
 	SessionName         = "auth_session"
 	minSessionSecretLen = 32
+	// sessionRenewAfter limits renewal to one new cookie a day per browser.
+	sessionRenewAfter = 24 * time.Hour
 )
 
 // Placeholder secrets that shipped in earlier code/config; anyone could forge cookies with them.
@@ -79,17 +83,44 @@ func sessionCookieSecure() bool {
 	return secure
 }
 
-// SetSession stores the user ID and session version; everything else is read from the DB per request.
+// SetSession stores the user ID, session version and renewal time; everything else is read
+// from the DB per request. An undecodable cookie (e.g. after rotating SESSION_SECRET) comes
+// back as a usable new session plus an error, so it is simply overwritten.
 func SetSession(w http.ResponseWriter, r *http.Request, user *models.User) error {
 	session, err := sessionStore.Get(r, SessionName)
-	if err != nil {
+	if session == nil {
 		return err
 	}
 
 	session.Values["user_id"] = user.ID
 	session.Values["session_version"] = user.SessionVersion
+	session.Values["renewed_at"] = time.Now().Unix()
 
 	return session.Save(r, w)
+}
+
+// renewSessionIfDue restarts the cookie's 30 days for an active user, so only
+// inactivity logs them out. Cookies from before renewed_at existed count as due.
+func renewSessionIfDue(w http.ResponseWriter, r *http.Request, user *models.User) {
+	session, err := sessionStore.Get(r, SessionName)
+	if err != nil {
+		return
+	}
+	last, _ := session.Values["renewed_at"].(int64)
+	if time.Since(time.Unix(last, 0)) < sessionRenewAfter {
+		return
+	}
+	if err := SetSession(w, r, user); err != nil {
+		log.Printf("failed to renew session: %v", err)
+	}
+}
+
+// loginRedirectURL sends the user back to the requested page after login.
+func loginRedirectURL(r *http.Request) string {
+	if r.Method != http.MethodGet || r.URL.RequestURI() == "/" {
+		return "/login.html"
+	}
+	return "/login.html?next=" + url.QueryEscape(r.URL.RequestURI())
 }
 
 func GetSession(r *http.Request) (map[interface{}]interface{}, error) {
@@ -107,7 +138,7 @@ func GetSession(r *http.Request) (map[interface{}]interface{}, error) {
 
 func ClearSession(w http.ResponseWriter, r *http.Request) error {
 	session, err := sessionStore.Get(r, SessionName)
-	if err != nil {
+	if session == nil {
 		return err
 	}
 
@@ -165,7 +196,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			if isAPI {
 				writeJSONError(w, http.StatusUnauthorized, "session expired")
 			} else {
-				http.Redirect(w, r, "/login.html", http.StatusSeeOther)
+				http.Redirect(w, r, loginRedirectURL(r), http.StatusSeeOther)
 			}
 			return
 		}
@@ -187,6 +218,11 @@ func AuthMiddleware(next http.Handler) http.Handler {
 				http.Redirect(w, r, "/change-password", http.StatusSeeOther)
 				return
 			}
+		}
+
+		// Page loads only: a slow API response could re-set the cookie after logout.
+		if !isAPI && r.Method == http.MethodGet {
+			renewSessionIfDue(w, r, dbUser)
 		}
 
 		ctx := context.WithValue(r.Context(), "user_id", dbUser.ID)

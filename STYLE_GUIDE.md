@@ -11,7 +11,7 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 | `campaigns-candlelight.png` | The same page in the dark theme |
 | `calendar.png` | Calendar grid, reply buttons, drawn when the calendar was a modal sheet (its session chips are superseded by `calendar-days.html`) |
 | `calendar-days.html` | Calendar redesign: the Ledger day cell, the Roll call panel, the strong candidate frame (variant A and panel 2 are the chosen ones) |
-| `game-detail.html` | The game page: title block, the tale, the company margin, the chronicle of played sessions |
+| `game-detail.dc.html` | The game page: the sheet, the tale, the chronicle (Ahead cells, Played rows) and the session panel |
 | `banners.dc.html` | The banner redesign: three variants, see `BANNER_DESIGN_GUIDE.md` |
 
 ## Design Philosophy
@@ -163,7 +163,11 @@ The logo mark is the standing-stone from the mock-ups: a tapered stone with a do
 <p class="page-subtitle">6 games on the roll · 2 await thee</p>
 ```
 
-The drop cap is optional and goes on the page h1. The one other place for it is a heading that names a single thing inside a panel, like the calendar's selected day (34px there). The game and calendar pages put it on the game title. The subtitle summarises the list, and counts what awaits the viewer when that's above zero.
+The drop cap is optional and goes on the page h1, except on the game page, whose title has none. The one other place for it is a heading inside a modal or side panel that names a single thing, like the calendar's selected day or the game page's session panel (34px there). The subtitle summarises the list, and counts what awaits the viewer when that's above zero.
+
+### Game page: the tale and the ledger
+
+The game page uses the modal sheet (double frame, `3px double` head rule) with the tale and the chronicle on the left and a session panel on the right, split by an ink rule. In the chronicle, **Ahead** reuses the calendar's `.day-frame` cells (a button per upcoming session, tally for members only), and **Played** is one `<li>` per session holding a full-width row button, so later elements can sit under it. Both select into the panel, which reuses the calendar panel's card, roster and reply buttons. Player avatars in a button are never links. When the layout stacks (≤ 900px), the actions move to the top of the sheet, above the tale, and the panel's session details and company sit below the chronicle. The actions keep their place in the DOM, so on a stacked layout with a keyboard they come after the chronicle in tab order.
 
 ### Buttons
 
@@ -294,6 +298,8 @@ Calendar day frames (the session fills the day; sizes scale with the cell in `cq
 
 Calendar grid: hairline cells, out-of-month days at 35% ink, selected day `background: var(--folio)` with a `2px solid var(--rubric)` inset outline. Days are square, and the month's width follows the viewport's height (the calendar is its own page, `/games/{id}/calendar`, which scrolls when the month is taller). A day with a session holds a frame inset from the hairlines: the day number, the start-end time and a four-column tally (accepted, tentative, declined, awaiting) with a hairline above it. Sizes are in `cqw`, so they scale with the cell. Narrow cells (≤ 85px) show only the start time, accepted and awaiting. The first planned session fills the cell and the rest show as "+N more". Zero counts stay at full `--muted` at weight 400, never reduced opacity (that drops the contrast below 4.5:1). The legend (■ confirmed · ▢ suggested · ~~cancelled~~) sits right of the month name, and a reply key (✓ aye · ? perhaps · ✗ nay · … awaiting · ✦ strong candidate) sits under the grid.
 
+Paste mode: the DM's Copy button on a session puts the calendar into paste mode, with a `.calendar-paste-bar` (rubric hairline border) stuck to the top of the side panel, so it stays in view while the page scrolls. The reply key hides while it's up. Free days in the shown month get a `+` in `--rubric` and a copy cursor, blocked days (past, or already holding a planned session) get a not-allowed cursor, and chosen days are filled `--folio` with the selection outline and a `✓`. The bar's note explains why a day was refused. Never use dashed outlines for this: dashed means Suggested. Esc or Cancel leaves the mode, and nothing is created until the DM confirms.
+
 Strong candidate: a Suggested session whose accepted players are over 70% of all players. Awaiting players count in the total, and exactly 70% does not qualify. The panel says it in a line ("Strong candidate: 5 of 6 accepted"), and so do the cell's `aria-label` and `title`.
 
 Roll call (day panel): one row per player, ordered Accepted, Tentative, Declined, Awaiting. Each row has the avatar with its reply-coded border, the name, which wraps and never truncates, and a fixed-width reply column.
@@ -416,4 +422,4 @@ Reference CSS with a version query (`styles.css?v=N`) and bump `N` whenever the 
 ---
 
 **Version**: 2.0 (Scriptorium), replacing 1.0 (terminal/cyberpunk)
-**Last updated**: 2026-11-04
+**Last updated**: 2026-11-05

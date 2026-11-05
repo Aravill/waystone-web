@@ -38,6 +38,8 @@ if [ -z "$SESSION_SECRET" ]; then
     exit 1
 fi
 
+export APP_VERSION=$(git describe --tags --always 2>/dev/null || echo dev)
+echo "✓ APP_VERSION=$APP_VERSION"
 echo "✓ ADMIN_USERNAME=${ADMIN_USERNAME:-admin}"
 echo "✓ PORT=${PORT:-8080}"
 

@@ -1,6 +1,6 @@
 // Calendar page (/games/{id}/calendar). Relies on campaigns.js (loaded first) for the top-level
-// helpers: REPLY_GLYPHS, userAvatarHtml, parseDateLocal, getSessionEndTime, getDurationLabel,
-// getDefaultTimezone and getTimezoneOptions. It does not use campaignsPage().
+// helpers: REPLY_GLYPHS, userAvatarHtml, parseDateLocal, getSessionEndTime, getSessionCounts, getTally,
+// isStrongCandidate, getCandidateNote, getDurationLabel, getDefaultTimezone and getTimezoneOptions. It does not use campaignsPage().
 
 window.calendarPage = function () {
     return {
@@ -12,8 +12,6 @@ window.calendarPage = function () {
         notFound: false,
         forbidden: false, // signed in, but neither the DM nor a player of this game
         loadError: '',
-        guestLinks: {},
-        guestTtlHours: 24,
         messageTimer: null,
         messageVisible: false,
         messageText: '',
@@ -38,7 +36,12 @@ window.calendarPage = function () {
         },
         timezoneOptions: getTimezoneOptions(),
         sessionResponseCache: {},
-        confirmDialog: { open: false, title: '', message: '', confirmLabel: '', resolve: null },
+        sessionClipboard: null,
+        pasteSelection: {},
+        pasteNote: { text: '', type: '' },
+        pasteSubmitting: false,
+        sessionsMonth: '',
+        sessionsLoadSeq: 0,
 
         async init() {
             try {
@@ -105,11 +108,8 @@ window.calendarPage = function () {
             this.selectedSession = null;
             this.pendingSessionAction = '';
             this.sessionResponseCache = {};
-            this.guestLinks = {};
+            this.clearClipboard();
             this.generateCalendarDays();
-            if (this.isCurrentUserDM) {
-                this.loadGuestLinks();
-            }
             await this.loadSessions();
             if (focus) {
                 await this.selectDay(focus);
@@ -183,18 +183,23 @@ window.calendarPage = function () {
         async loadSessions() {
             const year = this.currentCalendarDate.getFullYear();
             const month = String(this.currentCalendarDate.getMonth() + 1).padStart(2, '0');
+            const seq = ++this.sessionsLoadSeq;
             try {
                 const response = await fetch(`/api/campaigns/${this.currentCampaignId}/sessions?month=${year}-${month}`);
                 if (!response.ok) {
                     throw new Error('Failed to load sessions');
                 }
                 const data = await response.json();
+                if (seq !== this.sessionsLoadSeq) return;
                 this.sessions = Array.isArray(data) ? data : [];
                 this.buildSessionMap();
+                this.sessionsMonth = `${year}-${month}`;
             } catch (error) {
+                if (seq !== this.sessionsLoadSeq) return;
                 this.showMessage('Error loading sessions: ' + error.message, 'error');
                 this.sessions = [];
                 this.sessionMap = {};
+                this.sessionsMonth = '';
             }
         },
 
@@ -258,6 +263,7 @@ window.calendarPage = function () {
         },
 
         getDayTitle(date) {
+            if (this.sessionClipboard && this.isCurrentMonth(date)) return this.getPasteDayLabel(date);
             const summary = this.getDaySummary(date);
             if (!this.isHistoricalDay(date)) return summary;
             return `${summary}. ${this.isCurrentUserDM
@@ -266,6 +272,7 @@ window.calendarPage = function () {
         },
 
         getDayAriaLabel(date) {
+            if (this.sessionClipboard && this.isCurrentMonth(date)) return this.getPasteDayLabel(date);
             const summary = this.getDaySummary(date);
             if (!summary) return '';
             const head = this.formatDayHeading(date);
@@ -273,6 +280,12 @@ window.calendarPage = function () {
             return `${head}. ${summary}. ${this.isCurrentUserDM
                 ? 'Previously planned session is inactive. Select this day to suggest a new session.'
                 : 'Previously planned session is inactive.'}`;
+        },
+
+        getPasteDayLabel(date) {
+            const head = this.formatDayHeading(date);
+            if (this.pasteSelection[this.formatDateLocal(date)]) return `Remove ${head} from paste`;
+            return this.getPasteBlockReason(date) || `Paste session on ${head}`;
         },
 
         getSessionEndTime(session) {
@@ -286,32 +299,19 @@ window.calendarPage = function () {
         },
 
         getSessionCounts(session) {
-            const accepted = Number(session?.accepted_count) || 0;
-            const tentative = Number(session?.tentative_count) || 0;
-            const declined = Number(session?.declined_count) || 0;
-            const awaiting = Number(session?.pending_count) || 0;
-            return { accepted, tentative, declined, awaiting, total: accepted + tentative + declined + awaiting };
+            return getSessionCounts(session);
         },
 
         getTally(session) {
-            const c = this.getSessionCounts(session);
-            return [
-                { kind: 'accepted', n: c.accepted },
-                { kind: 'tentative', n: c.tentative },
-                { kind: 'declined', n: c.declined },
-                { kind: 'awaiting', n: c.awaiting }
-            ];
+            return getTally(session);
         },
 
-        // A suggestion with over 70% of all players accepted (awaiting players count; exactly 70% does not).
         isStrongCandidate(session) {
-            const c = this.getSessionCounts(session);
-            return session?.status === 'Suggested' && c.total > 0 && c.accepted * 10 > c.total * 7;
+            return isStrongCandidate(session);
         },
 
         getCandidateNote(session) {
-            const c = this.getSessionCounts(session);
-            return `Strong candidate: ${c.accepted} of ${c.total} accepted`;
+            return getCandidateNote(session);
         },
 
         getDaySummary(date) {
@@ -394,6 +394,120 @@ window.calendarPage = function () {
                 timezone: getDefaultTimezone()
             };
             this.showCreateSessionModal = true;
+        },
+
+        copySession(session) {
+            if (!this.isCurrentUserDM || !session) return;
+            this.sessionClipboard = {
+                time: session.time,
+                duration: session.duration,
+                timezone: session.timezone || getDefaultTimezone()
+            };
+            this.pasteSelection = {};
+            this.pasteNote = { text: '', type: '' };
+            // Read refs first: clearSelectedDay removes the Copy button, and $refs resolves from it.
+            const { pasteCancel, calendarMain, dayPanel } = this.$refs;
+            this.clearSelectedDay();
+            this.$nextTick(() => {
+                // x-show reveals the bar a frame later, and a hidden button can't take focus.
+                requestAnimationFrame(() => setTimeout(() => {
+                    if (dayPanel) dayPanel.scrollTop = 0;
+                    pasteCancel?.focus({ preventScroll: true });
+                    if (window.matchMedia('(max-width: 768px)').matches) {
+                        calendarMain?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }));
+            });
+        },
+
+        clearClipboard() {
+            this.sessionClipboard = null;
+            this.pasteSelection = {};
+            this.pasteNote = { text: '', type: '' };
+        },
+
+        getPasteBlockReason(date) {
+            const year = this.currentCalendarDate.getFullYear();
+            const month = String(this.currentCalendarDate.getMonth() + 1).padStart(2, '0');
+            if (this.sessionsMonth !== `${year}-${month}`) return "This month's sessions have not loaded yet";
+            if (this.formatDateLocal(date) < this.formatDateLocal(new Date())) return 'That day is in the past';
+            if (this.hasPlannedSession(date)) return 'That day already has a session';
+            return '';
+        },
+
+        handleDayActivate(date) {
+            if (this.sessionClipboard) {
+                this.togglePasteDay(date);
+            } else {
+                this.selectDay(date);
+            }
+        },
+
+        togglePasteDay(date) {
+            if (!this.isCurrentMonth(date) || this.pasteSubmitting) return;
+            const key = this.formatDateLocal(date);
+            if (this.pasteSelection[key]) {
+                delete this.pasteSelection[key];
+                this.pasteNote = { text: '', type: '' };
+                return;
+            }
+            const reason = this.getPasteBlockReason(date);
+            if (reason) {
+                this.pasteNote = { text: reason, type: 'error' };
+                return;
+            }
+            this.pasteSelection[key] = true;
+            this.pasteNote = { text: '', type: '' };
+        },
+
+        get pasteCount() {
+            return Object.keys(this.pasteSelection).length;
+        },
+
+        async submitPaste() {
+            if (this.pasteSubmitting || this.pasteCount === 0) return;
+            const clip = this.sessionClipboard;
+            if (!clip) return;
+            const campaignId = this.currentCampaignId;
+            const keys = Object.keys(this.pasteSelection).sort();
+            let done = 0;
+            let failed = 0;
+            let lastError = '';
+            this.pasteSubmitting = true;
+            try {
+                for (const key of keys) {
+                    try {
+                        const response = await fetch(`/api/campaigns/${campaignId}/sessions`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ date: key, time: clip.time, duration: clip.duration, timezone: clip.timezone })
+                        });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok) {
+                            failed++;
+                            lastError = data.error || 'Failed to create session';
+                            continue;
+                        }
+                        done++;
+                        if (this.sessionClipboard === clip) delete this.pasteSelection[key];
+                    } catch (error) {
+                        failed++;
+                        lastError = error.message;
+                    }
+                }
+            } finally {
+                this.pasteSubmitting = false;
+            }
+            await this.loadSessions();
+            await this.loadDayResponses();
+            if (failed === 0) {
+                if (this.sessionClipboard === clip) this.clearClipboard();
+                this.showMessage(`Pasted to ${done} ${done === 1 ? 'day' : 'days'}`, 'success');
+                return;
+            }
+            const text = `Pasted ${done}, ${failed} failed: ${lastError}`;
+            if (this.sessionClipboard === clip) this.pasteNote = { text, type: 'error' };
+            this.showMessage(text, 'error');
         },
 
         async loadDayResponses() {
@@ -610,108 +724,6 @@ window.calendarPage = function () {
                 return 'Are you sure you want to cancel the session?';
             }
             return '';
-        },
-
-        async loadGuestLinks() {
-            try {
-                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.currentCampaignId)}/guest-links`);
-                const data = await response.json();
-                if (!response.ok) {
-                    this.showMessage(data.error || 'Failed to load guest links', 'error');
-                    return;
-                }
-                this.guestLinks = data.links || {};
-            } catch (error) {
-                this.showMessage('Error loading guest links: ' + error.message, 'error');
-            }
-        },
-
-        guestUrl(userId) {
-            const link = this.guestLinks[userId];
-            return link ? `${window.location.origin}/r/${link.token}` : '';
-        },
-
-        get currentCampaignPlayers() {
-            return Array.isArray(this.campaign?.player_users) ? this.campaign.player_users : [];
-        },
-
-        isGuestLinkExpired(userId) {
-            const link = this.guestLinks[userId];
-            return !!link && new Date(link.expires_at) <= new Date();
-        },
-
-        guestLinkExpiry(userId) {
-            const link = this.guestLinks[userId];
-            if (!link) return 'no link';
-            const when = new Date(link.expires_at);
-            const text = when.toLocaleString('default', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            return when <= new Date() ? `expired ${text}` : `until ${text}`;
-        },
-
-        async createGuestLink(userId) {
-            try {
-                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.currentCampaignId)}/players/${encodeURIComponent(userId)}/guest-link`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ttl_hours: this.guestTtlHours })
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                    this.showMessage(data.error || 'Failed to create guest link', 'error');
-                    return;
-                }
-                await this.loadGuestLinks();
-            } catch (error) {
-                this.showMessage('Error creating guest link: ' + error.message, 'error');
-            }
-        },
-
-        async revokeGuestLink(userId, name) {
-            const ok = await this.askConfirm({
-                title: 'Revoke guest link',
-                message: `Revoke the guest link for ${name}? The current link will stop working.`,
-                confirmLabel: 'Revoke'
-            });
-            if (!ok) {
-                return;
-            }
-            try {
-                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.currentCampaignId)}/players/${encodeURIComponent(userId)}/guest-link`, {
-                    method: 'DELETE'
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                    this.showMessage(data.error || 'Failed to revoke guest link', 'error');
-                    return;
-                }
-                await this.loadGuestLinks();
-            } catch (error) {
-                this.showMessage('Error revoking guest link: ' + error.message, 'error');
-            }
-        },
-
-        async copyGuestLink(userId) {
-            try {
-                await navigator.clipboard.writeText(this.guestUrl(userId));
-                this.showMessage('Link copied', 'success');
-            } catch (error) {
-                window.prompt('Copy this link:', this.guestUrl(userId));
-            }
-        },
-
-        // askConfirm opens the confirm modal and resolves to true on confirm, false on cancel.
-        askConfirm({ title, message, confirmLabel }) {
-            if (this.confirmDialog.resolve) this.confirmDialog.resolve(false);
-            return new Promise((resolve) => {
-                this.confirmDialog = { open: true, title, message, confirmLabel: confirmLabel || 'Confirm', resolve };
-                this.$nextTick(() => this.$refs.confirmCancelBtn?.focus());
-            });
-        },
-
-        closeConfirm(result) {
-            const resolve = this.confirmDialog.resolve;
-            this.confirmDialog = { open: false, title: '', message: '', confirmLabel: '', resolve: null };
-            if (resolve) resolve(result);
         },
 
         async handleLogout() {

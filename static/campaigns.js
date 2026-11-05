@@ -1040,6 +1040,35 @@ function getSessionEndTime(session) {
     return `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
 }
 
+function getSessionCounts(session) {
+    const accepted = Number(session?.accepted_count) || 0;
+    const tentative = Number(session?.tentative_count) || 0;
+    const declined = Number(session?.declined_count) || 0;
+    const awaiting = Number(session?.pending_count) || 0;
+    return { accepted, tentative, declined, awaiting, total: accepted + tentative + declined + awaiting };
+}
+
+function getTally(session) {
+    const c = getSessionCounts(session);
+    return [
+        { kind: 'accepted', n: c.accepted },
+        { kind: 'tentative', n: c.tentative },
+        { kind: 'declined', n: c.declined },
+        { kind: 'awaiting', n: c.awaiting }
+    ];
+}
+
+// A suggestion with over 70% of all players accepted (awaiting players count; exactly 70% does not).
+function isStrongCandidate(session) {
+    const c = getSessionCounts(session);
+    return session?.status === 'Suggested' && c.total > 0 && c.accepted * 10 > c.total * 7;
+}
+
+function getCandidateNote(session) {
+    const c = getSessionCounts(session);
+    return `Strong candidate: ${c.accepted} of ${c.total} accepted`;
+}
+
 function getDurationLabel(session) {
     const total = Number(session?.duration) || 0;
     const hours = Math.floor(total / 60);
