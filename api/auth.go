@@ -231,7 +231,7 @@ func HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to hash password"})
 		return
 	}
-	if err := db.SetUserPassword(user.ID, hash, false); err != nil {
+	if err := db.SetUserPassword(user.ID, hash); err != nil {
 		log.Printf("change-password: failed to save: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to save password"})
 		return

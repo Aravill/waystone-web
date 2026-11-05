@@ -29,7 +29,8 @@ type Store interface {
 	GetUserAvatar(id string) ([]byte, string, error)
 	AnonymizeUser(id string) error
 	SetUserBlocked(id string, blocked bool) error
-	SetUserPassword(id, hash string, mustChange bool) error
+	SetUserPassword(id, hash string) error
+	UpdateUserRoles(id string, roles []string) error
 	GetSessionsByMonth(campaignID string, year int, month int) ([]models.CampaignSession, error)
 	GetSessionByID(sessionID string) (*models.CampaignSession, error)
 	SaveSession(session models.CampaignSession) error
@@ -38,10 +39,10 @@ type Store interface {
 	GetCalendarToken(userID string) (string, error)
 	SetCalendarToken(userID, token string) error
 	GetUserIDByCalendarToken(token string) (string, error)
-	GetGuestTokens(campaignID string) (map[string]models.GuestToken, error)
-	SetGuestToken(campaignID, userID, token string, expiresAt time.Time) error
-	DeleteGuestToken(campaignID, userID string) error
-	GetGuestToken(token string) (campaignID, userID string, expiresAt time.Time, err error)
+	IssuePasswordInvite(userID, tokenHash string, expiresAt time.Time) error
+	GetPasswordInvite(tokenHash string) (userID string, expiresAt time.Time, err error)
+	DeletePasswordInvite(userID string) error
+	RedeemPasswordInvite(tokenHash, passwordHash string) (userID string, err error)
 	UpsertSessionResponse(response models.SessionResponse) error
 	GetSessionResponses(sessionID string) ([]models.SessionResponse, error)
 	GetSessionResponsesBySessionIDs(sessionIDs []string) (map[string][]models.SessionResponse, error)

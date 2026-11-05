@@ -3,7 +3,9 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"waystone-web/auth"
 	"waystone-web/db"
@@ -141,20 +143,9 @@ func HandleAdminUsers(w http.ResponseWriter, r *http.Request) {
 			adminError(w, http.StatusConflict, "username already taken")
 			return
 		}
-		tempPassword, err := auth.GenerateTempPassword(username)
-		if err != nil {
-			adminError(w, http.StatusInternalServerError, "failed to generate password")
-			return
-		}
-		hash, err := auth.HashPassword(tempPassword)
-		if err != nil {
-			adminError(w, http.StatusInternalServerError, "failed to hash password")
-			return
-		}
 		newUser := models.User{
 			ID:                 db.GenerateUUID(),
 			Username:           username,
-			PasswordHash:       hash,
 			MustChangePassword: true,
 			NeedsProfileSetup:  true,
 			Name:               strings.TrimSpace(body.Name),
@@ -164,11 +155,14 @@ func HandleAdminUsers(w http.ResponseWriter, r *http.Request) {
 			adminError(w, http.StatusInternalServerError, "failed to create user")
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"user":          toAdminUserJSON(newUser),
-			"temp_password": tempPassword,
+		token, err := issueInvite(newUser.ID)
+		if err != nil {
+			adminError(w, http.StatusInternalServerError, "user created, but failed to create invite; use reset password")
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]interface{}{
+			"user":         toAdminUserJSON(newUser),
+			"invite_token": token,
 		})
 
 	default:
@@ -285,22 +279,12 @@ func HandleAdminUserActions(w http.ResponseWriter, r *http.Request) {
 			adminError(w, http.StatusConflict, "cannot reset your own password")
 			return
 		}
-		tempPassword, err := auth.GenerateTempPassword(target.Username)
+		token, err := issueInvite(targetID)
 		if err != nil {
-			adminError(w, http.StatusInternalServerError, "failed to generate password")
-			return
-		}
-		hash, err := auth.HashPassword(tempPassword)
-		if err != nil {
-			adminError(w, http.StatusInternalServerError, "failed to hash password")
-			return
-		}
-		if err := db.SetUserPassword(targetID, hash, true); err != nil {
 			adminError(w, http.StatusInternalServerError, "failed to reset password")
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"temp_password": tempPassword})
+		writeJSON(w, http.StatusOK, map[string]string{"invite_token": token})
 
 	case r.Method == http.MethodPost && action == "remove-admin":
 		if auth.IsEnvAdmin(target) {
@@ -339,5 +323,104 @@ func HandleAdminUserActions(w http.ResponseWriter, r *http.Request) {
 
 	default:
 		adminError(w, http.StatusNotFound, "unknown action")
+	}
+}
+
+// HandleAdminCampaignActions handles POST /api/admin/campaigns/{cid}/players and
+// DELETE /api/admin/campaigns/{cid}/players/{uid}.
+func HandleAdminCampaignActions(w http.ResponseWriter, r *http.Request) {
+	caller, err := getAdminCaller(r)
+	if err != nil || caller == nil {
+		adminForbidden(w)
+		return
+	}
+
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/admin/campaigns/"), "/")
+	campaignID := parts[0]
+	rest := parts[1:]
+	if campaignID == "" || len(rest) == 0 {
+		adminError(w, http.StatusNotFound, "not found")
+		return
+	}
+	campaign, err := db.GetCampaignByID(campaignID)
+	if err != nil {
+		adminError(w, http.StatusInternalServerError, "failed to retrieve game")
+		return
+	}
+	if campaign == nil {
+		adminError(w, http.StatusNotFound, "game not found")
+		return
+	}
+
+	switch {
+	case r.Method == http.MethodPost && len(rest) == 1 && rest[0] == "players":
+		adminAddPlayer(w, r, caller, campaign)
+
+	case r.Method == http.MethodDelete && len(rest) == 2 && rest[0] == "players":
+		uid := rest[1]
+		if !isCampaignPlayer(campaign, uid) {
+			adminError(w, http.StatusNotFound, "player not found")
+			return
+		}
+		if applySignupStatus(w, campaignID, uid, models.SignupKicked, "player removed") != nil {
+			notify(caller.ID, []string{uid}, models.NotificationPlayerKicked, campaign, "", nil)
+		}
+
+	default:
+		adminError(w, http.StatusNotFound, "not found")
+	}
+}
+
+func adminAddPlayer(w http.ResponseWriter, r *http.Request, caller *models.User, campaign *models.Campaign) {
+	var req struct {
+		UserID string `json:"user_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.UserID == "" {
+		adminError(w, http.StatusBadRequest, "user_id required")
+		return
+	}
+	target, err := db.GetUserByID(req.UserID)
+	if err != nil || target == nil || target.Deleted {
+		adminError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	if campaign.DM == target.ID {
+		adminError(w, http.StatusConflict, "the DM cannot be a player")
+		return
+	}
+	if isCampaignPlayer(campaign, target.ID) {
+		adminError(w, http.StatusConflict, "already a player")
+		return
+	}
+
+	existing, err := db.GetCampaignSignup(campaign.ID, target.ID)
+	if err != nil {
+		adminError(w, http.StatusInternalServerError, "failed to check sign-up")
+		return
+	}
+	if existing == nil {
+		now := time.Now().UTC().Format(time.RFC3339)
+		if err := db.CreateCampaignSignup(models.CampaignSignup{
+			ID:         db.GenerateUUID(),
+			CampaignID: campaign.ID,
+			UserID:     target.ID,
+			Status:     models.SignupPending,
+			CreatedAt:  now,
+			UpdatedAt:  now,
+		}); err != nil {
+			adminError(w, http.StatusInternalServerError, "failed to create sign-up")
+			return
+		}
+	}
+
+	updated := applySignupStatus(w, campaign.ID, target.ID, models.SignupAccepted, "player added")
+	if updated == nil {
+		return
+	}
+	notify(caller.ID, []string{target.ID}, models.NotificationSignupAccepted, campaign, "", nil)
+	if campaign.SignUpsOpen && !updated.SignUpsOpen {
+		notify("", []string{campaign.DM}, models.NotificationCampaignFull, campaign, "", map[string]string{
+			"player_count": strconv.Itoa(len(updated.Players)),
+		})
 	}
 }

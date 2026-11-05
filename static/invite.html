@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>Set your password — Waystone</title>
+    <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+    <script src="/static/theme.js?v=4"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=55">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .password-rules { list-style: none; margin: 10px 0 0; padding: 0; font-size: 0.85em; color: var(--muted); }
+        .password-rules li { margin-bottom: 4px; }
+        .password-rules li.ok { color: var(--verdigris); }
+    </style>
+</head>
+<body x-data="invitePage()" x-cloak>
+    <main class="container container--narrow" style="max-width: 40rem;">
+        <div x-show="messageVisible" x-text="messageText"
+            :class="messageType === 'error' ? 'message error' : 'message success'"
+            style="display: none;"></div>
+
+        <template x-if="state === 'invalid'">
+            <div>
+                <h1 class="page-title">Link not valid</h1>
+                <p class="form-hint">This invite is no longer valid. If you've already set your password, log in with it. Otherwise ask the admin for a new invite.</p>
+                <p class="form-hint"><a href="/login.html">Go to login</a></p>
+            </div>
+        </template>
+        <template x-if="state === 'expired'">
+            <div>
+                <h1 class="page-title">Invite expired</h1>
+                <p class="form-hint">This invite has expired. Ask the admin for a new one.</p>
+            </div>
+        </template>
+
+        <template x-if="state === 'error'">
+            <div>
+                <h1 class="page-title">Something went wrong</h1>
+                <p class="form-hint">Couldn't load this page. Try refreshing.</p>
+            </div>
+        </template>
+
+        <template x-if="state === 'ready'">
+            <div>
+                <h1 class="page-title"><span class="drop-cap">S</span>et your password</h1>
+                <p class="form-hint" x-text="'Welcome, ' + displayName + '. Choose a password to finish setting up your account.'"></p>
+                <p class="form-hint" style="margin-bottom: 1.5rem;" x-text="'Your username is ' + username + '. You\'ll use it with this password to log in from now on.'"></p>
+                <form @submit.prevent="submit()">
+                    <input type="text" :value="username" autocomplete="username" readonly tabindex="-1" aria-hidden="true"
+                        style="position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden;">
+                    <div class="form-group">
+                        <label for="newPassword">New password</label>
+                        <input id="newPassword" type="password" x-model="newPassword" autocomplete="new-password" minlength="10" required aria-describedby="passwordRules">
+                        <ul id="passwordRules" class="password-rules">
+                            <template x-for="rule in rules()" :key="rule.text">
+                                <li :class="rule.ok ? 'ok' : ''"><span x-text="rule.ok ? '[x]' : '[ ]'"></span> <span x-text="rule.text"></span></li>
+                            </template>
+                        </ul>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm new password</label>
+                        <input id="confirmPassword" type="password" x-model="confirmPassword" autocomplete="new-password" minlength="10" required>
+                    </div>
+                    <button type="submit" class="submit-btn" :disabled="saving">Set password</button>
+                </form>
+            </div>
+        </template>
+    </main>
+
+    <script src="/change-password.js?v=4"></script>
+    <script src="/static/invite.js?v=2"></script>
+</body>
+</html>

@@ -116,13 +116,13 @@ func (s *SQLiteStore) initSchema() error {
 		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 
-	CREATE TABLE IF NOT EXISTS guest_tokens (
-		token TEXT PRIMARY KEY,
-		campaign_id TEXT NOT NULL,
-		user_id TEXT NOT NULL,
-		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		expires_at TEXT NOT NULL,
-		UNIQUE(campaign_id, user_id)
+	DROP TABLE IF EXISTS guest_tokens;
+
+	CREATE TABLE IF NOT EXISTS password_invites (
+		user_id TEXT PRIMARY KEY,
+		token_hash TEXT NOT NULL UNIQUE,
+		created_at TEXT NOT NULL,
+		expires_at TEXT NOT NULL
 	);
 
 	CREATE TABLE IF NOT EXISTS session_responses (
@@ -809,7 +809,7 @@ func (s *SQLiteStore) AnonymizeUser(id string) error {
 		return ErrUserNotFound
 	}
 
-	for _, table := range []string{"campaign_signups", "campaign_follows", "calendar_tokens", "guest_tokens", "notifications"} {
+	for _, table := range []string{"campaign_signups", "campaign_follows", "calendar_tokens", "password_invites", "notifications"} {
 		if _, err := tx.Exec(`DELETE FROM `+table+` WHERE user_id = ?`, id); err != nil {
 			return err
 		}
@@ -827,29 +827,74 @@ func (s *SQLiteStore) SetUserBlocked(id string, blocked bool) error {
 		blockedInt = 1
 	}
 
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	// Blocking bumps session_version so unblocking doesn't revive cookies issued before the block.
-	_, err := s.db.Exec(
+	if _, err := tx.Exec(
 		`UPDATE users SET blocked=?, session_version=session_version+?, updated_at=? WHERE id=?`,
 		blockedInt, blockedInt, time.Now().UTC().Format(time.RFC3339), id,
-	)
-	return err
+	); err != nil {
+		return err
+	}
+	// A pending invite dies with the block and stays dead after unblocking.
+	if blocked {
+		if _, err := tx.Exec(`DELETE FROM password_invites WHERE user_id = ?`, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
-func (s *SQLiteStore) SetUserPassword(id, hash string, mustChange bool) error {
+// UpdateUserRoles writes only the roles, so it can't undo a concurrent password or block change.
+func (s *SQLiteStore) UpdateUserRoles(id string, roles []string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	mustChangeInt := 0
-	if mustChange {
-		mustChangeInt = 1
+	rolesJSON, err := json.Marshal(roles)
+	if err != nil {
+		return err
 	}
+	res, err := s.db.Exec(`UPDATE users SET roles=?, updated_at=? WHERE id=? AND deleted=0`,
+		string(rolesJSON), time.Now().UTC().Format(time.RFC3339), id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+func (s *SQLiteStore) SetUserPassword(id, hash string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 
 	// Bumping session_version revokes every existing session cookie for the user.
-	_, err := s.db.Exec(
-		`UPDATE users SET password_hash=?, must_change_password=?, session_version=session_version+1, updated_at=? WHERE id=?`,
-		hash, mustChangeInt, time.Now().UTC().Format(time.RFC3339), id,
-	)
-	return err
+	if _, err := tx.Exec(
+		`UPDATE users SET password_hash=?, must_change_password=0, session_version=session_version+1, updated_at=? WHERE id=?`,
+		hash, time.Now().UTC().Format(time.RFC3339), id,
+	); err != nil {
+		return err
+	}
+	// Any password change ends a pending invite.
+	if _, err := tx.Exec(`DELETE FROM password_invites WHERE user_id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func parseTime(timeStr string) (time.Time, error) {
@@ -1067,74 +1112,6 @@ func (s *SQLiteStore) GetUserIDByCalendarToken(token string) (string, error) {
 		return "", nil
 	}
 	return userID, err
-}
-
-// GetGuestTokens returns a campaign's guest links keyed by user ID.
-func (s *SQLiteStore) GetGuestTokens(campaignID string) (map[string]models.GuestToken, error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	rows, err := s.db.Query(`SELECT user_id, token, expires_at FROM guest_tokens WHERE campaign_id = ?`, campaignID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	tokens := map[string]models.GuestToken{}
-	for rows.Next() {
-		var userID string
-		var t models.GuestToken
-		if err := rows.Scan(&userID, &t.Token, &t.ExpiresAt); err != nil {
-			return nil, err
-		}
-		tokens[userID] = t
-	}
-	return tokens, rows.Err()
-}
-
-func (s *SQLiteStore) SetGuestToken(campaignID, userID, token string, expiresAt time.Time) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	if campaignID == "" || userID == "" || token == "" {
-		return fmt.Errorf("campaign id, user id and token cannot be empty")
-	}
-	_, err := s.db.Exec(`
-		INSERT INTO guest_tokens (token, campaign_id, user_id, created_at, expires_at)
-		VALUES (?, ?, ?, ?, ?)
-		ON CONFLICT(campaign_id, user_id) DO UPDATE SET token = excluded.token, created_at = excluded.created_at, expires_at = excluded.expires_at
-	`, token, campaignID, userID, time.Now().UTC().Format(time.RFC3339), expiresAt.UTC().Format(time.RFC3339))
-	return err
-}
-
-func (s *SQLiteStore) DeleteGuestToken(campaignID, userID string) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	_, err := s.db.Exec(`DELETE FROM guest_tokens WHERE campaign_id = ? AND user_id = ?`, campaignID, userID)
-	return err
-}
-
-// GetGuestToken resolves a guest token; the campaign ID is empty when it is unknown.
-func (s *SQLiteStore) GetGuestToken(token string) (string, string, time.Time, error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	if token == "" {
-		return "", "", time.Time{}, nil
-	}
-	var campaignID, userID, expires string
-	err := s.db.QueryRow(`SELECT campaign_id, user_id, expires_at FROM guest_tokens WHERE token = ?`, token).Scan(&campaignID, &userID, &expires)
-	if err == sql.ErrNoRows {
-		return "", "", time.Time{}, nil
-	}
-	if err != nil {
-		return "", "", time.Time{}, err
-	}
-	expiresAt, err := time.Parse(time.RFC3339, expires)
-	if err != nil {
-		return "", "", time.Time{}, err
-	}
-	return campaignID, userID, expiresAt, nil
 }
 
 func (s *SQLiteStore) GetSessionByID(sessionID string) (*models.CampaignSession, error) {
@@ -1632,9 +1609,6 @@ func (s *SQLiteStore) DeleteCampaign(id string) error {
 	if _, err := tx.Exec(`DELETE FROM notifications WHERE campaign_id = ?`, id); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM guest_tokens WHERE campaign_id = ?`, id); err != nil {
-		return err
-	}
 	res, err := tx.Exec(`DELETE FROM campaigns WHERE id = ?`, id)
 	if err != nil {
 		return err
@@ -2034,4 +2008,122 @@ func (s *SQLiteStore) MarkAllNotificationsRead(userID string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.Exec(`UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at = ''`, now, userID)
 	return err
+}
+
+// IssuePasswordInvite clears the user's password (so the old one stops working
+// at once) and upserts their single live invite.
+func (s *SQLiteStore) IssuePasswordInvite(userID, tokenHash string, expiresAt time.Time) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if userID == "" || tokenHash == "" {
+		return fmt.Errorf("user id and token hash cannot be empty")
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	res, err := tx.Exec(
+		`UPDATE users SET password_hash='', must_change_password=1, session_version=session_version+1, updated_at=? WHERE id=?`,
+		now, userID,
+	)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return ErrUserNotFound
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO password_invites (user_id, token_hash, created_at, expires_at)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(user_id) DO UPDATE SET token_hash = excluded.token_hash, created_at = excluded.created_at, expires_at = excluded.expires_at
+	`, userID, tokenHash, now, expiresAt.UTC().Format(time.RFC3339)); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// GetPasswordInvite resolves an invite by token hash; userID is empty when unknown.
+func (s *SQLiteStore) GetPasswordInvite(tokenHash string) (string, time.Time, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	if tokenHash == "" {
+		return "", time.Time{}, nil
+	}
+	var userID, expires string
+	err := s.db.QueryRow(`SELECT user_id, expires_at FROM password_invites WHERE token_hash = ?`, tokenHash).Scan(&userID, &expires)
+	if err == sql.ErrNoRows {
+		return "", time.Time{}, nil
+	}
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	expiresAt, err := time.Parse(time.RFC3339, expires)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return userID, expiresAt, nil
+}
+
+// DeletePasswordInvite removes the user's pending invite, if any.
+func (s *SQLiteStore) DeletePasswordInvite(userID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	_, err := s.db.Exec(`DELETE FROM password_invites WHERE user_id = ?`, userID)
+	return err
+}
+
+// RedeemPasswordInvite sets the password and deletes the invite in one transaction.
+func (s *SQLiteStore) RedeemPasswordInvite(tokenHash, passwordHash string) (string, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if tokenHash == "" {
+		return "", nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+
+	var userID, expires string
+	var deleted, blocked int
+	err = tx.QueryRow(`
+		SELECT i.user_id, i.expires_at, u.deleted, u.blocked
+		FROM password_invites i JOIN users u ON u.id = i.user_id
+		WHERE i.token_hash = ?`, tokenHash).Scan(&userID, &expires, &deleted, &blocked)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	expiresAt, err := time.Parse(time.RFC3339, expires)
+	if err != nil {
+		return "", err
+	}
+	if !expiresAt.After(time.Now()) || deleted != 0 || blocked != 0 {
+		return "", nil
+	}
+	if _, err := tx.Exec(
+		`UPDATE users SET password_hash=?, must_change_password=0, session_version=session_version+1, updated_at=? WHERE id=?`,
+		passwordHash, time.Now().UTC().Format(time.RFC3339), userID,
+	); err != nil {
+		return "", err
+	}
+	if _, err := tx.Exec(`DELETE FROM password_invites WHERE user_id = ?`, userID); err != nil {
+		return "", err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", err
+	}
+	return userID, nil
 }

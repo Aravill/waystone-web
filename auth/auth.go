@@ -2,10 +2,8 @@
 package auth
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 	"regexp"
 	"strings"
@@ -20,9 +18,6 @@ const (
 	MinPasswordLength = 10
 	// MaxPasswordBytes is bcrypt's input limit; longer passwords fail to hash.
 	MaxPasswordBytes = 72
-	tempPasswordLen  = 12
-	// Unambiguous alphabet: no 0/O, 1/l/I.
-	tempPasswordAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
 )
 
 var usernamePattern = regexp.MustCompile(`^[a-z0-9_-]{2,32}$`)
@@ -79,27 +74,6 @@ func PasswordPolicyViolations(password, username string) []string {
 // PasswordPolicyError builds a user-facing message from policy violations.
 func PasswordPolicyError(violations []string) string {
 	return "password must " + strings.Join(violations, "; ")
-}
-
-// GenerateTempPassword returns a random temporary password that satisfies the
-// password policy for username.
-func GenerateTempPassword(username string) (string, error) {
-	max := big.NewInt(int64(len(tempPasswordAlphabet)))
-	out := make([]byte, tempPasswordLen)
-	// Each draw passes ~85% of the time; the cap only makes termination obvious.
-	for attempt := 0; attempt < 100; attempt++ {
-		for i := range out {
-			n, err := rand.Int(rand.Reader, max)
-			if err != nil {
-				return "", err
-			}
-			out[i] = tempPasswordAlphabet[n.Int64()]
-		}
-		if len(PasswordPolicyViolations(string(out), username)) == 0 {
-			return string(out), nil
-		}
-	}
-	return "", errors.New("could not generate a policy-compliant temporary password")
 }
 
 // ParseUsername trims, lowercases and validates a username.

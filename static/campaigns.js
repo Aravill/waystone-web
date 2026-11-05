@@ -341,8 +341,6 @@ window.campaignsPage = function () {
     return {
         displayName: 'User',
         isAdmin: false,
-        guestLinks: {},
-        guestTtlHours: 24,
         currentUserId: '',
         campaigns: [],
         loading: true,
@@ -980,94 +978,6 @@ window.campaignsPage = function () {
             }
         },
 
-        async loadGuestLinks() {
-            try {
-                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.currentCampaignId)}/guest-links`);
-                const data = await response.json();
-                if (!response.ok) {
-                    this.showMessage(data.error || 'Failed to load guest links', 'error');
-                    return;
-                }
-                this.guestLinks = data.links || {};
-            } catch (error) {
-                this.showMessage('Error loading guest links: ' + error.message, 'error');
-            }
-        },
-
-        guestUrl(userId) {
-            const link = this.guestLinks[userId];
-            return link ? `${window.location.origin}/r/${link.token}` : '';
-        },
-
-        get currentCampaignPlayers() {
-            const campaign = this.campaigns.find((c) => c.id === this.currentCampaignId);
-            return Array.isArray(campaign?.player_users) ? campaign.player_users : [];
-        },
-
-        isGuestLinkExpired(userId) {
-            const link = this.guestLinks[userId];
-            return !!link && new Date(link.expires_at) <= new Date();
-        },
-
-        guestLinkExpiry(userId) {
-            const link = this.guestLinks[userId];
-            if (!link) return 'no link';
-            const when = new Date(link.expires_at);
-            const text = when.toLocaleString('default', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            return when <= new Date() ? `expired ${text}` : `until ${text}`;
-        },
-
-        async createGuestLink(userId) {
-            try {
-                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.currentCampaignId)}/players/${encodeURIComponent(userId)}/guest-link`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ttl_hours: this.guestTtlHours })
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                    this.showMessage(data.error || 'Failed to create guest link', 'error');
-                    return;
-                }
-                await this.loadGuestLinks();
-            } catch (error) {
-                this.showMessage('Error creating guest link: ' + error.message, 'error');
-            }
-        },
-
-        async revokeGuestLink(userId, name) {
-            const ok = await this.askConfirm({
-                title: 'Revoke guest link',
-                message: `Revoke the guest link for ${name}? The current link will stop working.`,
-                confirmLabel: 'Revoke'
-            });
-            if (!ok) {
-                return;
-            }
-            try {
-                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.currentCampaignId)}/players/${encodeURIComponent(userId)}/guest-link`, {
-                    method: 'DELETE'
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                    this.showMessage(data.error || 'Failed to revoke guest link', 'error');
-                    return;
-                }
-                await this.loadGuestLinks();
-            } catch (error) {
-                this.showMessage('Error revoking guest link: ' + error.message, 'error');
-            }
-        },
-
-        async copyGuestLink(userId) {
-            try {
-                await navigator.clipboard.writeText(this.guestUrl(userId));
-                this.showMessage('Link copied', 'success');
-            } catch (error) {
-                window.prompt('Copy this link:', this.guestUrl(userId));
-            }
-        },
-
         async kickPlayer(userId) {
             try {
                 const response = await fetch(`/api/campaigns/${encodeURIComponent(this.signupsCampaignId)}/players/${encodeURIComponent(userId)}`, {
@@ -1116,11 +1026,7 @@ window.campaignsPage = function () {
             this.selectedSession = null;
             this.pendingSessionAction = '';
             this.sessionResponseCache = {};
-            this.guestLinks = {};
             this.generateCalendarDays();
-            if (this.isCurrentUserDM) {
-                this.loadGuestLinks();
-            }
             await this.loadSessions();
             if (focus) {
                 await this.selectDay(focus);

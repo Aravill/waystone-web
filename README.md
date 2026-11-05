@@ -221,15 +221,15 @@ Demo data is seeded only when `SEED_DEMO_DATA` is set to `1`/`true` (default off
 
 ## Authentication & Users
 
-The application uses **local username/password accounts**. There is no self-registration: admins create users and hand out temporary passwords.
+The application uses **local username/password accounts**. There is no self-registration: admins create users and hand out one-time invite links.
 
 ### How It Works
 
 1. **Admin seeding** - On every startup the user named by `ADMIN_USERNAME` (default `admin`) is created if missing, unblocked, given the `admin` role and its password is reset to `ADMIN_PASSWORD`. This account is env-managed: its password can't be changed in the app, and it can't be blocked, deleted or demoted.
-2. **Creating users** - On the Admin page an admin enters a username (2-32 characters: `a-z`, `0-9`, `_`, `-`; stored lowercase) and an optional name. The server generates a 12-character temporary password and shows it once.
-3. **First login** - Users with a temporary password are redirected to `/change-password` and cannot use the rest of the app (API calls return `403 password change required`) until they pick a new password (at least 10 characters and at most 72 bytes, with an uppercase letter, a lowercase letter and a digit, not containing the username).
-4. **Reset** - An admin can reset any other user's password from the Admin page. This generates a new temporary password and forces a change at the next login.
-5. **Sessions** - The session cookie stores only the user ID (HttpOnly, SameSite=Lax, 30 days). Roles, blocked state and the forced-change flag are read from the database on every request.
+2. **Creating users** - On the Admin page an admin enters a username (2-32 characters: `a-z`, `0-9`, `_`, `-`; stored lowercase) and an optional name. The server creates a one-time invite link (valid 7 days, only its SHA-256 hash is stored) and shows it once; the user opens it and chooses their own password.
+3. **First login** - Users who still hold a legacy temporary password are redirected to `/change-password` and cannot use the rest of the app (API calls return `403 password change required`) until they pick a new password (at least 10 characters and at most 72 bytes, with an uppercase letter, a lowercase letter and a digit, not containing the username).
+4. **Reset** - An admin can reset any other user's password from the Admin page. This clears the current password at once and creates a new invite link, replacing any earlier one.
+5. **Sessions** - The session cookie stores the user ID, session version and last renewal time (HttpOnly, SameSite=Lax). It lasts 30 days and is renewed on page loads, at most once a day, so only 30 days of inactivity log a user out. Roles, blocked state and the forced-change flag are read from the database on every request.
 
 ### Auth Endpoints
 
@@ -239,14 +239,17 @@ The application uses **local username/password accounts**. There is no self-regi
 | `POST /auth/change-password` | Body `{current_password, new_password}`; requires a session; rejected for the env admin |
 | `POST /auth/logout` | Clears the session |
 | `GET /auth/current-user` | Current user info (`username`, `display_name`, `roles`, `must_change_password`, `is_env_admin`) |
+| `GET /invite/{token}` | Invite page where the user chooses a password |
+| `GET /api/invite/{token}` | Invite details (`user.username`, `user.display_name`); `404` if invalid or used, `410` if expired |
+| `POST /api/invite/{token}/password` | Body `{new_password}`; sets the password, uses up the invite and logs the browser in; returns `{status, needs_profile_setup}` |
 
 ### Admin API
 
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/admin/users` | List users |
-| `POST /api/admin/users` | Body `{username, name?}`; returns `201 {user, temp_password}`, `409` if the username is taken |
-| `POST /api/admin/users/{id}/reset-password` | Returns `{temp_password}`; refused for the env admin and yourself |
+| `POST /api/admin/users` | Body `{username, name?}`; returns `201 {user, invite_token}`, `409` if the username is taken |
+| `POST /api/admin/users/{id}/reset-password` | Returns `{invite_token}`; refused for the env admin and yourself |
 | `POST /api/admin/users/{id}/block` / `unblock` | Block or unblock a user |
 | `POST /api/admin/users/{id}/make-admin` / `remove-admin` | Change the admin role |
 | `DELETE /api/admin/users/{id}` | Delete a user |
@@ -280,6 +283,9 @@ Additional custom roles can be added to the `models/roles.go` file as needed.
 | `POST /auth/change-password` | Yes | - | Change own password (not the env admin) |
 | `GET /auth/current-user` | Yes | - | Get current user info with roles |
 | `POST /auth/logout` | Yes | - | Clear session and logout |
+| `GET /invite/{token}` | No (token) | - | Invite page |
+| `GET /api/invite/{token}` | No (token) | - | Invite details |
+| `POST /api/invite/{token}/password` | No (token) | - | Set password with an invite |
 | `GET /api/campaigns` | Yes | - | List campaigns |
 | `GET /api/campaigns/{id}` | Yes | - | One campaign with played sessions and attendees |
 | `PUT /api/campaigns/{id}` | Yes | DM or admin | Update a campaign |

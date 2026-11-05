@@ -6,7 +6,7 @@
     <title>Login - Waystone</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=54">
+    <link rel="stylesheet" href="/static/styles.css?v=55">
     <style>
         .login-container {
             display: flex;
@@ -106,6 +106,18 @@
             messageTimer = setTimeout(() => { messageEl.className = 'message'; }, 5000);
         }
 
+        // The page to return to, as an absolute URL; anything off-site is ignored.
+        function nextUrl() {
+            const next = new URLSearchParams(location.search).get('next');
+            if (!next) return '';
+            try {
+                const url = new URL(next, location.origin);
+                return url.origin === location.origin ? url.href : '';
+            } catch {
+                return '';
+            }
+        }
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('loginBtn');
@@ -124,7 +136,7 @@
                     showMessage(data.error || 'Login failed', 'error');
                     return;
                 }
-                window.location.href = data.must_change_password ? '/change-password' : (data.needs_profile_setup ? '/profile' : '/');
+                window.location.href = data.must_change_password ? '/change-password' : (nextUrl() || (data.needs_profile_setup ? '/profile' : '/'));
             } catch (error) {
                 showMessage('Login failed: ' + error.message, 'error');
             } finally {

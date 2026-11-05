@@ -1,3 +1,18 @@
+// Mirrors auth.PasswordPolicyViolations; the server stays the source of truth.
+window.passwordRules = function(pw, username) {
+    const rules = [
+        { text: 'at least 10 characters', ok: [...pw].length >= 10 },
+        { text: 'at most 72 bytes (accented/non-Latin characters count as 2-4)', ok: new TextEncoder().encode(pw).length <= 72 },
+        { text: 'a lowercase letter', ok: /\p{Ll}/u.test(pw) },
+        { text: 'an uppercase letter', ok: /\p{Lu}/u.test(pw) },
+        { text: 'a digit', ok: /\p{Nd}/u.test(pw) },
+    ];
+    if (username) {
+        rules.push({ text: 'does not contain your username', ok: !pw.toLowerCase().includes(username.toLowerCase()) });
+    }
+    return rules;
+};
+
 // Change password Alpine component
 window.changePasswordPage = function() {
     return {
@@ -33,20 +48,8 @@ window.changePasswordPage = function() {
             }
         },
 
-        // Mirrors auth.PasswordPolicyViolations; the server stays the source of truth.
         rules() {
-            const pw = this.newPassword;
-            const rules = [
-                { text: 'at least 10 characters', ok: [...pw].length >= 10 },
-                { text: 'at most 72 bytes (accented/non-Latin characters count as 2-4)', ok: new TextEncoder().encode(pw).length <= 72 },
-                { text: 'a lowercase letter', ok: /\p{Ll}/u.test(pw) },
-                { text: 'an uppercase letter', ok: /\p{Lu}/u.test(pw) },
-                { text: 'a digit', ok: /\p{Nd}/u.test(pw) },
-            ];
-            if (this.username) {
-                rules.push({ text: 'does not contain your username', ok: !pw.toLowerCase().includes(this.username.toLowerCase()) });
-            }
-            return rules;
+            return window.passwordRules(this.newPassword, this.username);
         },
 
         async submit() {
