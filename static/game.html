@@ -6,7 +6,7 @@
     <title>Waystone - Game</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=54">
+    <link rel="stylesheet" href="/static/styles.css?v=55">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -62,7 +62,7 @@
                             <p class="game-lede" x-text="campaign.summary"></p>
                         </div>
                         <div class="game-actions">
-                            <a class="campaign-action-btn" x-show="isMember" :href="'/campaigns?calendar=' + encodeURIComponent(campaign.id)"
+                            <a class="campaign-action-btn" x-show="isMember" :href="'/games/' + encodeURIComponent(campaign.id) + '/calendar'"
                                :title="unansweredCount > 0 ? unansweredCount + ' suggested session' + (unansweredCount === 1 ? '' : 's') + ' awaiting your response' : null"
                                :aria-label="unansweredCount > 0 ? 'Calendar, ' + unansweredCount + ' awaiting your response' : null">Calendar<span class="campaign-action-count" x-show="unansweredCount > 0" x-text="unansweredCount"></span></a>
                             <template x-if="isDM">
@@ -128,7 +128,7 @@
                                 <div class="game-next" :title="campaign.next_session.timezone">
                                     <span class="game-eyebrow">Next</span>
                                     <span x-text="formatDate(campaign.next_session.date) + ', ' + campaign.next_session.time"></span>
-                                    <a x-show="isMember" :href="'/campaigns?calendar=' + encodeURIComponent(campaign.id)">Open calendar →</a>
+                                    <a x-show="isMember" :href="'/games/' + encodeURIComponent(campaign.id) + '/calendar'">Open calendar →</a>
                                 </div>
                             </template>
 
@@ -179,7 +179,7 @@
     </div>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="/campaigns.js?v=47"></script>
+    <script src="/campaigns.js?v=48"></script>
     <script src="/static/game.js?v=4"></script>
 </body>
 </html>

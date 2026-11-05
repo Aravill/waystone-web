@@ -874,8 +874,6 @@ select option {
     }
 }
 
-
-
 .pending-notice,
 .player-responses p {
     margin: 0;
@@ -1574,20 +1572,23 @@ select option {
     border-top: 1px solid var(--line);
 }
 
-.calendar-modal-content {
-    width: 96vw;
-    max-width: 80rem;
-    height: 92vh;
-    max-height: 92vh;
+.calendar-head {
     display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 0.5rem 2rem;
+    padding: 0.5rem 0 1.25rem;
+    border-bottom: 1px solid var(--ink);
 }
 
-.calendar-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
+.calendar-head .modal-eyebrow {
+    margin-top: 1.5rem;
+}
+
+.calendar-head .page-title {
+    margin: 0.25rem 0 0;
+    text-wrap: balance;
 }
 
 .create-session-modal {
@@ -1701,20 +1702,16 @@ select option {
 .calendar-layout {
     display: flex;
     gap: 1.75rem;
-    flex: 1;
-    min-height: 0;
-    padding: 1.5rem;
+    padding: 1.5rem 0 0;
 }
 
-/* Square days: the month (6 rows + headers) is as wide as the modal's height allows,
-   and the side panel takes the rest. 18rem is the modal chrome above the grid. */
+/* Square days: the month's width follows the viewport's height, and the side panel takes the rest.
+   38rem keeps cells above the narrow-cell query (85px); the page scrolls when the month is taller. */
 .calendar-main {
     display: flex;
     flex-direction: column;
-    flex: 0 1 max(28rem, calc((92vh - 18rem) * 7 / 6));
+    flex: 0 1 max(38rem, calc((92vh - 18rem) * 7 / 6));
     min-width: 0;
-    min-height: 0;
-    overflow-y: auto;
 }
 
 .calendar-nav {
@@ -1756,7 +1753,6 @@ select option {
 .legend-cancelled {
     text-decoration: line-through;
 }
-
 
 .legend-star {
     color: var(--rubric);
@@ -1926,8 +1922,6 @@ select option {
     min-width: 15rem;
     padding-left: 1.75rem;
     border-left: 1px solid var(--ink);
-    overflow-y: auto;
-    min-height: 0;
 }
 
 .panel-heading .drop-cap {
@@ -2899,24 +2893,14 @@ select option {
     }
 }
 
-/* Calendar modal on small screens (kept last so it overrides the base rules above) */
+/* Calendar on small screens (kept last so it overrides the base rules above) */
 @media (max-width: 768px), (max-height: 600px) {
-    .calendar-modal-content {
-        width: 100%;
-        height: 100vh;
-        max-height: 100vh;
-        max-width: none;
-        border: none;
-        outline: none;
-    }
-
     .modal-header h2 {
         font-size: 1.5rem;
     }
 
     .calendar-layout {
-        overflow-y: auto;
-        padding: 0.75rem;
+        padding-top: 0.75rem;
         display: block;
     }
 
@@ -2927,7 +2911,6 @@ select option {
     }
 
     .calendar-panel {
-        overflow: visible;
         padding-left: 0;
         padding-top: 1rem;
         border-left: none;
