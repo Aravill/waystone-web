@@ -1970,10 +1970,13 @@ select option {
 .reply-declined, .reply-awaiting { color: var(--rubric); }
 .day-tally { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: auto; padding-top: 2cqw; border-top: 1px solid var(--line); text-align: center; }
 .frame-Confirmed .day-tally { border-top-color: var(--verdigris); }
-.day-tally > div { display: flex; flex-direction: column; align-items: center; font-size: clamp(0.6875rem, 11cqw, 0.875rem); line-height: 1.15; }
-.day-tally > div + div { border-left: 1px solid var(--line); }
+.day-tally > * { display: flex; flex-direction: column; align-items: center; font-size: clamp(0.6875rem, 11cqw, 0.875rem); line-height: 1.15; }
+.day-tally > * + * { border-left: 1px solid var(--line); }
+/* The x-for <template> is a sibling too: keep it out of the grid and off the first border */
+.day-tally > template { display: none; }
+.day-tally > template + * { border-left: 0; }
 /* Fixed glyph row: an SVG glyph is taller than a text one, which would push its number lower */
-.day-tally > div > span { display: flex; align-items: center; justify-content: center; height: 1.25em; line-height: 1; }
+.day-tally > * > span { display: flex; align-items: center; justify-content: center; height: 1.25em; line-height: 1; }
 .day-tally b { font-size: clamp(0.875rem, 18cqw, 1.5rem); font-weight: 700; line-height: 1.1; }
 /* Muted at full strength: any opacity drops it below 4.5:1. See STYLE_GUIDE.md */
 .day-tally .tally-zero { color: var(--muted); }
@@ -1995,7 +1998,7 @@ select option {
     .day-time { font-size: 0.6875rem; }
     .day-time-short { display: inline; }
     .day-tally { grid-template-columns: 1fr 1fr; padding-top: 1px; }
-    .day-tally > div { flex-direction: row; justify-content: center; gap: 1px; font-size: 0.625rem; }
+    .day-tally > * { flex-direction: row; justify-content: center; gap: 1px; font-size: 0.625rem; }
     .day-tally .reply-tentative, .day-tally .reply-declined { display: none; }
     .day-tally b { font-size: 0.75rem; }
     .day-tally .reply-awaiting { border-left: 1px solid var(--line); }
@@ -2014,11 +2017,13 @@ select option {
     font-size: 2.125rem;
 }
 
-.calendar-panel .modal-eyebrow {
+.calendar-panel .modal-eyebrow,
+.game-panel .modal-eyebrow {
     margin-bottom: 0.125rem;
 }
 
-.calendar-panel h3 {
+.calendar-panel h3,
+.game-panel h3 {
     margin-bottom: 0.75rem;
     font-family: var(--font-display);
     font-size: 1.5rem;
@@ -2198,6 +2203,11 @@ select option {
     color: var(--muted);
     border: 1px solid var(--muted);
     text-decoration: line-through;
+}
+
+.chip-Played,
+.chip-hand {
+    color: var(--muted);
 }
 
 .session-actions {
@@ -2464,24 +2474,6 @@ select option {
     text-transform: uppercase;
 }
 
-.game-head {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 1rem 2rem;
-    align-items: end;
-    padding: 0.5rem 0 1.75rem;
-    border-bottom: 1px solid var(--ink);
-}
-
-/* Needs the viewer's action: a rubric hairline, like the banner's frame */
-.game-head.needs-action {
-    border-bottom-color: var(--rubric);
-}
-
-.game-notice {
-    margin-bottom: 0.75rem;
-}
-
 .game-error {
     margin: 2rem 0;
     padding: 1rem 1.25rem;
@@ -2493,26 +2485,11 @@ select option {
     margin: 0 0 0.75rem;
 }
 
-.game-head .page-title {
-    margin: 0.75rem 0 0.5rem;
-    text-wrap: balance;
-}
-
 .game-kicker {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.75rem;
-}
-
-.game-type {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--ink);
-    font-size: 0.75rem;
-    letter-spacing: 0.1875rem;
-    text-transform: uppercase;
 }
 
 .game-type-icon {
@@ -2530,39 +2507,7 @@ select option {
     font-size: 1.0625rem;
 }
 
-.game-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.625rem;
-    justify-content: flex-end;
-}
-
-.game-actions .campaign-action-btn {
-    position: relative;
-}
-
-.game-folio {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 19rem;
-    grid-template-areas: "tale company" "chronicle company";
-    gap: 2.5rem 3.5rem;
-    align-items: start;
-    padding-top: 2rem;
-}
-
-.game-tale { grid-area: tale; min-width: 0; }
-.game-chronicle { grid-area: chronicle; min-width: 0; }
-
-.game-folio h2 {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0 0.75rem;
-    margin: 0 0 1rem;
-}
-
-.game-count,
-.game-eyebrow {
+.game-count {
     font-family: var(--font-text);
     font-size: 0.75rem;
     letter-spacing: 0.1875rem;
@@ -2610,72 +2555,6 @@ select option {
     text-underline-offset: 0.25rem;
 }
 
-.game-company {
-    grid-area: company;
-    min-width: 0;
-    border: 1px solid var(--line);
-    padding: 1.375rem 1.5rem;
-}
-
-.game-people {
-    display: grid;
-    gap: 0.875rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
-.game-person {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 0.875rem;
-    align-items: center;
-}
-
-.game-person a:not(.user-avatar-link) {
-    color: inherit;
-    text-decoration: none;
-}
-
-.game-person a:not(.user-avatar-link):hover .game-person-name {
-    text-decoration: underline;
-}
-
-.game-person .user-avatar {
-    width: 2.5rem;
-    height: 2.5rem;
-    font-size: 1.25rem;
-}
-
-.game-person--dm {
-    padding-bottom: 0.875rem;
-    border-bottom: 1px solid var(--line);
-}
-
-.game-person--dm .user-avatar {
-    width: 3.25rem;
-    height: 3.25rem;
-    font-size: 1.625rem;
-}
-
-.game-person-name {
-    display: block;
-    overflow-wrap: anywhere;
-}
-
-.game-person--dm .game-person-name {
-    color: var(--rubric);
-    font-weight: 700;
-}
-
-.game-person-role {
-    display: block;
-    font-size: 0.75rem;
-    letter-spacing: 0.125rem;
-    text-transform: uppercase;
-    color: var(--muted);
-}
-
 .game-you {
     color: var(--muted);
     font-weight: 400;
@@ -2687,54 +2566,6 @@ select option {
     border-top: 1px solid var(--line);
     font-size: 0.875rem;
     color: var(--muted);
-}
-
-.game-next {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.5rem 1rem;
-    margin-bottom: 1.25rem;
-    padding: 0.75rem 1rem;
-    border: 1px dashed var(--ink);
-    font-size: 0.9375rem;
-}
-
-.game-sessions {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    border-top: 1px solid var(--ink);
-}
-
-.game-session {
-    display: grid;
-    grid-template-columns: 2.25rem minmax(0, 1fr) auto; /* fits three 1.125rem Courier digits */
-    gap: 0.25rem 1rem;
-    align-items: center;
-    padding: 0.875rem 0;
-    border-bottom: 1px solid var(--line);
-}
-
-.game-session-no {
-    /* Courier's lining figures: the display face only has old-style numerals ("10" reads as "Io") */
-    font-family: var(--font-text);
-    font-size: 1.125rem;
-    font-weight: 700;
-    line-height: 1;
-    color: var(--rubric);
-    font-variant-numeric: tabular-nums;
-}
-
-.game-session-date {
-    display: block;
-}
-
-.game-session-meta {
-    display: block;
-    font-size: 0.875rem;
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
 }
 
 .game-attendees {
@@ -2770,12 +2601,6 @@ select option {
     pointer-events: none;
 }
 
-.game-session--you .game-session-date::after {
-    content: " · you were there";
-    color: var(--verdigris);
-    font-size: 0.8125rem;
-}
-
 .game-more {
     display: inline-block;
     margin-top: 1rem;
@@ -2791,6 +2616,549 @@ select option {
 
 .game-more:hover {
     color: var(--ink);
+}
+
+/* The sheet: the calendar modal's double frame, sitting on the page */
+.container.game-page {
+    max-width: 83rem;
+}
+
+.page-game .header {
+    max-width: 80rem;
+}
+
+.game-sheet {
+    margin-top: 2rem;
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    outline: 1px solid var(--ink);
+    outline-offset: 0.3125rem;
+}
+
+.game-sheet h2 {
+    margin: 0;
+}
+
+.game-sheet-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 3px double var(--ink);
+}
+
+.game-title-block {
+    flex: 1 1 30rem;
+    min-width: 0;
+}
+
+.game-sheet .page-title {
+    margin: 0.875rem 0 0.625rem;
+    text-wrap: balance;
+}
+
+.game-sheet-head .pending-notice {
+    margin-top: 1rem;
+}
+
+.game-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.game-close {
+    text-decoration: none;
+}
+
+/* Two panes, split by the calendar's ink rule */
+.game-layout {
+    display: flex;
+    gap: 1.75rem;
+    padding: 1.5rem;
+}
+
+.game-main {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 2rem;
+    min-width: 0;
+}
+
+.game-tale {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.game-panel {
+    flex: 0 0 23.75rem;
+    min-width: 0;
+    padding-left: 1.75rem;
+    border-left: 1px solid var(--ink);
+}
+
+.game-panel-inner {
+    position: sticky;
+    top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+    /* room for focus rings and count badges inside the scroller */
+    padding: 0.5rem;
+    margin: -0.5rem;
+}
+
+.game-panel-states,
+.game-panel-state {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.game-panel .panel-session,
+.game-panel .form-group {
+    margin-bottom: 0;
+}
+
+.game-panel .btn-close {
+    margin-top: 0;
+}
+
+/* The ledger: sessions as calendar cells */
+.game-chronicle {
+    min-width: 0;
+    padding-top: 2rem;
+    border-top: 1px solid var(--ink);
+}
+
+.game-ledger-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.game-ledger-label {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--ink);
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.125rem;
+    text-transform: uppercase;
+}
+
+.game-ahead-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    border-left: 1px solid var(--line);
+}
+
+.game-cell {
+    position: relative;
+    display: block;
+    aspect-ratio: 1;
+    min-width: 0;
+    padding: 0;
+    container-type: inline-size;
+    overflow: hidden;
+    background: var(--bg);
+    border: 0;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+}
+
+button.game-cell {
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+button.game-cell:hover {
+    background: var(--folio);
+}
+
+.game-cell:focus-visible {
+    outline-offset: -0.125rem;
+}
+
+.game-cell.is-selected,
+.game-cell.is-selected:hover {
+    background: var(--folio);
+    outline: 2px solid var(--rubric);
+    outline-offset: -0.125rem;
+}
+
+.game-cell .day-number {
+    font-size: clamp(0.6875rem, 11.5cqw, 0.875rem);
+}
+
+.game-cell .day-time {
+    color: var(--muted);
+    font-size: clamp(0.6875rem, 10cqw, 0.78rem);
+}
+
+.game-cell .day-tally > * {
+    flex-direction: row;
+    justify-content: center;
+    gap: 2px;
+}
+
+.game-cell .day-tally b {
+    font-size: inherit;
+}
+
+/* Played: one row per session, so a later element can sit under its button */
+.game-played-nav {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 0 0.75rem;
+    margin-top: 2rem;
+    border-bottom: 1px solid var(--ink);
+}
+
+.game-played-nav .game-ledger-label {
+    grid-column: 2;
+    border-bottom: 0;
+}
+
+.game-played-nav .game-more {
+    grid-column: 3;
+    justify-self: end;
+    min-height: 2.5rem;
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+.game-entries {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.game-entry {
+    display: grid;
+    grid-template-columns: 3.25rem minmax(0, 1fr) auto;
+    gap: 0.5rem 0.75rem;
+    width: 100%;
+    padding: 0.875rem 0.75rem 0.875rem 0.5rem;
+    background: none;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.game-entry:hover {
+    background: var(--folio);
+}
+
+.game-entry:focus-visible {
+    outline-offset: -0.125rem;
+}
+
+.game-entry.is-selected,
+.game-entry.is-selected:hover {
+    background: var(--folio);
+    outline: 2px solid var(--rubric);
+    outline-offset: -0.125rem;
+}
+
+.game-entry-no {
+    font-family: var(--font-text);
+    font-variant-numeric: tabular-nums;
+    font-size: 1.375rem;
+    line-height: 1.1;
+    color: var(--rubric);
+}
+
+.game-entry .game-attendees {
+    align-self: center;
+}
+
+.game-entry:hover .game-attendee--dm::after,
+.game-entry.is-selected .game-attendee--dm::after {
+    background: var(--folio);
+}
+
+.game-entry-date {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.125rem 0.625rem;
+}
+
+.game-entry-meta {
+    display: block;
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+/* Panel rows */
+.roster-name a {
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.roster-name a:hover {
+    text-decoration: underline;
+}
+
+.roster-name.is-dm,
+.roster-name.is-dm a {
+    color: var(--rubric);
+}
+
+.roster-name.is-dm {
+    font-weight: 700;
+}
+
+.roster-said.game-detail {
+    width: auto;
+    color: var(--muted);
+    font-weight: 400;
+}
+
+/* Record a past session */
+.game-field-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.game-field-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.125rem;
+    text-transform: uppercase;
+}
+
+.game-checks {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.game-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    margin: 0;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink);
+    font-size: 1rem;
+    letter-spacing: 0;
+    text-transform: none;
+    cursor: pointer;
+}
+
+.game-checks > li:last-of-type,
+.game-checks > li:last-of-type .game-check {
+    border-bottom: 0;
+}
+
+.game-check--guest {
+    padding-left: 1.625rem; /* lines the avatar up with the ticked rows */
+    cursor: default;
+}
+
+.game-check input[type="checkbox"] {
+    flex: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    accent-color: var(--ink);
+}
+
+.game-check input[type="checkbox"]:focus-visible {
+    outline: 2px solid var(--rubric);
+    outline-offset: 2px;
+}
+
+.game-check .roster-name {
+    flex: 1 1 auto;
+}
+
+.game-guest-tag {
+    color: var(--muted);
+    font-size: 0.6875rem;
+    letter-spacing: 0.125rem;
+    text-transform: uppercase;
+}
+
+.game-guest-remove {
+    flex: none;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.game-guest-remove:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+}
+
+.game-guest-add {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.game-guest-add input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.game-guest-add .btn-action {
+    flex: none;
+}
+
+.game-form-error {
+    margin: 0;
+    color: var(--rubric);
+    font-size: 0.875rem;
+}
+
+.game-form-btns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.game-foot {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+    gap: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--ink);
+}
+
+.game-foot .campaign-action-btn {
+    position: relative;
+}
+
+@media (max-width: 1180px) {
+    .game-ahead-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .game-cell--filler {
+        display: none;
+    }
+
+    .game-panel {
+        flex-basis: 20rem;
+    }
+}
+
+@media (max-width: 900px) {
+    .game-layout {
+        flex-direction: column;
+    }
+
+    /* Stacked: the panel's parts join the layout, so the actions can sit above the tale */
+    .game-panel,
+    .game-panel-inner {
+        display: contents;
+    }
+
+    .game-foot {
+        order: -2;
+        padding: 0 0 1.5rem;
+        border-top: 0;
+        border-bottom: 1px solid var(--ink);
+    }
+
+    /* Stuck to the viewport: actions and replies are now far apart on the page */
+    .game-panel .message {
+        order: -1;
+        position: sticky;
+        top: 0.5rem;
+        z-index: 1;
+        margin-top: 0;
+        background: var(--bg);
+    }
+
+    .game-panel-states {
+        order: 1;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--ink);
+    }
+
+    .game-ahead-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .game-sheet {
+        margin-top: 1.5rem;
+    }
+
+    .game-sheet-head,
+    .game-layout {
+        padding: 1rem;
+    }
+}
+
+@media (max-width: 560px) {
+    .game-ahead-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .game-ledger-nav .calendar-legend {
+        margin-left: 0;
+    }
+
+    .game-played-nav {
+        grid-template-columns: 1fr;
+    }
+
+    .game-played-nav .game-ledger-label,
+    .game-played-nav .game-more {
+        grid-column: 1;
+    }
+
+    .game-played-nav .game-more {
+        justify-self: center;
+    }
+
+    .game-entry {
+        grid-template-columns: 2.5rem minmax(0, 1fr);
+    }
+
+    .game-entry .game-attendees {
+        grid-column: 2;
+        justify-content: flex-start;
+    }
 }
 
 /* The banner cloth opens the game page; .on-cloth (set by campaigns.js while the
@@ -2812,28 +3180,6 @@ select option {
 
 /* ---------- Responsive ---------- */
 @media (max-width: 768px) {
-    .game-head {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .game-actions {
-        justify-content: flex-start;
-    }
-
-    .game-folio {
-        grid-template-columns: minmax(0, 1fr);
-        grid-template-areas: "tale" "company" "chronicle";
-    }
-
-    .game-session {
-        grid-template-columns: 2.25rem minmax(0, 1fr);
-    }
-
-    .game-attendees {
-        grid-column: 2;
-        justify-content: flex-start;
-    }
-
     .header {
         width: calc(100% - 2rem);
         padding: 1.25rem 0 0.875rem;

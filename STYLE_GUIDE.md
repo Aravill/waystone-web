@@ -11,7 +11,7 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 | `campaigns-candlelight.png` | The same page in the dark theme |
 | `calendar.png` | Modal sheet, calendar grid, reply buttons (its session chips are superseded by `calendar-days.html`) |
 | `calendar-days.html` | Calendar redesign: the Ledger day cell, the Roll call panel, the strong candidate frame (variant A and panel 2 are the chosen ones) |
-| `game-detail.html` | The game page: title block, the tale, the company margin, the chronicle of played sessions |
+| `game-detail.dc.html` | The game page: the sheet, the tale, the chronicle (Ahead cells, Played rows) and the session panel |
 | `banners.dc.html` | The banner redesign: three variants, see `BANNER_DESIGN_GUIDE.md` |
 
 ## Design Philosophy
@@ -163,7 +163,11 @@ The logo mark is the standing-stone from the mock-ups: a tapered stone with a do
 <p class="page-subtitle">6 games on the roll · 2 await thee</p>
 ```
 
-The drop cap is optional and goes on the page h1. The one other place for it is a heading inside a modal that names a single thing, like the calendar's selected day (34px there). The subtitle summarises the list, and counts what awaits the viewer when that's above zero.
+The drop cap is optional and goes on the page h1, except on the game page, whose title has none. The one other place for it is a heading inside a modal or side panel that names a single thing, like the calendar's selected day or the game page's session panel (34px there). The subtitle summarises the list, and counts what awaits the viewer when that's above zero.
+
+### Game page: the tale and the ledger
+
+The game page is the calendar modal's sheet (double frame, `3px double` head rule) with the tale and the chronicle on the left and a session panel on the right, split by an ink rule. In the chronicle, **Ahead** reuses the calendar's `.day-frame` cells (a button per upcoming session, tally for members only), and **Played** is one `<li>` per session holding a full-width row button, so later elements can sit under it. Both select into the panel, which reuses the calendar panel's card, roster and reply buttons. Player avatars in a button are never links. When the layout stacks (≤ 900px), the actions move to the top of the sheet, above the tale, and the panel's session details and company sit below the chronicle. The actions keep their place in the DOM, so on a stacked layout with a keyboard they come after the chronicle in tab order.
 
 ### Buttons
 

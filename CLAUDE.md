@@ -27,6 +27,7 @@ Waystone Web: Go (stdlib `net/http`, SQLite via `modernc.org/sqlite`, local user
 - When changing `models/user.go`, update seed data in `config/config.go` and keep `SaveUser` and the `SELECT`/`Scan` sites in `db/sqlite_store.go` in sync.
 - The `ADMIN_USERNAME` user is env-managed: password reset from `.env` on every start; can't be blocked, deleted or demoted.
 - The session cookie is `Secure` by default (`SESSION_COOKIE_SECURE`): fine on `http://localhost`, but over plain HTTP on a LAN IP login returns 200 and the cookie silently never sticks; set it to `false` there.
+- Sessions with `manual=1` (the DM's "Record a past session") are chronicle-only: excluded from the month view and ICS, no replies or notifications, and may have `time=''` so `sessionStart` fails; check `Manual` before calling it.
 - The Calendar button focuses the first unanswered session's month, so tests use `openCalendar`/`goToMonth` helpers, not `page.clock`.
 
 ## Conventions

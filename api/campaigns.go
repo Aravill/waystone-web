@@ -50,11 +50,17 @@ func campaignSessionSummaries(campaigns []models.Campaign) (map[string]campaignS
 		if session.Status != models.SessionConfirmed {
 			continue
 		}
+		summary := result[session.CampaignID]
+		if session.Manual { // recorded by hand: always played, never next, and may have no time
+			summary.playedCount++
+			summary.played = append(summary.played, session)
+			result[session.CampaignID] = summary
+			continue
+		}
 		start, ok := sessionStart(session)
 		if !ok {
 			continue
 		}
-		summary := result[session.CampaignID]
 		if start.Add(time.Duration(session.Duration) * time.Minute).After(now) {
 			if summary.next == nil || start.Before(summary.nextStart) {
 				summary.next, summary.nextStart = &session, start
@@ -69,7 +75,7 @@ func campaignSessionSummaries(campaigns []models.Campaign) (map[string]campaignS
 	for id, summary := range result {
 		starts := make(map[string]time.Time, len(summary.played))
 		for _, p := range summary.played {
-			starts[p.ID], _ = sessionStart(p)
+			starts[p.ID] = sessionSortInstant(p)
 		}
 		sort.SliceStable(summary.played, func(a, b int) bool {
 			pa, pb := summary.played[a], summary.played[b]
@@ -81,6 +87,20 @@ func campaignSessionSummaries(campaigns []models.Campaign) (map[string]campaignS
 		result[id] = summary
 	}
 	return result, nil
+}
+
+// sessionSortInstant is the key for numbering played sessions: the start instant, or
+// noon (in the session's timezone) of the date for by-hand sessions without a time.
+func sessionSortInstant(s models.CampaignSession) time.Time {
+	if start, ok := sessionStart(s); ok {
+		return start
+	}
+	loc := time.UTC
+	if l, err := time.LoadLocation(s.Timezone); err == nil && s.Timezone != "" {
+		loc = l
+	}
+	d, _ := time.ParseInLocation("2006-01-02 15:04", s.Date+" 12:00", loc)
+	return d
 }
 
 // campaignViewer holds everything needed to enrich campaigns for one viewer.
@@ -251,9 +271,9 @@ func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string
 	list := make([]map[string]interface{}, 0, len(played))
 	for i := len(played) - 1; i >= 0; i-- {
 		s := played[i]
-		// The DM runs every played session, so they always attend.
+		// The DM runs every played session unless a by-hand entry says they missed it.
 		attendees := []map[string]interface{}{}
-		if dm, ok := v.users[campaign.DM]; ok && dm != nil {
+		if dm, ok := v.users[campaign.DM]; ok && dm != nil && !s.DMAbsent {
 			attendees = append(attendees, userDisplayObject(dm))
 		}
 		for _, resp := range responses[s.ID] {
@@ -264,6 +284,9 @@ func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string
 				attendees = append(attendees, userDisplayObject(u))
 			}
 		}
+		for _, name := range s.Guests {
+			attendees = append(attendees, guestDisplayObject(name))
+		}
 		list = append(list, map[string]interface{}{
 			"id":        s.ID,
 			"number":    i + 1,
@@ -271,11 +294,102 @@ func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string
 			"time":      s.Time,
 			"duration":  s.Duration,
 			"timezone":  s.Timezone,
+			"manual":    s.Manual,
 			"attendees": attendees,
 		})
 	}
 	obj["played_sessions"] = list
+	upcoming, err := upcomingSessions(campaign, v)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve sessions")
+		return
+	}
+	obj["upcoming_sessions"] = upcoming
 	writeJSON(w, http.StatusOK, obj)
+}
+
+// guestDisplayObject is the attendee object for a named non-member: no id, no profile.
+func guestDisplayObject(name string) map[string]interface{} {
+	return map[string]interface{}{"guest": true, "display_name": name, "avatar_letter": avatarLetter(name)}
+}
+
+type sessionReply struct {
+	User          map[string]interface{}     `json:"user"`
+	Participation models.ParticipationStatus `json:"participation"` // empty: awaiting
+}
+
+type upcomingSession struct {
+	models.CampaignSession
+	Replies []sessionReply `json:"replies"`
+}
+
+// upcomingSessions lists a campaign's sessions that haven't ended. Members get every
+// live suggestion and confirmation with replies; visitors only the next confirmed
+// session, with no replies, since the session endpoints are member-only.
+func upcomingSessions(campaign *models.Campaign, v *campaignViewer) ([]upcomingSession, error) {
+	result := []upcomingSession{}
+	if !hasCampaignSessionAccess(campaign, v.userID) {
+		if next := v.sessions[campaign.ID].next; next != nil {
+			result = append(result, upcomingSession{CampaignSession: *next, Replies: []sessionReply{}})
+		}
+		return result, nil
+	}
+
+	now := time.Now()
+	sessions, err := db.GetSessionsByCampaignIDs([]string{campaign.ID}, "")
+	if err != nil {
+		return nil, err
+	}
+	ids := []string{}
+	live := []models.CampaignSession{}
+	starts := map[string]time.Time{}
+	for _, session := range sessions {
+		if session.Manual || session.Status == models.SessionCancelled {
+			continue
+		}
+		start, ok := sessionStart(session)
+		if !ok || !start.Add(time.Duration(session.Duration)*time.Minute).After(now) {
+			continue
+		}
+		live = append(live, session)
+		starts[session.ID] = start
+		ids = append(ids, session.ID)
+	}
+	sort.SliceStable(live, func(a, b int) bool { return starts[live[a].ID].Before(starts[live[b].ID]) })
+	responses, err := db.GetSessionResponsesBySessionIDs(ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, session := range live {
+		// Current players only; the counts come from the same replies so tally and roster agree.
+		byUser := map[string]models.SessionResponse{}
+		for _, resp := range responses[session.ID] {
+			byUser[resp.UserID] = resp
+		}
+		replies := []sessionReply{}
+		session.AcceptedCount, session.TentativeCount, session.DeclinedCount, session.PendingCount = 0, 0, 0, 0
+		for _, playerID := range campaign.Players {
+			u, ok := v.users[playerID]
+			if !ok || u == nil {
+				continue
+			}
+			resp, answered := byUser[playerID]
+			replies = append(replies, sessionReply{User: userDisplayObject(u), Participation: resp.Participation})
+			switch {
+			case !answered:
+				session.PendingCount++
+			case resp.Participation == models.Accepted:
+				session.AcceptedCount++
+			case resp.Participation == models.Tentative:
+				session.TentativeCount++
+			case resp.Participation == models.Declined:
+				session.DeclinedCount++
+			}
+		}
+		session.CurrentUserParticipation = byUser[v.userID].Participation
+		result = append(result, upcomingSession{CampaignSession: session, Replies: replies})
+	}
+	return result, nil
 }
 
 func HandleCreateCampaign(w http.ResponseWriter, r *http.Request) {

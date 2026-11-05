@@ -117,7 +117,18 @@ Visit: **http://localhost:8080**
 
 ### Get Campaign
 - **GET** `/api/campaigns/{id}`
-- Returns: One campaign (same fields as the list) plus `played_sessions`, newest first, each with `number`, `date`, `time`, `duration`, `timezone` and `attendees` (the DM, always first, plus users whose response was Accepted). Played sessions are numbered chronologically by start instant. Visible to every logged-in user; 404 if the game does not exist.
+- Returns: One campaign (same fields as the list) plus `played_sessions`, newest first, each with `number`, `date`, `time`, `duration`, `timezone` and `attendees` (the DM, always first unless a by-hand session has `dm_absent: true`, plus users whose response was Accepted). Played sessions are numbered chronologically by start instant. Visible to every logged-in user; 404 if the game does not exist.
+
+- Also returns `upcoming_sessions`: members get every live Suggested or Confirmed session with counts, `current_user_participation` and `replies` (`{user, participation}`, empty participation means awaiting). Visitors get only the next confirmed session, with `replies: []` and no counts.
+- Played sessions recorded by hand carry `manual: true`, may have an empty `time` and `duration` 0, and list guests as attendees with `guest: true`, no `id` and no `profile_url`.
+
+### Played Sessions (by hand)
+- **POST** `/api/campaigns/{id}/played-sessions` (201), **PUT** `/api/campaigns/{id}/played-sessions/{sid}` (200), **DELETE** the same path (200). DM only (403 otherwise); PUT and DELETE on a session not recorded by hand return 409.
+- Body: `{"date":"2026-10-01","start":"19:00","end":"22:00","timezone":"Europe/Prague","attendee_ids":["<user id>"],"guests":["Old Pete"]}`. `start` and `end` are optional (`end` needs `start`); the date may not be in the future; attendees must be the DM or players; at most 20 guests of 64 characters; at least one attendee or guest. The 999-session limit applies on create (409).
+- `start` may be omitted for a time-less session (stored with `time: ""`, `duration: 0`). If `end` is before `start` the session ran past midnight and 24 hours are added to the duration; `end` equal to `start` is rejected, and a start that is in the future is rejected too.
+- The DM is present only if their id is in `attendee_ids` (otherwise the session gets `dm_absent: true`); the DM never has a response row. The returned `session` includes `manual`, `guests` and `dm_absent`.
+- On edit, anyone already on the session stays allowed in `attendee_ids`, even if they have since left the game.
+- These sessions are chronicle-only: they never appear in the month view or the ICS feed, take no replies and send no notifications.
 
 ### Sign Up
 - **POST** `/api/signup`
@@ -292,6 +303,7 @@ Additional custom roles can be added to the `models/roles.go` file as needed.
 | `POST /api/invite/{token}/password` | No (token) | - | Set password with an invite |
 | `GET /api/campaigns` | Yes | - | List campaigns |
 | `GET /api/campaigns/{id}` | Yes | - | One campaign with played sessions and attendees |
+| `POST /api/campaigns/{id}/played-sessions` | Yes | DM | Record a past session by hand (PUT/DELETE on `/{sid}` edit and remove it) |
 | `PUT /api/campaigns/{id}` | Yes | DM or admin | Update a campaign |
 | `DELETE /api/campaigns/{id}` | Yes | admin | Delete a campaign (DMs can't, to prevent malicious deletion) |
 | `/api/admin/users...` | Yes | admin | User management (see Admin API) |

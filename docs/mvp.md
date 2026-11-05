@@ -47,7 +47,9 @@ This document describes what must-have features are to be implemented before pre
     - [x] Visually distinct campaign statuses
     - [x] Campaign types (and their visual distinction) - Campaign, Adventure, One-shot
     - [x] Game systems - admins manage known systems (optional logo); campaigns pick one or type a custom one; shown on the campaign card
-    - [x] Game page - full description (basic Markdown), company, chronicle of played sessions with attendees (visible to all users)
+    - [x] Game page - sheet with the full description (basic Markdown), the chronicle (upcoming sessions as calendar cells, played sessions with attendees) and a side panel for the selected session or the company (visible to all users; replies and rolls are for members)
+    - [x] Reply to suggested sessions from the game page
+    - [x] DMs record past sessions by hand (optional times, ticked attendees, named guests), edit and delete them
 - [x] Profile
     - [x] Standard operations
         - [x] Changing nicknames

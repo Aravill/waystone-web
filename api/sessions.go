@@ -231,7 +231,7 @@ func handleCreateSession(w http.ResponseWriter, r *http.Request, campaignID stri
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve sessions")
 		return
 	}
-	if len(existing) >= 999 {
+	if len(existing) >= maxSessionsPerCampaign {
 		writeJSONError(w, http.StatusConflict, "a game can have at most 999 sessions")
 		return
 	}
@@ -279,6 +279,10 @@ func handleUpdateSessionStatus(w http.ResponseWriter, r *http.Request, campaignI
 	}
 	if session == nil {
 		writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	if session.Manual {
+		writeJSONError(w, http.StatusConflict, "a session recorded by hand cannot be changed here")
 		return
 	}
 	if campaign.DM != userID {
@@ -363,6 +367,10 @@ func handleDeleteSession(w http.ResponseWriter, r *http.Request, campaignID, ses
 		writeJSONError(w, http.StatusNotFound, "session not found")
 		return
 	}
+	if session.Manual {
+		writeJSONError(w, http.StatusConflict, "a session recorded by hand cannot be deleted here")
+		return
+	}
 	if campaign.DM != userID {
 		writeJSONError(w, http.StatusForbidden, "only game DM can delete sessions")
 		return
@@ -415,6 +423,10 @@ func handleSubmitSessionResponse(w http.ResponseWriter, r *http.Request, campaig
 	}
 	if session == nil {
 		writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	if session.Manual {
+		writeJSONError(w, http.StatusConflict, "a session recorded by hand takes no replies")
 		return
 	}
 
@@ -482,6 +494,10 @@ func handleGetSessionResponses(w http.ResponseWriter, r *http.Request, campaignI
 	}
 	if session == nil {
 		writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	if session.Manual {
+		writeJSONError(w, http.StatusConflict, "a session recorded by hand has no replies")
 		return
 	}
 
