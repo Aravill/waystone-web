@@ -17,6 +17,7 @@ Waystone Web: Go (stdlib `net/http`, SQLite via `modernc.org/sqlite`, local user
 ## Architecture gotchas
 
 - Routes are registered in `api/router.go` (not `main.go`, despite the README). `/` is auth-wrapped and serves `dashboard.html`, so every root-level JS/CSS file a page loads must get its own `http.HandleFunc` entry there, or be referenced under `/static/...`.
+- App version is baked in at build via ldflags (`config.Version`, `APP_VERSION` build arg). The Deploy workflow computes it from the PR-title prefix (`feat/` bumps minor, else patch) and tags after a successful deploy, so keep the `feat/` prefix accurate.
 - DB access goes through the `Store` interface in `db/store.go`: add the method to the interface, implement it on the SQLite store, and expose a package-level wrapper in `db/` that calls `GetStore()`.
 - Protect routes with `middleware.AuthMiddleware`; use `middleware.GetSession()` / `ClearSession()` for session state.
 - Accounts start with no password (`password_hash=''`, `must_change_password=1`). Admin create and reset call `issueInvite`, which returns a one-time token valid for 7 days; only its SHA-256 hash is stored in `password_invites`, one per user. `/invite/` and `/api/invite/` are public, outside `AuthMiddleware`. An invite is valid because its row exists, never because of `must_change_password`, and `/change-password` only remains for users still holding an old temporary password.
