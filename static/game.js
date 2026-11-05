@@ -76,7 +76,7 @@ window.gamePage = function () {
             try {
                 const userResponse = await fetch('/auth/current-user');
                 if (!userResponse.ok) {
-                    window.redirectToLogin();
+                    window.location.href = '/login.html';
                     return;
                 }
                 const user = await userResponse.json();
@@ -85,7 +85,7 @@ window.gamePage = function () {
                 this.currentUserId = user.user_id || user.id || '';
             } catch (error) {
                 console.error('Auth check failed:', error);
-                window.redirectToLogin();
+                window.location.href = '/login.html';
                 return;
             }
             this.gameId = decodeURIComponent(location.pathname.split('/')[2] || '');
@@ -101,7 +101,7 @@ window.gamePage = function () {
             try {
                 const response = await fetch(`/api/campaigns/${encodeURIComponent(this.gameId)}`);
                 if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
-                    window.redirectToLogin();
+                    window.location.href = '/login.html';
                     return;
                 }
                 const data = await response.json();
@@ -203,7 +203,7 @@ window.gamePage = function () {
             try {
                 const response = await fetch(url, { method });
                 if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
-                    window.redirectToLogin();
+                    window.location.href = '/login.html';
                     return;
                 }
                 const data = await response.json();
@@ -260,7 +260,7 @@ window.gamePage = function () {
             try {
                 const response = await fetch(`/api/campaigns/${encodeURIComponent(this.campaign.id)}`, { method: 'DELETE' });
                 if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
-                    window.redirectToLogin();
+                    window.location.href = '/login.html';
                     return;
                 }
                 const data = await response.json();

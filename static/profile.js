@@ -27,7 +27,7 @@ window.profilePage = function() {
             try {
                 const userResponse = await fetch('/auth/current-user');
                 if (!userResponse.ok) {
-                    window.redirectToLogin();
+                    window.location.href = '/login.html';
                     return;
                 }
                 
@@ -38,7 +38,7 @@ window.profilePage = function() {
                 this.needsProfileSetup = !!user.needs_profile_setup;
             } catch (error) {
                 console.error('Auth check failed:', error);
-                window.redirectToLogin();
+                window.location.href = '/login.html';
                 return;
             }
             

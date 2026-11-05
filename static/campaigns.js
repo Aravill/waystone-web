@@ -399,7 +399,7 @@ window.campaignsPage = function () {
             try {
                 const userResponse = await fetch('/auth/current-user');
                 if (!userResponse.ok) {
-                    window.redirectToLogin();
+                    window.location.href = '/login.html';
                     return;
                 }
 
@@ -467,7 +467,7 @@ window.campaignsPage = function () {
                 }
             } catch (error) {
                 console.error('Auth check failed:', error);
-                window.redirectToLogin();
+                window.location.href = '/login.html';
                 return;
             }
 
@@ -596,7 +596,7 @@ window.campaignsPage = function () {
                     body: JSON.stringify({ title, summary, description, type, system: (system || '').trim(), desired_player_count: Number(desired_player_count) || 0 })
                 });
                 if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
-                    window.redirectToLogin();
+                    window.location.href = '/login.html';
                     return;
                 }
                 const data = await response.json();
@@ -828,7 +828,7 @@ window.campaignsPage = function () {
             try {
                 const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/signups`, { method: 'POST' });
                 if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
-                    window.redirectToLogin();
+                    window.location.href = '/login.html';
                     return;
                 }
                 const data = await response.json();
@@ -848,7 +848,7 @@ window.campaignsPage = function () {
             try {
                 const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/follow`, { method: following ? 'DELETE' : 'PUT' });
                 if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
-                    window.redirectToLogin();
+                    window.location.href = '/login.html';
                     return;
                 }
                 const data = await response.json();
@@ -880,7 +880,7 @@ window.campaignsPage = function () {
             try {
                 const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/signups/${encodeURIComponent(this.currentUserId)}`, { method: 'DELETE' });
                 if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
-                    window.redirectToLogin();
+                    window.location.href = '/login.html';
                     return;
                 }
                 const data = await response.json();

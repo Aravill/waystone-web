@@ -12,11 +12,11 @@ window.dashboardPage = function() {
                     this.displayName = user.display_name || user.username;
                     this.isAdmin = (user.roles || []).includes('admin');
                 } else {
-                    window.redirectToLogin();
+                    window.location.href = '/login.html';
                 }
             } catch (error) {
                 console.error('Failed to fetch user info:', error);
-                window.redirectToLogin();
+                window.location.href = '/login.html';
             }
         },
         
