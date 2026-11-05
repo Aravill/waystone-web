@@ -294,6 +294,8 @@ Calendar day frames (the session fills the day; sizes scale with the cell in `cq
 
 Calendar grid: hairline cells, out-of-month days at 35% ink, selected day `background: var(--folio)` with a `2px solid var(--rubric)` inset outline. Days are square, and the month is sized to fit the modal's height. A day with a session holds a frame inset from the hairlines: the day number, the start-end time and a four-column tally (accepted, tentative, declined, awaiting) with a hairline above it. Sizes are in `cqw`, so they scale with the cell. Narrow cells (≤ 85px) show only the start time, accepted and awaiting. The first planned session fills the cell and the rest show as "+N more". Zero counts stay at full `--muted` at weight 400, never reduced opacity (that drops the contrast below 4.5:1). The legend (■ confirmed · ▢ suggested · ~~cancelled~~) sits right of the month name, and a reply key (✓ aye · ? perhaps · ✗ nay · … awaiting · ✦ strong candidate) sits under the grid.
 
+Paste mode: the DM's Copy button on a session puts the calendar into paste mode, with a `.calendar-paste-bar` (rubric hairline border) stuck to the top of the side panel, since the grid already fills the modal's height. The reply key hides while it's up. Free days in the shown month get a `+` in `--rubric` and a copy cursor, blocked days (past, or already holding a planned session) get a not-allowed cursor, and chosen days are filled `--folio` with the selection outline and a `✓`. The bar's note explains why a day was refused. Never use dashed outlines for this: dashed means Suggested. Esc or Cancel leaves the mode, and nothing is created until the DM confirms.
+
 Strong candidate: a Suggested session whose accepted players are over 70% of all players. Awaiting players count in the total, and exactly 70% does not qualify. The panel says it in a line ("Strong candidate: 5 of 6 accepted"), and so do the cell's `aria-label` and `title`.
 
 Roll call (day panel): one row per player, ordered Accepted, Tentative, Declined, Awaiting. Each row has the avatar with its reply-coded border, the name, which wraps and never truncates, and a fixed-width reply column.
@@ -416,4 +418,4 @@ Reference CSS with a version query (`styles.css?v=N`) and bump `N` whenever the 
 ---
 
 **Version**: 2.0 (Scriptorium), replacing 1.0 (terminal/cyberpunk)
-**Last updated**: 2026-11-04
+**Last updated**: 2026-11-05
