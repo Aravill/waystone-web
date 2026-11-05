@@ -94,7 +94,16 @@ func RegisterRoutes() {
 	// Protected page routes - serve authenticated pages
 	http.Handle("/", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("dashboard.html"))))
 	http.Handle("/campaigns", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("campaigns.html"))))
-	http.Handle("/games/", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("game.html"))))
+	gamePage := ServePageWithFallback("game.html")
+	calendarPage := ServePageWithFallback("calendar.html")
+	http.Handle("/games/", middleware.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// /games/{id}/calendar is the calendar page; every other /games/ path is the game page
+		if parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/"); len(parts) == 3 && parts[2] == "calendar" {
+			calendarPage(w, r)
+			return
+		}
+		gamePage(w, r)
+	})))
 	http.Handle("/games", http.RedirectHandler("/campaigns", http.StatusSeeOther))
 	http.Handle("/profile", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("profile.html"))))
 	http.Handle("/change-password", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("change-password.html"))))

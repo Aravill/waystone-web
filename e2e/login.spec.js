@@ -27,14 +27,13 @@ test('login returns to the page that was asked for', async ({ page }) => {
   const id = await sojournId(api);
   await api.dispose();
 
-  await page.goto(`/campaigns?calendar=${encodeURIComponent(id)}`);
+  await page.goto(`/games/${encodeURIComponent(id)}/calendar`);
   await expect(page).toHaveURL(/\/login\.html\?next=/);
   await page.getByLabel('Username').fill('testy');
   await page.getByLabel('Password').fill(env.DEMO_PASSWORD);
   await page.getByRole('button', { name: 'Enter' }).click();
-  // Only the kept ?calendar= opens the dialog; the page then tidies its own URL.
-  await expect(page.locator('#calendarModal')).toBeVisible();
-  await expect(page.locator('#calendarModal')).toContainText('Age of Sojourn');
+  await expect(page).toHaveURL(new RegExp(`/games/${id}/calendar$`));
+  await expect(page.locator('#calendarPage')).toContainText('Age of Sojourn');
 });
 
 for (const next of ['//evil.example', 'https://evil.example/', '/\\evil.example', '/.//evil.example', 'javascript:alert(1)']) {

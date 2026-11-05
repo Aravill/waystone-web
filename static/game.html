@@ -6,7 +6,7 @@
     <title>Waystone - Game</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=5"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=59">
+    <link rel="stylesheet" href="/static/styles.css?v=60">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -58,7 +58,7 @@
                                 <p class="pending-notice" x-show="pendingNotice"><span aria-hidden="true">✦</span> <span x-text="pendingNotice"></span></p>
                             </div>
                             <div class="game-head-actions">
-                                <a x-show="isMember" :href="'/campaigns?calendar=' + encodeURIComponent(campaign.id)">Open calendar →</a>
+                                <a x-show="isMember" :href="'/games/' + encodeURIComponent(campaign.id) + '/calendar'">Open calendar →</a>
                                 <a class="modal-close game-close" :href="'/campaigns#campaign-' + encodeURIComponent(campaign.id)" aria-label="Back to all games" title="Back to all games">&times;</a>
                             </div>
                         </div>
@@ -306,7 +306,7 @@
                                     <div id="message" class="message" :class="messageType" x-show="messageVisible" x-text="messageText"></div>
 
                                     <div class="game-foot">
-                                        <a class="campaign-action-btn" x-show="isMember" :href="'/campaigns?calendar=' + encodeURIComponent(campaign.id)"
+                                        <a class="campaign-action-btn" x-show="isMember" :href="'/games/' + encodeURIComponent(campaign.id) + '/calendar'"
                                            :title="unansweredCount > 0 ? unansweredCount + ' suggested session' + (unansweredCount === 1 ? '' : 's') + ' awaiting your response' : null"
                                            :aria-label="unansweredCount > 0 ? 'Calendar, ' + unansweredCount + ' awaiting your response' : null">Calendar<span class="campaign-action-count" x-show="unansweredCount > 0" x-text="unansweredCount"></span></a>
                                         <template x-if="isDM">
@@ -366,7 +366,7 @@
     </div>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="/campaigns.js?v=51"></script>
+    <script src="/campaigns.js?v=52"></script>
     <script src="/static/game.js?v=6"></script>
 </body>
 </html>

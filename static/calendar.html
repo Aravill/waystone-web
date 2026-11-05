@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waystone - Calendar</title>
+    <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+    <script src="/static/theme.js?v=5"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=60">
+    <link rel="stylesheet" href="/static/notifications.css?v=9">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
+</head>
+<body x-data="calendarPage()">
+    <div class="header">
+        <div class="header-left">
+            <a href="/" class="logo">Waystone</a>
+        </div>
+        <nav class="nav-bar" aria-label="Main">
+            <a href="/" class="nav-item" data-page="dashboard">Home</a>
+            <a href="/campaigns" class="nav-item active" aria-current="page" data-page="campaigns">Games</a>
+            <a href="/profile" class="nav-item" data-page="profile">Profile</a>
+            <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
+        </nav>
+        <div class="header-right">
+            <span class="user-name" x-text="displayName"></span>
+            <button @click="handleLogout()" class="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <main id="calendarPage" @keydown.escape.window="sessionClipboard && !showCreateSessionModal && !pasteSubmitting && clearClipboard()">
+            <nav class="game-crumb" aria-label="Breadcrumb">
+                <a :href="campaign ? '/campaigns#campaign-' + encodeURIComponent(campaign.id) : '/campaigns'">Games</a>
+                <template x-if="campaign">
+                    <span><span aria-hidden="true"> › </span><a :href="'/games/' + encodeURIComponent(campaign.id)" x-text="campaign.title"></a></span>
+                </template>
+                <span aria-hidden="true"> › </span><span aria-current="page">Calendar</span>
+            </nav>
+
+            <p x-show="loading">Loading calendar...</p>
+            <div class="game-error" role="alert" x-show="loadError">
+                <p x-text="loadError"></p>
+                <button type="button" class="campaign-action-btn" @click="load()">Try again</button>
+            </div>
+            <template x-if="notFound">
+                <p>This game could not be found. It may have been deleted.</p>
+            </template>
+            <template x-if="forbidden">
+                <p>Only the game's DM and players can see its calendar. <a :href="'/games/' + encodeURIComponent(campaign.id)" x-text="'Back to ' + campaign.title"></a></p>
+            </template>
+
+            <template x-if="campaign && !forbidden">
+                <div>
+                    <section class="calendar-head">
+                        <div>
+                            <p class="modal-eyebrow">Calendar of sessions</p>
+                            <h1 class="page-title"><span class="drop-cap" x-text="(campaign.title || '').charAt(0)"></span><span x-text="(campaign.title || '').slice(1)"></span></h1>
+                        </div>
+                        <a href="/profile#calendar-sync" class="calendar-sync-link">Sync to calendar &rarr;</a>
+                    </section>
+                    <div class="calendar-layout">
+                        <div class="calendar-main" x-ref="calendarMain">
+                            <!-- Month Navigation -->
+                            <div class="calendar-nav">
+                                <button type="button" class="nav-btn" @click="previousMonth()" aria-label="Previous month">&lsaquo;</button>
+                                <span class="current-month" x-text="formatMonthYear()"></span>
+                                <button type="button" class="nav-btn" @click="nextMonth()" aria-label="Next month">&rsaquo;</button>
+                                <div class="calendar-legend">
+                                    <span class="legend-item legend-confirmed">confirmed</span>
+                                    <span class="legend-item legend-suggested">suggested</span>
+                                    <span class="legend-item legend-cancelled">cancelled</span>
+                                </div>
+                                <div class="calendar-message message" :class="messageType" x-show="messageVisible" x-text="messageText"></div>
+                            </div>
+
+                            <!-- Calendar Grid -->
+                            <div class="calendar-grid">
+                                <!-- Day headers -->
+                                <div class="calendar-day-header">Mon</div>
+                                <div class="calendar-day-header">Tue</div>
+                                <div class="calendar-day-header">Wed</div>
+                                <div class="calendar-day-header">Thu</div>
+                                <div class="calendar-day-header">Fri</div>
+                                <div class="calendar-day-header">Sat</div>
+                                <div class="calendar-day-header">Sun</div>
+
+                                <!-- Calendar days -->
+                                <template x-for="(day, idx) in calendarDays" :key="idx">
+                                    <div class="calendar-day"
+                                         :class="{
+                                             'other-month': !isCurrentMonth(day),
+                                             'has-session': hasSession(day),
+                                             'is-selected': isSelectedDay(day),
+                                             'is-today': isToday(day),
+                                             'is-paste-target': sessionClipboard && isCurrentMonth(day) && !pasteSelection[formatDateLocal(day)] && !getPasteBlockReason(day),
+                                             'is-paste-blocked': sessionClipboard && isCurrentMonth(day) && !pasteSelection[formatDateLocal(day)] && getPasteBlockReason(day),
+                                             'is-paste-selected': sessionClipboard && isCurrentMonth(day) && pasteSelection[formatDateLocal(day)],
+                                             'day-suggested': getDayStatusClass(day) === 'day-suggested',
+                                             'day-confirmed': getDayStatusClass(day) === 'day-confirmed',
+                                             'day-cancelled': getDayStatusClass(day) === 'day-cancelled'
+                                         }"
+                                         :title="getDayTitle(day)"
+                                         :aria-label="getDayAriaLabel(day)"
+                                         role="button"
+                                         tabindex="0"
+                                         @click="handleDayActivate(day)"
+                                         @keydown.enter.prevent="handleDayActivate(day)"
+                                         @keydown.space.prevent="handleDayActivate(day)">
+                                        <div class="day-number" x-show="!hasSession(day)" x-text="day.getDate()"></div>
+                                        <template x-for="s in getCellSessions(day)" :key="s.id">
+                                            <div class="day-frame" :class="`frame-${s.status}${isStrongCandidate(s) ? ' is-candidate' : ''}`">
+                                                <svg class="day-march" aria-hidden="true" x-show="isStrongCandidate(s)"><rect/></svg>
+                                                <span class="day-candidate-mark" aria-hidden="true" x-show="isStrongCandidate(s)">✦</span>
+                                                <div class="day-frame-head">
+                                                    <span class="day-number" x-text="day.getDate()"></span>
+                                                    <span class="day-overflow" x-show="getCellOverflow(day) > 0">+<span x-text="getCellOverflow(day)"></span><span class="day-overflow-word"> more</span></span>
+                                                </div>
+                                                <div class="day-time">
+                                                    <span class="day-time-full" x-text="getSessionTimeRange(s)"></span>
+                                                    <span class="day-time-short" x-text="s.time"></span>
+                                                </div>
+                                                <div class="day-cancelled-word" x-show="s.status === 'Cancelled'">cancelled</div>
+                                                <div class="day-tally" x-show="s.status !== 'Cancelled'">
+                                                    <template x-for="c in getTally(s)" :key="c.kind">
+                                                        <div :class="`reply-${c.kind}${c.n ? '' : ' tally-zero'}`">
+                                                            <span x-html="replyGlyph(c.kind)"></span><b x-text="c.n"></b>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="calendar-reply-key" x-show="!sessionClipboard">
+                                <span class="reply-accepted" x-html="replyGlyph('accepted') + ' aye'"></span>
+                                <span class="reply-tentative">? perhaps</span>
+                                <span class="reply-declined" x-html="replyGlyph('declined') + ' nay'"></span>
+                                <span class="reply-awaiting">… awaiting</span>
+                                <span><span class="legend-star" aria-hidden="true">✦</span> strong candidate</span>
+                            </div>
+                        </div>
+
+                        <!-- Day / agenda panel -->
+                        <aside class="calendar-panel" x-ref="dayPanel">
+                            <div class="calendar-paste-bar" x-show="sessionClipboard">
+                                <div class="paste-summary">
+                                    <span class="paste-label">Copied</span>
+                                    <span x-text="sessionClipboard ? getSessionTimeRange(sessionClipboard) : ''"></span>
+                                    <span class="paste-meta" x-text="sessionClipboard ? getSessionMeta(sessionClipboard) : ''"></span>
+                                </div>
+                                <p class="paste-note" :class="pasteNote.type" role="status" x-text="pasteNote.text || (pasteCount ? pasteCount + (pasteCount === 1 ? ' day' : ' days') + ' selected' : 'Choose the days to paste it on.')"></p>
+                                <div class="paste-actions">
+                                    <button type="button" class="btn-action" x-ref="pasteCancel" :disabled="pasteSubmitting" @click="clearClipboard()">Cancel<span class="paste-esc-hint">(Esc)</span></button>
+                                    <button type="button" class="btn-create" :disabled="!pasteCount || pasteSubmitting" @click="submitPaste()" x-text="pasteSubmitting ? 'Pasting…' : (pasteCount ? 'Paste to ' + pasteCount + (pasteCount === 1 ? ' day' : ' days') : 'Paste')"></button>
+                                </div>
+                            </div>
+                            <template x-if="selectedDay">
+                                <div>
+                                    <p class="modal-eyebrow">Selected day</p>
+                                    <h3 class="panel-heading"><span class="drop-cap" x-text="formatDayHeading(selectedDay).charAt(0)"></span><span x-text="formatDayHeading(selectedDay).slice(1)"></span></h3>
+                                    <p class="panel-empty" x-show="getSelectedDaySessions().length === 0">No sessions on this day.</p>
+                                    <template x-for="s in getSelectedDaySessions()" :key="s.id">
+                                        <div class="panel-session" :class="{ 'awaits-reply': !isCurrentUserDM && s.status === 'Suggested' && !s.current_user_participation }">
+                                            <div class="panel-session-head">
+                                                <span class="panel-session-time" x-text="getSessionTimeRange(s)"></span>
+                                                <span class="panel-status-tag" :class="`chip-${s.status}`" x-text="s.status"></span>
+                                            </div>
+                                            <div class="panel-session-meta" x-text="getSessionMeta(s)"></div>
+
+                                            <p class="panel-candidate" x-show="isStrongCandidate(s)"><span class="panel-candidate-mark" aria-hidden="true">✦</span> <span x-text="getCandidateNote(s)"></span></p>
+                                            <div class="roster" x-show="getRoster(s).length > 0">
+                                                <template x-for="row in getRoster(s)" :key="row.key">
+                                                    <div class="roster-row" :class="`avatars-${row.cls}`">
+                                                        <span class="roster-avatar" x-html="avatarHtml(row.user)"></span>
+                                                        <span class="roster-name" x-text="row.user.display_name || row.user.name || 'Unknown'"></span>
+                                                        <span class="roster-said" :class="`reply-${row.kind}`"><span x-html="replyGlyph(row.kind)"></span> <span x-text="row.label"></span></span>
+                                                    </div>
+                                                </template>
+                                            </div>
+
+                                            <div class="player-responses" x-show="!isCurrentUserDM && s.status !== 'Cancelled'">
+                                                <p class="pending-notice"><span aria-hidden="true">✦</span> Thy reply</p>
+                                                <div class="session-actions session-replies">
+                                                    <button type="button" class="btn-response btn-response--accepted"
+                                                            :class="{ 'selected': s.current_user_participation === 'Accepted' }"
+                                                            @click="submitResponse('Accepted', s)">Aye</button>
+                                                    <button type="button" class="btn-response btn-response--tentative"
+                                                            :class="{ 'selected': s.current_user_participation === 'Tentative' }"
+                                                            @click="submitResponse('Tentative', s)">Perhaps</button>
+                                                    <button type="button" class="btn-response btn-response--declined"
+                                                            :class="{ 'selected': s.current_user_participation === 'Declined' }"
+                                                            @click="submitResponse('Declined', s)">Nay</button>
+                                                </div>
+                                            </div>
+
+                                            <div class="panel-dm-actions" x-show="isCurrentUserDM && s.status !== 'Cancelled'">
+                                                <div class="session-actions">
+                                                    <button type="button" class="btn-action btn-action-confirm"
+                                                            x-show="s.status === 'Suggested'"
+                                                            @click="requestSessionStatusChange('Confirmed', s)">Confirm</button>
+                                                    <button type="button" class="btn-action btn-action-cancel"
+                                                            @click="requestSessionStatusChange('Cancelled', s)">Cancel</button>
+                                                    <button type="button" class="btn-action" @click="copySession(s)">Copy</button>
+                                                </div>
+                                                <p class="session-status-warning" x-show="selectedSession && selectedSession.id === s.id && pendingSessionAction" x-text="getSessionStatusWarning()"></p>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <button type="button" class="btn-action panel-suggest" x-show="isCurrentUserDM" @click="openCreateSession(selectedDay)">+ Suggest session</button>
+                                    <button type="button" class="btn-close" @click="clearSelectedDay()">Show month agenda</button>
+                                </div>
+                            </template>
+                            <template x-if="!selectedDay">
+                                <div>
+                                    <p class="modal-eyebrow">Month agenda</p>
+                                    <h3 class="panel-heading" x-text="`Sessions in ${formatMonthYear()}`"></h3>
+                                    <p class="panel-empty" x-show="sessions.length === 0">No sessions this month.</p>
+                                    <template x-for="s in sessions" :key="s.id">
+                                        <button type="button" class="agenda-row" :class="`chip-${s.status}`" @click="selectDay(parseDateLocal(s.date))">
+                                            <span class="agenda-date" x-text="formatAgendaDate(s)"></span>
+                                            <span class="agenda-time" x-text="getSessionTimeRange(s)"></span>
+                                            <span class="agenda-status" x-text="s.status"></span>
+                                        </button>
+                                    </template>
+                                    <p class="panel-empty" x-show="isCurrentUserDM && !sessionClipboard">Select a day to suggest a session.</p>
+
+                                </div>
+                            </template>
+                        </aside>
+                    </div>
+                </div>
+            </template>
+        </main>
+    </div>
+
+    <!-- Session Creation Modal -->
+    <div id="createSessionModal" class="modal create-session-modal" :class="{ 'modal-open': showCreateSessionModal }" @click="handleCreateSessionBackdropClick($event)">
+        <div class="modal-content create-session-modal-content compact-modal-content">
+            <div class="modal-header">
+                <div class="modal-title-block"><p class="modal-eyebrow" x-text="currentCampaignTitle"></p>
+                <h2>Suggest a session</h2></div>
+                <button type="button" class="modal-close" aria-label="Close" @click="closeCreateSessionModal()">&times;</button>
+            </div>
+            <form @submit.prevent="createSession()" class="modal-form compact-modal-form">
+                <div class="form-group">
+                    <label for="sessionDate">Date</label>
+                    <input type="date" id="sessionDate" x-model="sessionFormData.date" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="sessionTime">Time *</label>
+                    <input type="time" id="sessionTime" x-model="sessionFormData.time" required>
+                </div>
+                <div class="form-group">
+                    <label>Duration *</label>
+                    <div class="duration-row">
+                        <div class="duration-unit">
+                            <span class="duration-unit-label">H</span>
+                            <div class="duration-control">
+                                <input type="number" id="sessionDurationHours" class="duration-input" x-model.number="sessionFormData.durationHours" min="0" step="1" required>
+                                <div class="duration-arrows">
+                                    <button type="button" class="duration-arrow-btn" aria-label="One hour less" @click="adjustDurationPart('durationHours', -1)">−</button>
+                                    <button type="button" class="duration-arrow-btn" aria-label="One hour more" @click="adjustDurationPart('durationHours', 1)">+</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="duration-unit">
+                            <span class="duration-unit-label">M</span>
+                            <div class="duration-control">
+                                <input type="number" id="sessionDurationMinutes" class="duration-input" x-model.number="sessionFormData.durationMinutes" min="0" max="59" step="1" required>
+                                <div class="duration-arrows">
+                                    <button type="button" class="duration-arrow-btn" aria-label="One minute less" @click="adjustDurationPart('durationMinutes', -1)">−</button>
+                                    <button type="button" class="duration-arrow-btn" aria-label="One minute more" @click="adjustDurationPart('durationMinutes', 1)">+</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="sessionTimezone">Timezone *</label>
+                    <select id="sessionTimezone" x-model="sessionFormData.timezone" required>
+                        <template x-for="tz in timezoneOptions" :key="tz">
+                            <option :value="tz" x-text="tz" :selected="tz === sessionFormData.timezone"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn-create">Create</button>
+                    <button type="button" class="btn-cancel" @click="closeCreateSessionModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <script src="/static/notifications.js?v=9"></script>
+    <script src="/campaigns.js?v=52"></script>
+    <script src="/static/calendar.js?v=1"></script>
+</body>
+</html>

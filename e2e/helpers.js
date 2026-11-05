@@ -64,17 +64,17 @@ function dateFromToday(n) {
 }
 
 /**
- * Open the Games page calendar for Age of Sojourn. With unanswered suggestions the
- * button carries a focus date, so the calendar opens on that month with that day selected.
+ * Open the calendar page of Age of Sojourn from its card on the Games page. With unanswered
+ * suggestions the page opens on that month with that day selected.
  */
 async function openCalendar(page) {
   await page.goto('/campaigns');
   await page
     .getByRole('article')
     .filter({ hasText: GAME })
-    .getByRole('button', { name: /^Calendar/ })
+    .getByRole('link', { name: /^Calendar/ })
     .click();
-  const modal = page.locator('#calendarModal');
+  const modal = page.locator('#calendarPage');
   // Wait for the focus load, so a later "Next month" can't race with it.
   await expect(modal.locator('.calendar-day.is-selected')).toBeVisible();
   return modal;
@@ -84,7 +84,7 @@ async function openCalendar(page) {
 async function goToMonth(page, ymd) {
   const [y, m] = ymd.split('-').map(Number);
   const label = new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
-  const modal = page.locator('#calendarModal');
+  const modal = page.locator('#calendarPage');
   const current = modal.locator('.current-month');
   for (let i = 0; i < 6 && (await current.textContent()) !== label; i++) {
     // Wait for each month's load: loadSessions has no guard against a stale response.
