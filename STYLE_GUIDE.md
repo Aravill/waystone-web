@@ -9,7 +9,7 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 | `campaigns-parchment.png` | Header, nav, page title, game card grid (light) |
 | `type-icons.png` | The three game-type marks, light and dark |
 | `campaigns-candlelight.png` | The same page in the dark theme |
-| `calendar.png` | Modal sheet, calendar grid, reply buttons (its session chips are superseded by `calendar-days.html`) |
+| `calendar.png` | Calendar grid, reply buttons, drawn when the calendar was a modal sheet (its session chips are superseded by `calendar-days.html`) |
 | `calendar-days.html` | Calendar redesign: the Ledger day cell, the Roll call panel, the strong candidate frame (variant A and panel 2 are the chosen ones) |
 | `game-detail.html` | The game page: title block, the tale, the company margin, the chronicle of played sessions |
 | `banners.dc.html` | The banner redesign: three variants, see `BANNER_DESIGN_GUIDE.md` |
@@ -163,7 +163,7 @@ The logo mark is the standing-stone from the mock-ups: a tapered stone with a do
 <p class="page-subtitle">6 games on the roll · 2 await thee</p>
 ```
 
-The drop cap is optional and goes on the page h1. The one other place for it is a heading inside a modal that names a single thing, like the calendar's selected day (34px there). The subtitle summarises the list, and counts what awaits the viewer when that's above zero.
+The drop cap is optional and goes on the page h1. The one other place for it is a heading that names a single thing inside a panel, like the calendar's selected day (34px there). The game and calendar pages put it on the game title. The subtitle summarises the list, and counts what awaits the viewer when that's above zero.
 
 ### Buttons
 
@@ -292,7 +292,7 @@ Calendar day frames (the session fills the day; sizes scale with the cell in `cq
 
 `.chip-*` remains for the status tags in the day panel and the agenda rows.
 
-Calendar grid: hairline cells, out-of-month days at 35% ink, selected day `background: var(--folio)` with a `2px solid var(--rubric)` inset outline. Days are square, and the month is sized to fit the modal's height. A day with a session holds a frame inset from the hairlines: the day number, the start-end time and a four-column tally (accepted, tentative, declined, awaiting) with a hairline above it. Sizes are in `cqw`, so they scale with the cell. Narrow cells (≤ 85px) show only the start time, accepted and awaiting. The first planned session fills the cell and the rest show as "+N more". Zero counts stay at full `--muted` at weight 400, never reduced opacity (that drops the contrast below 4.5:1). The legend (■ confirmed · ▢ suggested · ~~cancelled~~) sits right of the month name, and a reply key (✓ aye · ? perhaps · ✗ nay · … awaiting · ✦ strong candidate) sits under the grid.
+Calendar grid: hairline cells, out-of-month days at 35% ink, selected day `background: var(--folio)` with a `2px solid var(--rubric)` inset outline. Days are square, and the month's width follows the viewport's height (the calendar is its own page, `/games/{id}/calendar`, which scrolls when the month is taller). A day with a session holds a frame inset from the hairlines: the day number, the start-end time and a four-column tally (accepted, tentative, declined, awaiting) with a hairline above it. Sizes are in `cqw`, so they scale with the cell. Narrow cells (≤ 85px) show only the start time, accepted and awaiting. The first planned session fills the cell and the rest show as "+N more". Zero counts stay at full `--muted` at weight 400, never reduced opacity (that drops the contrast below 4.5:1). The legend (■ confirmed · ▢ suggested · ~~cancelled~~) sits right of the month name, and a reply key (✓ aye · ? perhaps · ✗ nay · … awaiting · ✦ strong candidate) sits under the grid.
 
 Strong candidate: a Suggested session whose accepted players are over 70% of all players. Awaiting players count in the total, and exactly 70% does not qualify. The panel says it in a line ("Strong candidate: 5 of 6 accepted"), and so do the cell's `aria-label` and `title`.
 
