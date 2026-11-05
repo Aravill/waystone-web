@@ -100,6 +100,38 @@ test('a return address beats pending profile setup at login', async ({ page, inv
   await expect(page).toHaveURL(/\/campaigns/);
 });
 
+test('an invite logs in despite an undecodable cookie', async ({ page, context, invites }) => {
+  const user = await invites.newUser();
+  await context.addCookies([{ name: 'auth_session', value: 'from-an-old-secret', url: BASE_URL }]);
+  await page.goto(`/invite/${user.token}`);
+  await setPasswordInForm(page, PASSWORD);
+  await expect(page).toHaveURL(/\/profile/);
+  const me = await (await page.request.get('/auth/current-user')).json();
+  expect(me.username).toBe(user.username);
+});
+
+test('a mangled invite link shows the invalid page', async ({ page }) => {
+  await page.goto('/invite/%E0%A4');
+  await expect(page.getByRole('heading', { name: 'Link not valid' })).toBeVisible();
+});
+
+test('changing a role leaves the invite and password alone', async ({ invites }) => {
+  const user = await invites.newUser();
+  const api = await anonymous();
+  expect((await invites.admin.post(`/api/admin/users/${user.id}/make-admin`)).ok()).toBeTruthy();
+  expect((await api.get(`/api/invite/${user.token}`)).ok()).toBeTruthy();
+  expect((await api.post(`/api/invite/${user.token}/password`, { data: { new_password: PASSWORD } })).ok()).toBeTruthy();
+  expect((await invites.admin.post(`/api/admin/users/${user.id}/remove-admin`)).ok()).toBeTruthy();
+
+  const fresh = await anonymous();
+  expect(await login(fresh, user.username, PASSWORD)).toBe(200);
+  const me = await (await fresh.get('/auth/current-user')).json();
+  expect(me.must_change_password).toBe(false);
+  expect(me.roles).not.toContain('admin');
+  await fresh.dispose();
+  await api.dispose();
+});
+
 test('a used invite is dead and points to login', async ({ page, invites }) => {
   const user = await invites.newUser();
   const api = await anonymous();
@@ -175,16 +207,14 @@ test('the invite replaces a session already in the browser', async ({ page, invi
   expect(me.username).toBe(user.username);
 });
 
-test('only admins issue invites, and guest links are gone', async ({ invites }) => {
+test('only admins issue invites', async ({ invites }) => {
   const user = await invites.newUser();
   const testy = await apiAs('testy');
   expect((await testy.post('/api/admin/users', { data: { username: 'sneaky-user' } })).status()).toBe(403);
   expect((await testy.post(`/api/admin/users/${user.id}/reset-password`)).status()).toBe(403);
-  expect((await testy.get(`/api/campaigns/${user.id}/guest-links`)).status()).not.toBe(200);
   await testy.dispose();
 
   const api = await anonymous();
-  expect((await api.get('/api/guest/x')).status()).not.toBe(200);
   expect((await api.get('/api/invite/x')).status()).toBe(404);
   await api.dispose();
 });

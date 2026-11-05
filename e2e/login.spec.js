@@ -1,5 +1,6 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const { apiAs, sojournId } = require('./helpers');
 const env = require('./env');
 
 test('valid login reaches the app', async ({ page }) => {
@@ -22,12 +23,18 @@ test('wrong password shows an error', async ({ page }) => {
 });
 
 test('login returns to the page that was asked for', async ({ page }) => {
-  await page.goto('/campaigns?calendar=not-a-real-game');
+  const api = await apiAs('testy');
+  const id = await sojournId(api);
+  await api.dispose();
+
+  await page.goto(`/campaigns?calendar=${encodeURIComponent(id)}`);
   await expect(page).toHaveURL(/\/login\.html\?next=/);
   await page.getByLabel('Username').fill('testy');
   await page.getByLabel('Password').fill(env.DEMO_PASSWORD);
   await page.getByRole('button', { name: 'Enter' }).click();
-  await expect(page).toHaveURL(/\/campaigns/);
+  // Only the kept ?calendar= opens the dialog; the page then tidies its own URL.
+  await expect(page.locator('#calendarModal')).toBeVisible();
+  await expect(page.locator('#calendarModal')).toContainText('Age of Sojourn');
 });
 
 for (const next of ['//evil.example', 'https://evil.example/', '/\\evil.example', '/.//evil.example', 'javascript:alert(1)']) {
@@ -55,5 +62,15 @@ test('a fresh session lasts 30 days and is not reissued on every page', async ({
 
   const res = await page.request.get('/campaigns');
   expect(res.ok()).toBeTruthy();
+  expect(new URL(res.url()).pathname, 'still logged in, not sent to login').toBe('/campaigns');
   expect(res.headers()['set-cookie']).toBeUndefined();
+});
+
+test('an undecodable cookie does not block login', async ({ page, context }) => {
+  await context.addCookies([{ name: 'auth_session', value: 'from-an-old-secret', url: `http://localhost:${env.PORT}` }]);
+  await page.goto('/login.html');
+  await page.getByLabel('Username').fill('testy');
+  await page.getByLabel('Password').fill(env.DEMO_PASSWORD);
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible();
 });
