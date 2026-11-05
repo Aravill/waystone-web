@@ -135,6 +135,11 @@ func HandleCampaignRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(parts) >= 2 && parts[1] == "played-sessions" {
+		HandlePlayedSessions(w, r)
+		return
+	}
+
 	if len(parts) >= 2 && parts[1] == "signups" {
 		if len(parts) == 2 {
 			HandleCampaignSignups(w, r)

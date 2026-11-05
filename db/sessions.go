@@ -38,3 +38,11 @@ func DeleteSession(sessionID string) error {
 func GetUnansweredSessions(userID, fromDate string) (map[string]models.UnansweredSessions, error) {
 	return GetStore().GetUnansweredSessions(userID, fromDate)
 }
+
+func SaveManualSession(session models.CampaignSession, attendeeIDs []string) error {
+	return GetStore().SaveManualSession(session, attendeeIDs)
+}
+
+func DeleteManualSession(sessionID string) error {
+	return GetStore().DeleteManualSession(sessionID)
+}

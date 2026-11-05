@@ -26,6 +26,9 @@ type CampaignSession struct {
 	DeclinedCount            int                 `json:"declined_count,omitempty"`
 	TentativeCount           int                 `json:"tentative_count,omitempty"`
 	PendingCount             int                 `json:"pending_count,omitempty"`
+	Manual                   bool                `json:"manual,omitempty"`    // recorded by hand by the DM, chronicle only
+	Guests                   []string            `json:"guests,omitempty"`    // names of non-members who attended a manual session
+	DMAbsent                 bool                `json:"dm_absent,omitempty"` // the DM missed a manual session
 	CurrentUserParticipation ParticipationStatus `json:"current_user_participation,omitempty"`
 	CreatedAt                string              `json:"created_at"`
 	UpdatedAt                string              `json:"updated_at"`
