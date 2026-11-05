@@ -54,5 +54,9 @@ func EnsureAdmin() error {
 	if err := SaveUser(*user); err != nil {
 		return fmt.Errorf("failed to save admin: %w", err)
 	}
+	// The env password replaces whatever an earlier invite would have set.
+	if err := DeletePasswordInvite(user.ID); err != nil {
+		return fmt.Errorf("failed to delete admin invite: %w", err)
+	}
 	return nil
 }

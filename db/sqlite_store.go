@@ -849,14 +849,33 @@ func (s *SQLiteStore) SetUserBlocked(id string, blocked bool) error {
 	return tx.Commit()
 }
 
-func (s *SQLiteStore) SetUserPassword(id, hash string, mustChange bool) error {
+// UpdateUserRoles writes only the roles, so it can't undo a concurrent password or block change.
+func (s *SQLiteStore) UpdateUserRoles(id string, roles []string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	mustChangeInt := 0
-	if mustChange {
-		mustChangeInt = 1
+	rolesJSON, err := json.Marshal(roles)
+	if err != nil {
+		return err
 	}
+	res, err := s.db.Exec(`UPDATE users SET roles=?, updated_at=? WHERE id=? AND deleted=0`,
+		string(rolesJSON), time.Now().UTC().Format(time.RFC3339), id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+func (s *SQLiteStore) SetUserPassword(id, hash string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -866,8 +885,8 @@ func (s *SQLiteStore) SetUserPassword(id, hash string, mustChange bool) error {
 
 	// Bumping session_version revokes every existing session cookie for the user.
 	if _, err := tx.Exec(
-		`UPDATE users SET password_hash=?, must_change_password=?, session_version=session_version+1, updated_at=? WHERE id=?`,
-		hash, mustChangeInt, time.Now().UTC().Format(time.RFC3339), id,
+		`UPDATE users SET password_hash=?, must_change_password=0, session_version=session_version+1, updated_at=? WHERE id=?`,
+		hash, time.Now().UTC().Format(time.RFC3339), id,
 	); err != nil {
 		return err
 	}
@@ -2050,6 +2069,15 @@ func (s *SQLiteStore) GetPasswordInvite(tokenHash string) (string, time.Time, er
 		return "", time.Time{}, err
 	}
 	return userID, expiresAt, nil
+}
+
+// DeletePasswordInvite removes the user's pending invite, if any.
+func (s *SQLiteStore) DeletePasswordInvite(userID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	_, err := s.db.Exec(`DELETE FROM password_invites WHERE user_id = ?`, userID)
+	return err
 }
 
 // RedeemPasswordInvite sets the password and deletes the invite in one transaction.

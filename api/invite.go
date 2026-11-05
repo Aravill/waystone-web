@@ -34,16 +34,16 @@ func hashInviteToken(token string) string {
 
 // issueInvite creates a one-time password invite for the user, replacing any earlier
 // one and clearing the current password. Only the token's hash is stored.
-func issueInvite(userID string) (string, time.Time, error) {
+func issueInvite(userID string) (string, error) {
 	token, err := newToken()
 	if err != nil {
-		return "", time.Time{}, err
+		return "", err
 	}
 	expiresAt := time.Now().UTC().Add(inviteTTL)
 	if err := db.IssuePasswordInvite(userID, hashInviteToken(token), expiresAt); err != nil {
-		return "", time.Time{}, err
+		return "", err
 	}
-	return token, expiresAt, nil
+	return token, nil
 }
 
 // inviteHeaders keeps tokens out of caches and Referer headers.
@@ -52,33 +52,33 @@ func inviteHeaders(w http.ResponseWriter) {
 	w.Header().Set("Referrer-Policy", "no-referrer")
 }
 
-// resolveInvite validates an invite token and returns its user and expiry. On
+// resolveInvite validates an invite token and returns its user. On
 // failure it writes the error response and returns false. It never touches the
 // session or cookies.
-func resolveInvite(w http.ResponseWriter, token string) (*models.User, time.Time, bool) {
+func resolveInvite(w http.ResponseWriter, token string) (*models.User, bool) {
 	userID, expiresAt, err := db.GetPasswordInvite(hashInviteToken(token))
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "internal error")
-		return nil, time.Time{}, false
+		return nil, false
 	}
 	if userID == "" {
 		writeJSONError(w, http.StatusNotFound, "link is not valid")
-		return nil, time.Time{}, false
+		return nil, false
 	}
 	user, err := db.GetUserByID(userID)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "internal error")
-		return nil, time.Time{}, false
+		return nil, false
 	}
 	if user == nil || user.Deleted || user.Blocked || auth.IsEnvAdmin(user) {
 		writeJSONError(w, http.StatusNotFound, "link is not valid")
-		return nil, time.Time{}, false
+		return nil, false
 	}
 	if !expiresAt.After(time.Now()) {
 		writeJSONError(w, http.StatusGone, "link has expired")
-		return nil, time.Time{}, false
+		return nil, false
 	}
-	return user, expiresAt, true
+	return user, true
 }
 
 // HandleInvitePage serves the invite page at /invite/{token}. The token is
@@ -105,13 +105,12 @@ func HandleInviteAPI(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
-		user, expiresAt, ok := resolveInvite(w, token)
+		user, ok := resolveInvite(w, token)
 		if !ok {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"user":       map[string]string{"username": user.Username, "display_name": user.DisplayName()},
-			"expires_at": expiresAt.UTC().Format(time.RFC3339),
+			"user": map[string]string{"username": user.Username, "display_name": user.DisplayName()},
 		})
 	case len(parts) == 2 && parts[1] == "password":
 		if r.Method != http.MethodPost {
@@ -125,7 +124,7 @@ func HandleInviteAPI(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleInviteSetPassword(w http.ResponseWriter, r *http.Request, token string) {
-	user, _, ok := resolveInvite(w, token)
+	user, ok := resolveInvite(w, token)
 	if !ok {
 		return
 	}

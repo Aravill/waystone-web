@@ -155,17 +155,14 @@ func HandleAdminUsers(w http.ResponseWriter, r *http.Request) {
 			adminError(w, http.StatusInternalServerError, "failed to create user")
 			return
 		}
-		token, expiresAt, err := issueInvite(newUser.ID)
+		token, err := issueInvite(newUser.ID)
 		if err != nil {
 			adminError(w, http.StatusInternalServerError, "user created, but failed to create invite; use reset password")
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"user":              toAdminUserJSON(newUser),
-			"invite_token":      token,
-			"invite_expires_at": expiresAt.Format(time.RFC3339),
+		writeJSON(w, http.StatusCreated, map[string]interface{}{
+			"user":         toAdminUserJSON(newUser),
+			"invite_token": token,
 		})
 
 	default:
@@ -282,16 +279,12 @@ func HandleAdminUserActions(w http.ResponseWriter, r *http.Request) {
 			adminError(w, http.StatusConflict, "cannot reset your own password")
 			return
 		}
-		token, expiresAt, err := issueInvite(targetID)
+		token, err := issueInvite(targetID)
 		if err != nil {
 			adminError(w, http.StatusInternalServerError, "failed to reset password")
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
-			"invite_token":      token,
-			"invite_expires_at": expiresAt.Format(time.RFC3339),
-		})
+		writeJSON(w, http.StatusOK, map[string]string{"invite_token": token})
 
 	case r.Method == http.MethodPost && action == "remove-admin":
 		if auth.IsEnvAdmin(target) {

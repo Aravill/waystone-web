@@ -83,10 +83,12 @@ func sessionCookieSecure() bool {
 	return secure
 }
 
-// SetSession stores the user ID and session version; everything else is read from the DB per request.
+// SetSession stores the user ID, session version and renewal time; everything else is read
+// from the DB per request. An undecodable cookie (e.g. after rotating SESSION_SECRET) comes
+// back as a usable new session plus an error, so it is simply overwritten.
 func SetSession(w http.ResponseWriter, r *http.Request, user *models.User) error {
 	session, err := sessionStore.Get(r, SessionName)
-	if err != nil {
+	if session == nil {
 		return err
 	}
 
@@ -136,7 +138,7 @@ func GetSession(r *http.Request) (map[interface{}]interface{}, error) {
 
 func ClearSession(w http.ResponseWriter, r *http.Request) error {
 	session, err := sessionStore.Get(r, SessionName)
-	if err != nil {
+	if session == nil {
 		return err
 	}
 

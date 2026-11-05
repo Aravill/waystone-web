@@ -39,19 +39,7 @@ func GetAllUsers() ([]models.User, error) {
 
 // UpdateUserRoles updates the roles for a user
 func UpdateUserRoles(userID string, roles []string) error {
-	users, err := GetAllUsers()
-	if err != nil {
-		return err
-	}
-
-	for i := range users {
-		if users[i].ID == userID {
-			users[i].Roles = roles
-			return SaveUser(users[i])
-		}
-	}
-
-	return fmt.Errorf("user not found")
+	return GetStore().UpdateUserRoles(userID, roles)
 }
 
 // GetUserByUsername retrieves a user by username (case-insensitive)
@@ -120,7 +108,7 @@ func SetUserBlocked(id string, blocked bool) error {
 	return GetStore().SetUserBlocked(id, blocked)
 }
 
-// SetUserPassword stores a new password hash and the must-change flag, revoking all sessions and deleting any pending invite
-func SetUserPassword(id, hash string, mustChange bool) error {
-	return GetStore().SetUserPassword(id, hash, mustChange)
+// SetUserPassword stores a new password hash and clears the must-change flag, revoking all sessions and deleting any pending invite
+func SetUserPassword(id, hash string) error {
+	return GetStore().SetUserPassword(id, hash)
 }

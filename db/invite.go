@@ -19,3 +19,7 @@ func GetPasswordInvite(tokenHash string) (string, time.Time, error) {
 func RedeemPasswordInvite(tokenHash, passwordHash string) (string, error) {
 	return GetStore().RedeemPasswordInvite(tokenHash, passwordHash)
 }
+
+func DeletePasswordInvite(userID string) error {
+	return GetStore().DeletePasswordInvite(userID)
+}
