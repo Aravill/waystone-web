@@ -73,6 +73,10 @@ Production setup:
 2. Create `.env` with `SESSION_SECRET`, `ADMIN_PASSWORD` and `TRUST_PROXY=1` (see below).
 3. Run `./deploy.sh`.
 
+### Versioning
+
+Every deploy from `main` gets a `vX.Y.Z` tag once it succeeds: a `feat/` PR bumps the minor version, anything else bumps the patch. For a major version, push the tag on main's latest commit, then run the Deploy workflow manually (pushing a tag alone doesn't deploy). Re-running a tagged Deploy run rolls production back to that commit. The version shows at the bottom of logged-in pages; local builds show `dev`.
+
 ### 2. Local Docker (no Caddy)
 
 ```bash
