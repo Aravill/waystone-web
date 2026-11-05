@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"waystone-web/config"
 	"waystone-web/middleware"
 )
 
@@ -44,6 +45,7 @@ func RegisterRoutes() {
 	// Protected API endpoints (wrapped with auth middleware)
 	http.Handle("/api/campaigns", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaigns)))
 	http.Handle("/api/campaigns/", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaignRoutes)))
+	http.Handle("/api/version", middleware.AuthMiddleware(http.HandlerFunc(HandleVersion)))
 	http.Handle("/api/systems", middleware.AuthMiddleware(http.HandlerFunc(HandleSystems)))
 	http.Handle("/api/profile/avatar", middleware.AuthMiddleware(http.HandlerFunc(HandleProfileAvatar)))
 	http.Handle("/api/users/", middleware.AuthMiddleware(http.HandlerFunc(HandleUserRoutes)))
@@ -166,4 +168,13 @@ func HandleCampaignRoutes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusNotFound)
 	fmt.Fprintf(w, `{"error": "not found"}`)
+}
+
+// HandleVersion returns the deployed app version (GET /api/version).
+func HandleVersion(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"version": config.Version})
 }

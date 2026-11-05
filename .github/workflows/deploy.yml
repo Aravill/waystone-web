@@ -6,16 +6,65 @@ on:
 
 concurrency: deploy
 
+permissions:
+  contents: read
+
 jobs:
-  deploy:
-    runs-on: self-hosted
+  version:
+    # Only main deploys: a manual run on another branch must not ship unmerged code.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+      is_new: ${{ steps.next.outputs.is_new }}
     steps:
-      - name: Deploy latest main
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Work out the version
+        id: next
+        run: |
+          semver='^v[0-9]+\.[0-9]+\.[0-9]+$'
+          # A commit that already has a tag keeps it (manual redeploys, re-runs, a hand-pushed major).
+          existing=$(git tag --points-at "$GITHUB_SHA" | grep -E "$semver" | sort -V | tail -1 || true)
+          if [ -n "$existing" ]; then
+            echo "version=$existing" >> "$GITHUB_OUTPUT"
+            echo "is_new=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          highest=$(git tag --list | grep -E "$semver" | sort -V | tail -1 || true)
+          if [ -z "$highest" ]; then
+            version=v0.1.0
+          else
+            # Re-running an old untagged run would give old code a newer version than what's live.
+            if ! git merge-base --is-ancestor "$highest" "$GITHUB_SHA"; then
+              echo "::error::$GITHUB_SHA is older than $highest; refusing to version it"
+              exit 1
+            fi
+            IFS=. read -r major minor patch <<< "${highest#v}"
+            # Squash-merge subjects start with the branch type: feat/... bumps minor, the rest patch.
+            if git log --format=%s "$highest..$GITHUB_SHA" | grep '^feat/' > /dev/null; then
+              version="v$major.$((minor + 1)).0"
+            else
+              version="v$major.$minor.$((patch + 1))"
+            fi
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "is_new=true" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: version
+    runs-on: self-hosted
+    env:
+      APP_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - name: Deploy this commit
         run: |
           cd /opt/waystone-web
           git fetch origin main
           # Keeps untracked .env, docker-compose.override.yml and backups/.
-          git reset --hard origin/main
+          # This run's commit, not origin/main, so what's live always matches APP_VERSION.
+          git reset --hard "$GITHUB_SHA"
           # Build cache isn't touched by `image prune` and grows with every
           # --build. Best-effort: a failed cleanup shouldn't block a deploy.
           docker builder prune -f --filter until=168h || true
@@ -31,3 +80,17 @@ jobs:
             docker compose logs --tail=50 waystone-web
             exit 1
           }
+
+  # After the deploy so a failed one leaves no tag; the next run reuses the number.
+  tag:
+    needs: [version, deploy]
+    if: needs.version.outputs.is_new == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Tag the deployed commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: gh api "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$VERSION" -f "sha=$GITHUB_SHA"

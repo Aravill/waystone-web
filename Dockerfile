@@ -7,7 +7,8 @@ COPY go.mod go.sum* ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o waystone-web .
+ARG APP_VERSION=dev
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-X waystone-web/config.Version=${APP_VERSION}" -o waystone-web .
 
 # Runtime stage
 FROM alpine:3.24
