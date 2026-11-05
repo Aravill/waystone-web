@@ -126,7 +126,7 @@ func SetInitialPassword(id, hash string) (bool, error) {
 	return GetStore().SetInitialPassword(id, hash)
 }
 
-// SetUserPassword stores a new password hash and the must-change flag, revoking all sessions
+// SetUserPassword stores a new password hash and the must-change flag, revoking all sessions and guest links
 func SetUserPassword(id, hash string, mustChange bool) error {
 	return GetStore().SetUserPassword(id, hash, mustChange)
 }

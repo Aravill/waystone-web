@@ -116,6 +116,20 @@ test('changing the password the normal way also kills the link', async ({ thorns
   await api.dispose();
 });
 
+test('an admin reset kills the link until a new one is generated', async ({ thorns }) => {
+  const player = await thorns.newPlayer();
+  const token = await thorns.link(player.id);
+  expect((await thorns.admin.post(`/api/admin/users/${player.id}/reset-password`)).ok()).toBeTruthy();
+
+  const api = await anonymous();
+  expect((await api.get(`/api/guest/${token}`)).status()).toBe(404);
+  expect((await api.post(`/api/guest/${token}/password`, { data: { new_password: PASSWORD } })).status()).toBe(404);
+
+  const fresh = await thorns.link(player.id);
+  expect((await api.get(`/api/guest/${fresh}`)).ok()).toBeTruthy();
+  await api.dispose();
+});
+
 test('rejected passwords leave the link usable', async ({ page, thorns }) => {
   const player = await thorns.newPlayer();
   const token = await thorns.link(player.id);

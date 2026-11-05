@@ -857,11 +857,10 @@ func (s *SQLiteStore) SetUserPassword(id, hash string, mustChange bool) error {
 	); err != nil {
 		return err
 	}
-	// A set password makes setup links pointless; an admin reset keeps them.
-	if !mustChange {
-		if _, err := tx.Exec(`DELETE FROM guest_tokens WHERE user_id = ?`, id); err != nil {
-			return err
-		}
+	// Any password change ends existing setup links. That includes an admin reset,
+	// which would otherwise revive old links; the DM can generate a new one.
+	if _, err := tx.Exec(`DELETE FROM guest_tokens WHERE user_id = ?`, id); err != nil {
+		return err
 	}
 	return tx.Commit()
 }
