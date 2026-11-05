@@ -232,17 +232,18 @@
                             <tr>
                                 <td x-text="p.display_name"></td>
                                 <td>
-                                    <code x-show="guestLinks[p.id]" x-text="guestUrl(p.id)" style="user-select: all; word-break: break-all;"></code>
-                                    <span x-show="!guestLinks[p.id]" class="admin-tag admin-tag--muted">—</span>
+                                    <code x-show="guestNeedsSetup.includes(p.id) && guestLinks[p.id]" x-text="guestUrl(p.id)" style="user-select: all; word-break: break-all;"></code>
+                                    <span x-show="guestNeedsSetup.includes(p.id) && !guestLinks[p.id]" class="admin-tag admin-tag--muted">—</span>
+                                    <span x-show="!guestNeedsSetup.includes(p.id)" class="admin-tag admin-tag--muted">no link needed</span>
                                 </td>
                                 <td>
-                                    <span x-show="guestLinks[p.id]" x-text="formatExpiry(guestLinks[p.id])"></span>
-                                    <span x-show="guestLinks[p.id] && isExpired(guestLinks[p.id])" class="admin-tag admin-tag--danger">expired</span>
-                                    <span x-show="!guestLinks[p.id]" class="admin-tag admin-tag--muted">—</span>
+                                    <span x-show="guestNeedsSetup.includes(p.id) && guestLinks[p.id]" x-text="formatExpiry(guestLinks[p.id])"></span>
+                                    <span x-show="guestNeedsSetup.includes(p.id) && guestLinks[p.id] && isExpired(guestLinks[p.id])" class="admin-tag admin-tag--danger">expired</span>
+                                    <span x-show="guestNeedsSetup.includes(p.id) && !guestLinks[p.id]" class="admin-tag admin-tag--muted">—</span>
                                 </td>
                                 <td>
                                     <div style="display: flex; gap: 0.375rem; flex-wrap: wrap;">
-                                        <select x-model.number="ttlHours" style="width: auto; margin: 0;">
+                                        <select x-show="guestNeedsSetup.includes(p.id)" x-model.number="ttlHours" style="width: auto; margin: 0;">
                                             <option value="1">1 hour</option>
                                             <option value="24">1 day</option>
                                             <option value="72">3 days</option>
@@ -250,9 +251,9 @@
                                             <option value="336">2 weeks</option>
                                             <option value="720">30 days</option>
                                         </select>
-                                        <button @click="createGuestLink(p.id)" :disabled="loading" class="action-btn" x-text="guestLinks[p.id] ? 'regenerate' : 'generate link'"></button>
-                                        <button x-show="guestLinks[p.id]" @click="copyGuestLink(p.id)" class="action-btn">copy link</button>
-                                        <button x-show="guestLinks[p.id]" @click="confirmAction('revoke link', 'revoke the guest link for ' + p.display_name + '?', () => revokeGuestLink(p.id))" class="action-btn danger">revoke</button>
+                                        <button x-show="guestNeedsSetup.includes(p.id)" @click="createGuestLink(p.id)" :disabled="loading" class="action-btn" x-text="guestLinks[p.id] ? 'regenerate' : 'generate link'"></button>
+                                        <button x-show="guestNeedsSetup.includes(p.id) && guestLinks[p.id]" @click="copyGuestLink(p.id)" class="action-btn">copy link</button>
+                                        <button x-show="guestNeedsSetup.includes(p.id) && guestLinks[p.id]" @click="confirmAction('revoke link', 'revoke the guest link for ' + p.display_name + '?', () => revokeGuestLink(p.id))" class="action-btn danger">revoke</button>
                                         <button @click="confirmAction('remove player', 'remove ' + p.display_name + ' from this game? this also revokes their guest link.', () => removePlayer(p.id))" class="action-btn danger">remove</button>
                                     </div>
                                 </td>
@@ -280,6 +281,6 @@
     </main>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="/admin-users.js?v=4"></script>
+    <script src="/admin-users.js?v=5"></script>
 </body>
 </html>

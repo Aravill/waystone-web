@@ -284,7 +284,7 @@
 
                             <section class="guest-links" x-show="isCurrentUserDM && currentCampaignPlayers.length > 0">
                                 <p class="modal-eyebrow">Guest links</p>
-                                <p class="panel-empty">Send a player a link to reply to this game's sessions without logging in.</p>
+                                <p class="panel-empty">Send a player who hasn't set a password yet a link. It lets them choose a password and go straight to this game's calendar. Treat it like a password: anyone with it can claim the account. It stops working once they've set a password.</p>
                                 <label class="guest-links-ttl">Link lasts
                                     <select x-model.number="guestTtlHours">
                                         <option value="1">1 hour</option>
@@ -300,9 +300,9 @@
                                         <li class="guest-link-row">
                                             <div class="guest-link-info">
                                                 <span class="guest-link-name" x-text="p.display_name"></span>
-                                                <span class="guest-link-expiry" :class="{ 'is-expired': isGuestLinkExpired(p.id) }" x-text="guestLinkExpiry(p.id)"></span>
+                                                <span class="guest-link-expiry" :class="{ 'is-expired': isGuestLinkExpired(p.id) }" x-text="guestNeedsSetup.includes(p.id) ? guestLinkExpiry(p.id) : 'no link needed'"></span>
                                             </div>
-                                            <div class="guest-link-actions">
+                                            <div class="guest-link-actions" x-show="guestNeedsSetup.includes(p.id)">
                                                 <button type="button" class="btn-action" x-show="!guestLinks[p.id]" @click="createGuestLink(p.id)">Generate</button>
                                                 <button type="button" class="btn-action" x-show="guestLinks[p.id]" @click="copyGuestLink(p.id)">Copy</button>
                                                 <button type="button" class="btn-action" x-show="guestLinks[p.id]" title="Replace with a new link" @click="createGuestLink(p.id)">New</button>
@@ -522,6 +522,6 @@
     </div>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="campaigns.js?v=47"></script>
+    <script src="campaigns.js?v=48"></script>
 </body>
 </html>

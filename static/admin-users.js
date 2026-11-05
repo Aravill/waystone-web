@@ -10,6 +10,7 @@ window.adminUsersPage = function () {
         campaigns: [],
         selectedCampaignId: '',
         guestLinks: {},
+        guestNeedsSetup: [],
         newPlayerId: '',
         ttlHours: 24,
         newUsername: '',
@@ -273,12 +274,15 @@ window.adminUsersPage = function () {
 
         async loadGuestLinks() {
             this.guestLinks = {};
+            this.guestNeedsSetup = [];
             this.newPlayerId = '';
             if (!this.selectedCampaignId) return;
             try {
                 const res = await fetch(`/api/campaigns/${this.selectedCampaignId}/guest-links`);
                 if (!res.ok) throw new Error('failed');
-                this.guestLinks = (await res.json()).links || {};
+                const data = await res.json();
+                this.guestLinks = data.links || {};
+                this.guestNeedsSetup = data.needs_setup || [];
             } catch {
                 this.showMessage('failed to load guest links', 'error');
             }

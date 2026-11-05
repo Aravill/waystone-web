@@ -342,6 +342,7 @@ window.campaignsPage = function () {
         displayName: 'User',
         isAdmin: false,
         guestLinks: {},
+        guestNeedsSetup: [],
         guestTtlHours: 24,
         currentUserId: '',
         campaigns: [],
@@ -989,6 +990,7 @@ window.campaignsPage = function () {
                     return;
                 }
                 this.guestLinks = data.links || {};
+                this.guestNeedsSetup = data.needs_setup || [];
             } catch (error) {
                 this.showMessage('Error loading guest links: ' + error.message, 'error');
             }
@@ -1117,6 +1119,7 @@ window.campaignsPage = function () {
             this.pendingSessionAction = '';
             this.sessionResponseCache = {};
             this.guestLinks = {};
+            this.guestNeedsSetup = [];
             this.generateCalendarDays();
             if (this.isCurrentUserDM) {
                 this.loadGuestLinks();
