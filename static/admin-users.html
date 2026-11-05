@@ -6,7 +6,7 @@
     <title>Admin Users - Waystone</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=54">
+    <link rel="stylesheet" href="/static/styles.css?v=55">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
     <style>
@@ -88,16 +88,17 @@
             </form>
         </section>
 
-        <!-- Temporary password banner -->
-        <div x-cloak x-show="tempPassword" class="card" style="margin-bottom: 1rem; border-color: var(--ink);">
+        <!-- Invite link banner -->
+        <div x-cloak x-show="invite" class="card" style="margin-bottom: 1rem; border-color: var(--ink);">
             <p class="form-hint" style="margin-bottom: 0.625rem;">
-                Temporary password for <strong x-text="tempPassword && tempPassword.username"></strong>.
-                Give this to the user; they must change it at first login. It will not be shown again.
+                Invite link for <strong x-text="invite && invite.username"></strong>.
+                Send it to the user; they choose their own password with it.
+                Valid for 7 days. Shown once: it can't be retrieved later.
             </p>
             <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                <code x-text="tempPassword && tempPassword.password" style="font-size: 1.125rem; letter-spacing: 0.0625rem; user-select: all;"></code>
-                <button @click="copyTempPassword()" class="action-btn">copy</button>
-                <button @click="tempPassword = null" class="action-btn">dismiss</button>
+                <code x-text="invite && invite.url" style="user-select: all; word-break: break-all;"></code>
+                <button @click="copyInvite()" class="action-btn">copy</button>
+                <button @click="invite = null" class="action-btn">dismiss</button>
             </div>
         </div>
 
@@ -139,7 +140,7 @@
                             </td>
                             <td>
                                 <div style="display: flex; gap: 0.375rem; flex-wrap: wrap;">
-                                    <button x-show="!user.is_env_admin" @click="confirmAction('reset password', 'reset password for ' + user.username + '? their current password will stop working.', () => resetPassword(user))" class="action-btn">reset password</button>
+                                    <button x-show="!user.is_env_admin" @click="confirmAction(user.must_change_password ? 'new invite' : 'reset password', (user.must_change_password ? 'create a new invite for ' : 'reset password for ') + user.username + '? their current password stops working and a new invite link is created.', () => resetPassword(user))" class="action-btn" x-text="user.must_change_password ? 'new invite' : 'reset password'"></button>
                                     <button x-show="!user.blocked && !user.is_env_admin" @click="confirmAction('block user', 'block ' + user.username + '?', () => blockUser(user.id))" class="action-btn danger">block</button>
                                     <button x-show="user.blocked" @click="unblockUser(user.id)" class="action-btn">unblock</button>
                                     <button x-show="!user.roles || !user.roles.includes('admin')" @click="confirmAction('make admin', 'promote ' + user.username + ' to admin?', () => makeAdmin(user.id))" class="action-btn">make admin</button>
@@ -197,11 +198,11 @@
             </table>
         </section>
 
-        <!-- Game players & guest links -->
+        <!-- Game players -->
         <section class="card" style="margin-top: 1rem; overflow-x: auto;">
             <h2 class="section-header">Game Players</h2>
             <div style="margin-bottom: 1rem;">
-                <select x-model="selectedCampaignId" @change="loadGuestLinks()">
+                <select x-model="selectedCampaignId" @change="newPlayerId = ''">
                     <option value="">select a game...</option>
                     <template x-for="c in campaigns" :key="c.id">
                         <option :value="c.id" x-text="c.title"></option>
@@ -222,8 +223,6 @@
                     <thead>
                         <tr>
                             <th>Player</th>
-                            <th>Guest link</th>
-                            <th>Expires</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -232,35 +231,14 @@
                             <tr>
                                 <td x-text="p.display_name"></td>
                                 <td>
-                                    <code x-show="guestNeedsSetup.includes(p.id) && guestLinks[p.id]" x-text="guestUrl(p.id)" style="user-select: all; word-break: break-all;"></code>
-                                    <span x-show="guestNeedsSetup.includes(p.id) && !guestLinks[p.id]" class="admin-tag admin-tag--muted">—</span>
-                                    <span x-show="!guestNeedsSetup.includes(p.id)" class="admin-tag admin-tag--muted">no link needed</span>
-                                </td>
-                                <td>
-                                    <span x-show="guestNeedsSetup.includes(p.id) && guestLinks[p.id]" x-text="formatExpiry(guestLinks[p.id])"></span>
-                                    <span x-show="guestNeedsSetup.includes(p.id) && guestLinks[p.id] && isExpired(guestLinks[p.id])" class="admin-tag admin-tag--danger">expired</span>
-                                    <span x-show="guestNeedsSetup.includes(p.id) && !guestLinks[p.id]" class="admin-tag admin-tag--muted">—</span>
-                                </td>
-                                <td>
                                     <div style="display: flex; gap: 0.375rem; flex-wrap: wrap;">
-                                        <select x-show="guestNeedsSetup.includes(p.id)" x-model.number="ttlHours" style="width: auto; margin: 0;">
-                                            <option value="1">1 hour</option>
-                                            <option value="24">1 day</option>
-                                            <option value="72">3 days</option>
-                                            <option value="168">1 week</option>
-                                            <option value="336">2 weeks</option>
-                                            <option value="720">30 days</option>
-                                        </select>
-                                        <button x-show="guestNeedsSetup.includes(p.id)" @click="createGuestLink(p.id)" :disabled="loading" class="action-btn" x-text="guestLinks[p.id] ? 'regenerate' : 'generate link'"></button>
-                                        <button x-show="guestNeedsSetup.includes(p.id) && guestLinks[p.id]" @click="copyGuestLink(p.id)" class="action-btn">copy link</button>
-                                        <button x-show="guestNeedsSetup.includes(p.id) && guestLinks[p.id]" @click="confirmAction('revoke link', 'revoke the guest link for ' + p.display_name + '?', () => revokeGuestLink(p.id))" class="action-btn danger">revoke</button>
-                                        <button @click="confirmAction('remove player', 'remove ' + p.display_name + ' from this game? this also revokes their guest link.', () => removePlayer(p.id))" class="action-btn danger">remove</button>
+                                        <button @click="confirmAction('remove player', 'remove ' + p.display_name + ' from this game?', () => removePlayer(p.id))" class="action-btn danger">remove</button>
                                     </div>
                                 </td>
                             </tr>
                         </template>
                         <tr x-show="!selectedCampaign || selectedCampaign.player_users.length === 0">
-                            <td colspan="4" class="admin-empty">no players</td>
+                            <td colspan="2" class="admin-empty">no players</td>
                         </tr>
                     </tbody>
                 </table>
@@ -281,6 +259,6 @@
     </main>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="/admin-users.js?v=5"></script>
+    <script src="/admin-users.js?v=6"></script>
 </body>
 </html>

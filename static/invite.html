@@ -7,7 +7,7 @@
     <title>Set your password — Waystone</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=4"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=54">
+    <link rel="stylesheet" href="/static/styles.css?v=55">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
     <style>
         [x-cloak] { display: none !important; }
@@ -16,7 +16,7 @@
         .password-rules li.ok { color: var(--verdigris); }
     </style>
 </head>
-<body x-data="guestPage()" x-cloak>
+<body x-data="invitePage()" x-cloak>
     <main class="container container--narrow" style="max-width: 40rem;">
         <div x-show="messageVisible" x-text="messageText"
             :class="messageType === 'error' ? 'message error' : 'message success'"
@@ -25,14 +25,14 @@
         <template x-if="state === 'invalid'">
             <div>
                 <h1 class="page-title">Link not valid</h1>
-                <p class="form-hint">This link is no longer valid. If you've already set your password, log in with it. Otherwise ask your DM for a new link.</p>
+                <p class="form-hint">This invite is no longer valid. If you've already set your password, log in with it. Otherwise ask the admin for a new invite.</p>
                 <p class="form-hint"><a href="/login.html">Go to login</a></p>
             </div>
         </template>
         <template x-if="state === 'expired'">
             <div>
-                <h1 class="page-title">Link expired</h1>
-                <p class="form-hint">This link has expired. Ask your DM to generate a new one for you.</p>
+                <h1 class="page-title">Invite expired</h1>
+                <p class="form-hint">This invite has expired. Ask the admin for a new one.</p>
             </div>
         </template>
 
@@ -46,7 +46,7 @@
         <template x-if="state === 'ready'">
             <div>
                 <h1 class="page-title"><span class="drop-cap">S</span>et your password</h1>
-                <p class="form-hint" x-text="'Welcome, ' + displayName + '. Choose a password to reach the calendar for ' + campaignTitle + '.'"></p>
+                <p class="form-hint" x-text="'Welcome, ' + displayName + '. Choose a password to finish setting up your account.'"></p>
                 <p class="form-hint" style="margin-bottom: 1.5rem;" x-text="'Your username is ' + username + '. You\'ll use it with this password to log in from now on.'"></p>
                 <form @submit.prevent="submit()">
                     <input type="text" :value="username" autocomplete="username" readonly tabindex="-1" aria-hidden="true"
@@ -71,6 +71,6 @@
     </main>
 
     <script src="/change-password.js?v=4"></script>
-    <script src="/static/guest.js?v=3"></script>
+    <script src="/static/invite.js?v=1"></script>
 </body>
 </html>
