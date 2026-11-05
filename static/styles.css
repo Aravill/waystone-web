@@ -1783,6 +1783,54 @@ select option {
     border-color: var(--muted);
 }
 
+.calendar-paste-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--rubric);
+}
+
+.paste-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    align-items: baseline;
+}
+
+.paste-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--muted);
+}
+
+.paste-meta {
+    color: var(--muted);
+}
+
+.paste-note {
+    margin: 0;
+    font-size: 14px;
+    color: var(--muted);
+}
+
+.paste-note.error { color: var(--rubric); }
+
+.paste-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.paste-esc-hint { margin-left: 0.5em; }
+
 .calendar-message {
     margin: 0 0 0 auto;
     padding: 0.375rem 0.625rem;
@@ -1850,6 +1898,30 @@ select option {
 
 .calendar-day.is-selected,
 .calendar-day.is-selected:hover {
+    background: var(--folio);
+    outline: 2px solid var(--rubric);
+    outline-offset: -0.125rem;
+}
+
+.calendar-day.is-paste-target { cursor: copy; }
+.calendar-day.is-paste-blocked { cursor: not-allowed; }
+.calendar-day.is-paste-blocked:hover { background: var(--bg); }
+
+.calendar-day.is-paste-target::after,
+.calendar-day.is-paste-selected::after {
+    position: absolute;
+    top: 3cqw;
+    right: 4cqw;
+    color: var(--rubric);
+    font-size: clamp(0.8125rem, 12cqw, 1.125rem);
+    line-height: 1;
+}
+
+.calendar-day.is-paste-target::after { content: '+'; }
+.calendar-day.is-paste-selected::after { content: '✓'; }
+
+.calendar-day.is-paste-selected,
+.calendar-day.is-paste-selected:hover {
     background: var(--folio);
     outline: 2px solid var(--rubric);
     outline-offset: -0.125rem;
@@ -2878,4 +2950,6 @@ select option {
         flex-wrap: wrap;
         gap: 0.625rem;
     }
+
+    .paste-esc-hint { display: none; }
 }

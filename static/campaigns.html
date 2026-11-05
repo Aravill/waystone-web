@@ -6,7 +6,7 @@
     <title>Waystone - Games</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=5"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=56">
+    <link rel="stylesheet" href="/static/styles.css?v=57">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -119,7 +119,7 @@
     </div>
 
     <!-- Calendar Modal -->
-    <div id="calendarModal" class="modal" :class="{ 'modal-open': calendarModalOpen }" @click="handleCalendarBackdropClick($event)">
+    <div id="calendarModal" class="modal" :class="{ 'modal-open': calendarModalOpen }" @click="handleCalendarBackdropClick($event)" @keydown.escape.window="sessionClipboard && !showCreateSessionModal && !pasteSubmitting && clearClipboard()">
         <div class="modal-content calendar-modal-content">
             <div class="modal-header">
                 <div class="modal-title-block">
@@ -132,7 +132,7 @@
                 </div>
             </div>
             <div class="calendar-layout">
-                <div class="calendar-main">
+                <div class="calendar-main" x-ref="calendarMain">
                     <!-- Month Navigation -->
                     <div class="calendar-nav">
                         <button type="button" class="nav-btn" @click="previousMonth()" aria-label="Previous month">&lsaquo;</button>
@@ -165,6 +165,9 @@
                                      'has-session': hasSession(day),
                                      'is-selected': isSelectedDay(day),
                                      'is-today': isToday(day),
+                                     'is-paste-target': sessionClipboard && isCurrentMonth(day) && !pasteSelection[formatDateLocal(day)] && !getPasteBlockReason(day),
+                                     'is-paste-blocked': sessionClipboard && isCurrentMonth(day) && !pasteSelection[formatDateLocal(day)] && getPasteBlockReason(day),
+                                     'is-paste-selected': sessionClipboard && isCurrentMonth(day) && pasteSelection[formatDateLocal(day)],
                                      'day-suggested': getDayStatusClass(day) === 'day-suggested',
                                      'day-confirmed': getDayStatusClass(day) === 'day-confirmed',
                                      'day-cancelled': getDayStatusClass(day) === 'day-cancelled'
@@ -173,9 +176,9 @@
                                  :aria-label="getDayAriaLabel(day)"
                                  role="button"
                                  tabindex="0"
-                                 @click="selectDay(day)"
-                                 @keydown.enter.prevent="selectDay(day)"
-                                 @keydown.space.prevent="selectDay(day)">
+                                 @click="handleDayActivate(day)"
+                                 @keydown.enter.prevent="handleDayActivate(day)"
+                                 @keydown.space.prevent="handleDayActivate(day)">
                                 <div class="day-number" x-show="!hasSession(day)" x-text="day.getDate()"></div>
                                 <template x-for="s in getCellSessions(day)" :key="s.id">
                                     <div class="day-frame" :class="`frame-${s.status}${isStrongCandidate(s) ? ' is-candidate' : ''}`">
@@ -202,7 +205,7 @@
                             </div>
                         </template>
                     </div>
-                    <div class="calendar-reply-key">
+                    <div class="calendar-reply-key" x-show="!sessionClipboard">
                         <span class="reply-accepted" x-html="replyGlyph('accepted') + ' aye'"></span>
                         <span class="reply-tentative">? perhaps</span>
                         <span class="reply-declined" x-html="replyGlyph('declined') + ' nay'"></span>
@@ -213,6 +216,18 @@
 
                 <!-- Day / agenda panel -->
                 <aside class="calendar-panel" x-ref="dayPanel">
+                    <div class="calendar-paste-bar" x-show="sessionClipboard">
+                        <div class="paste-summary">
+                            <span class="paste-label">Copied</span>
+                            <span x-text="sessionClipboard ? getSessionTimeRange(sessionClipboard) : ''"></span>
+                            <span class="paste-meta" x-text="sessionClipboard ? getSessionMeta(sessionClipboard) : ''"></span>
+                        </div>
+                        <p class="paste-note" :class="pasteNote.type" role="status" x-text="pasteNote.text || (pasteCount ? pasteCount + (pasteCount === 1 ? ' day' : ' days') + ' selected' : 'Choose the days to paste it on.')"></p>
+                        <div class="paste-actions">
+                            <button type="button" class="btn-action" x-ref="pasteCancel" :disabled="pasteSubmitting" @click="clearClipboard()">Cancel<span class="paste-esc-hint">(Esc)</span></button>
+                            <button type="button" class="btn-create" :disabled="!pasteCount || pasteSubmitting" @click="submitPaste()" x-text="pasteSubmitting ? 'Pasting…' : (pasteCount ? 'Paste to ' + pasteCount + (pasteCount === 1 ? ' day' : ' days') : 'Paste')"></button>
+                        </div>
+                    </div>
                     <template x-if="selectedDay">
                         <div>
                             <p class="modal-eyebrow">Selected day</p>
@@ -259,6 +274,7 @@
                                                     @click="requestSessionStatusChange('Confirmed', s)">Confirm</button>
                                             <button type="button" class="btn-action btn-action-cancel"
                                                     @click="requestSessionStatusChange('Cancelled', s)">Cancel</button>
+                                            <button type="button" class="btn-action" @click="copySession(s)">Copy</button>
                                         </div>
                                         <p class="session-status-warning" x-show="selectedSession && selectedSession.id === s.id && pendingSessionAction" x-text="getSessionStatusWarning()"></p>
                                     </div>
@@ -280,7 +296,7 @@
                                     <span class="agenda-status" x-text="s.status"></span>
                                 </button>
                             </template>
-                            <p class="panel-empty" x-show="isCurrentUserDM">Select a day to suggest a session.</p>
+                            <p class="panel-empty" x-show="isCurrentUserDM && !sessionClipboard">Select a day to suggest a session.</p>
 
                         </div>
                     </template>
@@ -492,6 +508,6 @@
     </div>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="campaigns.js?v=49"></script>
+    <script src="campaigns.js?v=50"></script>
 </body>
 </html>
