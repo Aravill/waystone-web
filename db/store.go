@@ -30,6 +30,7 @@ type Store interface {
 	AnonymizeUser(id string) error
 	SetUserBlocked(id string, blocked bool) error
 	SetUserPassword(id, hash string, mustChange bool) error
+	SetInitialPassword(id, hash string) (bool, error)
 	GetSessionsByMonth(campaignID string, year int, month int) ([]models.CampaignSession, error)
 	GetSessionByID(sessionID string) (*models.CampaignSession, error)
 	SaveSession(session models.CampaignSession) error

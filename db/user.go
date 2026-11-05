@@ -120,6 +120,12 @@ func SetUserBlocked(id string, blocked bool) error {
 	return GetStore().SetUserBlocked(id, blocked)
 }
 
+// SetInitialPassword sets the first password (guest setup link) and deletes the user's guest links.
+// It returns false if the user had already set a password.
+func SetInitialPassword(id, hash string) (bool, error) {
+	return GetStore().SetInitialPassword(id, hash)
+}
+
 // SetUserPassword stores a new password hash and the must-change flag, revoking all sessions
 func SetUserPassword(id, hash string, mustChange bool) error {
 	return GetStore().SetUserPassword(id, hash, mustChange)

@@ -844,12 +844,58 @@ func (s *SQLiteStore) SetUserPassword(id, hash string, mustChange bool) error {
 		mustChangeInt = 1
 	}
 
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	// Bumping session_version revokes every existing session cookie for the user.
-	_, err := s.db.Exec(
+	if _, err := tx.Exec(
 		`UPDATE users SET password_hash=?, must_change_password=?, session_version=session_version+1, updated_at=? WHERE id=?`,
 		hash, mustChangeInt, time.Now().UTC().Format(time.RFC3339), id,
+	); err != nil {
+		return err
+	}
+	// A set password makes setup links pointless; an admin reset keeps them.
+	if !mustChange {
+		if _, err := tx.Exec(`DELETE FROM guest_tokens WHERE user_id = ?`, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// SetInitialPassword sets the first password for a user who still must change it and
+// deletes their guest links. It returns false if the user had already set one.
+func (s *SQLiteStore) SetInitialPassword(id, hash string) (bool, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec(
+		`UPDATE users SET password_hash=?, must_change_password=0, session_version=session_version+1, updated_at=? WHERE id=? AND must_change_password=1`,
+		hash, time.Now().UTC().Format(time.RFC3339), id,
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if n == 0 {
+		return false, nil
+	}
+	if _, err := tx.Exec(`DELETE FROM guest_tokens WHERE user_id = ?`, id); err != nil {
+		return false, err
+	}
+	return true, tx.Commit()
 }
 
 func parseTime(timeStr string) (time.Time, error) {
