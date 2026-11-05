@@ -229,7 +229,7 @@ The application uses **local username/password accounts**. There is no self-regi
 2. **Creating users** - On the Admin page an admin enters a username (2-32 characters: `a-z`, `0-9`, `_`, `-`; stored lowercase) and an optional name. The server creates a one-time invite link (valid 7 days, only its SHA-256 hash is stored) and shows it once; the user opens it and chooses their own password.
 3. **First login** - Users who still hold a legacy temporary password are redirected to `/change-password` and cannot use the rest of the app (API calls return `403 password change required`) until they pick a new password (at least 10 characters and at most 72 bytes, with an uppercase letter, a lowercase letter and a digit, not containing the username).
 4. **Reset** - An admin can reset any other user's password from the Admin page. This clears the current password at once and creates a new invite link, replacing any earlier one.
-5. **Sessions** - The session cookie stores only the user ID (HttpOnly, SameSite=Lax, 30 days). Roles, blocked state and the forced-change flag are read from the database on every request.
+5. **Sessions** - The session cookie stores only the user ID (HttpOnly, SameSite=Lax). It lasts 30 days and is renewed on page loads, at most once a day, so only 30 days of inactivity log a user out. Roles, blocked state and the forced-change flag are read from the database on every request.
 
 ### Auth Endpoints
 

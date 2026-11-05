@@ -87,6 +87,19 @@ test('the admin page shows the invite link once a user is added', async ({ page,
   await expect(page.getByText(`Your username is ${username}.`)).toBeVisible();
 });
 
+test('a return address beats pending profile setup at login', async ({ page, invites }) => {
+  const user = await invites.newUser();
+  const api = await anonymous();
+  expect((await api.post(`/api/invite/${user.token}/password`, { data: { new_password: PASSWORD } })).ok()).toBeTruthy();
+  await api.dispose();
+
+  await page.goto('/campaigns');
+  await page.getByLabel('Username').fill(user.username);
+  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await expect(page).toHaveURL(/\/campaigns/);
+});
+
 test('a used invite is dead and points to login', async ({ page, invites }) => {
   const user = await invites.newUser();
   const api = await anonymous();
