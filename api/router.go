@@ -37,9 +37,9 @@ func RegisterRoutes() {
 	// Public calendar feed (authenticated by the unguessable token in the URL)
 	http.HandleFunc("/calendar/", HandleCalendarFeed)
 
-	// Public guest links (authenticated by the unguessable token in the URL)
-	http.HandleFunc("/r/", HandleGuestPage)
-	http.HandleFunc("/api/guest/", HandleGuestAPI)
+	// Public invite links (authenticated by the unguessable token in the URL)
+	http.HandleFunc("/invite/", HandleInvitePage)
+	http.HandleFunc("/api/invite/", HandleInviteAPI)
 
 	// Protected API endpoints (wrapped with auth middleware)
 	http.Handle("/api/campaigns", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaigns)))
@@ -147,10 +147,6 @@ func HandleCampaignRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(parts) == 2 && parts[1] == "signups-open" {
 		HandleCampaignSignupsOpen(w, r)
-		return
-	}
-	if len(parts) == 2 && parts[1] == "guest-links" || len(parts) == 4 && parts[1] == "players" && parts[3] == "guest-link" {
-		HandleCampaignGuestLinks(w, r)
 		return
 	}
 	if len(parts) == 3 && parts[1] == "players" {

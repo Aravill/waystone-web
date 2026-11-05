@@ -30,7 +30,6 @@ type Store interface {
 	AnonymizeUser(id string) error
 	SetUserBlocked(id string, blocked bool) error
 	SetUserPassword(id, hash string, mustChange bool) error
-	SetInitialPassword(id, hash string) (bool, error)
 	GetSessionsByMonth(campaignID string, year int, month int) ([]models.CampaignSession, error)
 	GetSessionByID(sessionID string) (*models.CampaignSession, error)
 	SaveSession(session models.CampaignSession) error
@@ -39,10 +38,9 @@ type Store interface {
 	GetCalendarToken(userID string) (string, error)
 	SetCalendarToken(userID, token string) error
 	GetUserIDByCalendarToken(token string) (string, error)
-	GetGuestTokens(campaignID string) (map[string]models.GuestToken, error)
-	SetGuestToken(campaignID, userID, token string, expiresAt time.Time) error
-	DeleteGuestToken(campaignID, userID string) error
-	GetGuestToken(token string) (campaignID, userID string, expiresAt time.Time, err error)
+	IssuePasswordInvite(userID, tokenHash string, expiresAt time.Time) error
+	GetPasswordInvite(tokenHash string) (userID string, expiresAt time.Time, err error)
+	RedeemPasswordInvite(tokenHash, passwordHash string) (userID string, err error)
 	UpsertSessionResponse(response models.SessionResponse) error
 	GetSessionResponses(sessionID string) ([]models.SessionResponse, error)
 	GetSessionResponsesBySessionIDs(sessionIDs []string) (map[string][]models.SessionResponse, error)
