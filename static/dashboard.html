@@ -107,7 +107,6 @@
                                 <span class="ledger-date" x-text="shortDate(s)"></span>
                                 <span class="ledger-time" x-text="timeRange(s)"></span>
                                 <a class="ledger-game" :href="gameUrl(s)" x-text="s.campaign.title"></a>
-                                <span class="ledger-tag"><span class="panel-status-tag" :class="`chip-${s.status}`" x-text="statusLabel(s)"></span></span>
                                 <span class="ledger-mine" :class="mineClass(s)" x-html="mineHtml(s)"></span>
                             </div>
                         </template>
