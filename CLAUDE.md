@@ -16,7 +16,7 @@ Waystone Web: Go (stdlib `net/http`, SQLite via `modernc.org/sqlite`, local user
 
 ## Architecture gotchas
 
-- Routes are registered in `api/router.go` (not `main.go`, despite the README). `/` is auth-wrapped and serves `dashboard.html`, so every root-level JS/CSS file a page loads must get its own `http.HandleFunc` entry there, or be referenced under `/static/...`.
+- Routes are registered in `api/router.go` (not `main.go`, despite the README). `/` is auth-wrapped and serves `dashboard.html` (Home, fed by `GET /api/agenda` in `api/agenda.go`), so every root-level JS/CSS file a page loads must get its own `http.HandleFunc` entry there, or be referenced under `/static/...`. Home also loads `/campaigns.js` for the shared helpers (`replyWord`, `zoneAbbr`, `formatShortDate`, `userAvatarHtml`).
 - App version is baked in at build via ldflags (`config.Version`, `APP_VERSION` build arg). The Deploy workflow computes it from the PR-title prefix (`feat/` bumps minor, else patch) and tags after a successful deploy, so keep the `feat/` prefix accurate.
 - DB access goes through the `Store` interface in `db/store.go`: add the method to the interface, implement it on the SQLite store, and expose a package-level wrapper in `db/` that calls `GetStore()`.
 - Protect routes with `middleware.AuthMiddleware`; use `middleware.GetSession()` / `ClearSession()` for session state.
@@ -30,12 +30,14 @@ Waystone Web: Go (stdlib `net/http`, SQLite via `modernc.org/sqlite`, local user
 - Journal entries key on the session id (`journal_entries.session_id`), never on a session number: numbers are positional (`campaignSessionSummaries`, computed per request) and shift when a session is recorded, deleted, re-dated or cancelled, so never store one (not in a revision, notification or seed). Entries exist only for played sessions (Confirmed and ended, or by hand): `journalSession` in `api/journal.go` is the one check. Foreign keys are off, so the cascades are by hand: `DeleteCampaign` and `DeleteManualSession` delete contributors, revisions, then entries via `deleteJournalForSessions`. Saves are optimistic (`entry_id` + `base_revision`, 409 on a stale base) and the newest 200 revisions per entry are kept; credit lives in `journal_entries.author_id` and `journal_contributors`, so it survives pruning. A cancelled session's entry stays readable and deletable (`journal_cancelled` on the game API) but not editable.
 - Sessions with `manual=1` (the DM's "Record a past session") are chronicle-only: excluded from the month view and ICS, no replies or notifications, and may have `time=''` so `sessionStart` fails; check `Manual` before calling it.
 - The Calendar button focuses the first unanswered session's month, so tests use `openCalendar`/`goToMonth` helpers, not `page.clock`.
+- `api.StartSessionStartNotifier(ctx)` (started from `main.go`) runs every minute and sends one `session_started` notification per Confirmed session to its players and followers (never the DM) once it begins. The `notifications` table is the dedupe, so there is no schema or env var for it.
+- Log out and Profile live in the header's user menu (`<details class="user-menu">`), not the nav; every page with a nav must include it and call its own logout handler (`admin-users` uses `logout()`). `.message` is a fixed toast, so pages show it with `x-show` and `role="status"`.
 
 ## Conventions
 
 - Go: handlers named `HandleXxx`; always set `Content-Type: application/json` and an explicit status; decode bodies with `json.NewDecoder(r.Body).Decode(&v)`; guard methods with `r.Method` checks.
 - JS: `fetch()` only; wrap calls in try/catch and report via `showMessage(text, 'error')`; use `textContent` (or `escapeHtml()`) for user-generated content; init on `DOMContentLoaded`.
-- Styling follows `STYLE_GUIDE.md` ("Scriptorium": parchment/candlelight themes via CSS tokens, Courier Prime + IM Fell, rubric-red accent; mock-ups in `docs/design/mockups/`). Read it before UI work. Bump the `?v=N` cache-busting query on CSS links when changing CSS.
+- Styling follows `STYLE_GUIDE.md` ("Scriptorium": parchment/candlelight themes via CSS tokens, IBM Plex Mono + IM Fell, rubric-red accent that means "you"; mock-ups in `docs/design/mockups/`). Read it before UI work. Bump the `?v=N` cache-busting query on CSS links when changing CSS.
 - Keep the app lightweight and minimal: surgical changes, reuse existing helpers before adding abstractions, no broad refactors unless asked.
 
 ## Git

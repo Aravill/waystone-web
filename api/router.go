@@ -46,6 +46,7 @@ func RegisterRoutes() {
 	http.Handle("/api/campaigns", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaigns)))
 	http.Handle("/api/campaigns/", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaignRoutes)))
 	http.Handle("/api/version", middleware.AuthMiddleware(http.HandlerFunc(HandleVersion)))
+	http.Handle("/api/agenda", middleware.AuthMiddleware(http.HandlerFunc(HandleAgenda)))
 	http.Handle("/api/systems", middleware.AuthMiddleware(http.HandlerFunc(HandleSystems)))
 	http.Handle("/api/profile/avatar", middleware.AuthMiddleware(http.HandlerFunc(HandleProfileAvatar)))
 	http.Handle("/api/users/", middleware.AuthMiddleware(http.HandlerFunc(HandleUserRoutes)))

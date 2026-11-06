@@ -20,6 +20,7 @@ window.changePasswordPage = function() {
         userLoaded: false,
         isAdmin: false,
         username: '',
+        displayName: '',
         needsProfileSetup: false,
         currentPassword: '',
         newPassword: '',
@@ -39,6 +40,7 @@ window.changePasswordPage = function() {
                 const user = await response.json();
                 this.needsProfileSetup = !!user.needs_profile_setup;
                 this.username = user.username || '';
+                this.displayName = user.display_name || user.username || '';
                 if (user.is_env_admin) {
                     window.location.href = '/';
                     return;

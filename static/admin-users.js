@@ -61,7 +61,7 @@ window.adminUsersPage = function () {
                 if (!res.ok) throw new Error('failed');
                 this.users = await res.json();
             } catch {
-                this.showMessage('failed to load users', 'error');
+                this.showMessage('Failed to load users', 'error');
             } finally {
                 this.loading = false;
             }
@@ -78,36 +78,36 @@ window.adminUsersPage = function () {
                 });
                 const data = await res.json();
                 if (!res.ok) {
-                    this.showMessage(data.error || 'failed to add user', 'error');
+                    this.showMessage(data.error || 'Failed to add user', 'error');
                     await this.loadUsers(); // the user may exist even though the invite failed
                     return;
                 }
                 this.newUsername = '';
                 this.newName = '';
                 this.invite = { username: data.user.username, url: `${window.location.origin}/invite/${data.invite_token}` };
-                this.showMessage('user added', 'success');
+                this.showMessage('User added', 'success');
                 await this.loadUsers();
             } catch {
-                this.showMessage('failed to add user', 'error');
+                this.showMessage('Failed to add user', 'error');
             } finally {
                 this.loading = false;
             }
         },
 
         async blockUser(id) {
-            await this._postAction(id, 'block', 'user blocked', 'failed to block user');
+            await this._postAction(id, 'block', 'User blocked', 'Failed to block user');
         },
 
         async unblockUser(id) {
-            await this._postAction(id, 'unblock', 'user unblocked', 'failed to unblock user');
+            await this._postAction(id, 'unblock', 'User unblocked', 'Failed to unblock user');
         },
 
         async makeAdmin(id) {
-            await this._postAction(id, 'make-admin', 'user promoted to admin', 'failed to promote user');
+            await this._postAction(id, 'make-admin', 'User promoted to admin', 'Failed to promote user');
         },
 
         async removeAdmin(id) {
-            await this._postAction(id, 'remove-admin', 'admin role removed', 'failed to remove admin role');
+            await this._postAction(id, 'remove-admin', 'Admin role removed', 'Failed to remove admin role');
         },
 
         async resetPassword(user) {
@@ -115,12 +115,12 @@ window.adminUsersPage = function () {
             try {
                 const res = await fetch(`/api/admin/users/${user.id}/reset-password`, { method: 'POST' });
                 const data = await res.json();
-                if (!res.ok) { this.showMessage(data.error || 'failed to reset password', 'error'); return; }
+                if (!res.ok) { this.showMessage(data.error || 'Failed to reset password', 'error'); return; }
                 this.invite = { username: user.username, url: `${window.location.origin}/invite/${data.invite_token}` };
-                this.showMessage('invite created', 'success');
+                this.showMessage('Invite created', 'success');
                 await this.loadUsers();
             } catch {
-                this.showMessage('failed to reset password', 'error');
+                this.showMessage('Failed to reset password', 'error');
             } finally {
                 this.loading = false;
             }
@@ -129,9 +129,9 @@ window.adminUsersPage = function () {
         async copyInvite() {
             try {
                 await navigator.clipboard.writeText(this.invite.url);
-                this.showMessage('invite link copied', 'success');
+                this.showMessage('Invite link copied', 'success');
             } catch {
-                this.showMessage('copy failed - select and copy it manually', 'error');
+                this.showMessage('Copy failed - select and copy it manually', 'error');
             }
         },
 
@@ -140,11 +140,11 @@ window.adminUsersPage = function () {
             try {
                 const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
                 const data = await res.json();
-                if (!res.ok) { this.showMessage(data.error || 'failed to remove user', 'error'); return; }
-                this.showMessage('user removed', 'success');
+                if (!res.ok) { this.showMessage(data.error || 'Failed to remove user', 'error'); return; }
+                this.showMessage('User removed', 'success');
                 await this.loadUsers();
             } catch {
-                this.showMessage('failed to remove user', 'error');
+                this.showMessage('Failed to remove user', 'error');
             } finally {
                 this.loading = false;
             }
@@ -156,15 +156,15 @@ window.adminUsersPage = function () {
                 if (!res.ok) throw new Error('failed');
                 this.systems = await res.json();
             } catch {
-                this.showMessage('failed to load systems', 'error');
+                this.showMessage('Failed to load systems', 'error');
             }
         },
 
         async _sendLogo(id, file) {
-            if (file.size > 256 * 1024) { this.showMessage('logo must be 256 KB or smaller', 'error'); return false; }
+            if (file.size > 256 * 1024) { this.showMessage('Logo must be 256 KB or smaller', 'error'); return false; }
             const res = await fetch(`/api/admin/systems/${id}/logo`, { method: 'PUT', body: file });
             const data = await res.json();
-            if (!res.ok) { this.showMessage(data.error || 'failed to upload logo', 'error'); return false; }
+            if (!res.ok) { this.showMessage(data.error || 'Failed to upload logo', 'error'); return false; }
             return true;
         },
 
@@ -173,7 +173,7 @@ window.adminUsersPage = function () {
             if (!name) return;
             const input = this.$refs.newSystemLogo;
             const file = input.files[0];
-            if (file && file.size > 256 * 1024) { this.showMessage('logo must be 256 KB or smaller', 'error'); return; }
+            if (file && file.size > 256 * 1024) { this.showMessage('Logo must be 256 KB or smaller', 'error'); return; }
             this.loading = true;
             try {
                 const res = await fetch('/api/admin/systems', {
@@ -182,17 +182,17 @@ window.adminUsersPage = function () {
                     body: JSON.stringify({ name }),
                 });
                 const data = await res.json();
-                if (!res.ok) { this.showMessage(data.error || 'failed to add system', 'error'); return; }
+                if (!res.ok) { this.showMessage(data.error || 'Failed to add system', 'error'); return; }
                 this.newSystemName = '';
                 input.value = '';
                 if (file && !(await this._sendLogo(data.id, file))) {
                     await this.loadSystems();
                     return;
                 }
-                this.showMessage('system added', 'success');
+                this.showMessage('System added', 'success');
                 await this.loadSystems();
             } catch {
-                this.showMessage('failed to add system', 'error');
+                this.showMessage('Failed to add system', 'error');
             } finally {
                 this.loading = false;
             }
@@ -209,11 +209,11 @@ window.adminUsersPage = function () {
                     body: JSON.stringify({ name }),
                 });
                 const data = await res.json();
-                if (!res.ok) { this.showMessage(data.error || 'failed to rename system', 'error'); return; }
-                this.showMessage('system renamed', 'success');
+                if (!res.ok) { this.showMessage(data.error || 'Failed to rename system', 'error'); return; }
+                this.showMessage('System renamed', 'success');
                 await this.loadSystems();
             } catch {
-                this.showMessage('failed to rename system', 'error');
+                this.showMessage('Failed to rename system', 'error');
             } finally {
                 this.loading = false;
             }
@@ -223,10 +223,10 @@ window.adminUsersPage = function () {
             if (!file) return;
             this.loading = true;
             try {
-                if (await this._sendLogo(id, file)) this.showMessage('logo updated', 'success');
+                if (await this._sendLogo(id, file)) this.showMessage('Logo updated', 'success');
                 await this.loadSystems();
             } catch {
-                this.showMessage('failed to upload logo', 'error');
+                this.showMessage('Failed to upload logo', 'error');
             } finally {
                 this.loading = false;
             }
@@ -237,11 +237,11 @@ window.adminUsersPage = function () {
             try {
                 const res = await fetch(`/api/admin/systems/${id}/logo`, { method: 'DELETE' });
                 const data = await res.json();
-                if (!res.ok) { this.showMessage(data.error || 'failed to remove logo', 'error'); return; }
-                this.showMessage('logo removed', 'success');
+                if (!res.ok) { this.showMessage(data.error || 'Failed to remove logo', 'error'); return; }
+                this.showMessage('Logo removed', 'success');
                 await this.loadSystems();
             } catch {
-                this.showMessage('failed to remove logo', 'error');
+                this.showMessage('Failed to remove logo', 'error');
             } finally {
                 this.loading = false;
             }
@@ -252,11 +252,11 @@ window.adminUsersPage = function () {
             try {
                 const res = await fetch(`/api/admin/systems/${id}`, { method: 'DELETE' });
                 const data = await res.json();
-                if (!res.ok) { this.showMessage(data.error || 'failed to delete system', 'error'); return; }
-                this.showMessage('system deleted', 'success');
+                if (!res.ok) { this.showMessage(data.error || 'Failed to delete system', 'error'); return; }
+                this.showMessage('System deleted', 'success');
                 await this.loadSystems();
             } catch {
-                this.showMessage('failed to delete system', 'error');
+                this.showMessage('Failed to delete system', 'error');
             } finally {
                 this.loading = false;
             }
@@ -269,7 +269,7 @@ window.adminUsersPage = function () {
                 const data = await res.json();
                 this.campaigns = (Array.isArray(data) ? data : data.campaigns || []).map(c => ({ ...c, player_users: c.player_users || [], players: c.players || [] }));
             } catch {
-                this.showMessage('failed to load games', 'error');
+                this.showMessage('Failed to load games', 'error');
             }
         },
 

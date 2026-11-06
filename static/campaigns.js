@@ -336,6 +336,41 @@ const REPLY_GLYPHS = {
     awaiting: '…'
 };
 
+// Reply words, one vocabulary wherever a person reads a reply state (API values are unchanged).
+const REPLY_WORDS = { Accepted: 'Aye', Tentative: 'Perhaps', Declined: 'Nay', '': 'No reply yet' };
+function replyWord(participation) {
+    return REPLY_WORDS[participation || ''] || REPLY_WORDS[''];
+}
+
+// Zone abbreviation for a session's own timezone ("CET"): times are shown as stored, never converted.
+// An empty timezone has no label. dateStr (YYYY-MM-DD) picks the right side of a DST change.
+function zoneAbbr(timezone, dateStr) {
+    if (!timezone) return '';
+    try {
+        const at = dateStr ? new Date(dateStr + 'T12:00:00Z') : new Date();
+        const parts = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, timeZoneName: 'short' }).formatToParts(at);
+        return (parts.find((p) => p.type === 'timeZoneName') || {}).value || '';
+    } catch (error) {
+        return '';
+    }
+}
+
+// "18:00 CET", or just the time when the session has no zone.
+function timeWithZone(time, session) {
+    const zone = zoneAbbr(session?.timezone, session?.date);
+    return zone ? time + ' ' + zone : time;
+}
+
+// "18:00–22:00 CET"
+function sessionRangeWithZone(session) {
+    return timeWithZone((session?.time || '') + '–' + getSessionEndTime(session), session);
+}
+
+// "Fri, Nov 13" from a YYYY-MM-DD date.
+function formatShortDate(dateStr) {
+    return parseDateLocal(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 // Campaigns Alpine component
 window.campaignsPage = function () {
     return {
@@ -369,6 +404,25 @@ window.campaignsPage = function () {
         signupsOpen: false,
         showDeclinedSignups: false,
         confirmDialog: { open: false, title: '', message: '', confirmLabel: '', resolve: null },
+        messageAction: null,
+        _messageTimer: null,
+        otherOpen: true,
+
+        // Sections of the Games page: your games, games open to join, everything else.
+        get myGames() { return this.campaigns.filter((c) => this.isMember(c)); },
+        get openGames() { return this.campaigns.filter((c) => this.isOpenToJoin(c)); },
+        get otherGames() { return this.campaigns.filter((c) => !this.isMember(c) && !this.isOpenToJoin(c)); },
+
+        isMember(c) {
+            return (!!this.currentUserId && c?.dm === this.currentUserId)
+                || (Array.isArray(c?.players) && c.players.includes(this.currentUserId));
+        },
+
+        // Not a member, the game is live and sign-ups are open (or your own sign-up is waiting).
+        isOpenToJoin(c) {
+            if (this.isMember(c) || c?.status === 'Finished' || c?.status === 'Cancelled') return false;
+            return c?.sign_ups_open === true || c?.current_user_signup_status === 'Pending';
+        },
 
         get editingCampaign() {
             return this.campaigns.find((c) => c.id === this.editingCampaignId) || null;
@@ -437,8 +491,12 @@ window.campaignsPage = function () {
                 return;
             }
 
+            try { this.otherOpen = localStorage.getItem('waystone-other-games') !== 'closed'; } catch (e) { /* storage unavailable: stay open */ }
             await this.loadCampaigns();
             if (location.hash) {
+                // A link to a row in the collapsed section opens it (without remembering that choice).
+                const id = decodeURIComponent(location.hash.slice(1)).replace(/^campaign-/, '');
+                if (this.otherGames.some((c) => c.id === id)) this.otherOpen = true;
                 await this.$nextTick();
                 document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: 'start' });
             }
@@ -502,6 +560,11 @@ window.campaignsPage = function () {
             } catch (error) {
                 this.showMessage('Logout failed: ' + error.message, 'error');
             }
+        },
+
+        toggleOther() {
+            this.otherOpen = !this.otherOpen;
+            try { localStorage.setItem('waystone-other-games', this.otherOpen ? 'open' : 'closed'); } catch (e) { /* not persisted */ }
         },
 
         openModal() {
@@ -660,57 +723,64 @@ window.campaignsPage = function () {
         },
 
         renderCampaignHtml(campaign) {
+            const id = escapeHtml(campaign?.id || '');
             const title = campaign?.title || 'Untitled Game';
             const summary = campaign?.summary || 'No summary available.';
             const status = campaign?.status || 'Unknown';
             const signUpsOpen = campaign?.sign_ups_open === true;
             const next = campaign?.next_session;
-            const playedCount = parseInt(campaign?.played_sessions_count, 10) || 0;
-            let nextSession;
-            if (next) {
-                nextSession = `${playedCount > 0 ? `Session ${playedCount + 1}` : 'First session'} · ${this.formatAgendaDate(next)} · ${next.time}`;
-            } else {
-                nextSession = playedCount > 0
-                    ? `${playedCount} session${playedCount === 1 ? '' : 's'} played · none scheduled`
-                    : 'No session scheduled';
-            }
-            const nextTimezone = next?.timezone || '';
             const isDM = !!this.currentUserId && campaign?.dm === this.currentUserId;
             const campaignPlayers = Array.isArray(campaign?.players) ? campaign.players : [];
             const isPlayer = campaignPlayers.includes(this.currentUserId);
+            const isMember = isDM || isPlayer;
             const signupStatus = campaign?.current_user_signup_status || '';
             const unansweredCount = isPlayer ? (parseInt(campaign?.unanswered_sessions_count, 10) || 0) : 0;
             const pendingSignupsCount = isDM ? (parseInt(campaign?.pending_signups_count, 10) || 0) : 0;
             const needsAction = unansweredCount > 0 || pendingSignupsCount > 0;
             const maxPlayers = parseInt(campaign?.desired_player_count, 10) || 0;
-            const seatsLabel = `${campaignPlayers.length} / ${maxPlayers > 0 ? maxPlayers : '∞'} seats`;
-            const factsLine = `${seatsLabel} · sign-ups ${signUpsOpen ? 'open' : 'closed'}`;
+
+            // Facts: seats and sign-ups, then the next session.
+            let factsLine;
+            if (!isMember && signupStatus === 'Declined') {
+                factsLine = 'Sign-up declined';
+            } else if (!isMember && signupStatus === 'Kicked') {
+                factsLine = 'Removed from this game';
+            } else {
+                const seats = maxPlayers > 0
+                    ? `${campaignPlayers.length} of ${maxPlayers} seats taken.`
+                    : `${campaignPlayers.length} player${campaignPlayers.length === 1 ? '' : 's'}, no seat limit.`;
+                factsLine = `${seats} Sign-ups ${signUpsOpen ? 'open' : 'closed'}.`;
+            }
+            const nextSession = next
+                ? `Next: ${formatShortDate(next.date)}, ${timeWithZone(next.time, next)}`
+                : 'No session scheduled';
+            const nextTimezone = next?.timezone || '';
 
             const isFollowing = !!campaign?.is_following;
-            const followBtnHtml = (!isDM && !isPlayer && this.currentUserId)
-                ? `<button type="button" class="campaign-action-btn campaign-follow-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-following="${isFollowing}" title="${isFollowing ? 'Stop getting notifications for this game' : 'Get notified about status changes, sign-ups and sessions'}">${isFollowing ? 'Unfollow' : 'Follow'}</button>`
+            const followBtnHtml = (!isMember && this.currentUserId)
+                ? `<button type="button" class="campaign-action-btn campaign-follow-btn" data-campaign-id="${id}" data-following="${isFollowing}" title="${isFollowing ? 'Stop getting notifications for this game' : 'Get notified about status changes, sign-ups and sessions'}">${isFollowing ? 'Unfollow' : 'Follow'}</button>`
+                : '';
+            const calendarBtnHtml = isMember
+                ? `<a class="campaign-action-btn campaign-calendar-btn" href="/games/${encodeURIComponent(campaign?.id ?? '')}/calendar"${unansweredCount > 0 ? ` title="${unansweredCount} suggested session${unansweredCount === 1 ? '' : 's'} awaiting your response" aria-label="Calendar, ${unansweredCount} awaiting your response"` : ''}>Calendar${unansweredCount > 0 ? `<span class="campaign-action-count">${unansweredCount}</span>` : ''}</a>`
+                : '';
+            const editBtnHtml = campaign?.can_manage
+                ? `<button type="button" class="campaign-action-btn campaign-edit-btn" data-campaign-id="${id}">Edit</button>`
                 : '';
 
-            let signupBtnHtml;
+            // One clear action per banner (see BANNER_DESIGN_GUIDE.md, Buttons).
+            let buttonsHtml;
             if (isDM) {
-                signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-signups-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-campaign-title="${escapeHtml(campaign?.title || '')}"${pendingSignupsCount > 0 ? ` title="${pendingSignupsCount} pending sign-up${pendingSignupsCount === 1 ? '' : 's'} awaiting your decision" aria-label="Sign-ups, ${pendingSignupsCount} pending"` : ''}>Sign-ups${pendingSignupsCount > 0 ? `<span class="campaign-action-count">${pendingSignupsCount}</span>` : ''}</button>`;
+                buttonsHtml = `<button type="button" class="campaign-action-btn campaign-signups-btn${pendingSignupsCount > 0 ? ' campaign-primary-btn' : ''}" data-campaign-id="${id}" data-campaign-title="${escapeHtml(campaign?.title || '')}"${pendingSignupsCount > 0 ? ` title="${pendingSignupsCount} pending sign-up${pendingSignupsCount === 1 ? '' : 's'} awaiting your decision" aria-label="Sign-ups, ${pendingSignupsCount} pending"` : ''}>Sign-ups${pendingSignupsCount > 0 ? `<span class="campaign-action-count">${pendingSignupsCount}</span>` : ''}</button>${calendarBtnHtml}${editBtnHtml}`;
+            } else if (isPlayer) {
+                buttonsHtml = (unansweredCount > 0
+                    ? `<a class="campaign-action-btn campaign-reply-btn span-2" href="/games/${encodeURIComponent(campaign?.id ?? '')}">Reply</a>`
+                    : '') + calendarBtnHtml + editBtnHtml;
+            } else if (signupStatus === 'Pending') {
+                buttonsHtml = `<button type="button" class="campaign-action-btn campaign-withdraw-btn" data-campaign-id="${id}" data-campaign-title="${escapeHtml(campaign?.title || '')}" data-withdraw-kind="withdraw" title="Withdraw your sign-up">Withdraw</button>${followBtnHtml}${editBtnHtml}`;
+            } else if (signUpsOpen && signupStatus !== 'Declined' && signupStatus !== 'Kicked') {
+                buttonsHtml = `<button type="button" class="campaign-action-btn campaign-signup-btn span-2" data-campaign-id="${id}">Sign up</button>${followBtnHtml}${editBtnHtml}`;
             } else {
-                let label = 'Sign-up';
-                let disabled = !signUpsOpen;
-                let withdrawKind = '';
-                if (isPlayer) {
-                    label = 'Leave'; disabled = false; withdrawKind = 'leave';
-                } else if (signupStatus === 'Pending') {
-                    label = 'Withdraw'; disabled = false; withdrawKind = 'withdraw';
-                } else if (signupStatus === 'Declined') {
-                    label = 'Declined'; disabled = true;
-                } else if (signupStatus === 'Kicked') {
-                    label = 'Removed'; disabled = true;
-                }
-                if (withdrawKind) {
-                    const hint = withdrawKind === 'leave' ? 'Leave this game' : 'Withdraw your sign-up';
-                    signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-withdraw-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" data-campaign-title="${escapeHtml(campaign?.title || '')}" data-withdraw-kind="${withdrawKind}" title="${hint}">${label}</button>`;
-                } else signupBtnHtml = `<button type="button" class="campaign-action-btn campaign-signup-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}" ${disabled ? 'disabled aria-disabled="true"' : ''}>${label}</button>`;
+                buttonsHtml = followBtnHtml + editBtnHtml;
             }
 
             const statusClass = campaignStatusClass(status);
@@ -777,12 +847,29 @@ window.campaignsPage = function () {
                     </section>
 
                     <section class="campaign-row campaign-row-bottom">
-                        <a class="campaign-action-btn campaign-calendar-btn" href="/games/${encodeURIComponent(campaign?.id ?? '')}/calendar"${unansweredCount > 0 ? ` title="${unansweredCount} suggested session${unansweredCount === 1 ? '' : 's'} awaiting your response" aria-label="Calendar, ${unansweredCount} awaiting your response"` : ''}>Calendar${unansweredCount > 0 ? `<span class="campaign-action-count">${unansweredCount}</span>` : ''}</a>
-                        ${signupBtnHtml}
-                        ${followBtnHtml}
-                        ${campaign?.can_manage ? `<button type="button" class="campaign-action-btn campaign-edit-btn" data-campaign-id="${escapeHtml(campaign?.id || '')}">Edit</button>` : ''}
+                        ${buttonsHtml}
                     </section>
                 </article>
+            `;
+        },
+
+        // A compact ledger row for a game that is neither yours nor open to join.
+        renderOtherRowHtml(campaign) {
+            const id = escapeHtml(campaign?.id || '');
+            const status = campaign?.status || 'Unknown';
+            const typeInfo = CAMPAIGN_TYPES.find((t) => t.value === campaign?.type) || CAMPAIGN_TYPES.find((t) => t.value === 'Campaign');
+            const dmUser = campaign?.dm_user;
+            const dm = dmUser ? (dmUser.display_name || dmUser.name || 'Unknown') : (campaign?.dm || 'Unassigned');
+            const isFollowing = !!campaign?.is_following;
+            return `
+                <div role="listitem" class="ledger-row ledger-row--game status-${escapeHtml(campaignStatusClass(status))}" id="campaign-${id}">
+                    <svg class="type-icon ledger-type" viewBox="0 0 24 24" role="img" aria-label="${escapeHtml(typeInfo.label)}"><title>${escapeHtml(typeInfo.label)}</title>${TYPE_ICON_PATHS[typeInfo.value] || ''}</svg>
+                    <a class="ledger-title" href="/games/${encodeURIComponent(campaign?.id ?? '')}">${escapeHtml(campaign?.title || 'Untitled Game')}</a>
+                    <span class="ledger-meta ledger-system">${escapeHtml(campaign?.system || '')}</span>
+                    <span class="ledger-meta ledger-dm"><span class="ledger-crown" aria-hidden="true">♛</span> <span class="visually-hidden">Dungeon master: </span>${escapeHtml(dm)}</span>
+                    <span class="ledger-status"><span class="campaign-status-badge">${escapeHtml(status)}</span></span>
+                    ${this.currentUserId ? `<button type="button" class="campaign-action-btn campaign-follow-btn ledger-follow" data-campaign-id="${id}" data-following="${isFollowing}">${isFollowing ? 'Unfollow' : 'Follow'}</button>` : ''}
+                </div>
             `;
         },
 
@@ -819,7 +906,11 @@ window.campaignsPage = function () {
                     await this.loadCampaigns();
                     return;
                 }
-                this.showMessage(data.message || (following ? 'Unfollowed' : 'Following'), 'success');
+                const title = this.campaigns.find((c) => c.id === campaignId)?.title || 'this game';
+                this.showMessage(following ? `No longer following ${title}` : `Now following ${title}`, 'success', {
+                    label: 'Undo',
+                    run: () => this.toggleFollow(campaignId, !following)
+                });
                 await this.loadCampaigns();
             } catch (error) {
                 this.showMessage('Error updating follow: ' + error.message, 'error');
@@ -984,12 +1075,12 @@ window.campaignsPage = function () {
                 || (isDM && (parseInt(c?.pending_signups_count, 10) || 0) > 0);
         },
 
-        // "6 games on the roll · 2 await thee": the page subtitle under the h1.
+        // "6 games, 1 awaits thy reply": the page subtitle under the h1.
         gamesSubtitle() {
             const total = this.campaigns.length;
             const awaiting = this.campaigns.filter((c) => this.campaignNeedsAction(c)).length;
-            const roll = `${total} game${total === 1 ? '' : 's'} on the roll`;
-            return awaiting > 0 ? `${roll} · ${awaiting} await${awaiting === 1 ? 's' : ''} thee` : roll;
+            const roll = `${total} game${total === 1 ? '' : 's'}`;
+            return awaiting > 0 ? `${roll}, ${awaiting} await${awaiting === 1 ? 's' : ''} thy reply` : roll;
         },
 
         avatarHtml(user, link = true) {
@@ -1001,16 +1092,27 @@ window.campaignsPage = function () {
         },
 
         formatAgendaDate(session) {
-            return this.parseDateLocal(session.date).toLocaleDateString('default', { weekday: 'short', day: 'numeric', month: 'short' });
+            return formatShortDate(session.date);
         },
 
-        showMessage(text, type) {
+        // A toast; action is an optional { label, run } text button ("Undo").
+        showMessage(text, type, action = null) {
             this.messageText = text;
             this.messageType = type;
+            this.messageAction = action;
             this.messageVisible = true;
-            setTimeout(() => {
+            clearTimeout(this._messageTimer);
+            this._messageTimer = setTimeout(() => {
                 this.messageVisible = false;
+                this.messageAction = null;
             }, 5000);
+        },
+
+        runMessageAction() {
+            const action = this.messageAction;
+            this.messageVisible = false;
+            this.messageAction = null;
+            if (action) action.run();
         }
     };
 };
@@ -1076,6 +1178,17 @@ function getDurationLabel(session) {
     if (hours && minutes) return `${hours}h ${minutes}m`;
     if (hours) return `${hours}h`;
     return `${minutes}m`;
+}
+
+// "4 hours", "1 hour 30 minutes": the duration in words.
+function getDurationWords(session) {
+    const total = Number(session?.duration) || 0;
+    const hours = Math.floor(total / 60);
+    const minutes = total % 60;
+    const parts = [];
+    if (hours) parts.push(`${hours} hour${hours === 1 ? '' : 's'}`);
+    if (minutes || !hours) parts.push(`${minutes} minute${minutes === 1 ? '' : 's'}`);
+    return parts.join(' ');
 }
 
 function getTimezoneOptions() {

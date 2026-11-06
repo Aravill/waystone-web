@@ -99,7 +99,9 @@
                         console.error('Failed to mark notification read:', error);
                     }
                 }
-                if (n.campaign_id) {
+                if (n.campaign_id && n.type === 'session_started') {
+                    location.href = '/games/' + encodeURIComponent(n.campaign_id);
+                } else if (n.campaign_id) {
                     const anchor = 'campaign-' + n.campaign_id;
                     const target = location.pathname === '/campaigns' ? document.getElementById(anchor) : null;
                     if (target) {
@@ -162,6 +164,8 @@
                         return `"${title}" reached ${d.player_count} ${d.player_count === '1' ? 'player' : 'players'} - sign-ups closed automatically`;
                     case 'signups_opened':
                         return `Sign-ups opened for "${title}"`;
+                    case 'session_started':
+                        return `A session of "${title}" has begun`;
                     case 'session_confirmed':
                         return `${actor} confirmed the session for "${title}" on ${when}`;
                     default:

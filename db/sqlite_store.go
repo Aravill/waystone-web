@@ -1159,6 +1159,35 @@ func (s *SQLiteStore) GetSessionsByCampaignIDs(campaignIDs []string, fromDate st
 	return sessions, rows.Err()
 }
 
+// GetUnannouncedConfirmedSessions returns confirmed, non-manual sessions dated within the range
+// that have no session_started notification yet: the notifications table is the dedupe.
+func (s *SQLiteStore) GetUnannouncedConfirmedSessions(fromDate, toDate string) ([]models.CampaignSession, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(`
+		SELECT id, campaign_id, date, time, duration, status, timezone, manual, guests, dm_absent, created_at, updated_at
+		FROM campaign_sessions
+		WHERE status = ? AND manual = 0 AND date >= ? AND date <= ?
+		  AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.type = 'session_started' AND n.session_id = campaign_sessions.id)
+		ORDER BY date ASC, time ASC, id ASC
+	`, models.SessionConfirmed, fromDate, toDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []models.CampaignSession
+	for rows.Next() {
+		session, err := scanSession(rows)
+		if err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, session)
+	}
+	return sessions, rows.Err()
+}
+
 // GetAcceptedConfirmedSessions returns confirmed sessions the user responded Accepted to.
 func (s *SQLiteStore) GetAcceptedConfirmedSessions(userID string) ([]models.CampaignSession, error) {
 	s.mutex.RLock()

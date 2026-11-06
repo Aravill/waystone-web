@@ -38,6 +38,7 @@ type Store interface {
 	DeleteManualSession(sessionID string) error
 	GetSessionsByCampaignIDs(campaignIDs []string, fromDate string) ([]models.CampaignSession, error)
 	GetAcceptedConfirmedSessions(userID string) ([]models.CampaignSession, error)
+	GetUnannouncedConfirmedSessions(fromDate, toDate string) ([]models.CampaignSession, error)
 	GetCalendarToken(userID string) (string, error)
 	SetCalendarToken(userID, token string) error
 	GetUserIDByCalendarToken(token string) (string, error)

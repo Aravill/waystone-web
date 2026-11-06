@@ -10,7 +10,7 @@ test('calendar opens on the seeded suggestion with its time and tally', async ({
   await expect(modal.getByRole('heading', { name: 'Age of Sojourn' })).toBeVisible();
 
   const cell = modal.getByRole('button', { name: /Suggested 18:00-22:00/ });
-  await expect(cell.getByText('18:00-22:00')).toBeVisible();
+  await expect(cell.getByText('18:00', { exact: true })).toBeVisible(); // the cell shows the start time only
   await expect(cell.locator('.reply-accepted b')).toHaveText('1');
   await expect(cell.locator('.reply-awaiting b')).toHaveText('3');
   await expect(cell.locator('.reply-declined b')).toHaveText('0');
@@ -28,7 +28,7 @@ test('day panel lists a roster row per player', async ({ page, game }) => {
   await modal.getByRole('button', { name: /Suggested 20:30-/ }).click();
 
   const panel = modal.locator('.calendar-panel');
-  for (const [name, said] of [['Roy', 'Accepted'], ['Adam', 'Tentative'], ['Simon', 'Declined'], ['Testy', 'Awaiting']]) {
+  for (const [name, said] of [['Roy', 'Aye'], ['Adam', 'Perhaps'], ['Simon', 'Nay'], ['Testy', 'Thy reply?']]) {
     await expect(panel.getByText(name, { exact: true })).toBeVisible();
     await expect(panel.locator('.roster-row').filter({ hasText: name })).toContainText(said);
   }

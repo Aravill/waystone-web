@@ -152,7 +152,16 @@ window.calendarPage = function () {
         },
 
         formatMonthYear() {
-            return this.currentCalendarDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+            return this.currentCalendarDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+        },
+
+        // The month header sets the name in the display face and the year in the text face.
+        formatMonthName() {
+            return this.currentCalendarDate.toLocaleString('en-US', { month: 'long' });
+        },
+
+        formatYear() {
+            return String(this.currentCalendarDate.getFullYear());
         },
 
         previousMonth() {
@@ -292,10 +301,16 @@ window.calendarPage = function () {
             return getSessionEndTime(session);
         },
 
+        // The hyphen form is for accessible names (the e2e tests pin it); the panel shows getSessionTimeRangeZone.
         getSessionTimeRange(session) {
             const startTime = session?.time || '';
             const endTime = this.getSessionEndTime(session);
             return `${startTime}-${endTime}`;
+        },
+
+        // "18:00–22:00 CET"
+        getSessionTimeRangeZone(session) {
+            return sessionRangeWithZone(session);
         },
 
         getSessionCounts(session) {
@@ -320,7 +335,7 @@ window.calendarPage = function () {
             const parts = [`${s.status} ${this.getSessionTimeRange(s)}`];
             if (s.status !== 'Cancelled') {
                 const c = this.getSessionCounts(s);
-                parts[0] += `: ${c.accepted} accepted, ${c.tentative} tentative, ${c.declined} declined, ${c.awaiting} awaiting`;
+                parts[0] += `: ${c.accepted} aye, ${c.tentative} perhaps, ${c.declined} nay, ${c.awaiting} no reply yet`;
             }
             if (this.isStrongCandidate(s)) parts.push('Strong candidate');
             const more = this.getCellOverflow(date);
@@ -333,8 +348,11 @@ window.calendarPage = function () {
         },
 
         getRoster(session) {
-            return this.getResponseGroups(session).flatMap((g) => g.users.map((user, i) =>
-                ({ key: `${g.kind}-${user.id || i}`, user, label: g.label, cls: g.cls, kind: g.kind })));
+            return this.getResponseGroups(session).flatMap((g) => g.users.map((user, i) => {
+                // The awaited reply is the viewer's own: ask for it in rubric; others stay quiet
+                const you = g.kind === 'awaiting' && !!user.id && user.id === this.currentUserId && session.status === 'Suggested';
+                return { key: `${g.kind}-${user.id || i}`, user, label: you ? 'Thy reply?' : g.label, cls: g.cls, kind: g.kind, you };
+            }));
         },
 
         avatarHtml(user, link = true) {
@@ -553,12 +571,13 @@ window.calendarPage = function () {
             return parseDateLocal(dateStr);
         },
 
+        // "Friday, Nov 20": dates are set in the text face, never the display face
         formatDayHeading(date) {
-            return date.toLocaleDateString('default', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+            return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
         },
 
         formatAgendaDate(session) {
-            return this.parseDateLocal(session.date).toLocaleDateString('default', { weekday: 'short', day: 'numeric', month: 'short' });
+            return formatShortDate(session.date);
         },
 
         getDurationLabel(session) {
@@ -566,9 +585,8 @@ window.calendarPage = function () {
         },
 
         getSessionMeta(session) {
-            const parts = [this.getDurationLabel(session)];
-            if (session?.timezone) parts.push(session.timezone);
-            return parts.join(' · ');
+            const dm = this.campaign?.dm_user?.display_name || 'the DM';
+            return `${getDurationWords(session)}, proposed by ♛ ${dm}`;
         },
 
         getResponseGroups(session) {
@@ -578,10 +596,10 @@ window.calendarPage = function () {
                 .filter((entry) => entry?.participation === participation)
                 .map((entry) => entry.user || { display_name: 'Unknown' });
             return [
-                { kind: 'accepted', label: 'Accepted', cls: 'participation-accepted', users: byStatus('Accepted') },
-                { kind: 'tentative', label: 'Tentative', cls: 'participation-tentative', users: byStatus('Tentative') },
-                { kind: 'declined', label: 'Declined', cls: 'participation-declined', users: byStatus('Declined') },
-                { kind: 'awaiting', label: 'Awaiting', cls: 'participation-pending', users: details.pending }
+                { kind: 'accepted', label: replyWord('Accepted'), cls: 'participation-accepted', users: byStatus('Accepted') },
+                { kind: 'tentative', label: replyWord('Tentative'), cls: 'participation-tentative', users: byStatus('Tentative') },
+                { kind: 'declined', label: replyWord('Declined'), cls: 'participation-declined', users: byStatus('Declined') },
+                { kind: 'awaiting', label: replyWord(''), cls: 'participation-pending', users: details.pending }
             ];
         },
 

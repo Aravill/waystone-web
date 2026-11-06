@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Waystone home and games proposal</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&amp;family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&amp;family=Libertinus+Mono&amp;family=IM+Fell+English+SC&amp;family=UnifrakturMaguntia&amp;display=swap">
+<style>
+body{margin:0}
+.board{width:1700px;box-sizing:border-box;padding:48px;background:#CFC6B4;display:grid;grid-template-columns:1160px 392px;gap:44px 52px;align-items:start;font-family:var(--mono)}
+.board *{box-sizing:border-box}
+.cap{font:600 15px Arial,sans-serif;color:#2B241C;margin:0 0 10px}
+.tag{position:absolute;background:#1F4FB5;color:#fff;font:600 12px/1 Arial,sans-serif;padding:4px 6px;z-index:5;white-space:nowrap}
+.ws{--bg:#F2EAD8;--folio:#E6DBC2;--ink:#2B241C;--muted:#6B5E4B;--line:rgba(43,36,28,.4);--ctl:rgba(43,36,28,.64);--rubric:#8E2A1E;--verdigris:#355E52;--ochre:#7A5A12;--shadow:rgba(43,36,28,.24);background:var(--bg);color:var(--ink);font-size:16px;line-height:1.55;position:relative;overflow:hidden}
+.ws[data-t="dark"]{--bg:#16120E;--folio:#2A231B;--ink:#E8DCC4;--muted:#A8997F;--line:rgba(232,220,196,.3);--ctl:rgba(232,220,196,.5);--rubric:#D9735C;--verdigris:#7FB09E;--ochre:#D4A94A;--shadow:rgba(0,0,0,.7)}
+.ws a{color:inherit}
+
+/* header */
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 32px;padding:18px 0 12px;border-bottom:3px double var(--ink)}
+.logo{display:flex;align-items:center;gap:8px;font:400 34px/1 'UnifrakturMaguntia',serif;text-decoration:none}
+.stone{width:22px;height:28px;flex:none}
+.stone path{fill:none;stroke:currentColor;stroke-width:3}
+.nav{display:flex;gap:28px}
+.nav a{font:400 21px/1 'IM Fell English SC',serif;text-decoration:none;color:var(--muted);padding:6px 0;border-bottom:2px solid transparent}
+.nav a.on{color:var(--ink);border-bottom-color:var(--rubric)}
+.hr{display:flex;align-items:center;gap:16px}
+.ico{width:40px;height:40px;display:flex;align-items:center;justify-content:center;position:relative}
+.ico svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8}
+.who{display:flex;align-items:center;gap:8px;text-decoration:none;font-size:15px}
+.av{display:inline-block;width:32px;height:32px;border:1px solid var(--line);background:var(--folio);font:400 19px/30px 'IM Fell English SC',serif;text-align:center;flex:none}
+.caret{font-size:11px;color:var(--muted)}
+
+/* page */
+.pg{padding:30px 32px 36px}
+.h1{font:400 44px/1.1 'IM Fell English SC',serif;margin:0}
+.cap1{font:400 56px/.8 'UnifrakturMaguntia',serif;color:var(--rubric)}
+.sub{margin:6px 0 0;color:var(--muted);font-size:15px}
+.sec{font:400 25px/1.2 'IM Fell English SC',serif;margin:0 0 12px;display:flex;align-items:baseline;gap:8px}
+.sec i{font-style:normal;color:var(--rubric)}
+.sec small{font:400 14px var(--mono);color:var(--muted)}
+.two{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:40px;margin-top:28px}
+.stack{display:flex;flex-direction:column;gap:32px}
+
+/* the red-letter reply card */
+.rl{border:1px solid var(--rubric);padding:18px 20px;display:grid;grid-template-columns:76px minmax(0,1fr);gap:0 20px}
+.day{color:var(--rubric);text-align:center;border-right:1px solid var(--line);padding-right:18px;line-height:1.1}
+.day b{display:block;font:600 40px/1 var(--mono);margin:4px 0}
+.day span{font-size:14px;font-weight:500}
+.rl h3{font:400 28px/1.15 'IM Fell English SC',serif;margin:0}
+.rl .m{font-size:14.5px;color:var(--muted);margin:3px 0 12px}
+.bs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.b{min-height:46px;font:500 15px var(--mono);background:none;border:1px solid var(--verdigris);color:var(--verdigris);padding:0 6px}
+.b.q{border-color:var(--ochre);color:var(--ochre)}
+.b.n{border-color:var(--ctl);color:var(--ink)}
+.lk{color:var(--rubric) !important;text-underline-offset:4px;font-size:15px}
+.more{margin-top:10px;font-size:14.5px;display:flex;justify-content:space-between;color:var(--muted)}
+
+/* ledger rows */
+.rows{border-top:1px solid var(--ink)}
+.row{display:grid;align-items:center;gap:14px;padding:11px 2px;border-bottom:1px solid var(--line);font-size:15px}
+.ag{grid-template-columns:118px 134px minmax(0,1fr) 122px 124px}
+.d{font-weight:600}
+.mt{color:var(--muted);font-size:14.5px}
+.gt{font:400 20px/1.2 'IM Fell English SC',serif}
+.ok{color:var(--verdigris)} .wn{color:var(--rubric);font-weight:600} .tn{color:var(--ochre)}
+.st{display:inline-block;font-size:13.5px;line-height:1.5;border:1px solid currentColor;padding:0 7px;white-space:nowrap}
+.st.g{color:var(--verdigris)} .st.r{color:var(--rubric)} .st.o{color:var(--ochre);border-style:dashed} .st.m{color:var(--muted)} .st.dash{border-style:dashed;color:var(--ink)} .st.x span{text-decoration:line-through}
+.gr{grid-template-columns:minmax(0,1fr) auto}
+.sideh{font-size:14.5px;color:var(--muted);margin:0}
+
+/* further roads */
+.roads{display:flex;gap:18px;align-items:flex-end}
+.road{flex:1;text-align:center;color:var(--muted);font-size:14px;line-height:1.3}
+.road svg{display:block;width:64px;height:78px;margin:0 auto 4px;fill:none;stroke:currentColor;stroke-width:1;stroke-dasharray:4 3}
+.road b{display:block;font:400 19px 'IM Fell English SC',serif}
+.fine{font-size:14.5px;color:var(--muted);margin:0}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 14px;background:none;color:var(--ink);border:1px solid var(--ctl);font:500 14.5px var(--mono);text-decoration:none;white-space:nowrap}
+.btn.pri{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.need{background:var(--rubric);color:var(--bg);border-color:var(--rubric)}
+
+/* banner */
+.bwrap{display:grid;grid-template-columns:repeat(auto-fill,360px);gap:28px;justify-content:start}
+.ban{position:relative;width:360px;height:630px}
+.ban svg.cl{position:absolute;left:0;top:0;width:360px;height:630px;overflow:visible}
+.bo{fill:var(--bg);stroke:var(--line);stroke-width:1;filter:drop-shadow(4px 8px 5px var(--shadow))}
+.need .bo{stroke:var(--rubric);stroke-width:1.5}
+.orn{fill:none;stroke:var(--muted);stroke-width:1}
+.need .orn{stroke:var(--rubric)}
+.ro{fill:var(--bg);stroke:var(--ink);stroke-width:1}
+.need .ro{stroke:var(--rubric)}
+.ri{fill:none;stroke:var(--line);stroke-width:1}
+.ty{fill:none;stroke:currentColor;stroke-width:1.5}
+.tyf{fill:var(--bg)}
+.ban .in{position:absolute;left:28px;right:28px;top:0;bottom:0}
+.note{position:absolute;top:58px;height:22px;left:0;right:-8px;font-size:14.5px;font-weight:600;color:var(--rubric);white-space:nowrap}
+.head{position:absolute;top:92px;left:0;right:0;display:flex;flex-direction:column;gap:6px}
+.bt{font:400 28px/1.15 'IM Fell English SC',serif;margin:0}
+.sy{font-size:14.5px;font-style:italic;color:var(--muted)}
+.sm{font-size:15px;line-height:1.45;margin:2px 0 0}
+.ppl{position:absolute;top:264px;left:0;right:0;display:flex;flex-direction:column;gap:8px}
+.sep{height:1px;background:var(--line)}
+.dm{font-weight:600;color:var(--rubric);font-size:15px;color:var(--ink)}
+.dm i{font-style:normal;color:var(--rubric)}
+.avs{display:flex;gap:6px}
+.avs .av{width:30px;height:30px;line-height:28px;font-size:18px}
+.fx{font-size:14.5px;line-height:1.45;color:var(--muted)}
+.fx.nxt{color:var(--ink)}
+.acts{position:absolute;top:430px;left:0;right:0;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.acts .btn{padding:0 4px}
+.w2{grid-column:span 2}
+.oth{grid-template-columns:32px minmax(0,1fr) 130px 110px 118px}
+.oth svg{width:26px;height:26px;fill:none;stroke:var(--muted);stroke-width:1.5}
+.toast{position:absolute;left:50%;transform:translateX(-50%);bottom:24px;background:var(--ink);color:var(--bg);font-size:15px;padding:10px 12px 10px 16px;display:flex;gap:18px;align-items:center;white-space:nowrap}
+.toast u{text-underline-offset:3px}
+
+/* phone */
+.ph .hdr{margin:0 16px;padding:10px 0 0;flex-wrap:wrap;gap:0;border-bottom:3px double var(--ink)}
+.ph .logo{font-size:28px}
+.ph .hr{gap:4px}
+.ph .nav{order:3;width:100%;gap:24px;margin-top:2px}
+.ph .nav a{font-size:19px;padding:5px 0 6px}
+.ph .pg{padding:18px 16px 28px}
+.ph .h1{font-size:34px}
+.ph .cap1{font-size:46px}
+.ph .rl{grid-template-columns:1fr;padding:14px}
+.ph .rlh{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.ph .day{border:none;padding:0 12px 0 0;border-right:1px solid var(--line);flex:none}
+.ph .day b{font-size:32px}
+.ph .rl h3{font-size:24px}
+.ph .rl .m{margin:2px 0 0;font-size:14px}
+.ph .ag{grid-template-columns:112px minmax(0,1fr) auto;gap:4px 10px}
+.ph .stack{gap:26px;margin-top:20px}
+</style>
+</helmet>
+
+<div class="board" style="--mono: {{mono}}">
+
+<!-- HOME, DESKTOP -->
+<div>
+<p class="cap">Home, desktop: 1,160 wide</p>
+<div class="ws" data-t="{{theme}}">
+<span class="tag" style="left:262px;top:6px">H2 Profile and Log out move under the name</span>
+<div class="hdr">
+<a class="logo"><svg class="stone" viewBox="0 0 44 56"><path d="M8 54L10 14Q22 0 34 14L36 54Z"></path><path d="M22 18V42M16 26L22 32L28 26"></path><path d="M2 54H42"></path></svg>Waystone</a>
+<nav class="nav"><a class="on">Home</a><a>Games</a></nav>
+<div class="hr"><span class="ico"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"></rect><path d="M3 6l9 7 9-7"></path></svg></span><a class="who"><span class="av">T</span>Testy <span class="caret">▼</span></a></div>
+</div>
+<div class="pg">
+<h1 class="h1"><span class="cap1">W</span>ell met, Testy</h1>
+<p class="sub">One session awaits thy reply. Thy next game is Friday, Nov 13.</p>
+<div class="two">
+<div class="stack">
+<section style="position:relative">
+<span class="tag" style="right:0;top:0">H1 reply from Home</span>
+<h2 class="sec"><i>§</i>Awaits thy reply</h2>
+<div class="rl">
+<div class="day"><span>Nov</span><b>20</b><span>Friday</span></div>
+<div>
+<h3>Age of Sojourn</h3>
+<p class="m">18:00–22:00 CET, proposed by ♛ Aravill. 1 of 4 have replied.</p>
+<div class="bs"><button class="b">✓ Aye</button><button class="b q">? Perhaps</button><button class="b n">✗ Nay</button></div>
+</div>
+</div>
+</section>
+<section>
+<h2 class="sec"><i>§</i>The road ahead</h2>
+<div class="rows">
+<div class="row ag"><span class="d">Fri, Nov 13</span><span class="mt">18:00–22:00</span><span class="gt">Age of Sojourn</span><span><span class="st g">● Confirmed</span></span><span class="ok">✓ Aye</span></div>
+<div class="row ag"><span class="d">Fri, Nov 20</span><span class="mt">18:00–22:00</span><span class="gt">Age of Sojourn</span><span><span class="st dash">Suggested</span></span><span class="wn">Thy reply?</span></div>
+</div>
+<div class="more"><span>Times are shown in CET.</span><a class="lk">Add to my calendar</a></div>
+</section>
+</div>
+<aside class="stack">
+<section>
+<h2 class="sec"><i>§</i>Thy games</h2>
+<div class="rows">
+<div class="row gr"><div><div class="gt">Age of Sojourn</div><div class="mt">Player, 11 sessions played</div></div><span class="st g">● Ongoing</span></div>
+<div class="row gr"><div><div class="gt">Embittered Arcanist</div><div class="mt">♛ You are the DM. No session yet.</div></div><span class="st r">✦ Pitch</span></div>
+</div>
+<p class="more"><a class="lk">All games</a><span>1 open to join</span></p>
+</section>
+<section>
+<h2 class="sec"><i>§</i>Roads yet to open</h2>
+<div class="roads">
+<div class="road"><svg viewBox="0 0 64 78"><path d="M10 74L13 24Q15 8 26 4L46 3Q52 6 54 24L58 74Z"></path><path d="M2 74H62"></path></svg><b>Chat</b>Interactive games</div>
+<div class="road"><svg viewBox="0 0 64 78"><path d="M8 74L12 22Q14 8 24 4L36 2L42 7L46 4Q54 10 56 22L60 74Z"></path><path d="M2 74H62"></path></svg><b>Codex</b>World database</div>
+</div>
+</section>
+<p class="fine">Something broken, or a feature you'd like? <a class="lk">Tell us on Discord</a></p>
+</aside>
+</div>
+</div>
+</div>
+</div>
+
+<!-- HOME, PHONE -->
+<div>
+<p class="cap">Home, phone: reply is on the first screen</p>
+<div class="ws ph" data-t="{{theme}}">
+<div class="hdr">
+<a class="logo"><svg class="stone" viewBox="0 0 44 56"><path d="M8 54L10 14Q22 0 34 14L36 54Z"></path><path d="M22 18V42M16 26L22 32L28 26"></path><path d="M2 54H42"></path></svg>Waystone</a>
+<div class="hr"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"></rect><path d="M3 6l9 7 9-7"></path></svg></span><a class="who"><span class="av">T</span></a></div>
+<nav class="nav"><a class="on">Home</a><a>Games</a></nav>
+</div>
+<div class="pg">
+<h1 class="h1"><span class="cap1">W</span>ell met, Testy</h1>
+<p class="sub">One session awaits thy reply.</p>
+<div class="stack">
+<section>
+<div class="rl">
+<div class="rlh"><div class="day"><span>Nov</span><b>20</b><span>Fri</span></div><div><h3>Age of Sojourn</h3><p class="m">18:00–22:00 CET. 1 of 4 have replied.</p></div></div>
+<div class="bs"><button class="b">✓ Aye</button><button class="b q">? Perhaps</button><button class="b n">✗ Nay</button></div>
+</div>
+</section>
+<section>
+<h2 class="sec"><i>§</i>The road ahead</h2>
+<div class="rows">
+<div class="row ag"><span class="d">Fri, Nov 13</span><span class="gt">Age of Sojourn</span><span class="ok">✓</span></div>
+<div class="row ag"><span class="d">Fri, Nov 20</span><span class="gt">Age of Sojourn</span><span class="wn">?</span></div>
+</div>
+</section>
+<section>
+<h2 class="sec"><i>§</i>Thy games</h2>
+<div class="rows">
+<div class="row gr"><div><div class="gt">Age of Sojourn</div><div class="mt">Player, 11 sessions played</div></div><span class="st g">● Ongoing</span></div>
+<div class="row gr"><div><div class="gt">Embittered Arcanist</div><div class="mt">♛ You are the DM</div></div><span class="st r">✦ Pitch</span></div>
+</div>
+<p class="more"><a class="lk">All games</a><span>1 open to join</span></p>
+</section>
+</div>
+</div>
+</div>
+</div>
+
+<!-- GAMES, DESKTOP -->
+<div>
+<p class="cap">Games, desktop: the banners stay, grouped by what they mean to you</p>
+<div class="ws" data-t="{{theme}}">
+<div class="hdr">
+<a class="logo"><svg class="stone" viewBox="0 0 44 56"><path d="M8 54L10 14Q22 0 34 14L36 54Z"></path><path d="M22 18V42M16 26L22 32L28 26"></path><path d="M2 54H42"></path></svg>Waystone</a>
+<nav class="nav"><a>Home</a><a class="on">Games</a></nav>
+<div class="hr"><span class="ico"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"></rect><path d="M3 6l9 7 9-7"></path></svg></span><a class="who"><span class="av">T</span>Testy <span class="caret">▼</span></a></div>
+</div>
+<div class="pg">
+<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:26px">
+<div><h1 class="h1"><span class="cap1">G</span>ames</h1><p class="sub">6 games, 1 awaits thy reply</p></div>
+<a class="btn">+ Register game</a>
+</div>
+
+<section style="position:relative">
+<span class="tag" style="left:230px;top:4px">G1 sections instead of one long roll</span>
+<h2 class="sec"><i>§</i>Thy games <small>2</small></h2>
+<div class="bwrap" style="margin-top:6px">
+
+<div class="ban need">
+<svg class="cl" viewBox="0 0 360 630"><path class="bo" d="M0.5 26 L329.5 26 A30 30 0 0 0 359.5 56 L359.5 516 L346 590 C310 574 268 562 230 554 C160 570 82 596 20 620 L0.5 602 Z"></path><path class="orn" d="M38 33 L7 33 L7 584 C7 592 13 595 17 590"></path><circle class="ro" cx="64" cy="26" r="24"></circle><circle class="ri" cx="64" cy="26" r="20"></circle><svg class="ty" x="50" y="12" width="28" height="28" viewBox="0 0 24 24"><circle cx="12" cy="1.8" r="0.9"></circle><path d="M12 2.7 V4"></path><path d="M8 4 H16"></path><path d="M9 4 V14.5 L12 12 L15 14.5 V4"></path><path d="M12 12 V22.5"></path><path d="M2.5 3 V15"></path><path d="M0.8 15 H4.2"></path><path d="M2.5 15 V18.6"></path><circle cx="2.5" cy="19.7" r="1"></circle><path d="M21.5 3 V15"></path><path d="M19.8 15 H23.2"></path><path d="M21.5 15 V18.6"></path><circle cx="21.5" cy="19.7" r="1"></circle></svg></svg>
+<div class="in">
+<div class="note">✦ A session awaits thy reply</div>
+<div class="head"><span><span class="st g">● Ongoing</span></span><h3 class="bt">Age of Sojourn</h3><span class="sy">D&amp;D 5e</span><p class="sm">An epic campaign of discovery and adventure</p></div>
+<div class="ppl"><div class="sep"></div><div class="dm"><i>♛</i> Aravill</div><div class="avs"><span class="av">T</span><span class="av">R</span><span class="av">A</span><span class="av">S</span></div><div class="fx">4 players, no seat limit. Sign-ups open.</div><div class="fx nxt">Next: Fri, Nov 13, 18:00 CET</div></div>
+<div class="acts"><a class="btn need w2">Reply</a><a class="btn">Calendar</a></div>
+</div>
+<span class="tag" style="left:28px;top:486px">G2 one clear action</span>
+</div>
+
+<div class="ban">
+<svg class="cl" viewBox="0 0 360 630"><path class="bo" d="M0.5 26 L330 26 L359.5 55.5 L359.5 196 L352 201 L356 207 L350 212 L359.5 216 L361.94 530 L362.36 547.5 L340.5 605.89 L303.18 560.13 L250.07 591.61 L199.06 555.53 L75.49 634.89 L4.46 588.32 L4.18 578.6 L17.53 573.12 L3.91 568.88 L2.94 530 Z"></path><path class="orn" d="M18 69 H150 M210 69 H342 M180 62 L188 69 L180 76 L172 69 Z"></path><circle class="ro" cx="64" cy="26" r="24"></circle><circle class="ri" cx="64" cy="26" r="20"></circle><svg class="ty" x="50" y="12" width="28" height="28" viewBox="0 0 24 24"><path d="M12 1.5 L13.6 4 V15 H10.4 V4 Z"></path><path d="M7 15 H17"></path><path d="M12 15 V19.5"></path><circle cx="12" cy="21" r="1.4"></circle></svg></svg>
+<div class="in">
+<div class="head"><span><span class="st r">✦ Pitch</span></span><h3 class="bt">Embittered Arcanist</h3><p class="sm">Figure out who turned the Archmage into a sheep</p></div>
+<div class="ppl"><div class="sep"></div><div class="dm"><i>♛</i> Testy (you)</div><div class="avs"><span class="av">A</span></div><div class="fx">1 player, no seat limit. Sign-ups open.</div><div class="fx">No session scheduled</div></div>
+<div class="acts"><a class="btn pri">Sign-ups</a><a class="btn">Calendar</a><a class="btn">Edit</a></div>
+</div>
+</div>
+
+</div>
+</section>
+
+<section style="position:relative;margin-top:34px">
+<h2 class="sec"><i>§</i>Open to join <small>1</small></h2>
+<div class="bwrap" style="margin-top:6px">
+<div class="ban">
+<svg class="cl" viewBox="0 0 360 630"><path class="bo" d="M12 26 L359.5 26 L361.66 530 L362.57 540.27 L344.18 552.64 L335.62 546.41 L323.1 562.5 L310.53 556.1 L296.01 571.48 L281.53 566.12 L268.93 580.46 L254.37 574.69 L239.9 590.82 L225.44 586.67 L209.12 604.94 L194.66 600.65 L180.16 616.51 L165.85 613.23 L141.3 626.73 L6.36 571.09 L2.66 530 L0.62 316 L16.05 299 L0.51 282 L0.5 38 Z"></path><path class="orn" d="M18 69 H150 M210 69 H342 M168 69 C172 62 188 62 192 69 C188 76 172 76 168 69 Z"></path><circle class="ro" cx="64" cy="26" r="24"></circle><circle class="ri" cx="64" cy="26" r="20"></circle><svg class="ty" x="50" y="12" width="28" height="28" viewBox="0 0 24 24"><path d="M21.5 2.5 L7 17"></path><path d="M5 15 L9 19"></path><path d="M7 17 L4 20"></path><circle cx="3.2" cy="20.8" r="1.1"></circle><path d="M2.5 2.5 L17 17"></path><path d="M15 19 L19 15"></path><path d="M17 17 L20 20"></path><circle cx="20.8" cy="20.8" r="1.1"></circle><path class="tyf" d="M12 6 L15.5 7.5 V11.5 Q15.5 15 12 17 Q8.5 15 8.5 11.5 V7.5 Z"></path><path d="M12 8 V15"></path></svg></svg>
+<div class="in">
+<div class="head"><span><span class="st r">✦ Pitch</span></span><h3 class="bt">The Lantern Road</h3><span class="sy">Cyberpunk Red</span><p class="sm">Escort a convoy of lantern-bearers through the dead zone</p></div>
+<div class="ppl"><div class="sep"></div><div class="dm"><i>♛</i> Roy</div><div class="avs"><span class="av">A</span></div><div class="fx">1 of 4 seats taken. Sign-ups open.</div><div class="fx">No session scheduled</div></div>
+<div class="acts"><a class="btn pri w2">Sign up</a><a class="btn">Follow</a></div>
+</div>
+</div>
+</div>
+</section>
+
+<section style="position:relative;margin-top:34px">
+<h2 class="sec"><i>§</i>Other games <small>3</small> <span class="caret">▼</span></h2>
+<div class="rows">
+<div class="row oth"><svg viewBox="0 0 24 24"><path d="M12 12 V22.5"></path><path d="M9 4 V14.5 L12 12 L15 14.5 V4"></path><path d="M8 4 H16"></path><path d="M2.5 3 V15"></path><path d="M21.5 3 V15"></path></svg><span class="gt">Saltmarsh Tides</span><span class="mt">D&amp;D 2024</span><span class="mt">♛ Simon</span><span><span class="st o">◐ On hiatus</span></span></div>
+<div class="row oth"><svg viewBox="0 0 24 24"><path d="M12 1.5 L13.6 4 V15 H10.4 V4 Z"></path><path d="M7 15 H17"></path><path d="M12 15 V19.5"></path><circle cx="12" cy="21" r="1.4"></circle></svg><span class="gt">Night at the Gilded Goose</span><span class="mt"></span><span class="mt">♛ Adam</span><span><span class="st m">✓ Finished</span></span></div>
+<div class="row oth"><svg viewBox="0 0 24 24"><path d="M21.5 2.5 L7 17"></path><path d="M2.5 2.5 L17 17"></path><path d="M12 8 V15"></path></svg><span class="gt">Thorns of Anevion</span><span class="mt"></span><span class="mt">♛ Mira</span><span><span class="st m x">✗ <span>Cancelled</span></span></span></div>
+</div>
+</section>
+</div>
+<div class="toast" style="left:560px;transform:none;bottom:440px">✓ Now following The Lantern Road <u>Undo</u></div>
+<span class="tag" style="left:560px;bottom:492px">T1 toast fixed to the bottom of the screen, in plain words</span>
+</div>
+</div>
+
+<!-- GAMES, PHONE -->
+<div>
+<p class="cap">Games, phone: your game is the first thing below the title</p>
+<div class="ws ph" data-t="{{theme}}" style="height:980px">
+<div class="hdr">
+<a class="logo"><svg class="stone" viewBox="0 0 44 56"><path d="M8 54L10 14Q22 0 34 14L36 54Z"></path><path d="M22 18V42M16 26L22 32L28 26"></path><path d="M2 54H42"></path></svg>Waystone</a>
+<div class="hr"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"></rect><path d="M3 6l9 7 9-7"></path></svg></span><a class="who"><span class="av">T</span></a></div>
+<nav class="nav"><a>Home</a><a class="on">Games</a></nav>
+</div>
+<div class="pg">
+<h1 class="h1"><span class="cap1">G</span>ames</h1>
+<p class="sub">6 games, 1 awaits thy reply</p>
+<h2 class="sec" style="margin-top:18px"><i>§</i>Thy games <small>2</small></h2>
+<div class="ban need" style="margin-top:4px">
+<svg class="cl" viewBox="0 0 360 630"><path class="bo" d="M0.5 26 L329.5 26 A30 30 0 0 0 359.5 56 L359.5 516 L346 590 C310 574 268 562 230 554 C160 570 82 596 20 620 L0.5 602 Z"></path><path class="orn" d="M38 33 L7 33 L7 584 C7 592 13 595 17 590"></path><circle class="ro" cx="64" cy="26" r="24"></circle><circle class="ri" cx="64" cy="26" r="20"></circle><svg class="ty" x="50" y="12" width="28" height="28" viewBox="0 0 24 24"><circle cx="12" cy="1.8" r="0.9"></circle><path d="M12 2.7 V4"></path><path d="M8 4 H16"></path><path d="M9 4 V14.5 L12 12 L15 14.5 V4"></path><path d="M12 12 V22.5"></path><path d="M2.5 3 V15"></path><path d="M0.8 15 H4.2"></path><path d="M2.5 15 V18.6"></path><circle cx="2.5" cy="19.7" r="1"></circle><path d="M21.5 3 V15"></path><path d="M19.8 15 H23.2"></path><path d="M21.5 15 V18.6"></path><circle cx="21.5" cy="19.7" r="1"></circle></svg></svg>
+<div class="in">
+<div class="note">✦ A session awaits thy reply</div>
+<div class="head"><span><span class="st g">● Ongoing</span></span><h3 class="bt">Age of Sojourn</h3><span class="sy">D&amp;D 5e</span><p class="sm">An epic campaign of discovery and adventure</p></div>
+<div class="ppl"><div class="sep"></div><div class="dm"><i>♛</i> Aravill</div><div class="avs"><span class="av">T</span><span class="av">R</span><span class="av">A</span><span class="av">S</span></div><div class="fx">4 players, no seat limit. Sign-ups open.</div><div class="fx nxt">Next: Fri, Nov 13, 18:00 CET</div></div>
+<div class="acts"><a class="btn need w2">Reply</a><a class="btn">Calendar</a></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"baseFont":{"editor":"enum","options":["IBM Plex Mono","Courier Prime","Libertinus Mono"],"default":"IBM Plex Mono"},"candlelight":{"editor":"boolean","default":false},"$preview":{"width":1700,"height":2841}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const f = this.props.baseFont ?? 'IBM Plex Mono';
+    return { mono: f + ', monospace', theme: this.props.candlelight ? 'dark' : 'light' };
+  }
+}
+</script>
+</body>
+</html>

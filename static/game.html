@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Waystone - Game</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
-    <script src="/static/theme.js?v=5"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=61">
-    <link rel="stylesheet" href="/static/notifications.css?v=9">
+    <script src="/static/theme.js?v=6"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=64">
+    <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="page-game" x-data="gamePage()">
@@ -18,12 +18,16 @@
         <nav class="nav-bar" aria-label="Main">
             <a href="/" class="nav-item" data-page="dashboard">Home</a>
             <a href="/campaigns" class="nav-item active" aria-current="page" data-page="campaigns">Games</a>
-            <a href="/profile" class="nav-item" data-page="profile">Profile</a>
             <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
         </nav>
         <div class="header-right">
-            <span class="user-name" x-text="displayName"></span>
-            <button @click="handleLogout()" class="logout-btn">Logout</button>
+            <details class="user-menu">
+                <summary><span class="user-menu-avatar" aria-hidden="true" x-text="(displayName || '?').charAt(0).toUpperCase()"></span><span class="user-menu-name" x-text="displayName"></span><span class="user-menu-caret" aria-hidden="true">&#9662;</span></summary>
+                <div class="user-menu-panel">
+                    <a href="/profile">Profile</a>
+                    <button type="button" @click="handleLogout()">Log out</button>
+                </div>
+            </details>
         </div>
     </div>
 
@@ -47,345 +51,339 @@
 
             <template x-if="campaign">
                 <div>
-                    <div class="game-sheet">
-                        <div class="game-sheet-head" :class="'status-' + statusClass">
-                            <div class="game-title-block">
-                                <div class="game-kicker" :title="typeInfo.label + ': ' + typeInfo.description">
-                                    <svg class="game-type-icon" viewBox="0 0 24 24" aria-hidden="true" x-html="typeIconPaths"></svg>
-                                    <span class="modal-eyebrow" x-text="typeInfo.label + (campaign.system && !campaign.system_logo_url ? ' · ' + campaign.system : '')"></span>
-                                    <template x-if="campaign.system_logo_url">
-                                        <img class="campaign-system-logo" :src="campaign.system_logo_url" :alt="campaign.system" :title="campaign.system">
-                                    </template>
-                                    <span class="campaign-status-badge" x-text="campaign.status"></span>
-                                </div>
-                                <h1 class="page-title" x-text="campaign.title"></h1>
-                                <p class="game-lede" x-text="campaign.summary"></p>
-                                <p class="pending-notice" x-show="pendingNotice"><span aria-hidden="true">✦</span> <span x-text="pendingNotice"></span></p>
+                    <header class="game-head" :class="'status-' + statusClass">
+                        <div class="game-title-block">
+                            <div class="game-kicker" :title="typeInfo.label + ': ' + typeInfo.description">
+                                <svg class="game-type-icon" viewBox="0 0 24 24" aria-hidden="true" x-html="typeIconPaths"></svg>
+                                <span class="game-kind" x-text="typeInfo.label + (campaign.system && !campaign.system_logo_url ? ', ' + campaign.system : '')"></span>
+                                <template x-if="campaign.system_logo_url">
+                                    <img class="campaign-system-logo" :src="campaign.system_logo_url" :alt="campaign.system" :title="campaign.system">
+                                </template>
+                                <span class="campaign-status-badge" x-text="campaign.status"></span>
                             </div>
-                            <div class="game-head-actions">
-                                <a x-show="isMember" :href="'/games/' + encodeURIComponent(campaign.id) + '/calendar'">Open calendar →</a>
-                            </div>
-                        </div>
+                            <h1 class="page-title game-title" x-text="campaign.title"></h1>
+                            <p class="game-lede" x-text="campaign.summary"></p>
+                            <p class="pending-notice" x-show="pendingNotice"><span aria-hidden="true">✦</span> <span x-text="pendingNotice"></span></p>
 
-                        <div class="game-layout">
-                            <div class="game-main">
-                                <section class="game-tale" aria-labelledby="taleHeading">
-                                    <h2 id="taleHeading" class="section-header">The tale</h2>
-                                    <div class="game-text" x-html="descriptionHtml"></div>
-                                </section>
-
-                                <section class="game-chronicle" aria-labelledby="chronicleHeading">
-                                    <div class="game-ledger-nav">
-                                        <h2 id="chronicleHeading" class="section-header">The chronicle</h2>
-                                        <span class="game-count" x-text="played.length + ' session' + (played.length === 1 ? '' : 's') + ' played · ' + journalCount + ' in the journal'"></span>
-                                        <div class="calendar-legend">
-                                            <span class="legend-item legend-confirmed">confirmed</span>
-                                            <span class="legend-item legend-suggested">suggested</span>
-                                        </div>
+                            <!-- Phones: the reply you owe sits right under the lede, before the tale -->
+                            <template x-if="replySession">
+                                <div class="game-reply-block panel-session awaits-reply">
+                                    <div class="panel-session-head">
+                                        <span class="panel-session-time" x-text="formatShort(replySession.date)"></span>
+                                        <span class="panel-status-tag" :class="`chip-${replySession.status}`" x-text="replySession.status"></span>
                                     </div>
+                                    <p class="panel-session-meta" x-text="replyBlockMeta(replySession)"></p>
+                                    <p class="game-reply-who"><a href="#gamePanel" @click.prevent="pick(replySession.id)">Who?</a></p>
+                                    <div class="session-actions session-replies" role="group" aria-label="Thy reply">
+                                        <button type="button" class="btn-response btn-response--accepted" :disabled="busy" @click="reply('Accepted', replySession)">Aye</button>
+                                        <button type="button" class="btn-response btn-response--tentative" :disabled="busy" @click="reply('Tentative', replySession)">Perhaps</button>
+                                        <button type="button" class="btn-response btn-response--declined" :disabled="busy" @click="reply('Declined', replySession)">Nay</button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="game-head-actions">
+                            <a class="campaign-action-btn game-calendar-btn" x-show="isMember" :href="'/games/' + encodeURIComponent(campaign.id) + '/calendar'"
+                               :title="unansweredCount > 0 ? unansweredCount + ' suggested session' + (unansweredCount === 1 ? '' : 's') + ' awaiting your response' : null"
+                               :aria-label="unansweredCount > 0 ? 'Calendar, ' + unansweredCount + ' awaiting your response' : null">Calendar<span class="campaign-action-count" x-show="unansweredCount > 0" x-text="unansweredCount"></span></a>
+                        </div>
+                    </header>
 
-                                    <div class="game-ledger-label">Ahead</div>
-                                    <p class="panel-empty" x-show="upcoming.length === 0">Nothing ahead on the calendar.</p>
-                                    <div class="game-ahead-grid" x-show="upcoming.length > 0">
-                                        <template x-for="s in upcoming" :key="s.id">
-                                            <button type="button" class="game-cell" :class="{ 'is-selected': selectedId === s.id }" :aria-pressed="selectedId === s.id" :aria-label="cellLabel(s)" :title="cellLabel(s)" @click="pick(s.id)">
-                                                <span class="day-frame" :class="`frame-${s.status}${isStrongCandidate(s) ? ' is-candidate' : ''}`">
-                                                    <svg class="day-march" aria-hidden="true" x-show="isStrongCandidate(s)"><rect/></svg>
-                                                    <span class="day-candidate-mark" aria-hidden="true" x-show="isStrongCandidate(s) || awaitsMe(s)" x-text="isStrongCandidate(s) ? '✦' : '…'"></span>
-                                                    <span class="day-number"><b x-text="formatShort(s.date)"></b></span>
-                                                    <span class="day-time" :title="s.timezone"><span class="day-time-full" x-text="timeRange(s)"></span><span class="day-time-short" x-text="s.time"></span></span>
-                                                    <span class="day-tally" x-show="isMember">
-                                                        <template x-for="c in getTally(s)" :key="c.kind">
-                                                            <span :class="`reply-${c.kind}${c.n ? '' : ' tally-zero'}`"><span x-html="replyGlyph(c.kind)"></span><b x-text="c.n"></b></span>
-                                                        </template>
-                                                    </span>
+                    <div class="game-layout">
+                        <div class="game-main">
+                            <section class="game-tale" aria-labelledby="taleHeading">
+                                <h2 id="taleHeading" class="section-header">The tale</h2>
+                                <div id="taleText" class="game-text" :class="{ 'is-folded': taleCanFold && !taleOpen }" x-html="descriptionHtml"></div>
+                                <p class="game-tale-more" x-show="taleCanFold"><button type="button" class="text-link" :aria-expanded="taleOpen.toString()" @click="taleOpen = !taleOpen" x-text="taleOpen ? 'Fold the tale' : 'Read the whole tale'"></button></p>
+                            </section>
+
+                            <section class="game-chronicle" aria-labelledby="chronicleHeading">
+                                <div class="game-ledger-nav">
+                                    <h2 id="chronicleHeading" class="section-header">The chronicle</h2>
+                                    <span class="game-count" x-text="played.length + ' session' + (played.length === 1 ? '' : 's') + ' played · ' + journalCount + ' in the journal'"></span>
+                                </div>
+
+                                <h3 class="game-ledger-label">Ahead</h3>
+                                <p class="panel-empty" x-show="upcoming.length === 0">Nothing ahead on the calendar.</p>
+                                <div class="game-ahead" x-show="upcoming.length > 0">
+                                    <template x-for="s in upcoming" :key="s.id">
+                                        <button type="button" class="ahead-row" :class="{ 'is-selected': selectedId === s.id }" :aria-pressed="selectedId === s.id" :aria-label="cellLabel(s)" @click="pick(s.id)">
+                                            <span class="ahead-date" x-text="formatShort(s.date)"></span>
+                                            <span class="ahead-time" :title="s.timezone" x-text="s.time ? timeRange(s) : ''"></span>
+                                            <span class="ahead-status"><span class="panel-status-tag" :class="`chip-${s.status}`" x-text="s.status"></span></span>
+                                            <span class="ahead-counts" x-text="isMember ? aheadCounts(s) : ''"></span>
+                                            <span class="ahead-mine" :class="aheadMineClass(s)" x-show="isPlayer" x-html="aheadMine(s)"></span>
+                                        </button>
+                                    </template>
+                                </div>
+
+                                <div class="game-played-nav">
+                                    <h3 class="game-ledger-label">Played</h3>
+                                    <button type="button" class="game-more" x-show="isDM" @click="startRecording()">+ Record a past session</button>
+                                </div>
+                                <p class="panel-empty" x-show="played.length === 0">No sessions played yet.</p>
+                                <ol class="game-entries" reversed>
+                                    <template x-for="s in visibleSessions" :key="s.id">
+                                        <li class="game-row" :class="{ 'is-selected': selectedId === s.id }">
+                                            <button type="button" class="game-entry" :aria-pressed="selectedId === s.id" :aria-label="entryLabel(s)" @click="pick(s.id)">
+                                                <span class="game-entry-no" aria-hidden="true" x-text="s.number"></span>
+                                                <span>
+                                                    <span class="game-entry-date"><span x-text="formatDate(s.date)"></span><span class="panel-status-tag chip-hand" x-show="s.manual" title="Added by the DM, not from the calendar">By hand</span></span>
+                                                    <span class="game-entry-meta" :title="s.timezone" x-text="sessionMeta(s)"></span>
+                                                </span>
+                                                <span class="game-attendees" aria-hidden="true">
+                                                    <template x-for="(u, i) in s.attendees" :key="u.id || 'guest-' + i">
+                                                        <span :class="{ 'game-attendee--dm': u.id === campaign.dm }" :title="attendeeName(u)" x-html="userAvatarHtml(u, false)"></span>
+                                                    </template>
                                                 </span>
                                             </button>
-                                        </template>
-                                        <template x-for="i in aheadFillers" :key="'filler-' + i">
-                                            <div class="game-cell game-cell--filler" aria-hidden="true"></div>
-                                        </template>
-                                    </div>
-                                    <div class="calendar-reply-key" x-show="isMember && upcoming.length > 0">
-                                        <span class="reply-accepted" x-html="replyGlyph('accepted') + ' aye'"></span>
-                                        <span class="reply-tentative">? perhaps</span>
-                                        <span class="reply-declined" x-html="replyGlyph('declined') + ' nay'"></span>
-                                        <span class="reply-awaiting">… awaiting</span>
-                                        <span><span class="legend-star" aria-hidden="true">✦</span> strong candidate</span>
-                                    </div>
-
-                                    <div class="game-played-nav">
-                                        <div class="game-ledger-label">Played</div>
-                                        <button type="button" class="game-more" x-show="isDM" @click="startRecording()">+ Record a past session</button>
-                                    </div>
-                                    <p class="panel-empty" x-show="played.length === 0">No sessions played yet.</p>
-                                    <ol class="game-entries" reversed>
-                                        <template x-for="s in visibleSessions" :key="s.id">
-                                            <li class="game-row" :class="{ 'is-selected': selectedId === s.id }">
-                                                <button type="button" class="game-entry" :aria-pressed="selectedId === s.id" :aria-label="entryLabel(s)" @click="pick(s.id)">
-                                                    <span class="game-entry-no" aria-hidden="true" x-text="s.number"></span>
-                                                    <span>
-                                                        <span class="game-entry-date"><span x-text="formatDate(s.date)"></span><span class="panel-status-tag chip-hand" x-show="s.manual" title="Added by the DM, not from the calendar">By hand</span></span>
-                                                        <span class="game-entry-meta" :title="s.timezone" x-text="sessionMeta(s)"></span>
-                                                    </span>
-                                                    <span class="game-attendees" aria-hidden="true">
-                                                        <template x-for="(u, i) in s.attendees" :key="u.id || 'guest-' + i">
-                                                            <span :class="{ 'game-attendee--dm': u.id === campaign.dm }" :title="attendeeName(u)" x-html="userAvatarHtml(u, false)"></span>
-                                                        </template>
-                                                    </span>
-                                                </button>
-                                                <div class="entry-line">
-                                                    <template x-if="s.journal">
-                                                        <a class="entry-link" :href="journalUrl(s.id)" x-text="s.journal.name || 'Unnamed entry'"></a>
-                                                    </template>
-                                                    <template x-if="s.journal">
-                                                        <span class="session-by" x-text="journalByline(s.journal)"></span>
-                                                    </template>
-                                                    <template x-if="!s.journal">
-                                                        <span class="entry-none">No entry yet</span>
-                                                    </template>
-                                                    <template x-if="!s.journal && isMember">
-                                                        <span class="session-by"><a :href="journalUrl(s.id) + '/edit'">✎ Write the entry →</a></span>
-                                                    </template>
-                                                </div>
-                                            </li>
-                                        </template>
-                                    </ol>
-                                    <button type="button" class="game-more" x-show="played.length > 5" :aria-expanded="showAll" @click="showAll = !showAll" x-text="showAll ? 'Show fewer ↑' : 'Show all ' + played.length + ' sessions ↓'"></button>
-                                    <p class="entry-cancelled" x-show="cancelledEntries.length > 0">
-                                        <span>Entries on cancelled sessions:</span>
-                                        <template x-for="c in cancelledEntries" :key="c.session_id">
-                                            <a :href="journalUrl(c.session_id)" x-text="cancelledLabel(c)"></a>
-                                        </template>
-                                    </p>
-                                </section>
-                            </div>
-
-                            <aside id="gamePanel" class="game-panel">
-                                <div class="game-panel-inner">
-                                    <div class="game-panel-states" aria-live="polite">
-                                        <template x-for="s in selectedUpcomingList" :key="s.id">
-                                            <div class="game-panel-state">
-                                                <div>
-                                                    <p class="modal-eyebrow" x-text="upcomingEyebrow(s)"></p>
-                                                    <h3 class="panel-heading" tabindex="-1"><span class="drop-cap" x-text="formatHeading(s.date).charAt(0)"></span><span x-text="formatHeading(s.date).slice(1)"></span></h3>
-                                                </div>
-                                                <div class="panel-session" :class="{ 'awaits-reply': awaitsMe(s) }">
-                                                    <div class="panel-session-head">
-                                                        <span class="panel-session-time" :title="s.timezone" x-text="timeRange(s) || 'Time not recorded'"></span>
-                                                        <span class="panel-status-tag" :class="`chip-${s.status}`" x-text="s.status"></span>
-                                                    </div>
-                                                    <div class="panel-session-meta" x-text="upcomingMeta(s)"></div>
-                                                    <p class="panel-candidate" x-show="isStrongCandidate(s)"><span class="panel-candidate-mark" aria-hidden="true">✦</span> <span x-text="getCandidateNote(s)"></span></p>
-                                                    <div class="roster" x-show="isMember">
-                                                        <template x-for="r in upcomingRoster(s)" :key="r.key">
-                                                            <div class="roster-row" :class="`avatars-${r.cls}`">
-                                                                <span class="roster-avatar" x-html="userAvatarHtml(r.user, false)"></span>
-                                                                <span class="roster-name" :class="{ 'is-dm': r.user.id === campaign.dm }">
-                                                                    <template x-if="r.user.profile_url"><a :href="r.user.profile_url" x-text="rosterName(r.user)"></a></template>
-                                                                    <template x-if="!r.user.profile_url"><span x-text="rosterName(r.user)"></span></template>
-                                                                    <span class="game-you" x-show="r.user.id === currentUserId"> (you)</span>
-                                                                </span>
-                                                                <span class="roster-said" :class="`reply-${r.kind}`"><span x-html="replyGlyph(r.kind)"></span> <span x-text="r.label"></span></span>
-                                                            </div>
-                                                        </template>
-                                                    </div>
-                                                    <div class="player-responses" x-show="isPlayer">
-                                                        <p><span aria-hidden="true">✦</span> Thy reply</p>
-                                                        <div class="session-actions session-replies">
-                                                            <button type="button" class="btn-response btn-response--accepted" :class="{ 'selected': s.current_user_participation === 'Accepted' }" :aria-pressed="s.current_user_participation === 'Accepted'" :disabled="busy" @click="reply('Accepted', s)">Aye</button>
-                                                            <button type="button" class="btn-response btn-response--tentative" :class="{ 'selected': s.current_user_participation === 'Tentative' }" :aria-pressed="s.current_user_participation === 'Tentative'" :disabled="busy" @click="reply('Tentative', s)">Perhaps</button>
-                                                            <button type="button" class="btn-response btn-response--declined" :class="{ 'selected': s.current_user_participation === 'Declined' }" :aria-pressed="s.current_user_participation === 'Declined'" :disabled="busy" @click="reply('Declined', s)">Nay</button>
-                                                        </div>
-                                                    </div>
-                                                    <div class="panel-dm-actions" x-show="isDM">
-                                                        <div class="session-actions">
-                                                            <button type="button" class="btn-action btn-action-confirm" x-show="s.status === 'Suggested'" :disabled="busy" @click="setSessionStatus('Confirmed', s)">Confirm</button>
-                                                            <button type="button" class="btn-action btn-action-cancel" :disabled="busy" @click="setSessionStatus('Cancelled', s)">Cancel</button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <button type="button" class="btn-close game-back" @click="showCompany()">Show the company</button>
+                                            <div class="entry-line">
+                                                <template x-if="s.journal">
+                                                    <a class="entry-link" :href="journalUrl(s.id)" x-text="s.journal.name || 'Unnamed entry'"></a>
+                                                </template>
+                                                <template x-if="s.journal">
+                                                    <span class="session-by" x-text="journalByline(s.journal)"></span>
+                                                </template>
+                                                <template x-if="!s.journal">
+                                                    <span class="entry-none">No entry yet</span>
+                                                </template>
+                                                <template x-if="!s.journal && isMember">
+                                                    <span class="session-by"><a :href="journalUrl(s.id) + '/edit'">✎ Write the entry →</a></span>
+                                                </template>
                                             </div>
-                                        </template>
+                                        </li>
+                                    </template>
+                                </ol>
+                                <button type="button" class="game-more" x-show="played.length > 5" :aria-expanded="showAll" @click="showAll = !showAll" x-text="showAll ? 'Show fewer ↑' : 'Show all ' + played.length + ' sessions ↓'"></button>
+                                <p class="entry-cancelled" x-show="cancelledEntries.length > 0">
+                                    <span>Entries on cancelled sessions:</span>
+                                    <template x-for="c in cancelledEntries" :key="c.session_id">
+                                        <a :href="journalUrl(c.session_id)" x-text="cancelledLabel(c)"></a>
+                                    </template>
+                                </p>
+                            </section>
+                        </div>
 
-                                        <template x-for="s in selectedPlayedList" :key="s.id">
-                                            <div class="game-panel-state">
-                                                <div>
-                                                    <p class="modal-eyebrow" x-text="'Session ' + s.number"></p>
-                                                    <h3 class="panel-heading" tabindex="-1"><span class="drop-cap" x-text="formatHeading(s.date, true).charAt(0)"></span><span x-text="formatHeading(s.date, true).slice(1)"></span></h3>
-                                                </div>
-                                                <div class="panel-session panel-journal">
-                                                    <p class="modal-eyebrow">The journal</p>
-                                                    <template x-if="s.journal">
-                                                        <div class="panel-journal-entry">
-                                                            <a class="journal-title" :href="journalUrl(s.id)" x-html="journalTitleHtml(campaign.title, s.number, s.journal.name)"></a>
-                                                            <p class="journal-excerpt" x-text="journalExcerpt(s.journal.excerpt_source)"></p>
-                                                            <p class="session-by" x-text="journalByline(s.journal)"></p>
-                                                            <div class="journal-actions">
-                                                                <a class="submit-btn" :href="journalUrl(s.id)">Read the entry</a>
-                                                                <a class="campaign-action-btn" :href="journalUrl(s.id) + '/history'" x-text="'History · ' + s.journal.revisions"></a>
-                                                            </div>
-                                                        </div>
-                                                    </template>
-                                                    <template x-if="!s.journal">
-                                                        <div class="panel-journal-entry">
-                                                            <p class="panel-empty">Nobody has written the entry for this session yet.</p>
-                                                            <div class="journal-actions" x-show="isMember">
-                                                                <a class="submit-btn" :href="journalUrl(s.id) + '/edit'">Write the entry</a>
-                                                            </div>
-                                                        </div>
-                                                    </template>
-                                                </div>
-                                                <div class="panel-session">
-                                                    <div class="panel-session-head">
-                                                        <span class="panel-session-time" x-text="timeRange(s) || 'Time not recorded'"></span>
-                                                        <span class="panel-status-tag" :class="s.manual ? 'chip-hand' : 'chip-Played'" x-text="s.manual ? 'By hand' : 'Played'"></span>
-                                                    </div>
-                                                    <div class="panel-session-meta" x-text="playedMeta(s)"></div>
-                                                    <div class="roster">
-                                                        <template x-for="r in playedRoster(s)" :key="r.key">
-                                                            <div class="roster-row" :class="`avatars-${r.cls}`">
-                                                                <span class="roster-avatar" x-html="userAvatarHtml(r.user, false)"></span>
-                                                                <span class="roster-name" :class="{ 'is-dm': r.user.id === campaign.dm }">
-                                                                    <template x-if="r.user.profile_url"><a :href="r.user.profile_url" x-text="rosterName(r.user)"></a></template>
-                                                                    <template x-if="!r.user.profile_url"><span x-text="rosterName(r.user)"></span></template>
-                                                                    <span class="game-you" x-show="r.user.id === currentUserId"> (you)</span>
-                                                                </span>
-                                                                <span class="roster-said" :class="`reply-${r.kind}`"><span x-html="replyGlyph(r.kind)"></span> <span x-text="r.label"></span></span>
-                                                            </div>
-                                                        </template>
-                                                    </div>
-                                                    <div class="panel-dm-actions" x-show="isDM && s.manual">
-                                                        <div class="session-actions">
-                                                            <button type="button" class="btn-action" :disabled="busy" @click="startEdit(s)">Edit</button>
-                                                            <button type="button" class="btn-action btn-action-cancel" :disabled="busy" @click="deletePlayed(s)">Delete</button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <button type="button" class="btn-close game-back" @click="showCompany()">Show the company</button>
+                        <aside id="gamePanel" class="game-panel">
+                            <div class="game-panel-inner">
+                                <div class="game-panel-states" aria-live="polite">
+                                    <template x-for="s in selectedUpcomingList" :key="s.id">
+                                        <div class="game-panel-state">
+                                            <div>
+                                                <p class="modal-eyebrow" x-text="upcomingEyebrow(s)"></p>
+                                                <h3 class="panel-heading" tabindex="-1" x-text="formatHeading(s.date)"></h3>
                                             </div>
-                                        </template>
-
-                                        <template x-if="!selectedUpcoming && !selectedPlayed && !recording">
-                                            <div class="game-panel-state">
-                                                <div>
-                                                    <p class="modal-eyebrow">Who rides</p>
-                                                    <h3 class="panel-heading" tabindex="-1"><span class="drop-cap">T</span>he company</h3>
+                                            <div class="panel-session" :class="{ 'awaits-reply': awaitsMe(s) }">
+                                                <div class="panel-session-head">
+                                                    <span class="panel-session-time" :title="s.timezone" x-text="upcomingTime(s)"></span>
+                                                    <span class="panel-status-tag" :class="`chip-${s.status}`" x-text="s.status"></span>
                                                 </div>
-                                                <div class="roster">
-                                                    <template x-for="r in company" :key="r.user.id">
-                                                        <div class="roster-row">
+                                                <div class="panel-session-meta" x-text="upcomingMeta(s)"></div>
+                                                <p class="panel-candidate" x-show="isStrongCandidate(s)"><span class="panel-candidate-mark" aria-hidden="true">✦</span> <span x-text="getCandidateNote(s)"></span></p>
+                                                <div class="roster" x-show="isMember">
+                                                    <template x-for="r in upcomingRoster(s)" :key="r.key">
+                                                        <div class="roster-row" :class="`avatars-${r.cls}`">
                                                             <span class="roster-avatar" x-html="userAvatarHtml(r.user, false)"></span>
-                                                            <span class="roster-name" :class="{ 'is-dm': r.dm }">
-                                                                <template x-if="r.user.profile_url"><a :href="r.user.profile_url" x-text="rosterName(r.user)"></a></template>
-                                                                <template x-if="!r.user.profile_url"><span x-text="rosterName(r.user)"></span></template>
+                                                            <span class="roster-name" :class="{ 'is-dm': r.user.id === campaign.dm }">
+                                                                <span class="roster-crown" aria-hidden="true" x-show="r.user.id === campaign.dm">♛ </span>
+                                                                <template x-if="r.user.profile_url"><a :href="r.user.profile_url" x-text="r.user.display_name || r.user.name || 'Unknown'"></a></template>
+                                                                <template x-if="!r.user.profile_url"><span x-text="r.user.display_name || r.user.name || 'Unknown'"></span></template>
                                                                 <span class="game-you" x-show="r.user.id === currentUserId"> (you)</span>
                                                             </span>
-                                                            <span class="roster-said game-detail" x-show="r.detail" x-text="r.detail"></span>
+                                                            <span class="roster-said" :class="[`reply-${r.kind}`, r.you ? 'is-you' : '']"><span x-html="replyGlyph(r.kind)"></span> <span x-text="r.label"></span></span>
                                                         </div>
                                                     </template>
                                                 </div>
-                                                <p class="game-seats" x-text="seatsLabel"></p>
-                                            </div>
-                                        </template>
-                                    </div>
-
-                                    <template x-if="recording">
-                                        <form class="game-panel-state" @submit.prevent="savePlayed()" novalidate>
-                                            <div>
-                                                <p class="modal-eyebrow">Off the calendar</p>
-                                                <h3 class="panel-heading" tabindex="-1"><span class="drop-cap" x-text="formTitle.charAt(0)"></span><span x-text="formTitle.slice(1)"></span></h3>
-                                            </div>
-                                            <p class="form-hint">For games played away from Waystone, or never put on the calendar. It takes its place in the chronicle by date.</p>
-                                            <div class="form-group">
-                                                <label for="recDate">Date</label>
-                                                <input id="recDate" type="date" :max="today" x-model="form.date">
-                                            </div>
-                                            <div class="game-field-row">
-                                                <div class="form-group">
-                                                    <label for="recStart">Start (optional)</label>
-                                                    <input id="recStart" type="time" x-model="form.start">
+                                                <div class="player-responses" x-show="isPlayer">
+                                                    <div class="session-actions session-replies" role="group" aria-label="Thy reply">
+                                                        <button type="button" class="btn-response btn-response--accepted" :class="{ 'selected': s.current_user_participation === 'Accepted' }" :aria-pressed="s.current_user_participation === 'Accepted'" :disabled="busy" @click="reply('Accepted', s)">Aye</button>
+                                                        <button type="button" class="btn-response btn-response--tentative" :class="{ 'selected': s.current_user_participation === 'Tentative' }" :aria-pressed="s.current_user_participation === 'Tentative'" :disabled="busy" @click="reply('Tentative', s)">Perhaps</button>
+                                                        <button type="button" class="btn-response btn-response--declined" :class="{ 'selected': s.current_user_participation === 'Declined' }" :aria-pressed="s.current_user_participation === 'Declined'" :disabled="busy" @click="reply('Declined', s)">Nay</button>
+                                                    </div>
                                                 </div>
-                                                <div class="form-group">
-                                                    <label for="recEnd">End (optional)</label>
-                                                    <input id="recEnd" type="time" x-model="form.end">
+                                                <div class="panel-dm-actions" x-show="isDM">
+                                                    <div class="session-actions">
+                                                        <button type="button" class="btn-action btn-action-confirm" x-show="s.status === 'Suggested'" :disabled="busy" @click="setSessionStatus('Confirmed', s)">Confirm</button>
+                                                        <button type="button" class="btn-action btn-action-cancel" :disabled="busy" @click="setSessionStatus('Cancelled', s)">Cancel</button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div class="form-group">
-                                                <span class="game-field-label" id="recWho">Who was there</span>
-                                                <ul class="game-checks" aria-labelledby="recWho">
-                                                    <template x-for="p in formPeople" :key="p.id">
-                                                        <li>
-                                                            <label class="game-check">
-                                                                <input type="checkbox" :value="p.id" x-model="form.attendees">
-                                                                <span x-html="userAvatarHtml(p, false)"></span>
-                                                                <span class="roster-name" :class="{ 'is-dm': p.id === campaign.dm }" x-text="rosterName(p)"></span>
-                                                            </label>
-                                                        </li>
-                                                    </template>
-                                                    <template x-for="(g, i) in form.guests" :key="'guest-' + g.toLowerCase()">
-                                                        <li class="game-check game-check--guest">
-                                                            <span aria-hidden="true" x-html="userAvatarHtml({ avatar_letter: guestLetter(g) }, false)"></span>
-                                                            <span class="roster-name" x-text="g"></span>
-                                                            <span class="game-guest-tag">guest</span>
-                                                            <button type="button" class="game-guest-remove" :aria-label="'Remove guest ' + g" @click="removeGuest(i)">&times;</button>
-                                                        </li>
-                                                    </template>
-                                                </ul>
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="recGuest">Guest (optional)</label>
-                                                <div class="game-guest-add">
-                                                    <input id="recGuest" type="text" maxlength="64" autocomplete="off" placeholder="Someone not in the game" x-model="form.guestDraft" @keydown.enter.prevent="addGuest()">
-                                                    <button type="button" class="btn-action" @click="addGuest()">+ Add</button>
-                                                </div>
-                                            </div>
-                                            <p class="game-form-error" role="alert" x-show="form.error" x-text="'✗ ' + form.error"></p>
-                                            <div class="game-form-btns">
-                                                <button type="submit" class="btn-create" :disabled="busy" x-text="editingId ? 'Save' : 'Record'"></button>
-                                                <button type="button" class="btn-cancel" :disabled="busy" @click="cancelRecord()">Cancel</button>
-                                            </div>
-                                        </form>
+                                            <button type="button" class="text-link game-back" @click="showCompany()">Show the company</button>
+                                        </div>
                                     </template>
 
-                                    <div id="message" class="message" :class="messageType" x-show="messageVisible" x-text="messageText"></div>
+                                    <template x-for="s in selectedPlayedList" :key="s.id">
+                                        <div class="game-panel-state">
+                                            <div>
+                                                <p class="modal-eyebrow" x-text="'Session ' + s.number"></p>
+                                                <h3 class="panel-heading" tabindex="-1" x-text="formatHeading(s.date, true)"></h3>
+                                            </div>
+                                            <div class="panel-session panel-journal">
+                                                <p class="modal-eyebrow">The journal</p>
+                                                <template x-if="s.journal">
+                                                    <div class="panel-journal-entry">
+                                                        <a class="journal-title" :href="journalUrl(s.id)" x-html="journalTitleHtml(campaign.title, s.number, s.journal.name)"></a>
+                                                        <p class="journal-excerpt" x-text="journalExcerpt(s.journal.excerpt_source)"></p>
+                                                        <p class="session-by" x-text="journalByline(s.journal)"></p>
+                                                        <div class="journal-actions">
+                                                            <a class="submit-btn" :href="journalUrl(s.id)">Read the entry</a>
+                                                            <a class="campaign-action-btn" :href="journalUrl(s.id) + '/history'" x-text="'History · ' + s.journal.revisions"></a>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                                <template x-if="!s.journal">
+                                                    <div class="panel-journal-entry">
+                                                        <p class="panel-empty">Nobody has written the entry for this session yet.</p>
+                                                        <div class="journal-actions" x-show="isMember">
+                                                            <a class="submit-btn" :href="journalUrl(s.id) + '/edit'">Write the entry</a>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                            <div class="panel-session">
+                                                <div class="panel-session-head">
+                                                    <span class="panel-session-time" x-text="playedTime(s)"></span>
+                                                    <span class="panel-status-tag" :class="s.manual ? 'chip-hand' : 'chip-Played'" x-text="s.manual ? 'By hand' : 'Played'"></span>
+                                                </div>
+                                                <div class="panel-session-meta" x-text="playedMeta(s)"></div>
+                                                <div class="roster">
+                                                    <template x-for="r in playedRoster(s)" :key="r.key">
+                                                        <div class="roster-row" :class="`avatars-${r.cls}`">
+                                                            <span class="roster-avatar" x-html="userAvatarHtml(r.user, false)"></span>
+                                                            <span class="roster-name" :class="{ 'is-dm': r.user.id === campaign.dm }">
+                                                                <span class="roster-crown" aria-hidden="true" x-show="r.user.id === campaign.dm">♛ </span>
+                                                                <template x-if="r.user.profile_url"><a :href="r.user.profile_url" x-text="r.user.display_name || r.user.name || 'Unknown'"></a></template>
+                                                                <template x-if="!r.user.profile_url"><span x-text="r.user.display_name || r.user.name || 'Unknown'"></span></template>
+                                                                <span class="game-you" x-show="r.user.id === currentUserId"> (you)</span>
+                                                            </span>
+                                                            <span class="roster-said" :class="`reply-${r.kind}`"><span x-html="replyGlyph(r.kind)"></span> <span x-text="r.label"></span></span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                                <div class="panel-dm-actions" x-show="isDM && s.manual">
+                                                    <div class="session-actions">
+                                                        <button type="button" class="btn-action" :disabled="busy" @click="startEdit(s)">Edit</button>
+                                                        <button type="button" class="btn-action btn-action-cancel" :disabled="busy" @click="deletePlayed(s)">Delete</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="text-link game-back" @click="showCompany()">Show the company</button>
+                                        </div>
+                                    </template>
 
-                                    <div class="game-foot">
-                                        <a class="campaign-action-btn" x-show="isMember" :href="'/games/' + encodeURIComponent(campaign.id) + '/calendar'"
-                                           :title="unansweredCount > 0 ? unansweredCount + ' suggested session' + (unansweredCount === 1 ? '' : 's') + ' awaiting your response' : null"
-                                           :aria-label="unansweredCount > 0 ? 'Calendar, ' + unansweredCount + ' awaiting your response' : null">Calendar<span class="campaign-action-count" x-show="unansweredCount > 0" x-text="unansweredCount"></span></a>
-                                        <template x-if="isDM">
-                                            <a class="campaign-action-btn" :href="'/campaigns?signups=' + encodeURIComponent(campaign.id)"
-                                               :title="pendingCount > 0 ? pendingCount + ' pending sign-up' + (pendingCount === 1 ? '' : 's') + ' awaiting your decision' : null"
-                                               :aria-label="pendingCount > 0 ? 'Sign-ups, ' + pendingCount + ' pending' : null">Sign-ups<span class="campaign-action-count" x-show="pendingCount > 0" x-text="pendingCount"></span></a>
-                                        </template>
-                                        <template x-if="!isMember && currentUserId">
-                                            <button type="button" class="campaign-action-btn" @click="toggleFollow()" :disabled="busy"
-                                                    :title="campaign.is_following ? 'Stop getting notifications for this game' : 'Get notified about status changes, sign-ups and sessions'"
-                                                    x-text="campaign.is_following ? 'Unfollow' : 'Follow'"></button>
-                                        </template>
-                                        <template x-if="!isDM && isPlayer">
-                                            <button type="button" class="campaign-action-btn" title="Leave this game" :disabled="busy" @click="withdraw()">Leave</button>
-                                        </template>
-                                        <template x-if="!isMember && signupStatus === 'Pending'">
-                                            <button type="button" class="campaign-action-btn" title="Withdraw your sign-up" :disabled="busy" @click="withdraw()">Withdraw</button>
-                                        </template>
-                                        <template x-if="!isMember && signupStatus === 'Declined'">
-                                            <button type="button" class="campaign-action-btn campaign-signup-btn" disabled aria-disabled="true">Declined</button>
-                                        </template>
-                                        <template x-if="!isMember && signupStatus === 'Kicked'">
-                                            <button type="button" class="campaign-action-btn campaign-signup-btn" disabled aria-disabled="true">Removed</button>
-                                        </template>
-                                        <template x-if="!isMember && signupStatus !== 'Pending' && signupStatus !== 'Declined' && signupStatus !== 'Kicked'">
-                                            <button type="button" class="campaign-action-btn campaign-signup-btn" :disabled="!campaign.sign_ups_open || busy" :aria-disabled="!campaign.sign_ups_open" @click="signUp()">Sign-up</button>
-                                        </template>
-                                        <a class="campaign-action-btn" x-show="campaign.can_manage" :href="'/campaigns?edit=' + encodeURIComponent(campaign.id)">Edit</a>
-                                        <button type="button" class="btn-danger" x-show="isAdmin" :disabled="busy" @click="deleteGame()">Delete game</button>
-                                    </div>
+                                    <template x-if="!selectedUpcoming && !selectedPlayed && !recording">
+                                        <div class="game-panel-state">
+                                            <div>
+                                                <p class="modal-eyebrow">Who rides</p>
+                                                <h3 class="panel-heading" tabindex="-1">The company</h3>
+                                            </div>
+                                            <div class="roster">
+                                                <template x-for="r in company" :key="r.user.id">
+                                                    <div class="roster-row">
+                                                        <span class="roster-avatar" x-html="userAvatarHtml(r.user, false)"></span>
+                                                        <span class="roster-name" :class="{ 'is-dm': r.dm }">
+                                                            <span class="roster-crown" aria-hidden="true" x-show="r.dm">♛ </span>
+                                                            <template x-if="r.user.profile_url"><a :href="r.user.profile_url" x-text="r.user.display_name || r.user.name || 'Unknown'"></a></template>
+                                                            <template x-if="!r.user.profile_url"><span x-text="r.user.display_name || r.user.name || 'Unknown'"></span></template>
+                                                            <span class="game-you" x-show="r.user.id === currentUserId"> (you)</span>
+                                                        </span>
+                                                        <span class="roster-said game-detail" x-show="r.detail" x-text="r.detail"></span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                            <p class="game-seats" x-text="seatsLabel"></p>
+                                        </div>
+                                    </template>
                                 </div>
-                            </aside>
-                        </div>
+
+                                <template x-if="recording">
+                                    <form class="game-panel-state" @submit.prevent="savePlayed()" novalidate>
+                                        <div>
+                                            <p class="modal-eyebrow">Off the calendar</p>
+                                            <h3 class="panel-heading" tabindex="-1" x-text="formTitle"></h3>
+                                        </div>
+                                        <p class="form-hint">For games played away from Waystone, or never put on the calendar. It takes its place in the chronicle by date.</p>
+                                        <div class="form-group">
+                                            <label for="recDate">Date</label>
+                                            <input id="recDate" type="date" :max="today" x-model="form.date">
+                                        </div>
+                                        <div class="game-field-row">
+                                            <div class="form-group">
+                                                <label for="recStart">Start (optional)</label>
+                                                <input id="recStart" type="time" x-model="form.start">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="recEnd">End (optional)</label>
+                                                <input id="recEnd" type="time" x-model="form.end">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <span class="game-field-label" id="recWho">Who was there</span>
+                                            <ul class="game-checks" aria-labelledby="recWho">
+                                                <template x-for="p in formPeople" :key="p.id">
+                                                    <li>
+                                                        <label class="game-check">
+                                                            <input type="checkbox" :value="p.id" x-model="form.attendees">
+                                                            <span x-html="userAvatarHtml(p, false)"></span>
+                                                            <span class="roster-name" :class="{ 'is-dm': p.id === campaign.dm }"><span class="roster-crown" aria-hidden="true" x-show="p.id === campaign.dm">♛ </span><span x-text="rosterName(p)"></span></span>
+                                                        </label>
+                                                    </li>
+                                                </template>
+                                                <template x-for="(g, i) in form.guests" :key="'guest-' + g.toLowerCase()">
+                                                    <li class="game-check game-check--guest">
+                                                        <span aria-hidden="true" x-html="userAvatarHtml({ avatar_letter: guestLetter(g) }, false)"></span>
+                                                        <span class="roster-name" x-text="g"></span>
+                                                        <span class="game-guest-tag">guest</span>
+                                                        <button type="button" class="game-guest-remove" :aria-label="'Remove guest ' + g" @click="removeGuest(i)">&times;</button>
+                                                    </li>
+                                                </template>
+                                            </ul>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="recGuest">Guest (optional)</label>
+                                            <div class="game-guest-add">
+                                                <input id="recGuest" type="text" maxlength="64" autocomplete="off" placeholder="Someone not in the game" x-model="form.guestDraft" @keydown.enter.prevent="addGuest()">
+                                                <button type="button" class="btn-action" @click="addGuest()">+ Add</button>
+                                            </div>
+                                        </div>
+                                        <p class="game-form-error" role="alert" x-show="form.error" x-text="'✗ ' + form.error"></p>
+                                        <div class="game-form-btns">
+                                            <button type="submit" class="btn-create" :disabled="busy" x-text="editingId ? 'Save' : 'Record'"></button>
+                                            <button type="button" class="btn-cancel" :disabled="busy" @click="cancelRecord()">Cancel</button>
+                                        </div>
+                                    </form>
+                                </template>
+
+                                <p class="game-leave" x-show="isPlayer && !isDM"><button type="button" class="text-link" :disabled="busy" @click="withdraw()">Leave this game</button></p>
+
+                                <div class="game-foot" x-show="isDM || (!isMember && currentUserId) || campaign.can_manage || isAdmin">
+                                    <template x-if="isDM">
+                                        <a class="campaign-action-btn" :href="'/campaigns?signups=' + encodeURIComponent(campaign.id)"
+                                           :title="pendingCount > 0 ? pendingCount + ' pending sign-up' + (pendingCount === 1 ? '' : 's') + ' awaiting your decision' : null"
+                                           :aria-label="pendingCount > 0 ? 'Sign-ups, ' + pendingCount + ' pending' : null">Sign-ups<span class="campaign-action-count" x-show="pendingCount > 0" x-text="pendingCount"></span></a>
+                                    </template>
+                                    <template x-if="!isMember && currentUserId">
+                                        <button type="button" class="campaign-action-btn" @click="toggleFollow()" :disabled="busy"
+                                                :title="campaign.is_following ? 'Stop getting notifications for this game' : 'Get notified about status changes, sign-ups and sessions'"
+                                                x-text="campaign.is_following ? 'Unfollow' : 'Follow'"></button>
+                                    </template>
+                                    <template x-if="!isMember && signupStatus === 'Pending'">
+                                        <button type="button" class="campaign-action-btn" title="Withdraw your sign-up" :disabled="busy" @click="withdraw()">Withdraw</button>
+                                    </template>
+                                    <template x-if="!isMember && signupStatus === 'Declined'">
+                                        <button type="button" class="campaign-action-btn campaign-signup-btn" disabled aria-disabled="true">Declined</button>
+                                    </template>
+                                    <template x-if="!isMember && signupStatus === 'Kicked'">
+                                        <button type="button" class="campaign-action-btn campaign-signup-btn" disabled aria-disabled="true">Removed</button>
+                                    </template>
+                                    <template x-if="!isMember && signupStatus !== 'Pending' && signupStatus !== 'Declined' && signupStatus !== 'Kicked'">
+                                        <button type="button" class="campaign-action-btn campaign-signup-btn" :disabled="!campaign.sign_ups_open || busy" :aria-disabled="!campaign.sign_ups_open" @click="signUp()">Sign-up</button>
+                                    </template>
+                                    <a class="campaign-action-btn" x-show="campaign.can_manage" :href="'/campaigns?edit=' + encodeURIComponent(campaign.id)">Edit</a>
+                                    <button type="button" class="btn-danger" x-show="isAdmin" :disabled="busy" @click="deleteGame()">Delete game</button>
+                                </div>
+                            </div>
+                        </aside>
                     </div>
 
                     <p class="ornament" aria-hidden="true">❦ ❦ ❦</p>
@@ -393,6 +391,8 @@
             </template>
         </main>
     </div>
+
+    <div id="message" class="message" :class="messageType" x-show="messageVisible" role="status" x-text="messageText"></div>
 
     <!-- Confirm Modal -->
     <div id="confirmModal" class="modal confirm-modal" :class="{ 'modal-open': confirmDialog.open }" @click.self="closeConfirm(false)" @keydown.escape.window="confirmDialog.open && closeConfirm(false)" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
@@ -411,8 +411,8 @@
         </div>
     </div>
 
-    <script src="/static/notifications.js?v=9"></script>
-    <script src="/campaigns.js?v=53"></script>
-    <script src="/static/game.js?v=7"></script>
+    <script src="/static/notifications.js?v=10"></script>
+    <script src="/campaigns.js?v=54"></script>
+    <script src="/static/game.js?v=9"></script>
 </body>
 </html>

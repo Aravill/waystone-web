@@ -61,7 +61,7 @@ Cards in a row share row tracks (CSS subgrid), so the same parts line up across 
 - **The Alpine `x-for` wrapper div is `display: contents`**, so cards are direct grid items.
 - **The separator is always aligned.** It is the first thing in the people track, so a long title or summary on one card never pushes it lower than on its neighbours.
 - **Status badge** is the only item in the head row's first line, left-aligned where the type label used to be.
-- **Buttons:** a 3-column grid with **up to two rows** (6 buttons). The track takes the height of the card with the most buttons; buttons align to the track's top, so a single row lines up with the first row of a double. Every banner must leave room for two rows.
+- **Buttons:** a 3-column grid with **up to two rows** (6 buttons). One clear action per banner (see Button rows below). The track takes the height of the card with the most buttons; buttons align to the track's top, so a single row lines up with the first row of a double. Every banner must leave room for two rows.
 - **Button hover:** the standard style-guide button states. A secondary button fills with `--ink` and its text turns `--bg`. The primary button drops to `opacity: 0.85`. Transitions are 0.15s on colour, background and border. On `:focus-visible` they get the rubric outline. Buttons don't move with the cloth, and hover doesn't animate the banner.
 - **Content padding:** `28px` left, `30px` right. The content box never overlaps an inner line (`x 7` or `x 353`), a tear or a chip. Side tears go at most ~22px deep.
 - **Height:** cards in a row are equally tall (the tallest content wins); the minimum is 598px. It is carried by `.banner-cloth` (`grid-row: 1 / 7`), an in-flow grid item, not by a min-height on the card.
@@ -104,9 +104,33 @@ Banners sway in the breeze, clearly visible but not distracting. This is a banne
 
 ---
 
+## Button rows
+
+The 3-column track holds one clear action per banner. `Calendar` shows only to members.
+
+| Viewer | Buttons |
+|--------|---------|
+| Player owing a reply | **Reply** (rubric fill, spans 2 columns, links to `/games/{id}`), Calendar |
+| Player otherwise | Calendar. Leave moved to the game page |
+| DM | Sign-ups (primary only while there are pending sign-ups, with the count tab), Calendar, Edit |
+| Not a member, sign-ups open | **Sign up** (primary, spans 2), Follow |
+| Not a member, sign-ups closed | Follow only (no disabled button) |
+| Pending sign-up | Withdraw, Follow |
+| Declined or removed | Follow; the facts line says "Sign-up declined" or "Removed from this game" |
+
+`can_manage` still adds Edit for admins. Secondary buttons use `--ctl` borders.
+
+### Facts wording
+
+- Seats: "4 players, no seat limit. Sign-ups open." or "1 of 4 seats taken. Sign-ups closed."
+- Next session: "Next: Fri, Nov 13, 18:00 CET", or "No session scheduled". The zone abbreviation is the session's own (`zoneAbbr()` in `campaigns.js`), never converted; a session without a zone shows no label.
+- The pending notice is 14.5px at weight 600 and still fits the notice row ("✦ A session awaits thy reply").
+- No type text label is added: the medallion stays the only type indicator.
+
 ## Order
 
-- **Needs action first**, then by status: Pitch · Ongoing · On Hiatus · Finished · Cancelled. Ties keep the API's order. Unknown statuses go last. Sorted in `loadCampaigns()` (`campaignNeedsAction()`, `bannerStatusRank()`).
+- **Sections:** the Games page lists banners in two sections, `§ Thy games` (the viewer is the DM or a player) and `§ Open to join` (not a member; sign-ups open, or the viewer's own sign-up is waiting). Each section is its own `.campaigns-list` grid with its own subgrid tracks. Every other game is a compact ledger row, not a banner (`STYLE_GUIDE.md`, Games page). The hash, FLIP sliding, hover and click-through work for banners as before.
+- **Needs action first**, then by status: Pitch · Ongoing · On Hiatus · Finished · Cancelled, inside each section. Ties keep the API's order. Unknown statuses go last. Sorted in `loadCampaigns()` (`campaignNeedsAction()`, `bannerStatusRank()`).
 - **Reordering slides, it never jumps.** When a refresh changes the order (a banner stops needing action, a status changes), every moved banner glides from its old place to its new one: FLIP via `bannerPositions()` / `slideBanners()`, 0.7s ease-out, translation only (no rotation, so the hairlines stay crisp). Skipped under reduced motion.
 
 ---
@@ -115,7 +139,7 @@ Banners sway in the breeze, clearly visible but not distracting. This is a banne
 
 - **Needs action:** the outline (1.5px), side edges, inner lines, ornaments and medallion rings turn `--rubric`, and the notice takes the headpiece row. This replaces the old rubric double frame.
   - **A flash rolls over the outline:** a light band sweeps diagonally (45°, top-left → bottom-right) across the rubric border, then pauses (4.5s cycle: ~2.5s sweep, ~2s rest). It's the outline's own stroke, a `userSpaceOnUse` linear gradient (`--rubric` · `--rubric` 25% mixed with white · `--rubric`) moved by `gradientTransform`, so there's no overlay path. The gradient is one shared definition (`#banner-flash`), so all needs-action cards flash in sync. Only the outline flashes; the ornaments, medallion and notice stay solid. The stroke falls back to solid `--rubric` under reduced motion or with the motion tweak off.
-- **Finished:** the whole card at `opacity: 0.72`, rising to `0.92` on hover.
+- **Finished:** no fading. The title is `--muted` and the body text stays readable (the old `opacity: 0.72` dropped it below 4.5:1).
 - **Click:** clicking the cloth opens the game page (`/games/{id}`). Only points inside the live outline path count (`isPointInFill` on `.banner-outline`, so it follows the sway and stretch); the empty corners of the card around the silhouette don't. Its own links, buttons and the medallion hotspot keep their behaviour, selecting text doesn't navigate, and Ctrl/Cmd/Shift/middle-click open a new tab. The cursor is a pointer only over the cloth (`.on-cloth`). The title is a plain-looking link (underlined only on `:focus-visible`) so keyboard and screen-reader users still have a target.
 - **Hover:** every banner reacts, needs-action included. Hover means a mouse pointer is over the cloth, not the card's rectangle. Touch is ignored (mouse only; a touch also clears any stored hover), and the medallion hotspot counts as cloth for hover (not for click): `campaigns.js` sets `.on-cloth` with the same outline hit test as the click (re-checked on scroll), and the CSS and the gust key off that class instead of `:hover`.
   - **Banners that need no action:** the banner catches a gust, so it feels like something you can pick up. Over 0.3s, the outline, inner lines, ornaments and inner medallion ring darken from `--line` / `--muted` to `--ink`. The flutter eases up to double (±8°) and the ripple to 2.3× (~7px), then settles back when the pointer leaves (eased per frame, factor 0.06, so it never jumps). Text and buttons stay still. With motion off, only the colour changes.

@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Waystone reading proposal</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&amp;family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&amp;family=Libertinus+Mono&amp;family=IM+Fell+English+SC&amp;family=UnifrakturMaguntia&amp;display=swap">
+<style>
+body{margin:0}
+.board{width:1570px;box-sizing:border-box;padding:40px;background:#CFC6B4;display:grid;grid-template-columns:repeat(3,470px);gap:40px;font-family:'Courier Prime',monospace}
+.board *{box-sizing:border-box}
+.col{--bg:#F2EAD8;--folio:#E6DBC2;--ink:#2B241C;--muted:#6B5E4B;--line:rgba(43,36,28,.4);--ctl:rgba(43,36,28,.64);--rubric:#8E2A1E;--verdigris:#355E52;--ochre:#7A5A12;background:var(--bg);color:var(--ink);padding:28px;display:flex;flex-direction:column;gap:34px;position:relative}
+.col.dark{--bg:#16120E;--folio:#2A231B;--ink:#E8DCC4;--muted:#A8997F;--line:rgba(232,220,196,.3);--ctl:rgba(232,220,196,.5);--rubric:#D9735C;--verdigris:#7FB09E;--ochre:#D4A94A}
+.colhead{font:400 30px 'IM Fell English SC',serif;margin:0;padding-bottom:12px;border-bottom:3px double var(--ink)}
+.tag{position:absolute;background:#1F4FB5;color:#fff;font:600 12px/1 Arial,sans-serif;padding:4px 6px;z-index:3}
+.blk{position:relative;display:flex;flex-direction:column;gap:12px}
+
+/* today: the current sizes and tracking from styles.css */
+.t{font-family:'Courier Prime',monospace}
+.t .eb{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--muted)}
+.t .hd{font:400 26px/1.15 'IM Fell English SC',serif}
+.t .hd i{font:400 34px/1 'UnifrakturMaguntia',serif;color:var(--rubric);font-style:normal}
+.t .card{border:1px solid var(--rubric);padding:16px;display:flex;flex-direction:column;gap:9px}
+.t .sh{display:flex;justify-content:space-between;align-items:center}
+.t .time{font-weight:700;font-size:15px}
+.t .st{font-size:11px;letter-spacing:2px;text-transform:uppercase;border:1px dashed var(--ink);padding:3px 7px}
+.t .meta{font-size:13px;color:var(--muted)}
+.t .r{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;font-size:13px;padding:5px 0;border-top:1px solid var(--line)}
+.t .av{width:30px;height:30px;border:2px dotted var(--muted);background:var(--folio);color:var(--rubric);font:400 18px/26px 'IM Fell English SC',serif;text-align:center}
+.t .av.y{border:2px solid var(--verdigris)}
+.t .sd{font-weight:700;font-size:12.5px;color:var(--rubric)}
+.t .sd.y{color:var(--verdigris)}
+.t .ask{font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--rubric)}
+.t .bs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.t .b{min-height:44px;font:400 12px 'Courier Prime',monospace;letter-spacing:2px;text-transform:uppercase;background:none;border:1px solid var(--verdigris);color:var(--verdigris)}
+.t .b.q{border-color:var(--ochre);color:var(--ochre)}
+.t .b.n{border-color:var(--rubric);color:var(--rubric)}
+.t .sec{font:400 24px 'IM Fell English SC',serif;color:var(--rubric)}
+.t .cells{display:flex;gap:10px}
+.t .cell{width:88px;height:88px;padding:4px 5px;border:1px solid var(--verdigris);background:color-mix(in srgb,var(--verdigris) 10%,var(--bg));display:flex;flex-direction:column;font-size:11px;line-height:1.25}
+.t .cell.s{border:1px dashed var(--ink);background:var(--folio);outline:2px solid var(--rubric)}
+.t .cell b{font-size:12px;font-weight:400}
+.t .tl{margin-top:auto;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);font-size:11px;text-align:center;padding-top:2px}
+.t .tl span{color:var(--verdigris)} .t .tl span.a{color:var(--rubric)} .t .tl span.z{color:var(--muted)}
+.t .title{font:400 27px/1.15 'IM Fell English SC',serif}
+.t .sys{font-style:italic;font-size:14px;color:var(--muted)}
+.t .sum{font-size:14px;color:var(--muted)}
+.t .fin{opacity:.72}
+.t .sb{display:inline-block;font-size:11px;letter-spacing:2px;text-transform:uppercase;border:1px solid currentColor;padding:3px 8px;color:var(--muted);align-self:flex-start}
+.t .ct{display:flex;gap:8px}
+.t .btn{min-height:40px;padding:0 14px;background:none;color:var(--ink);border:1px solid var(--line);font:400 12px 'Courier Prime',monospace;letter-spacing:1px;text-transform:uppercase}
+.t .btn.off{opacity:.5}
+.t label{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.t .input{border-bottom:1px solid var(--ink);padding:10px 2px;font-size:16px}
+.t .hint{font-size:13px;color:var(--muted)}
+
+/* proposed */
+.p{font-family:var(--mono);font-size:16px;line-height:1.55}
+.p .eb{font-size:14px;color:var(--muted);margin:0}
+.p .hd{font:600 22px/1.2 var(--mono);margin:0}
+.p .card{border:1px solid var(--rubric);padding:18px;display:flex;flex-direction:column;gap:10px}
+.p .sh{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.p .time{font-weight:600;font-size:16px}
+.p .st{font-size:13.5px;border:1px dashed var(--ctl);padding:1px 8px}
+.p .meta{font-size:14px;color:var(--muted);line-height:1.45}
+.p .r{display:grid;grid-template-columns:32px 1fr auto;gap:11px;align-items:center;font-size:15px;padding:6px 0;border-top:1px solid var(--line)}
+.p .av{width:32px;height:32px;border:2px dotted var(--muted);background:var(--folio);color:var(--ink);font:400 19px/28px 'IM Fell English SC',serif;text-align:center}
+.p .av.y{border:2px solid var(--verdigris)}
+.p .sd{font-size:14px;color:var(--muted)}
+.p .sd.y{color:var(--verdigris);font-weight:500}
+.p .me{color:var(--rubric);font-weight:600}
+.p .bs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.p .b{min-height:46px;font:500 15px var(--mono);background:none;border:1px solid var(--verdigris);color:var(--verdigris)}
+.p .b.q{border-color:var(--ochre);color:var(--ochre)}
+.p .b.n{border-color:var(--ctl);color:var(--ink)}
+.p .sec{font:400 25px 'IM Fell English SC',serif;margin:0}
+.p .sec span{color:var(--rubric)}
+.p .cells{display:flex;gap:10px}
+.p .cell{width:88px;height:88px;padding:5px 7px;border:1px solid var(--verdigris);background:color-mix(in srgb,var(--verdigris) 10%,var(--bg));display:flex;flex-direction:column;font-size:14px;line-height:1.3}
+.p .cell.s{border:1px dashed var(--ink);background:var(--folio);outline:2px solid var(--rubric)}
+.p .cell b{font-size:16px;font-weight:600}
+.p .cell.s b{color:var(--rubric)}
+.p .tl{margin-top:auto;display:flex;justify-content:space-between;font-size:14px;font-weight:500}
+.p .tl .y{color:var(--verdigris)} .p .tl .a{color:var(--muted)} .p .cell.s .tl .a{color:var(--rubric)}
+.p .title{font:400 28px/1.15 'IM Fell English SC',serif}
+.p .sys{font-style:italic;font-size:15px;color:var(--muted)}
+.p .sum{font-size:15px}
+.p .fin .title{color:var(--muted)}
+.p .sb{display:inline-block;font-size:13.5px;border:1px solid currentColor;padding:1px 8px;color:var(--muted);align-self:flex-start}
+.p .ct{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.p .btn{min-height:42px;padding:0 16px;background:none;color:var(--ink);border:1px solid var(--ctl);font:500 14.5px var(--mono)}
+.p .note{font-size:14px;color:var(--muted)}
+.p label{font-size:14.5px;font-weight:500;color:var(--ink)}
+.p .input{border-bottom:1px solid var(--ink);padding:9px 2px;font-size:16px}
+.p .hint{font-size:14px;color:var(--muted);line-height:1.45}
+</style>
+</helmet>
+
+<div class="board" style="--mono: {{mono}}">
+
+<!-- TODAY -->
+<section class="col t">
+<h2 class="colhead">Today</h2>
+<div class="blk">
+<div><div class="eb">Suggested session</div><div class="hd"><i>F</i>riday, November 20</div></div>
+<div class="card">
+<div class="sh"><span class="time">18:00–22:00</span><span class="st">Suggested</span></div>
+<div class="meta">4h · proposed by ♛ Aravill</div>
+<div class="r"><div class="av y">R</div><div>Roy</div><div class="sd y">✓ Accepted</div></div>
+<div class="r"><div class="av">T</div><div>Testy (you)</div><div class="sd">… Awaiting</div></div>
+<div class="r"><div class="av">A</div><div>Adam</div><div class="sd">… Awaiting</div></div>
+<div class="r"><div class="av">S</div><div>Simon</div><div class="sd">… Awaiting</div></div>
+<div class="ask">✦ Thy reply</div>
+<div class="bs"><button class="b">✓ Aye</button><button class="b q">? Perhaps</button><button class="b n">✗ Nay</button></div>
+</div>
+</div>
+<div class="blk">
+<div class="cells">
+<div class="cell"><b>13</b>18:00-22:00<div class="tl"><span>✓3</span><span class="z">?0</span><span class="z">✗0</span><span class="a">…1</span></div></div>
+<div class="cell s"><b>20</b>18:00-22:00<div class="tl"><span>✓1</span><span class="z">?0</span><span class="z">✗0</span><span class="a">…3</span></div></div>
+</div>
+</div>
+<div class="blk">
+<div class="sec">§ The chronicle</div>
+<div class="hd"><i>A</i>ge of Sojourn</div>
+<div class="sb" style="color:var(--verdigris)">● Ongoing</div>
+<div class="title">The Lantern Road</div>
+<div class="sys">Cyberpunk Red</div>
+<div class="sum">Escort a convoy of lantern-bearers through the dead zone</div>
+<div class="meta">4 / ∞ seats · sign-ups open</div>
+<div class="meta">Session 12 · Fri, Nov 13 · 18:00</div>
+</div>
+<div class="blk fin">
+<div class="sb">✓ Finished</div>
+<div class="title">Night at the Gilded Goose</div>
+<div class="sum">A murder at the inn, solved before the candles burned out</div>
+<div class="ct"><button class="btn">Calendar</button><button class="btn off">Sign-up</button><button class="btn">Follow</button></div>
+</div>
+<div class="blk">
+<label>Desired player count</label>
+<div class="input">4</div>
+<div class="hint">Leave blank for unlimited (sign-ups never auto-close)</div>
+</div>
+</section>
+
+<!-- PROPOSED, PARCHMENT -->
+<section class="col p">
+<h2 class="colhead">Proposed, parchment</h2>
+<span class="tag" style="left:28px;top:84px">R3 dates</span>
+<div class="blk" style="padding-top:18px">
+<div><p class="eb">Suggested session</p><h3 class="hd">Friday, Nov 20</h3></div>
+<div class="card">
+<span class="tag" style="right:6px;top:-11px">R4 red = you</span>
+<div class="sh"><span class="time">18:00–22:00 CET</span><span class="st">Suggested</span></div>
+<div class="meta">4 hours, proposed by ♛ Aravill</div>
+<div class="r"><div class="av y">R</div><div>Roy</div><div class="sd y">✓ Aye</div></div>
+<div class="r"><div class="av">T</div><div>Testy (you)</div><div class="sd me">Thy reply?</div></div>
+<div class="r"><div class="av">A</div><div>Adam</div><div class="sd">No reply yet</div></div>
+<div class="r"><div class="av">S</div><div>Simon</div><div class="sd">No reply yet</div></div>
+<div class="bs"><button class="b">✓ Aye</button><button class="b q">? Perhaps</button><button class="b n">✗ Nay</button></div>
+</div>
+</div>
+<div class="blk">
+<span class="tag" style="left:200px;top:0">R1 no zeroes, larger</span>
+<div class="cells">
+<div class="cell"><b>13</b>18:00<div class="tl"><span class="y">✓3</span><span class="a">…1</span></div></div>
+<div class="cell s"><b>20</b>18:00<div class="tl"><span class="y">✓1</span><span class="a">…3</span></div></div>
+</div>
+</div>
+<div class="blk">
+<span class="tag" style="right:0;top:0">R2 base font</span>
+<h3 class="sec"><span>§</span> The chronicle</h3>
+<div class="title" style="font-size:30px">Age of Sojourn</div>
+<div class="sb" style="color:var(--verdigris)">● Ongoing</div>
+<div class="title">The Lantern Road</div>
+<div class="sys">Cyberpunk Red</div>
+<div class="sum">Escort a convoy of lantern-bearers through the dead zone</div>
+<div class="meta">4 players, no seat limit. Sign-ups open.</div>
+<div class="meta">Next: Fri, Nov 13, 18:00 CET</div>
+</div>
+<div class="blk fin">
+<span class="tag" style="right:0;top:0">R5 contrast</span>
+<div class="sb">✓ Finished</div>
+<div class="title">Night at the Gilded Goose</div>
+<div class="sum">A murder at the inn, solved before the candles burned out</div>
+<div class="ct"><button class="btn">Follow</button><span class="note">Sign-ups closed</span></div>
+</div>
+<div class="blk">
+<label>Desired player count</label>
+<div class="input">4</div>
+<div class="hint">Leave blank for no limit. Sign-ups then never close on their own.</div>
+</div>
+</section>
+
+<!-- PROPOSED, CANDLELIGHT -->
+<section class="col p dark">
+<h2 class="colhead">Proposed, candlelight</h2>
+<div class="blk" style="padding-top:18px">
+<div><p class="eb">Suggested session</p><h3 class="hd">Friday, Nov 20</h3></div>
+<div class="card">
+<div class="sh"><span class="time">18:00–22:00 CET</span><span class="st">Suggested</span></div>
+<div class="meta">4 hours, proposed by ♛ Aravill</div>
+<div class="r"><div class="av y">R</div><div>Roy</div><div class="sd y">✓ Aye</div></div>
+<div class="r"><div class="av">T</div><div>Testy (you)</div><div class="sd me">Thy reply?</div></div>
+<div class="r"><div class="av">A</div><div>Adam</div><div class="sd">No reply yet</div></div>
+<div class="r"><div class="av">S</div><div>Simon</div><div class="sd">No reply yet</div></div>
+<div class="bs"><button class="b">✓ Aye</button><button class="b q">? Perhaps</button><button class="b n">✗ Nay</button></div>
+</div>
+</div>
+<div class="blk">
+<div class="cells">
+<div class="cell"><b>13</b>18:00<div class="tl"><span class="y">✓3</span><span class="a">…1</span></div></div>
+<div class="cell s"><b>20</b>18:00<div class="tl"><span class="y">✓1</span><span class="a">…3</span></div></div>
+</div>
+</div>
+<div class="blk">
+<h3 class="sec"><span>§</span> The chronicle</h3>
+<div class="title" style="font-size:30px">Age of Sojourn</div>
+<div class="sb" style="color:var(--verdigris)">● Ongoing</div>
+<div class="title">The Lantern Road</div>
+<div class="sys">Cyberpunk Red</div>
+<div class="sum">Escort a convoy of lantern-bearers through the dead zone</div>
+<div class="meta">4 players, no seat limit. Sign-ups open.</div>
+<div class="meta">Next: Fri, Nov 13, 18:00 CET</div>
+</div>
+<div class="blk fin">
+<div class="sb">✓ Finished</div>
+<div class="title">Night at the Gilded Goose</div>
+<div class="sum">A murder at the inn, solved before the candles burned out</div>
+<div class="ct"><button class="btn">Follow</button><span class="note">Sign-ups closed</span></div>
+</div>
+<div class="blk">
+<label>Desired player count</label>
+<div class="input">4</div>
+<div class="hint">Leave blank for no limit. Sign-ups then never close on their own.</div>
+</div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"baseFont":{"editor":"enum","options":["IBM Plex Mono","Courier Prime","Libertinus Mono"],"default":"IBM Plex Mono"},"$preview":{"width":1570,"height":1525}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const f = this.props.baseFont ?? 'IBM Plex Mono';
+    return { mono: f + ', monospace' };
+  }
+}
+</script>
+</body>
+</html>
