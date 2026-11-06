@@ -12,6 +12,7 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 | `calendar.png` | Calendar grid, reply buttons, drawn when the calendar was a modal sheet (its session chips are superseded by `calendar-days.html`) |
 | `calendar-days.html` | Calendar redesign: the Ledger day cell, the Roll call panel, the strong candidate frame (variant A and panel 2 are the chosen ones) |
 | `game-detail.dc.html` | The game page: the sheet, the tale, the chronicle (Ahead cells, Played rows) and the session panel |
+| `game-journal.html` | The game journal: the Played rows' entry line, the panel block, the entry page, editor, "Combine your changes" and history (plan: `game-journal-plan.md`) |
 | `banners.dc.html` | The banner redesign: three variants, see `BANNER_DESIGN_GUIDE.md` |
 
 ## Design Philosophy
@@ -168,6 +169,23 @@ The drop cap is optional and goes on the page h1, except on the game page, whose
 ### Game page: the tale and the ledger
 
 The game page uses the modal sheet (double frame, `3px double` head rule) with the tale and the chronicle on the left and a session panel on the right, split by an ink rule. In the chronicle, **Ahead** reuses the calendar's `.day-frame` cells (a button per upcoming session, tally for members only), and **Played** is one `<li>` per session holding a full-width row button, so later elements can sit under it. Both select into the panel, which reuses the calendar panel's card, roster and reply buttons. Player avatars in a button are never links. When the layout stacks (≤ 900px), the actions move to the top of the sheet, above the tale, and the panel's session details and company sit below the chronicle. The actions keep their place in the DOM, so on a stacked layout with a keyboard they come after the chronicle in tab order.
+
+### Breadcrumb
+
+Every page below the Games page, and the change-password page, opens with `<nav class="game-crumb" aria-label="Breadcrumb">`: 13px uppercase links separated by ` › `, and the current page last as plain text with `aria-current="page"`. It replaces the × close link, which the game page no longer has. Pop-ups keep their ×. The change-password page also shows the main nav (Profile active), except on a forced change, where neither appears.
+
+### Game journal
+
+Each played session can have one entry, written in the game description's Markdown (`renderMarkdown` in `campaigns.js`, `.game-text`). The mock-up is `docs/design/mockups/game-journal.html`.
+
+- **Titles:** "Game 31: Name", set as the game title, the number in the text face (`.t-no`, because the display face's old-style numerals make "31" read as "3I"), then the optional name. The number comes from the session and is never stored.
+- **Pages:** `/games/{id}/journal/{sessionId}` (entry), `/edit` and `/history`, one page with a title block under the breadcrumb and, as on the calendar page, two panes split by an ink rule. The pane rules are scoped under `.journal-page` (`ins` and `del` are the diff colours: verdigris underlined, rubric struck through).
+- **Played rows:** the `<li class="game-row">` holds the session button and, under it, `.entry-line`: the entry title as a link plus a "Penned by … · amended by …" byline, or "No entry yet" with a "✎ Write the entry →" link for members. Hover and selection sit on the row. The same block is the first card of the session panel (`.panel-journal`, ink border).
+- **Entries on cancelled sessions** are one muted line under Played (`.entry-cancelled`). Their page is read-only.
+- **Editor:** name, text and preview side by side (Write/Preview tabs at ≤ 768px), an optional note, one `.notice` for errors. A failed save never discards the draft. Leaving a dirty draft asks first (`beforeunload`).
+- **Combine your changes:** one card per conflict, each with Yours and the other scribe's version as word diffs and a row of picks (Keep yours, Keep theirs, Keep both when both added, Combine by hand). A rubric border means undecided, a hairline means decided. The merged entry shows below, and Save stays disabled until every conflict is decided.
+- **History:** revisions newest first with a +/- word count, and the selected one as a diff against the one before, or its full text. Restoring asks first and saves a new revision. The newest 200 revisions are kept, and the page says so once older ones are gone.
+- **Buttons:** primary is `.submit-btn` (set to `width: auto` outside a form column), secondary `.campaign-action-btn`, Delete `.btn-danger`. Confirmations reuse the game page's modal. Errors are plain and precise.
 
 ### Buttons
 
