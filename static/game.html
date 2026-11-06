@@ -6,7 +6,7 @@
     <title>Waystone - Game</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=5"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=60">
+    <link rel="stylesheet" href="/static/styles.css?v=61">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -29,7 +29,12 @@
 
     <div class="container game-page">
         <main>
-            <a class="game-crumb" href="/campaigns" x-show="!campaign">← All games</a>
+            <nav class="game-crumb" aria-label="Breadcrumb">
+                <a :href="campaign ? '/campaigns#campaign-' + encodeURIComponent(campaign.id) : '/campaigns'">Games</a>
+                <template x-if="campaign">
+                    <span><span aria-hidden="true"> › </span><span aria-current="page" x-text="campaign.title"></span></span>
+                </template>
+            </nav>
 
             <p x-show="loading">Loading game...</p>
             <div class="game-error" role="alert" x-show="loadError">
@@ -59,7 +64,6 @@
                             </div>
                             <div class="game-head-actions">
                                 <a x-show="isMember" :href="'/games/' + encodeURIComponent(campaign.id) + '/calendar'">Open calendar →</a>
-                                <a class="modal-close game-close" :href="'/campaigns#campaign-' + encodeURIComponent(campaign.id)" aria-label="Back to all games" title="Back to all games">&times;</a>
                             </div>
                         </div>
 
@@ -73,7 +77,7 @@
                                 <section class="game-chronicle" aria-labelledby="chronicleHeading">
                                     <div class="game-ledger-nav">
                                         <h2 id="chronicleHeading" class="section-header">The chronicle</h2>
-                                        <span class="game-count" x-text="played.length + ' session' + (played.length === 1 ? '' : 's') + ' played'"></span>
+                                        <span class="game-count" x-text="played.length + ' session' + (played.length === 1 ? '' : 's') + ' played · ' + journalCount + ' in the journal'"></span>
                                         <div class="calendar-legend">
                                             <span class="legend-item legend-confirmed">confirmed</span>
                                             <span class="legend-item legend-suggested">suggested</span>
@@ -117,8 +121,8 @@
                                     <p class="panel-empty" x-show="played.length === 0">No sessions played yet.</p>
                                     <ol class="game-entries" reversed>
                                         <template x-for="s in visibleSessions" :key="s.id">
-                                            <li>
-                                                <button type="button" class="game-entry" :class="{ 'is-selected': selectedId === s.id }" :aria-pressed="selectedId === s.id" :aria-label="entryLabel(s)" @click="pick(s.id)">
+                                            <li class="game-row" :class="{ 'is-selected': selectedId === s.id }">
+                                                <button type="button" class="game-entry" :aria-pressed="selectedId === s.id" :aria-label="entryLabel(s)" @click="pick(s.id)">
                                                     <span class="game-entry-no" aria-hidden="true" x-text="s.number"></span>
                                                     <span>
                                                         <span class="game-entry-date"><span x-text="formatDate(s.date)"></span><span class="panel-status-tag chip-hand" x-show="s.manual" title="Added by the DM, not from the calendar">By hand</span></span>
@@ -130,10 +134,30 @@
                                                         </template>
                                                     </span>
                                                 </button>
+                                                <div class="entry-line">
+                                                    <template x-if="s.journal">
+                                                        <a class="entry-link" :href="journalUrl(s.id)" x-text="s.journal.name || 'Unnamed entry'"></a>
+                                                    </template>
+                                                    <template x-if="s.journal">
+                                                        <span class="session-by" x-text="journalByline(s.journal)"></span>
+                                                    </template>
+                                                    <template x-if="!s.journal">
+                                                        <span class="entry-none">No entry yet</span>
+                                                    </template>
+                                                    <template x-if="!s.journal && isMember">
+                                                        <span class="session-by"><a :href="journalUrl(s.id) + '/edit'">✎ Write the entry →</a></span>
+                                                    </template>
+                                                </div>
                                             </li>
                                         </template>
                                     </ol>
                                     <button type="button" class="game-more" x-show="played.length > 5" :aria-expanded="showAll" @click="showAll = !showAll" x-text="showAll ? 'Show fewer ↑' : 'Show all ' + played.length + ' sessions ↓'"></button>
+                                    <p class="entry-cancelled" x-show="cancelledEntries.length > 0">
+                                        <span>Entries on cancelled sessions:</span>
+                                        <template x-for="c in cancelledEntries" :key="c.session_id">
+                                            <a :href="journalUrl(c.session_id)" x-text="cancelledLabel(c)"></a>
+                                        </template>
+                                    </p>
                                 </section>
                             </div>
 
@@ -190,6 +214,28 @@
                                                 <div>
                                                     <p class="modal-eyebrow" x-text="'Session ' + s.number"></p>
                                                     <h3 class="panel-heading" tabindex="-1"><span class="drop-cap" x-text="formatHeading(s.date, true).charAt(0)"></span><span x-text="formatHeading(s.date, true).slice(1)"></span></h3>
+                                                </div>
+                                                <div class="panel-session panel-journal">
+                                                    <p class="modal-eyebrow">The journal</p>
+                                                    <template x-if="s.journal">
+                                                        <div class="panel-journal-entry">
+                                                            <a class="journal-title" :href="journalUrl(s.id)" x-html="journalTitleHtml(campaign.title, s.number, s.journal.name)"></a>
+                                                            <p class="journal-excerpt" x-text="journalExcerpt(s.journal.excerpt_source)"></p>
+                                                            <p class="session-by" x-text="journalByline(s.journal)"></p>
+                                                            <div class="journal-actions">
+                                                                <a class="submit-btn" :href="journalUrl(s.id)">Read the entry</a>
+                                                                <a class="campaign-action-btn" :href="journalUrl(s.id) + '/history'" x-text="'History · ' + s.journal.revisions"></a>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                    <template x-if="!s.journal">
+                                                        <div class="panel-journal-entry">
+                                                            <p class="panel-empty">Nobody has written the entry for this session yet.</p>
+                                                            <div class="journal-actions" x-show="isMember">
+                                                                <a class="submit-btn" :href="journalUrl(s.id) + '/edit'">Write the entry</a>
+                                                            </div>
+                                                        </div>
+                                                    </template>
                                                 </div>
                                                 <div class="panel-session">
                                                     <div class="panel-session-head">
@@ -366,7 +412,7 @@
     </div>
 
     <script src="/static/notifications.js?v=9"></script>
-    <script src="/campaigns.js?v=52"></script>
-    <script src="/static/game.js?v=6"></script>
+    <script src="/campaigns.js?v=53"></script>
+    <script src="/static/game.js?v=7"></script>
 </body>
 </html>

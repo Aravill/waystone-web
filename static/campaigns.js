@@ -1102,3 +1102,81 @@ function escapeHtml(text) {
     };
     return String(text).replace(/[&<>"']/g, (m) => map[m]);
 }
+
+// Basic Markdown, safe by construction: the whole input is HTML-escaped first, then only
+// whitelisted tags are produced. Supports paragraphs, **bold** (may contain *italic*),
+// *italic*/_italic_, [text](url), "- " / "1. " lists (also right after a text line), "#" headings
+// (rendered as h3/h4) and "> " quotes. Every pattern is bounded, so rendering stays linear.
+function renderMarkdown(text) {
+    const src = escapeHtml(String(text || '').replace(/\0/g, '').replace(/\r\n?/g, '\n'));
+    const inline = (line) => {
+        const links = [];
+        let out = line.replace(/\[([^\[\]\n]{1,300})\]\(((?:[^()\s]|\([^()\s]*\)){1,2000})\)/g, (m, label, url) => {
+            if (!/^(https?:\/\/|mailto:)\S+$/i.test(url)) return m;
+            links.push(`<a href="${url}" target="_blank" rel="noopener noreferrer nofollow">${label}</a>`);
+            return `\0${links.length - 1}\0`;
+        });
+        out = out
+            .replace(/\*\*(?=[^\s*])([^\n]{1,1000}?)\*\*/g, '<strong>$1</strong>')
+            .replace(/(^|[^*\w])\*([^*\s][^*\n]*?)\*(?![*\w])/g, '$1<em>$2</em>')
+            .replace(/(^|[^\w])_([^_\s][^_\n]*?)_(?!\w)/g, '$1<em>$2</em>');
+        return out.replace(/\0(\d+)\0/g, (m, i) => links[Number(i)]);
+    };
+    const kindOf = (l) => /^[-*]\s+/.test(l) ? 'ul' : /^\d+\.\s+/.test(l) ? 'ol' : /^&gt;\s?/.test(l) ? 'quote' : 'text';
+    const strip = { ul: /^[-*]\s+/, ol: /^\d+\.\s+/, quote: /^&gt;\s?/ };
+    // A run of lines of one kind becomes one element, so a list may follow a text line directly.
+    const renderRun = (kind, lines) => {
+        if (kind === 'text') return `<p>${lines.map(inline).join('<br>')}</p>`;
+        const items = lines.map((l) => inline(l.replace(strip[kind], '')));
+        if (kind === 'quote') return '<blockquote>' + items.join('<br>') + '</blockquote>';
+        return `<${kind}>` + items.map((i) => `<li>${i}</li>`).join('') + `</${kind}>`;
+    };
+    const blocks = src.split(/\n[ \t]*\n/).map((b) => b.trim()).filter(Boolean);
+    return blocks.map((block) => {
+        let lines = block.split('\n');
+        let out = '';
+        const head = lines[0].match(/^(#{1,3})\s+(.*)$/);
+        if (head) {
+            const tag = head[1].length === 3 ? 'h4' : 'h3';
+            out += `<${tag}>${inline(head[2])}</${tag}>`;
+            lines = lines.slice(1);
+        }
+        let run = [], kind = '';
+        for (const line of lines) {
+            const k = kindOf(line);
+            if (run.length && k !== kind) {
+                out += renderRun(kind, run);
+                run = [];
+            }
+            kind = k;
+            run.push(line);
+        }
+        return out + (run.length ? renderRun(kind, run) : '');
+    }).join('');
+}
+
+// Journal: "Penned by A · amended by B, C" from an entry or summary (author_user, amender_users).
+// Repeated names collapse, so several anonymised amenders read as one "Deleted user".
+function journalByline(j) {
+    const name = (u) => (u && (u.display_name || u.name)) || 'Unknown';
+    const others = [...new Set((j.amender_users || []).map(name))];
+    return 'Penned by ' + name(j.author_user) + (others.length ? ' · amended by ' + others.join(', ') : '');
+}
+
+// First plain-text paragraph of an entry body, cut at 130 characters.
+function journalExcerpt(body) {
+    const para = String(body || '').split(/\n[ \t]*\n/).map((p) => p.trim()).filter(Boolean).find((p) => !/^#/.test(p)) || '';
+    const plain = para.replace(/[*_>#]/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').trim();
+    return plain.length > 130 ? plain.slice(0, 130).trimEnd() + '…' : plain;
+}
+
+// "Age of Sojourn 31: The Summit". The number comes from the session and is never stored with an entry.
+function journalTitle(game, number, name) {
+    return game + (number ? ' ' + number : '') + (name ? ': ' + name : '');
+}
+
+// The same title as escaped HTML. The number is set in the text face: the display face's old-style numerals read badly.
+function journalTitleHtml(game, number, name, dropCap = false) {
+    const head = dropCap && game ? `<span class="drop-cap">${escapeHtml(game.charAt(0))}</span>${escapeHtml(game.slice(1))}` : escapeHtml(game);
+    return head + (number ? ` <span class="t-no">${number}</span>` : '') + (name ? ': ' + escapeHtml(name) : '');
+}

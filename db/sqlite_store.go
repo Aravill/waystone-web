@@ -171,6 +171,44 @@ func (s *SQLiteStore) initSchema() error {
 		read_at TEXT NOT NULL DEFAULT ''
 	);
 
+	CREATE TABLE IF NOT EXISTS journal_entries (
+		id TEXT PRIMARY KEY,
+		campaign_id TEXT NOT NULL,
+		session_id TEXT NOT NULL UNIQUE,
+		author_id TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+		FOREIGN KEY (session_id) REFERENCES campaign_sessions(id) ON DELETE CASCADE,
+		FOREIGN KEY (author_id) REFERENCES users(id)
+	);
+
+	CREATE TABLE IF NOT EXISTS journal_revisions (
+		entry_id TEXT NOT NULL,
+		number INTEGER NOT NULL,
+		author_id TEXT NOT NULL,
+		name TEXT NOT NULL DEFAULT '',
+		body TEXT NOT NULL,
+		note TEXT NOT NULL DEFAULT '',
+		restored_from INTEGER NOT NULL DEFAULT 0,
+		merged_with INTEGER NOT NULL DEFAULT 0,
+		created_at TEXT NOT NULL,
+		PRIMARY KEY (entry_id, number),
+		FOREIGN KEY (entry_id) REFERENCES journal_entries(id) ON DELETE CASCADE,
+		FOREIGN KEY (author_id) REFERENCES users(id)
+	);
+
+	-- Credit outlives pruning: one row per person per entry.
+	CREATE TABLE IF NOT EXISTS journal_contributors (
+		entry_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		revisions INTEGER NOT NULL,
+		first_revision INTEGER NOT NULL,
+		PRIMARY KEY (entry_id, user_id),
+		FOREIGN KEY (entry_id) REFERENCES journal_entries(id) ON DELETE CASCADE,
+		FOREIGN KEY (user_id) REFERENCES users(id)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_journal_entries_campaign_id ON journal_entries(campaign_id);
 	CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at);
 	CREATE INDEX IF NOT EXISTS idx_notifications_campaign_id ON notifications(campaign_id);
 	CREATE INDEX IF NOT EXISTS idx_campaign_follows_user_id ON campaign_follows(user_id);
@@ -1070,6 +1108,10 @@ func (s *SQLiteStore) DeleteManualSession(sessionID string) error {
 	if _, err := tx.Exec(`DELETE FROM session_responses WHERE session_id = ? AND EXISTS (SELECT 1 FROM campaign_sessions WHERE id = ? AND manual = 1)`, sessionID, sessionID); err != nil {
 		return err
 	}
+	// A by-hand session that is deleted didn't happen, so its journal entry goes too.
+	if err := deleteJournalForSessions(tx, `SELECT id FROM campaign_sessions WHERE id = ? AND manual = 1`, sessionID); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM campaign_sessions WHERE id = ? AND manual = 1`, sessionID); err != nil {
 		return err
 	}
@@ -1380,6 +1422,8 @@ var (
 	ErrSystemNotFound       = errors.New("system not found")
 	ErrUserNotFound         = errors.New("user not found")
 	ErrNotificationNotFound = errors.New("notification not found")
+	ErrJournalSessionGone   = errors.New("session not found")
+	ErrJournalNotFound      = errors.New("journal entry not found")
 )
 
 func (s *SQLiteStore) CreateCampaignSignup(signup models.CampaignSignup) error {
@@ -1655,6 +1699,9 @@ func (s *SQLiteStore) DeleteCampaign(id string) error {
 	defer tx.Rollback()
 
 	if _, err := tx.Exec(`DELETE FROM session_responses WHERE session_id IN (SELECT id FROM campaign_sessions WHERE campaign_id = ?)`, id); err != nil {
+		return err
+	}
+	if err := deleteJournalForSessions(tx, `SELECT id FROM campaign_sessions WHERE campaign_id = ?`, id); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM campaign_sessions WHERE campaign_id = ?`, id); err != nil {
@@ -2186,4 +2233,248 @@ func (s *SQLiteStore) RedeemPasswordInvite(tokenHash, passwordHash string) (stri
 		return "", err
 	}
 	return userID, nil
+}
+
+// deleteJournalForSessions removes the journal entries (with revisions and contributors) of the
+// sessions the query selects. Foreign keys are off, so nothing cascades.
+func deleteJournalForSessions(tx *sql.Tx, sessionIDsQuery string, args ...interface{}) error {
+	entries := `SELECT id FROM journal_entries WHERE session_id IN (` + sessionIDsQuery + `)`
+	for _, table := range []string{"journal_contributors", "journal_revisions"} {
+		if _, err := tx.Exec(`DELETE FROM `+table+` WHERE entry_id IN (`+entries+`)`, args...); err != nil {
+			return err
+		}
+	}
+	_, err := tx.Exec(`DELETE FROM journal_entries WHERE session_id IN (`+sessionIDsQuery+`)`, args...)
+	return err
+}
+
+const journalRevisionColumns = `number, author_id, name, body, note, restored_from, merged_with, created_at`
+
+type rowScanner interface{ Scan(dest ...interface{}) error }
+
+func scanJournalRevision(row rowScanner) (models.JournalRevision, error) {
+	var r models.JournalRevision
+	err := row.Scan(&r.Number, &r.AuthorID, &r.Name, &r.Body, &r.Note, &r.RestoredFrom, &r.MergedWith, &r.CreatedAt)
+	return r, err
+}
+
+// GetJournalSummaries returns the newest-revision digest of every entry in a campaign, keyed by session id.
+func (s *SQLiteStore) GetJournalSummaries(campaignID string) (map[string]models.JournalSummary, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(`
+		SELECT e.id, e.session_id, e.author_id, r.name, substr(r.body, 1, 600), r.created_at,
+		       (SELECT COUNT(*) FROM journal_revisions WHERE entry_id = e.id)
+		FROM journal_entries e
+		JOIN journal_revisions r ON r.entry_id = e.id
+		  AND r.number = (SELECT MAX(number) FROM journal_revisions WHERE entry_id = e.id)
+		WHERE e.campaign_id = ?`, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := map[string]models.JournalSummary{}
+	byEntry := map[string]string{} // entry id -> session id
+	for rows.Next() {
+		var j models.JournalSummary
+		if err := rows.Scan(&j.EntryID, &j.SessionID, &j.AuthorID, &j.Name, &j.ExcerptSource, &j.UpdatedAt, &j.Revisions); err != nil {
+			return nil, err
+		}
+		j.AmenderIDs = []string{}
+		result[j.SessionID] = j
+		byEntry[j.EntryID] = j.SessionID
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	people, err := s.db.Query(`
+		SELECT c.entry_id, c.user_id
+		FROM journal_contributors c JOIN journal_entries e ON e.id = c.entry_id
+		WHERE e.campaign_id = ?
+		ORDER BY c.entry_id, c.first_revision`, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	defer people.Close()
+	for people.Next() {
+		var entryID, userID string
+		if err := people.Scan(&entryID, &userID); err != nil {
+			return nil, err
+		}
+		j := result[byEntry[entryID]]
+		if userID != j.AuthorID {
+			j.AmenderIDs = append(j.AmenderIDs, userID)
+			result[j.SessionID] = j
+		}
+	}
+	return result, people.Err()
+}
+
+// GetJournalEntry returns a session's entry with its newest revision and credits, or nil.
+func (s *SQLiteStore) GetJournalEntry(sessionID string) (*models.JournalEntry, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	var e models.JournalEntry
+	err := s.db.QueryRow(`SELECT id, campaign_id, session_id, author_id, created_at FROM journal_entries WHERE session_id = ?`, sessionID).
+		Scan(&e.ID, &e.CampaignID, &e.SessionID, &e.AuthorID, &e.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if e.Latest, err = scanJournalRevision(s.db.QueryRow(
+		`SELECT `+journalRevisionColumns+` FROM journal_revisions WHERE entry_id = ? ORDER BY number DESC LIMIT 1`, e.ID)); err != nil {
+		return nil, err
+	}
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM journal_revisions WHERE entry_id = ?`, e.ID).Scan(&e.RevisionCount); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.Query(`SELECT user_id, revisions, first_revision FROM journal_contributors WHERE entry_id = ? ORDER BY first_revision`, e.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var c models.JournalScribe
+		if err := rows.Scan(&c.UserID, &c.Revisions, &c.FirstRevision); err != nil {
+			return nil, err
+		}
+		e.Scribes = append(e.Scribes, c)
+	}
+	return &e, rows.Err()
+}
+
+// GetJournalRevisions returns a session's entry id and every kept revision, oldest first.
+// With no entry the id is empty.
+func (s *SQLiteStore) GetJournalRevisions(sessionID string) (string, []models.JournalRevision, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	var entryID string
+	err := s.db.QueryRow(`SELECT id FROM journal_entries WHERE session_id = ?`, sessionID).Scan(&entryID)
+	if err == sql.ErrNoRows {
+		return "", nil, nil
+	}
+	if err != nil {
+		return "", nil, err
+	}
+	rows, err := s.db.Query(`SELECT `+journalRevisionColumns+` FROM journal_revisions WHERE entry_id = ? ORDER BY number`, entryID)
+	if err != nil {
+		return "", nil, err
+	}
+	defer rows.Close()
+	var revs []models.JournalRevision
+	for rows.Next() {
+		r, err := scanJournalRevision(rows)
+		if err != nil {
+			return "", nil, err
+		}
+		revs = append(revs, r)
+	}
+	return entryID, revs, rows.Err()
+}
+
+// SaveJournalRevision adds a revision to a session's entry in one transaction, creating the
+// entry when entryID and baseRevision are both empty. A save made against anything but the
+// latest revision is refused so the caller can merge. Revisions older than the newest
+// keepRevisions are pruned; credit is kept in journal_contributors.
+func (s *SQLiteStore) SaveJournalRevision(campaignID, sessionID, entryID string, baseRevision int, rev models.JournalRevision, keepRevisions int) (models.JournalSaveResult, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return models.JournalSaveResult{}, err
+	}
+	defer tx.Rollback()
+
+	var one int
+	err = tx.QueryRow(`SELECT 1 FROM campaign_sessions WHERE id = ? AND campaign_id = ?`, sessionID, campaignID).Scan(&one)
+	if err == sql.ErrNoRows {
+		return models.JournalSaveResult{}, ErrJournalSessionGone
+	}
+	if err != nil {
+		return models.JournalSaveResult{}, err
+	}
+
+	var current string
+	var latest *models.JournalRevision
+	err = tx.QueryRow(`SELECT id FROM journal_entries WHERE session_id = ?`, sessionID).Scan(&current)
+	if err != nil && err != sql.ErrNoRows {
+		return models.JournalSaveResult{}, err
+	}
+	if err == nil {
+		l, err := scanJournalRevision(tx.QueryRow(
+			`SELECT `+journalRevisionColumns+` FROM journal_revisions WHERE entry_id = ? ORDER BY number DESC LIMIT 1`, current))
+		if err != nil {
+			return models.JournalSaveResult{}, err
+		}
+		latest = &l
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	switch {
+	case latest == nil && (entryID != "" || baseRevision != 0):
+		return models.JournalSaveResult{Outcome: models.JournalDeleted}, nil
+	case latest == nil:
+		current = GenerateUUID()
+		if _, err := tx.Exec(`INSERT INTO journal_entries (id, campaign_id, session_id, author_id, created_at) VALUES (?, ?, ?, ?, ?)`,
+			current, campaignID, sessionID, rev.AuthorID, now); err != nil {
+			return models.JournalSaveResult{}, err
+		}
+	case entryID != "" && entryID != current:
+		return models.JournalSaveResult{Outcome: models.JournalReplaced, EntryID: current, Latest: latest}, nil
+	case baseRevision != latest.Number: // also a first draft written against an entry that now exists
+		return models.JournalSaveResult{Outcome: models.JournalStale, EntryID: current, Latest: latest}, nil
+	case latest.Name == rev.Name && latest.Body == rev.Body:
+		return models.JournalSaveResult{Outcome: models.JournalUnchanged, EntryID: current, Revision: *latest}, nil
+	}
+
+	outcome := models.JournalCreated
+	rev.Number = 1
+	if latest != nil {
+		outcome, rev.Number = models.JournalSaved, latest.Number+1
+	}
+	rev.CreatedAt = now
+	if _, err := tx.Exec(`INSERT INTO journal_revisions (entry_id, number, author_id, name, body, note, restored_from, merged_with, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		current, rev.Number, rev.AuthorID, rev.Name, rev.Body, rev.Note, rev.RestoredFrom, rev.MergedWith, rev.CreatedAt); err != nil {
+		return models.JournalSaveResult{}, err
+	}
+	if _, err := tx.Exec(`INSERT INTO journal_contributors (entry_id, user_id, revisions, first_revision) VALUES (?, ?, 1, ?)
+		ON CONFLICT(entry_id, user_id) DO UPDATE SET revisions = revisions + 1`, current, rev.AuthorID, rev.Number); err != nil {
+		return models.JournalSaveResult{}, err
+	}
+	if _, err := tx.Exec(`DELETE FROM journal_revisions WHERE entry_id = ? AND number <= ?`, current, rev.Number-keepRevisions); err != nil {
+		return models.JournalSaveResult{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return models.JournalSaveResult{}, err
+	}
+	return models.JournalSaveResult{Outcome: outcome, EntryID: current, Revision: rev}, nil
+}
+
+// DeleteJournalEntry removes a session's entry with all its revisions and credits.
+func (s *SQLiteStore) DeleteJournalEntry(sessionID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var one int
+	if err := tx.QueryRow(`SELECT 1 FROM journal_entries WHERE session_id = ?`, sessionID).Scan(&one); err == sql.ErrNoRows {
+		return ErrJournalNotFound
+	} else if err != nil {
+		return err
+	}
+	if err := deleteJournalForSessions(tx, `SELECT ?`, sessionID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
