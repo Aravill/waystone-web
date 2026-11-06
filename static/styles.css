@@ -1248,6 +1248,7 @@ select option {
     height: 1.5rem;
     max-width: 6rem;
     object-fit: contain;
+    object-position: left center;
 }
 
 .banner-type::before {

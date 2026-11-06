@@ -275,7 +275,7 @@ Other cards (`.card`, profile, admin) stay plain rectangles:
 }
 ```
 
-Order inside a game card: notice slot (the pending notice, or the variant's headpiece) → status badge → title + game system → summary → hairline → DM, player avatars, seats · sign-ups, next session → actions in a 3-column grid. Each part is one subgrid row (see `BANNER_DESIGN_GUIDE.md`).
+Order inside a game card: notice slot (the pending notice, or the variant's headpiece) → status badge + game system → title → summary → hairline → DM, player avatars, seats · sign-ups, next session → actions in a 3-column grid. Each part is one subgrid row (see `BANNER_DESIGN_GUIDE.md`).
 
 **Needs your action** (unanswered session for a player, pending sign-ups for the DM): the card gets `.needs-action`, which turns the banner's outline rubric (see `BANNER_DESIGN_GUIDE.md`), plus a notice line:
 

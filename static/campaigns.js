@@ -830,10 +830,10 @@ window.campaignsPage = function () {
                     <section class="campaign-row campaign-row-top">
                         <div class="campaign-badges">
                             <span class="campaign-status-badge">${escapeHtml(status)}</span>
+                            ${systemHtml}
                         </div>
                         <div class="campaign-title-container">
                             <h3 class="campaign-title"><a href="/games/${encodeURIComponent(campaign?.id ?? '')}" class="campaign-title-link">${escapeHtml(title)}</a></h3>
-                            ${systemHtml}
                         </div>
                         <p class="campaign-summary-text">${escapeHtml(summary)}</p>
                     </section>
