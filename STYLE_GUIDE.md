@@ -172,7 +172,7 @@ Wordmark left, nav centre, then the theme toggle, the inbox and the user menu, a
 .nav-item.active { color: var(--ink); border-bottom-color: var(--rubric); }
 ```
 
-**User menu.** There is no Profile nav item and no Logout button. `.header-right` holds the theme toggle, the inbox and a native `<details class="user-menu">`: its `<summary>` is a 32px avatar square (the first letter of the display name, in the display face, in `--ink`), the name and a small caret. The panel holds a Profile link and a "Log out" button that calls the page's own logout handler. `theme.js` closes it on a click outside and on Escape.
+**User menu.** There is no Profile nav item and no Logout button. `.header-right` holds the theme toggle, the inbox and a native `<details class="user-menu">`: its `<summary>` is a 32px avatar square (the uploaded avatar, set by `refreshHeaderAvatar()` in `theme.js`, else the first letter of the display name in the display face, in `--ink`), the name and a small caret. The panel holds a Profile link and a "Log out" button that calls the page's own logout handler. `theme.js` closes it on a click outside and on Escape.
 
 **Phones.** Row 1 is the logo (28px), the icons and the avatar with the name hidden; row 2 is the nav (19px). That is about 90px in all, instead of the old 190px. The theme toggle stays visible.
 

@@ -244,6 +244,7 @@ window.profilePage = function() {
                 }
                 this.needsProfileSetup = false;
                 this.showMessage(data.message || 'Avatar updated', 'success');
+                window.refreshHeaderAvatar?.();
                 await this.loadProfile();
             } catch (error) {
                 this.showMessage('Error uploading avatar: ' + error.message, 'error');
@@ -267,6 +268,7 @@ window.profilePage = function() {
                     throw new Error(data.error || 'Failed to remove avatar');
                 }
                 this.showMessage(data.message || 'Avatar removed', 'success');
+                window.refreshHeaderAvatar?.();
                 await this.loadProfile();
             } catch (error) {
                 this.showMessage('Error removing avatar: ' + error.message, 'error');
