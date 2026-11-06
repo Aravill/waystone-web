@@ -799,7 +799,7 @@ window.campaignsPage = function () {
 
             const dmUser = campaign?.dm_user;
             const dmHtml = dmUser
-                ? `<a href="${escapeHtml(dmUser.profile_url || `/profile?user_id=${encodeURIComponent(dmUser.id)}`)}" class="user-button user-button--dm">${escapeHtml(dmUser.display_name || dmUser.name || 'Unknown')}</a>`
+                ? `<a href="${escapeHtml(dmUser.profile_url || `/profile?user_id=${encodeURIComponent(dmUser.id)}`)}" class="campaign-dm-link">${userAvatarHtml(dmUser, false)}<span class="user-button user-button--dm">${escapeHtml(dmUser.display_name || dmUser.name || 'Unknown')}</span></a>`
                 : `<span class="campaign-nameplate">${escapeHtml(campaign?.dm || 'Unassigned')}</span>`;
 
             const playerUsers = Array.isArray(campaign?.player_users) ? campaign.player_users : [];

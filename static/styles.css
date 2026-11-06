@@ -1392,6 +1392,19 @@ select option {
     text-underline-offset: 0.25rem;
 }
 
+.campaign-dm-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: inherit;
+    text-decoration: none;
+}
+
+.campaign-dm-link:hover .user-button {
+    text-decoration: underline;
+    text-underline-offset: 0.25rem;
+}
+
 .user-button--dm {
     color: var(--ink);
     font-weight: 600;
