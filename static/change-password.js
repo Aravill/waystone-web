@@ -17,6 +17,8 @@ window.passwordRules = function(pw, username) {
 window.changePasswordPage = function() {
     return {
         mustChange: false,
+        userLoaded: false,
+        isAdmin: false,
         username: '',
         needsProfileSetup: false,
         currentPassword: '',
@@ -42,6 +44,8 @@ window.changePasswordPage = function() {
                     return;
                 }
                 this.mustChange = !!user.must_change_password;
+                this.isAdmin = (user.roles || []).includes('admin');
+                this.userLoaded = true;
             } catch (error) {
                 console.error('Auth check failed:', error);
                 window.location.href = '/login.html';

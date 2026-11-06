@@ -6,7 +6,7 @@
     <title>Waystone - Game</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=5"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=60">
+    <link rel="stylesheet" href="/static/styles.css?v=61">
     <link rel="stylesheet" href="/static/notifications.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -29,7 +29,12 @@
 
     <div class="container game-page">
         <main>
-            <a class="game-crumb" href="/campaigns" x-show="!campaign">← All games</a>
+            <nav class="game-crumb" aria-label="Breadcrumb">
+                <a :href="campaign ? '/campaigns#campaign-' + encodeURIComponent(campaign.id) : '/campaigns'">Games</a>
+                <template x-if="campaign">
+                    <span><span aria-hidden="true"> › </span><span aria-current="page" x-text="campaign.title"></span></span>
+                </template>
+            </nav>
 
             <p x-show="loading">Loading game...</p>
             <div class="game-error" role="alert" x-show="loadError">
@@ -59,7 +64,6 @@
                             </div>
                             <div class="game-head-actions">
                                 <a x-show="isMember" :href="'/games/' + encodeURIComponent(campaign.id) + '/calendar'">Open calendar →</a>
-                                <a class="modal-close game-close" :href="'/campaigns#campaign-' + encodeURIComponent(campaign.id)" aria-label="Back to all games" title="Back to all games">&times;</a>
                             </div>
                         </div>
 

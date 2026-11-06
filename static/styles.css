@@ -2663,10 +2663,6 @@ select option {
     gap: 1rem;
 }
 
-.game-close {
-    text-decoration: none;
-}
-
 /* Two panes, split by the calendar's ink rule */
 .game-layout {
     display: flex;
