@@ -2875,8 +2875,9 @@ select option {
 .game-attendee--dm::after {
     content: "♛" / "";
     position: absolute;
-    right: -0.25rem;
-    bottom: -0.375rem;
+    left: 50%;
+    bottom: -0.5rem;
+    translate: -50% 0;
     color: var(--rubric);
     background: var(--bg);
     font-size: 0.875rem;
