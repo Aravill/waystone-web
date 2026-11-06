@@ -395,6 +395,7 @@ Auto-hide after 5 seconds. Error text is plain and precise, no flavour copy. Mes
 
 Square (no radius), `1px solid var(--line)` frame, `object-fit: cover`. Everyone has one: without an upload the avatar is the first letter of the display name (nickname → name → username), in the display face in `--ink` on `--folio`. The API sends it as `avatar_letter` next to `avatar_url` on every user object.
 
+- **On game cards:** the DM's row shows their 30px avatar beside the crown and name, one link to the profile.
 - **In lists** (game-card players): 30px avatars in place of names, linked to the profile, with the name as `title` and `aria-label`. Built by `userAvatarHtml()` in `campaigns.js`.
 - **Next to a name** (sign-ups dialog): same 30px avatar, not linked.
 - **Calendar replies** (the Roll call, beside the name): a 2px border shows the reply. Accepted is solid `--verdigris`, Tentative dashed `--ochre`, Declined solid `--rubric` at 60% opacity, No reply dotted `--muted`.
