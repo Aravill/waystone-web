@@ -5,7 +5,7 @@ description: Commit conventions for this repo. Use whenever creating git commits
 
 # commit
 
-Only commit when the user has asked for it.
+When to commit and push is in the `commit-as-you-go` skill. This one covers how.
 
 1. Commit in small, logical chunks; never bundle unrelated changes. Stage specific files rather than `git add -A`.
 2. Subject: short, all lower case, at most 6 words (e.g. `add blocked field to user model`).
