@@ -96,10 +96,17 @@ func RegisterRoutes() {
 	http.Handle("/campaigns", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("campaigns.html"))))
 	gamePage := ServePageWithFallback("game.html")
 	calendarPage := ServePageWithFallback("calendar.html")
+	journalPage := ServePageWithFallback("journal.html")
 	http.Handle("/games/", middleware.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// /games/{id}/calendar is the calendar page; every other /games/ path is the game page
-		if parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/"); len(parts) == 3 && parts[2] == "calendar" {
+		// /games/{id}/calendar is the calendar page, /games/{id}/journal/{sessionId}[/edit|/history]
+		// the journal page; every other /games/ path is the game page
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		if len(parts) == 3 && parts[2] == "calendar" {
 			calendarPage(w, r)
+			return
+		}
+		if (len(parts) == 4 || len(parts) == 5 && (parts[4] == "edit" || parts[4] == "history")) && parts[2] == "journal" {
+			journalPage(w, r)
 			return
 		}
 		gamePage(w, r)
@@ -141,6 +148,11 @@ func HandleCampaignRoutes(w http.ResponseWriter, r *http.Request) {
 			// Handle session-specific actions
 			HandleSessionActions(w, r)
 		}
+		return
+	}
+
+	if len(parts) >= 3 && parts[1] == "journal" {
+		HandleJournal(w, r)
 		return
 	}
 

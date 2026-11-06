@@ -267,27 +267,16 @@ func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve sessions")
 		return
 	}
+	journals, err := db.GetJournalSummaries(campaign.ID)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve journal entries")
+		return
+	}
 
 	list := make([]map[string]interface{}, 0, len(played))
 	for i := len(played) - 1; i >= 0; i-- {
 		s := played[i]
-		// The DM runs every played session unless a by-hand entry says they missed it.
-		attendees := []map[string]interface{}{}
-		if dm, ok := v.users[campaign.DM]; ok && dm != nil && !s.DMAbsent {
-			attendees = append(attendees, userDisplayObject(dm))
-		}
-		for _, resp := range responses[s.ID] {
-			if resp.UserID == campaign.DM || resp.Participation != models.Accepted {
-				continue
-			}
-			if u, ok := v.users[resp.UserID]; ok && u != nil {
-				attendees = append(attendees, userDisplayObject(u))
-			}
-		}
-		for _, name := range s.Guests {
-			attendees = append(attendees, guestDisplayObject(name))
-		}
-		list = append(list, map[string]interface{}{
+		row := map[string]interface{}{
 			"id":        s.ID,
 			"number":    i + 1,
 			"date":      s.Date,
@@ -295,10 +284,33 @@ func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string
 			"duration":  s.Duration,
 			"timezone":  s.Timezone,
 			"manual":    s.Manual,
-			"attendees": attendees,
-		})
+			"attendees": playedAttendees(campaign, v.users, s, responses[s.ID]),
+			"journal":   nil,
+		}
+		if j, ok := journals[s.ID]; ok {
+			row["journal"] = journalSummaryObject(v.users, j)
+			delete(journals, s.ID)
+		}
+		list = append(list, row)
 	}
 	obj["played_sessions"] = list
+	// Entries left over belong to sessions that were cancelled after someone wrote them.
+	cancelled := []map[string]interface{}{}
+	for sessionID, j := range journals {
+		session, err := db.GetSessionByID(sessionID)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "failed to retrieve sessions")
+			return
+		}
+		if session == nil {
+			continue
+		}
+		entry := journalSummaryObject(v.users, j)
+		entry["session_id"], entry["date"] = sessionID, session.Date
+		cancelled = append(cancelled, entry)
+	}
+	sort.Slice(cancelled, func(a, b int) bool { return cancelled[a]["date"].(string) > cancelled[b]["date"].(string) })
+	obj["journal_cancelled"] = cancelled
 	upcoming, err := upcomingSessions(campaign, v)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve sessions")
@@ -306,6 +318,27 @@ func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string
 	}
 	obj["upcoming_sessions"] = upcoming
 	writeJSON(w, http.StatusOK, obj)
+}
+
+// playedAttendees lists who was at a played session. The DM runs every played session unless
+// a by-hand entry says they missed it.
+func playedAttendees(campaign *models.Campaign, users map[string]*models.User, s models.CampaignSession, responses []models.SessionResponse) []map[string]interface{} {
+	attendees := []map[string]interface{}{}
+	if dm, ok := users[campaign.DM]; ok && dm != nil && !s.DMAbsent {
+		attendees = append(attendees, userDisplayObject(dm))
+	}
+	for _, resp := range responses {
+		if resp.UserID == campaign.DM || resp.Participation != models.Accepted {
+			continue
+		}
+		if u, ok := users[resp.UserID]; ok && u != nil {
+			attendees = append(attendees, userDisplayObject(u))
+		}
+	}
+	for _, name := range s.Guests {
+		attendees = append(attendees, guestDisplayObject(name))
+	}
+	return attendees
 }
 
 // guestDisplayObject is the attendee object for a named non-member: no id, no profile.
