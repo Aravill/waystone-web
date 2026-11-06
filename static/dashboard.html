@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Waystone - Home</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
-    <script src="/static/theme.js?v=6"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=64">
-    <link rel="stylesheet" href="dashboard.css?v=12">
+    <script src="/static/theme.js?v=7"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=65">
+    <link rel="stylesheet" href="dashboard.css?v=13">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -107,7 +107,6 @@
                                 <span class="ledger-date" x-text="shortDate(s)"></span>
                                 <span class="ledger-time" x-text="timeRange(s)"></span>
                                 <a class="ledger-game" :href="gameUrl(s)" x-text="s.campaign.title"></a>
-                                <span class="ledger-tag"><span class="panel-status-tag" :class="`chip-${s.status}`" x-text="statusLabel(s)"></span></span>
                                 <span class="ledger-mine" :class="mineClass(s)" x-html="mineHtml(s)"></span>
                             </div>
                         </template>
@@ -163,7 +162,7 @@
     <div class="message" :class="messageType" x-show="messageVisible" role="status" x-text="messageText"></div>
 
     <script src="/static/notifications.js?v=10"></script>
-    <script src="/campaigns.js?v=54"></script>
-    <script src="dashboard.js?v=3"></script>
+    <script src="/campaigns.js?v=55"></script>
+    <script src="dashboard.js?v=4"></script>
 </body>
 </html>

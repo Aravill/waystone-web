@@ -49,7 +49,7 @@ Cards in a row share row tracks (CSS subgrid), so the same parts line up across 
 | Track | Size | Holds |
 |-------|------|-------|
 | top | `92px` | Medallion, top edge, notice / headpiece row |
-| head | auto | Status badge, title, game system, summary |
+| head | auto | Status badge + game system, title, summary |
 | people | auto | **Separator**, DM, player avatars, seats · next session |
 | spacer | `auto` | Takes the slack when the row is taller than the content |
 | buttons | auto | Action buttons |

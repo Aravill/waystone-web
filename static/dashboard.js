@@ -89,7 +89,7 @@ window.dashboardPage = function () {
             if (a.awaiting.length > 0) {
                 parts.push(a.awaiting.length === 1 ? 'One session awaits thy reply.' : `${a.awaiting.length} sessions await thy reply.`);
             }
-            const next = a.ahead.find((s) => s.status === 'Confirmed');
+            const next = a.ahead[0];
             if (next) {
                 parts.push(`Thy next game is ${parseDateLocal(next.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}.`);
             }
@@ -114,9 +114,6 @@ window.dashboardPage = function () {
         },
         timeRange(s) {
             return s.time ? sessionRangeWithZone(s) : '';
-        },
-        statusLabel(s) {
-            return s.status === 'Confirmed' ? '● Confirmed' : s.status;
         },
         statusClass(status) {
             return campaignStatusClass(status);

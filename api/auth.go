@@ -296,6 +296,7 @@ func HandleGetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		"name":                 user.Name,
 		"nickname":             user.Nickname,
 		"display_name":         user.DisplayName(),
+		"avatar_url":           user.AvatarURL(),
 		"roles":                user.Roles,
 		"must_change_password": user.MustChangePassword,
 		"needs_profile_setup":  user.NeedsProfileSetup,

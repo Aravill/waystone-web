@@ -263,6 +263,12 @@ a {
     text-align: center;
 }
 
+.user-menu-avatar.has-image {
+    background-position: center;
+    background-size: cover;
+    color: transparent;
+}
+
 .user-menu-caret {
     color: var(--muted);
     font-size: 0.8125rem;
@@ -1242,6 +1248,7 @@ select option {
     height: 1.5rem;
     max-width: 6rem;
     object-fit: contain;
+    object-position: left center;
 }
 
 .banner-type::before {

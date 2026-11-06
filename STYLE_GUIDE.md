@@ -172,7 +172,7 @@ Wordmark left, nav centre, then the theme toggle, the inbox and the user menu, a
 .nav-item.active { color: var(--ink); border-bottom-color: var(--rubric); }
 ```
 
-**User menu.** There is no Profile nav item and no Logout button. `.header-right` holds the theme toggle, the inbox and a native `<details class="user-menu">`: its `<summary>` is a 32px avatar square (the first letter of the display name, in the display face, in `--ink`), the name and a small caret. The panel holds a Profile link and a "Log out" button that calls the page's own logout handler. `theme.js` closes it on a click outside and on Escape.
+**User menu.** There is no Profile nav item and no Logout button. `.header-right` holds the theme toggle, the inbox and a native `<details class="user-menu">`: its `<summary>` is a 32px avatar square (the uploaded avatar, set by `refreshHeaderAvatar()` in `theme.js`, else the first letter of the display name in the display face, in `--ink`), the name and a small caret. The panel holds a Profile link and a "Log out" button that calls the page's own logout handler. `theme.js` closes it on a click outside and on Escape.
 
 **Phones.** Row 1 is the logo (28px), the icons and the avatar with the name hidden; row 2 is the nav (19px). That is about 90px in all, instead of the old 190px. The theme toggle stays visible.
 
@@ -192,7 +192,7 @@ The drop cap goes on fixed page titles only (see Typography). Titles that show a
 Greeting h1 "Well met, {name}" (blackletter W), a one-line subtitle that sums up what is on ("Age of Sojourn is in session now. One session awaits thy reply. Thy next game is Friday, Nov 13."), then two columns (one on phones). Fed by `GET /api/agenda` (`api/agenda.go`), which Home refreshes every 60 seconds while the tab is visible and on the `notifications:new` event.
 
 - **At the table now** (above everything, directly under the greeting): one card per Confirmed, non-manual session between its start and end in a game the viewer plays, runs or follows. It is the only filled block on the page: `--verdigris` with `--bg` text (5.9:1 in parchment, 7.7:1 in candlelight). It carries a "● In session" marker (so the state never relies on colour), the game title as a link, "Began 18:00 CET, ends 22:00 · 1h 20m left", the DM, the accepted players as avatars and the viewer's reply.
-- **Left column:** `§ Awaits thy reply`, red-letter date cards (rubric month, big day number and weekday; game title; time range with zone; "proposed by ♛ X"; "N of M have replied"; Aye / Perhaps / Nay posting to the session's `/responses` endpoint), then `§ The road ahead`, ledger rows of date, time, game, status tag and the viewer's reply.
+- **Left column:** `§ Awaits thy reply`, red-letter date cards (rubric month, big day number and weekday; game title; time range with zone; "proposed by ♛ X"; "N of M have replied"; Aye / Perhaps / Nay posting to the session's `/responses` endpoint), then `§ The road ahead`, ledger rows of Confirmed sessions only: date, time, game and the viewer's reply. A suggestion appears on Home only as an `Awaits thy reply` card; once answered, or if the viewer is its DM, it stays on the game page and calendar.
 - **Right column:** `§ Thy games` rows (role and status, "All games", "N open to join"), `§ Roads yet to open` (small dashed Chat and Codex stones, not clickable) and a line pointing to Discord.
 - A user with no games and nothing pending sees the introduction text and a "See the games" link instead.
 - Suggested sessions are availability requests: only a game's players and DM see them. Followers see Confirmed sessions only. Manual, Cancelled, Finished and Cancelled-game sessions are left out.
@@ -275,7 +275,7 @@ Other cards (`.card`, profile, admin) stay plain rectangles:
 }
 ```
 
-Order inside a game card: notice slot (the pending notice, or the variant's headpiece) → status badge → title + game system → summary → hairline → DM, player avatars, seats · sign-ups, next session → actions in a 3-column grid. Each part is one subgrid row (see `BANNER_DESIGN_GUIDE.md`).
+Order inside a game card: notice slot (the pending notice, or the variant's headpiece) → status badge + game system → title → summary → hairline → DM, player avatars, seats · sign-ups, next session → actions in a 3-column grid. Each part is one subgrid row (see `BANNER_DESIGN_GUIDE.md`).
 
 **Needs your action** (unanswered session for a player, pending sign-ups for the DM): the card gets `.needs-action`, which turns the banner's outline rubric (see `BANNER_DESIGN_GUIDE.md`), plus a notice line:
 

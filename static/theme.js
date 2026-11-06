@@ -30,7 +30,24 @@
         });
     });
 
+    // The header avatar shows the user's upload, over the first letter the page already renders.
+    // A background, so the page's x-text on the same element can't remove it. Failures keep the letter.
+    window.refreshHeaderAvatar = async function () {
+        const avatars = document.querySelectorAll('.user-menu-avatar');
+        if (avatars.length === 0) return;
+        try {
+            const response = await fetch('/auth/current-user');
+            if (!response.ok || !response.headers.get('Content-Type')?.includes('application/json')) return;
+            const url = (await response.json()).avatar_url || '';
+            avatars.forEach((el) => {
+                el.classList.toggle('has-image', !!url);
+                el.style.backgroundImage = url ? `url("${encodeURI(url)}")` : '';
+            });
+        } catch (e) { /* keep the letter */ }
+    };
+
     document.addEventListener('DOMContentLoaded', () => {
+        window.refreshHeaderAvatar();
         const header = document.querySelector('.header-right');
         if (!header) return;
 

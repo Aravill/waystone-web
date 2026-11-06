@@ -103,8 +103,8 @@ func HandleAgenda(w http.ResponseWriter, r *http.Request) {
 				inProgress = append(inProgress, item)
 			case session.Status == models.SessionSuggested && role == "player" && session.CurrentUserParticipation == "":
 				awaiting = append(awaiting, item)
-				ahead = append(ahead, item)
-			default:
+			case session.Status == models.SessionConfirmed:
+				// Other suggestions (already answered, or the viewer's own as DM) need nothing here.
 				ahead = append(ahead, item)
 			}
 		}
