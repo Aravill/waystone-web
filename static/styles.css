@@ -2837,34 +2837,37 @@ button.game-cell:hover {
     list-style: none;
 }
 
+/* The row holds the session button and, under it, the journal line (real links can't sit inside a button) */
+.game-row {
+    border-bottom: 1px solid var(--line);
+    transition: background-color 0.15s;
+}
+
+.game-row:has(.game-entry:hover) {
+    background: var(--folio);
+}
+
+.game-row.is-selected {
+    background: var(--folio);
+    outline: 2px solid var(--rubric);
+    outline-offset: -0.125rem;
+}
+
 .game-entry {
     display: grid;
     grid-template-columns: 3.25rem minmax(0, 1fr) auto;
     gap: 0.5rem 0.75rem;
     width: 100%;
-    padding: 0.875rem 0.75rem 0.875rem 0.5rem;
+    padding: 0.875rem 0.75rem 0.375rem 0.5rem;
     background: none;
     border: 0;
-    border-bottom: 1px solid var(--line);
     color: var(--ink);
     font: inherit;
     text-align: left;
     cursor: pointer;
-    transition: background-color 0.15s;
-}
-
-.game-entry:hover {
-    background: var(--folio);
 }
 
 .game-entry:focus-visible {
-    outline-offset: -0.125rem;
-}
-
-.game-entry.is-selected,
-.game-entry.is-selected:hover {
-    background: var(--folio);
-    outline: 2px solid var(--rubric);
     outline-offset: -0.125rem;
 }
 
@@ -2880,8 +2883,8 @@ button.game-cell:hover {
     align-self: center;
 }
 
-.game-entry:hover .game-attendee--dm::after,
-.game-entry.is-selected .game-attendee--dm::after {
+.game-row:has(.game-entry:hover) .game-attendee--dm::after,
+.game-row.is-selected .game-attendee--dm::after {
     background: var(--folio);
 }
 
@@ -3148,6 +3151,812 @@ button.game-cell:hover {
     .game-entry .game-attendees {
         grid-column: 2;
         justify-content: flex-start;
+    }
+
+    .entry-line {
+        padding-left: 3.75rem;
+    }
+}
+
+/* ---------- Journal ---------- */
+/* On the game page: the line under a played session's button, and the panel block */
+.entry-line {
+    display: grid;
+    gap: 0.125rem;
+    padding: 0 0.75rem 0.875rem 4.5rem;
+    min-width: 0;
+}
+
+.entry-link {
+    justify-self: start;
+    font-family: var(--font-display);
+    font-size: 1.3125rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.entry-none {
+    font-style: italic;
+    color: var(--muted);
+}
+
+.session-by {
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.session-by a {
+    color: var(--rubric);
+}
+
+.entry-cancelled {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    margin: 1rem 0 0;
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+.entry-cancelled a {
+    color: var(--muted);
+    text-underline-offset: 0.25rem;
+}
+
+.panel-journal {
+    display: grid;
+    gap: 0.5rem;
+    border-color: var(--ink);
+}
+
+.panel-journal-entry {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.panel-journal .panel-empty,
+.panel-journal .session-by,
+.panel-journal .journal-excerpt {
+    margin: 0;
+}
+
+.journal-title {
+    font-family: var(--font-display);
+    font-size: 1.3125rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.journal-excerpt {
+    font-size: 0.9375rem;
+}
+
+.journal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.journal-actions .submit-btn,
+.journal-actions .campaign-action-btn {
+    flex: 1 1 auto;
+    width: auto;
+    padding-inline: 0.625rem;
+}
+
+/* Session numbers are set in the text face: the display face's old-style numerals make "31" read as "3I" */
+.t-no {
+    font-family: var(--font-text);
+    font-size: 0.8em;
+}
+
+.message.info {
+    display: block;
+    color: var(--muted);
+    border-color: var(--line);
+}
+
+/* Journal pages: breadcrumb, title, then two panes split by an ink rule (like the calendar page) */
+.journal-page .journal-message {
+    position: sticky;
+    top: 0.5rem;
+    z-index: 5;
+    background: var(--bg);
+}
+
+.journal-page h1:focus {
+    outline: none;
+}
+
+.journal-page .title-block {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem 2rem;
+    align-items: end;
+    padding: 1.25rem 0 1.75rem;
+    border-bottom: 1px solid var(--ink);
+}
+
+.journal-page .title-block--single {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.journal-page .title-block .page-title {
+    margin: 0.75rem 0 0.5rem;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+}
+
+.journal-page .byline {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9375rem;
+}
+
+.journal-page .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+    justify-content: flex-end;
+}
+
+.journal-page .actions .submit-btn,
+.journal-page .form-foot .submit-btn,
+.journal-page .detail-head .submit-btn,
+.journal-page .confirm-modal .submit-btn {
+    width: auto;
+}
+
+.journal-page .notice-read {
+    margin: 1.25rem 0 0;
+    color: var(--muted);
+}
+
+.journal-page .split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 23.75rem;
+    gap: 1.75rem;
+    padding-top: 2rem;
+    align-items: start;
+}
+
+.journal-page .split > * {
+    min-width: 0;
+}
+
+.journal-page .split-side {
+    display: grid;
+    gap: 1rem;
+    padding-left: 1.75rem;
+    border-left: 1px solid var(--ink);
+}
+
+.journal-page .panel-heading {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 400;
+    line-height: 1.2;
+    color: var(--ink);
+}
+
+.journal-page .game-text > :first-child {
+    margin-top: 0;
+}
+
+.journal-page .people {
+    display: grid;
+    gap: 0.875rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.journal-page .person {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.875rem;
+    align-items: center;
+}
+
+.journal-page .person .user-avatar,
+.journal-page .rev .user-avatar {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1.25rem;
+}
+
+.journal-page .person-name {
+    display: block;
+    overflow-wrap: anywhere;
+}
+
+.journal-page .person-role {
+    display: block;
+    color: var(--muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.125rem;
+    text-transform: uppercase;
+}
+
+.journal-page .person--dm .person-name {
+    color: var(--rubric);
+    font-weight: 700;
+}
+
+.journal-page .person--lead {
+    padding-bottom: 0.875rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.journal-page .panel-foot {
+    margin: 0;
+    padding-top: 0.875rem;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.journal-page .journal-table {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.375rem;
+}
+
+.journal-page .entry-nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.75rem 2rem;
+    max-width: 65ch;
+    margin-top: 2.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--ink);
+}
+
+.journal-page .entry-nav a:only-child.is-next {
+    margin-left: auto;
+}
+
+.journal-page .entry-nav .is-next {
+    text-align: right;
+}
+
+/* Editor */
+.journal-page .field {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.journal-page .field label,
+.journal-page .field .label {
+    margin: 0;
+}
+
+.journal-page .label {
+    color: var(--muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.125rem;
+    text-transform: uppercase;
+}
+
+.journal-page .hint {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+}
+
+.journal-page .hint--formatting {
+    margin-top: 0.5rem;
+}
+
+.journal-page .field--note {
+    max-width: 40rem;
+}
+
+.journal-page .edit-form {
+    display: grid;
+    gap: 1.5rem;
+    padding-top: 1.5rem;
+}
+
+.journal-page .title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+}
+
+.journal-page .title-fixed {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.journal-page .title-row input {
+    flex: 1 1 14rem;
+    width: auto;
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    line-height: 1.2;
+}
+
+.journal-page .editor {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+    align-items: stretch;
+}
+
+.journal-page .pane {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0.375rem;
+    min-width: 0;
+}
+
+.journal-page textarea {
+    min-height: 28rem;
+    padding: 0.875rem 1rem;
+    line-height: 1.55;
+}
+
+.journal-page textarea:focus {
+    padding-bottom: 0.875rem;
+    box-shadow: inset 0 0 0 1px var(--rubric);
+}
+
+.journal-page .preview {
+    min-width: 0;
+    padding: 0.875rem 1rem;
+    border: 1px dashed var(--line);
+    overflow-wrap: anywhere;
+}
+
+.journal-page .preview-title {
+    margin: 0 0 0.875rem;
+    padding-bottom: 0.625rem;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    line-height: 1.2;
+}
+
+.journal-page .tabs {
+    display: none;
+}
+
+.journal-page .tab {
+    min-height: 2.5rem;
+    margin-right: 0.75rem;
+    padding: 0 1rem 0 0;
+    background: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 0.8125rem;
+    letter-spacing: 0.125rem;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+.journal-page .tab[aria-pressed="true"] {
+    color: var(--ink);
+    border-bottom-color: var(--rubric);
+}
+
+.journal-page .form-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+    align-items: center;
+}
+
+.journal-page .notice {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rubric);
+}
+
+.journal-page .notice p {
+    margin: 0;
+}
+
+/* History */
+.journal-page .history {
+    display: grid;
+    grid-template-columns: 22rem minmax(0, 1fr);
+    gap: 2rem 1.75rem;
+    padding-top: 2rem;
+    align-items: start;
+}
+
+.journal-page .revs {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--ink);
+}
+
+.journal-page .rev-item {
+    border-bottom: 1px solid var(--line);
+}
+
+.journal-page .rev {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.125rem 0.75rem;
+    width: 100%;
+    padding: 0.875rem 0.625rem;
+    background: none;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.journal-page .rev:hover {
+    background: var(--folio);
+}
+
+.journal-page .rev[aria-current="true"] {
+    background: var(--folio);
+    outline: 2px solid var(--rubric);
+    outline-offset: -0.125rem;
+}
+
+.journal-page .rev > span:first-child {
+    grid-row: span 3;
+}
+
+.journal-page .rev-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.125rem 0.625rem;
+}
+
+.journal-page .rev-no {
+    font-weight: 700;
+}
+
+.journal-page .tag {
+    padding: 0 6px;
+    border: 1px solid currentColor;
+    color: var(--verdigris);
+    font-size: 0.6875rem;
+    letter-spacing: 0.125rem;
+    text-transform: uppercase;
+}
+
+.journal-page .rev-meta {
+    color: var(--muted);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.journal-page .rev-note {
+    font-size: 0.9375rem;
+    overflow-wrap: anywhere;
+}
+
+.journal-page .rev-delta {
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.journal-page .plus {
+    color: var(--verdigris);
+}
+
+.journal-page .minus {
+    color: var(--rubric);
+}
+
+.journal-page .detail {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+    padding-left: 1.75rem;
+    border-left: 1px solid var(--ink);
+}
+
+.journal-page .detail-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 0.75rem 1.5rem;
+}
+
+.journal-page .detail-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 400;
+    color: var(--rubric);
+}
+
+.journal-page .detail-sub {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.journal-page .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem 1.5rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.journal-page .legend {
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+.journal-page .diff {
+    font-size: 0.9375rem;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.journal-page ins {
+    color: var(--verdigris);
+    background: color-mix(in srgb, var(--verdigris) 12%, var(--bg));
+    text-decoration: underline;
+    text-underline-offset: 0.1875rem;
+}
+
+.journal-page del {
+    color: var(--rubric);
+    background: color-mix(in srgb, var(--rubric) 10%, var(--bg));
+    text-decoration: line-through;
+}
+
+.journal-page .gap {
+    display: block;
+    margin: 0.5rem 0;
+    padding: 0.5rem 0;
+    border-block: 1px dotted var(--line);
+    color: var(--muted);
+    font-size: 0.8125rem;
+    letter-spacing: 0.125rem;
+}
+
+.journal-page .name-change {
+    margin: 0;
+    padding-bottom: 0.875rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.journal-page .same {
+    margin: 0;
+    color: var(--muted);
+    font-style: italic;
+}
+
+/* Merge */
+.journal-page .merge-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.5rem;
+    padding: 1.25rem 0 0.25rem;
+    font-size: 0.9375rem;
+}
+
+.journal-page .merge-ok {
+    color: var(--verdigris);
+}
+
+.journal-page .merge-todo {
+    color: var(--rubric);
+    font-weight: 700;
+}
+
+.journal-page .conflicts {
+    display: grid;
+    gap: 1.5rem;
+    padding-top: 1rem;
+}
+
+.journal-page .conflict {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--rubric);
+}
+
+.journal-page .conflict--done {
+    border-color: var(--line);
+}
+
+.journal-page .conflict-head {
+    margin: 0;
+    font-family: var(--font-text);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.125rem;
+    text-transform: uppercase;
+    color: var(--rubric);
+}
+
+.journal-page .conflict--done .conflict-head {
+    color: var(--verdigris);
+}
+
+.journal-page .context {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.875rem;
+    font-style: italic;
+    overflow-wrap: anywhere;
+}
+
+.journal-page .versions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.journal-page .version {
+    display: grid;
+    gap: 0.5rem;
+    align-content: start;
+    min-width: 0;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--line);
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.journal-page .version--picked {
+    background: var(--folio);
+    border-color: var(--ink);
+}
+
+.journal-page .version--picked ins,
+.journal-page .version--picked del {
+    background: none;
+}
+
+.journal-page .version-name {
+    font-family: var(--font-display);
+    font-size: 1.375rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.journal-page .picks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.journal-page .picks .campaign-action-btn[aria-pressed="true"] {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+}
+
+.journal-page .conflict-text {
+    min-height: 9rem;
+}
+
+.journal-page .unresolved {
+    padding: 0.25rem 0.625rem;
+    border: 1px dashed var(--rubric);
+    color: var(--rubric);
+    font-family: var(--font-text);
+    font-size: 0.9375rem;
+    font-style: italic;
+}
+
+.journal-page p.unresolved {
+    margin: 0 0 1rem;
+}
+
+.journal-page .merge-result {
+    padding-top: 2.5rem;
+}
+
+.journal-page .merge-result h2 {
+    margin-top: 0;
+}
+
+.journal-page .merge-notice {
+    margin-top: 1.5rem;
+}
+
+.journal-page .merge-foot {
+    padding-top: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    .journal-page .split {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .journal-page .split-side {
+        padding: 1.5rem 0 0;
+        border-left: 0;
+        border-top: 1px solid var(--ink);
+    }
+}
+
+@media (max-width: 768px) {
+    .journal-page .title-block {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .journal-page .actions {
+        justify-content: flex-start;
+    }
+
+    .journal-page .history {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .journal-page .detail {
+        padding: 1.5rem 0 0;
+        border-left: 0;
+        border-top: 1px solid var(--ink);
+    }
+
+    .journal-page .tabs {
+        display: flex;
+    }
+
+    .journal-page .editor {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .journal-page .editor .pane > label,
+    .journal-page .editor .pane > .label {
+        display: none;
+    }
+
+    .journal-page .editor[data-tab="write"] .pane--preview,
+    .journal-page .editor[data-tab="preview"] .pane--write {
+        display: none;
+    }
+
+    .journal-page textarea {
+        min-height: 22rem;
+    }
+
+    .journal-page .title-fixed,
+    .journal-page .title-row input {
+        font-size: 1.5rem;
+    }
+
+    .journal-page .versions {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .journal-page .conflict {
+        padding: 1rem;
+    }
+
+    .journal-page .picks {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .journal-page .picks .campaign-action-btn {
+        padding: 0.375rem 0.5rem;
+        letter-spacing: 0.0625rem;
     }
 }
 

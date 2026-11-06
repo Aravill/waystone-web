@@ -1,57 +1,5 @@
 // Game detail page. Relies on campaigns.js (loaded first) for CAMPAIGN_TYPES, TYPE_ICON_PATHS,
-// campaignStatusClass, userAvatarHtml, escapeHtml and getDefaultTimezone.
-
-// Basic Markdown, safe by construction: the whole input is HTML-escaped first, then only
-// whitelisted tags are produced. Supports paragraphs, **bold** (may contain *italic*),
-// *italic*/_italic_, [text](url), "- " / "1. " lists (also right after a text line), "#" headings
-// (rendered as h3/h4) and "> " quotes. Every pattern is bounded, so rendering stays linear.
-function renderMarkdown(text) {
-    const src = escapeHtml(String(text || '').replace(/\0/g, '').replace(/\r\n?/g, '\n'));
-    const inline = (line) => {
-        const links = [];
-        let out = line.replace(/\[([^\[\]\n]{1,300})\]\(((?:[^()\s]|\([^()\s]*\)){1,2000})\)/g, (m, label, url) => {
-            if (!/^(https?:\/\/|mailto:)\S+$/i.test(url)) return m;
-            links.push(`<a href="${url}" target="_blank" rel="noopener noreferrer nofollow">${label}</a>`);
-            return `\0${links.length - 1}\0`;
-        });
-        out = out
-            .replace(/\*\*(?=[^\s*])([^\n]{1,1000}?)\*\*/g, '<strong>$1</strong>')
-            .replace(/(^|[^*\w])\*([^*\s][^*\n]*?)\*(?![*\w])/g, '$1<em>$2</em>')
-            .replace(/(^|[^\w])_([^_\s][^_\n]*?)_(?!\w)/g, '$1<em>$2</em>');
-        return out.replace(/\0(\d+)\0/g, (m, i) => links[Number(i)]);
-    };
-    const kindOf = (l) => /^[-*]\s+/.test(l) ? 'ul' : /^\d+\.\s+/.test(l) ? 'ol' : /^&gt;\s?/.test(l) ? 'quote' : 'text';
-    const strip = { ul: /^[-*]\s+/, ol: /^\d+\.\s+/, quote: /^&gt;\s?/ };
-    // A run of lines of one kind becomes one element, so a list may follow a text line directly.
-    const renderRun = (kind, lines) => {
-        if (kind === 'text') return `<p>${lines.map(inline).join('<br>')}</p>`;
-        const items = lines.map((l) => inline(l.replace(strip[kind], '')));
-        if (kind === 'quote') return '<blockquote>' + items.join('<br>') + '</blockquote>';
-        return `<${kind}>` + items.map((i) => `<li>${i}</li>`).join('') + `</${kind}>`;
-    };
-    const blocks = src.split(/\n[ \t]*\n/).map((b) => b.trim()).filter(Boolean);
-    return blocks.map((block) => {
-        let lines = block.split('\n');
-        let out = '';
-        const head = lines[0].match(/^(#{1,3})\s+(.*)$/);
-        if (head) {
-            const tag = head[1].length === 3 ? 'h4' : 'h3';
-            out += `<${tag}>${inline(head[2])}</${tag}>`;
-            lines = lines.slice(1);
-        }
-        let run = [], kind = '';
-        for (const line of lines) {
-            const k = kindOf(line);
-            if (run.length && k !== kind) {
-                out += renderRun(kind, run);
-                run = [];
-            }
-            kind = k;
-            run.push(line);
-        }
-        return out + (run.length ? renderRun(kind, run) : '');
-    }).join('');
-}
+// campaignStatusClass, userAvatarHtml, escapeHtml, renderMarkdown and getDefaultTimezone.
 
 // A blank record-session form. attendees holds ticked user ids; former holds ex-players kept on an edited session.
 function emptyForm() {
@@ -102,6 +50,11 @@ window.gamePage = function () {
             await this.load();
             if (new URLSearchParams(location.search).get('updated') === '1') {
                 this.showMessage('Game updated', 'success');
+                history.replaceState(null, '', location.pathname);
+            }
+            const deleted = new URLSearchParams(location.search).get('entry_deleted');
+            if (deleted !== null) {
+                this.showMessage(Number(deleted) > 0 ? `Entry for session ${Number(deleted)} deleted` : 'Entry deleted', 'success');
                 history.replaceState(null, '', location.pathname);
             }
         },
@@ -170,6 +123,13 @@ window.gamePage = function () {
         },
         get played() {
             return this.campaign?.played_sessions || [];
+        },
+        // Entries written for sessions that were played; the cancelled ones are listed apart.
+        get journalCount() {
+            return this.played.filter((s) => s.journal).length;
+        },
+        get cancelledEntries() {
+            return this.campaign?.journal_cancelled || [];
         },
         get visibleSessions() {
             return this.showAll ? this.played : this.played.slice(0, 5);
@@ -288,6 +248,12 @@ window.gamePage = function () {
             if (this.isStrongCandidate(s)) parts.push('strong candidate');
             if (this.awaitsMe(s)) parts.push('awaiting your reply');
             return parts.join(', ');
+        },
+        journalUrl(sessionId) {
+            return `/games/${encodeURIComponent(this.campaign.id)}/journal/${encodeURIComponent(sessionId)}`;
+        },
+        cancelledLabel(c) {
+            return this.formatDate(c.date) + (c.name ? ': ' + c.name : '');
         },
         entryLabel(s) {
             return `Session ${s.number}, ${this.formatHeading(s.date, true)}, ${s.attendees.length} there`;
@@ -465,9 +431,11 @@ window.gamePage = function () {
         },
         async deletePlayed(s) {
             if (this.busy) return;
+            const n = s.journal?.revisions || 0;
+            const entry = s.journal ? ` Its journal entry is deleted too, with ${n} revision${n === 1 ? '' : 's'} of text, including text written by other people.` : '';
             const ok = await this.askConfirm({
                 title: 'Delete session',
-                message: `Delete the session of ${this.formatDate(s.date)}? This cannot be undone.`,
+                message: `Delete the session of ${this.formatDate(s.date)}?${entry} This cannot be undone.`,
                 confirmLabel: 'Delete'
             });
             if (!ok) return;

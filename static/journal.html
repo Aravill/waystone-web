@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waystone - Journal</title>
+    <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+    <script src="/static/theme.js?v=5"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=61">
+    <link rel="stylesheet" href="/static/notifications.css?v=9">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
+</head>
+<body class="journal-page" x-data="journalPage()">
+    <div class="header">
+        <div class="header-left">
+            <a href="/" class="logo">Waystone</a>
+        </div>
+        <nav class="nav-bar" aria-label="Main">
+            <a href="/" class="nav-item" data-page="dashboard">Home</a>
+            <a href="/campaigns" class="nav-item active" aria-current="page" data-page="campaigns">Games</a>
+            <a href="/profile" class="nav-item" data-page="profile">Profile</a>
+            <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
+        </nav>
+        <div class="header-right">
+            <span class="user-name" x-text="displayName"></span>
+            <button @click="handleLogout()" class="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <main>
+            <nav class="game-crumb" aria-label="Breadcrumb">
+                <a :href="gameId ? '/campaigns#campaign-' + encodeURIComponent(gameId) : '/campaigns'">Games</a>
+                <template x-for="(c, i) in crumbs" :key="i">
+                    <span><span aria-hidden="true"> › </span><a x-show="c.href" :href="c.href" x-text="c.label"></a><span x-show="!c.href" aria-current="page" x-text="c.label"></span></span>
+                </template>
+            </nav>
+
+            <p x-show="loading">Loading journal...</p>
+            <div class="game-error" role="alert" x-show="loadError">
+                <p x-text="loadError"></p>
+                <button type="button" class="campaign-action-btn" @click="load()">Try again</button>
+            </div>
+            <template x-if="notFound">
+                <p>This session could not be found. The game or the session may have been deleted. <a :href="'/games/' + encodeURIComponent(gameId)">Back to the game</a></p>
+            </template>
+
+            <div class="message journal-message" :class="messageType" x-show="messageVisible" role="status" x-text="messageText"></div>
+
+            <template x-if="campaign && data">
+                <div>
+                    <!-- Entry -->
+                    <template x-if="screen === 'entry'">
+                        <div>
+                            <section class="title-block">
+                                <div>
+                                    <span class="modal-eyebrow" x-text="eyebrow"></span>
+                                    <h1 class="page-title" tabindex="-1" x-html="titleHtml(true)"></h1>
+                                    <p class="byline" x-show="entry" x-text="entry ? journalByline(entry) : ''"></p>
+                                    <p class="byline" x-show="!entry" x-text="emptyNote"></p>
+                                </div>
+                                <div class="actions">
+                                    <button type="button" class="btn-danger" x-show="entry && data.can_delete" :disabled="busy" @click="deleteEntry()">Delete</button>
+                                    <a class="campaign-action-btn" x-show="entry" :href="url('/history')" x-text="'History · ' + (entry ? entry.revision_count : 0)"></a>
+                                    <a class="submit-btn" x-show="entry && data.can_edit" :href="url('/edit')">Edit</a>
+                                    <a class="submit-btn" x-show="!entry && data.can_edit" :href="url('/edit')">Write the entry</a>
+                                </div>
+                            </section>
+                            <p class="notice-read" x-show="!played && entry">This session was cancelled, so its entry can be read but not changed. The DM or an admin can delete it.</p>
+                            <div class="split" x-show="entry">
+                                <article>
+                                    <div class="game-text" x-html="bodyHtml"></div>
+                                    <nav class="entry-nav" aria-label="Other entries">
+                                        <a class="is-prev" x-show="prevEntry" :href="prevEntry ? journalLink(prevEntry) : '#'" x-text="prevEntry ? '← ' + entryNavLabel(prevEntry) : ''"></a>
+                                        <a class="is-next" x-show="nextEntry" :href="nextEntry ? journalLink(nextEntry) : '#'" x-text="nextEntry ? entryNavLabel(nextEntry) + ' →' : ''"></a>
+                                    </nav>
+                                </article>
+                                <aside class="split-side">
+                                    <div>
+                                        <p class="modal-eyebrow">Who wrote it</p>
+                                        <h2 class="panel-heading"><span class="drop-cap">T</span>he scribes</h2>
+                                    </div>
+                                    <ul class="people">
+                                        <template x-for="sc in scribes" :key="sc.user_id">
+                                            <li class="person" :class="{ 'person--dm': sc.user_id === campaign.dm, 'person--lead': sc.user_id === entry.author_id }">
+                                                <span x-html="userAvatarHtml(sc.user)"></span>
+                                                <span>
+                                                    <span class="person-name" x-text="personName(sc.user)"></span>
+                                                    <span class="person-role" x-text="(sc.user_id === entry.author_id ? 'Author · ' : '') + sc.revisions + ' revision' + (sc.revisions === 1 ? '' : 's')"></span>
+                                                </span>
+                                            </li>
+                                        </template>
+                                    </ul>
+                                    <p class="panel-foot">Last changed <span x-text="shortDate(entry.updated_at)"></span> by <span x-text="entry.updated_by_user.display_name"></span>.<br><a :href="url('/history')" x-text="'See all ' + entry.revision_count + ' revision' + (entry.revision_count === 1 ? '' : 's') + ' →'"></a></p>
+                                    <p class="panel-foot" x-show="attendees.length > 0">At the table
+                                        <span class="journal-table" :aria-label="attendees.map((a) => a.display_name).join(', ')">
+                                            <template x-for="(a, i) in attendees" :key="a.id || 'guest-' + i">
+                                                <span :title="a.display_name" x-html="userAvatarHtml(a, false)"></span>
+                                            </template>
+                                        </span>
+                                    </p>
+                                </aside>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Edit -->
+                    <template x-if="screen === 'edit'">
+                        <div>
+                            <section class="title-block title-block--single">
+                                <div>
+                                    <span class="modal-eyebrow" x-text="eyebrow"></span>
+                                    <h1 class="page-title" tabindex="-1" x-text="draft.startedNew ? 'Write the entry' : 'Edit the entry'"></h1>
+                                    <p class="byline" x-text="editByline"></p>
+                                </div>
+                            </section>
+                            <form class="edit-form" @submit.prevent="save()" novalidate>
+                                <div class="field">
+                                    <label for="fName">Session name (optional)</label>
+                                    <div class="title-row">
+                                        <span class="title-fixed"><span x-text="campaign.title"></span> <span class="t-no" x-text="data.session.number"></span>:</span>
+                                        <input type="text" id="fName" maxlength="80" placeholder="The Summit" x-model="draft.name">
+                                    </div>
+                                    <p class="hint">The game title and number come from the session and can't be edited.</p>
+                                </div>
+                                <div class="field">
+                                    <div class="tabs" role="group" aria-label="Editor view">
+                                        <button type="button" class="tab" :aria-pressed="draft.tab === 'write'" @click="draft.tab = 'write'">Write</button>
+                                        <button type="button" class="tab" :aria-pressed="draft.tab === 'preview'" @click="draft.tab = 'preview'">Preview</button>
+                                    </div>
+                                    <div class="editor" :data-tab="draft.tab">
+                                        <div class="pane pane--write">
+                                            <label for="fBody">The entry</label>
+                                            <textarea id="fBody" placeholder="What happened at the table?" x-model="draft.body"></textarea>
+                                        </div>
+                                        <div class="pane pane--preview">
+                                            <span class="label">Preview</span>
+                                            <div class="preview">
+                                                <p class="preview-title" x-html="titleHtml(false, draft.name.trim())"></p>
+                                                <div class="game-text" x-html="renderMarkdown(draft.body)"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p class="hint hint--formatting">Formatting, same as the game description: **bold** · *italic* · # heading · - list · 1. list · &gt; quote · [link](https://…)</p>
+                                </div>
+                                <div class="field field--note">
+                                    <label for="fNote">What changed (optional)</label>
+                                    <input type="text" id="fNote" maxlength="120" :placeholder="draft.entryId ? 'Fixed the name of the pass' : 'First draft'" x-model="draft.note">
+                                </div>
+                                <div class="notice" role="alert" x-show="draft.error"><p x-text="draft.error"></p></div>
+                                <div class="form-foot">
+                                    <button type="submit" class="submit-btn" :disabled="busy || draft.locked" x-text="draft.entryId ? 'Save changes' : 'Save entry'"></button>
+                                    <a class="campaign-action-btn" :href="cancelUrl">Cancel</a>
+                                </div>
+                            </form>
+                        </div>
+                    </template>
+
+                    <!-- Merge -->
+                    <template x-if="screen === 'merge'">
+                        <div>
+                            <section class="title-block title-block--single">
+                                <div>
+                                    <span class="modal-eyebrow" x-text="eyebrow"></span>
+                                    <h1 class="page-title" tabindex="-1">Combine your changes</h1>
+                                    <p class="byline"><span x-text="mergeWho"></span> saved revision <span x-text="merge.theirsN"></span> while you were writing. Nothing has been lost: your text is safe here, and <span x-text="mergeWho"></span>'s is in the history.</p>
+                                </div>
+                            </section>
+                            <div class="merge-summary" role="status">
+                                <span class="merge-ok" x-show="merge.auto > 0" x-text="'✓ ' + merge.auto + ' other change' + (merge.auto === 1 ? '' : 's') + ' combined automatically'"></span>
+                                <span class="merge-todo" x-show="openConflicts > 0" x-text="'✦ ' + openConflicts + ' of ' + merge.conflicts.length + ' conflict' + (merge.conflicts.length === 1 ? '' : 's') + ' still to decide'"></span>
+                                <span class="merge-ok" x-show="openConflicts === 0">✓ All conflicts decided. Check the result and save.</span>
+                            </div>
+                            <div class="conflicts">
+                                <template x-for="(c, i) in merge.conflicts" :key="c.id">
+                                    <article class="conflict" :class="{ 'conflict--done': isResolved(c) }" :aria-labelledby="'h-' + c.id">
+                                        <h3 class="conflict-head" :id="'h-' + c.id" x-text="(isResolved(c) ? '✓' : '✦') + ' Conflict ' + (i + 1) + ' of ' + merge.conflicts.length + ' · ' + (c.isName ? 'Session name' : 'Paragraph')"></h3>
+                                        <p class="context" x-show="c.before" x-text="c.before"></p>
+                                        <div class="versions">
+                                            <div class="version" :class="{ 'version--picked': c.choice === 'mine' || c.choice === 'both' }">
+                                                <span class="label">Yours</span>
+                                                <div class="version-name" x-show="c.isName" x-text="c.mine || 'No name'"></div>
+                                                <p class="same" x-show="!c.isName && c.mineRemoved">Removed this paragraph.</p>
+                                                <div class="diff" x-show="!c.isName && !c.mineRemoved" x-html="c.mineHtml"></div>
+                                            </div>
+                                            <div class="version" :class="{ 'version--picked': c.choice === 'theirs' || c.choice === 'both' }">
+                                                <span class="label" x-text="mergeWho + '\'s'"></span>
+                                                <div class="version-name" x-show="c.isName" x-text="c.theirs || 'No name'"></div>
+                                                <p class="same" x-show="!c.isName && c.theirsRemoved">Removed this paragraph.</p>
+                                                <div class="diff" x-show="!c.isName && !c.theirsRemoved" x-html="c.theirsHtml"></div>
+                                            </div>
+                                        </div>
+                                        <p class="context" x-show="c.after" x-text="c.after"></p>
+                                        <div class="picks" role="group" aria-label="Which version to keep">
+                                            <button type="button" class="campaign-action-btn" :aria-pressed="c.choice === 'mine'" @click="pick(c, 'mine')" x-text="(c.choice === 'mine' ? '✓ ' : '') + 'Keep yours'"></button>
+                                            <button type="button" class="campaign-action-btn" :aria-pressed="c.choice === 'theirs'" @click="pick(c, 'theirs')" x-text="(c.choice === 'theirs' ? '✓ ' : '') + 'Keep ' + mergeWho + '\'s'"></button>
+                                            <button type="button" class="campaign-action-btn" x-show="!c.isName && c.base.length === 0" :aria-pressed="c.choice === 'both'" @click="pick(c, 'both')" x-text="(c.choice === 'both' ? '✓ ' : '') + 'Keep both'"></button>
+                                            <button type="button" class="campaign-action-btn" :aria-pressed="c.choice === 'edit'" @click="pick(c, 'edit')" x-text="(c.choice === 'edit' ? '✓ ' : '') + (c.isName ? 'Write it myself' : 'Combine by hand')"></button>
+                                        </div>
+                                        <div class="field" x-show="c.choice === 'edit'">
+                                            <label :for="'c-' + c.id">Your wording</label>
+                                            <input type="text" x-show="c.isName" :id="c.isName ? 'c-' + c.id : null" maxlength="80" x-model="c.text">
+                                            <textarea x-show="!c.isName" :id="!c.isName ? 'c-' + c.id : null" class="conflict-text" x-model="c.text"></textarea>
+                                        </div>
+                                    </article>
+                                </template>
+                            </div>
+                            <section class="merge-result">
+                                <h2 class="section-header">The merged entry</h2>
+                                <div class="preview">
+                                    <p class="preview-title" x-html="mergeTitleHtml"></p>
+                                    <div class="game-text" x-html="mergeBodyHtml"></div>
+                                </div>
+                            </section>
+                            <div class="notice merge-notice" role="alert" x-show="draft.error"><p x-text="draft.error"></p></div>
+                            <div class="form-foot merge-foot">
+                                <button type="button" class="submit-btn" :disabled="busy || draft.locked || openConflicts > 0" @click="saveMerged()">Save merged entry</button>
+                                <button type="button" class="campaign-action-btn" @click="backToDraft()">Back to my draft</button>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- History -->
+                    <template x-if="screen === 'history'">
+                        <div>
+                            <section class="title-block title-block--single">
+                                <div>
+                                    <span class="modal-eyebrow" x-text="'History · ' + revisions.length + ' revision' + (revisions.length === 1 ? '' : 's')"></span>
+                                    <h1 class="page-title" tabindex="-1" x-html="titleHtml(true)"></h1>
+                                    <p class="byline" x-text="journalByline(entry)"></p>
+                                    <p class="byline" x-show="pruned">Only the latest 200 revisions are kept.</p>
+                                </div>
+                            </section>
+                            <p x-show="historyLoading">Loading history...</p>
+                            <div class="history" x-show="!historyLoading && revisions.length > 0">
+                                <ol class="revs" reversed aria-label="Revisions, newest first">
+                                    <template x-for="r in revisionsNewestFirst" :key="r.number">
+                                        <li class="rev-item">
+                                            <button type="button" class="rev" :aria-current="r.number === selected" @click="selectRevision(r.number)">
+                                                <span x-html="userAvatarHtml(r.author_user, false)"></span>
+                                                <span class="rev-head"><span class="rev-no" x-text="'Revision ' + r.number"></span><span class="tag" x-show="r.number === currentRevision">✓ Current</span></span>
+                                                <span class="rev-meta" x-text="r.author_user.display_name + (r.author_id === currentUserId ? ' (you)' : '') + ' · ' + formatStamp(r.created_at)"></span>
+                                                <span class="rev-note"><span x-text="revNote(r) || 'No note'"></span> <span class="rev-delta" x-html="deltaHtml(r)"></span></span>
+                                            </button>
+                                        </li>
+                                    </template>
+                                </ol>
+                                <section class="detail" aria-live="polite" x-show="selectedRevision">
+                                    <div class="detail-head">
+                                        <div>
+                                            <h2 class="detail-title">§ Revision <span class="t-no" x-text="selected"></span></h2>
+                                            <p class="detail-sub" x-text="selectedRevision ? selectedRevision.author_user.display_name + ' · ' + formatStamp(selectedRevision.created_at) + (revNote(selectedRevision) ? ' · ' + revNote(selectedRevision) : '') : ''"></p>
+                                        </div>
+                                        <span class="legend" x-show="selected === currentRevision">This is the current version.</span>
+                                        <button type="button" class="submit-btn" x-show="selected !== currentRevision && data.can_edit" :disabled="busy" @click="restore()">Restore this version</button>
+                                        <span class="legend" x-show="selected !== currentRevision && !data.can_edit">Only the DM and players can restore.</span>
+                                    </div>
+                                    <div class="toolbar">
+                                        <div role="group" aria-label="Show">
+                                            <button type="button" class="tab" :aria-pressed="historyMode === 'changes'" @click="historyMode = 'changes'">Changes</button>
+                                            <button type="button" class="tab" :aria-pressed="historyMode === 'full'" @click="historyMode = 'full'">Full text</button>
+                                        </div>
+                                        <span class="legend" x-show="historyMode === 'changes' && previousRevision">Against revision <span x-text="previousRevision ? previousRevision.number : ''"></span>: <ins>added</ins> · <del>removed</del></span>
+                                    </div>
+                                    <div x-show="historyMode === 'full'">
+                                        <p class="preview-title" x-html="journalTitleHtml(campaign.title, data.session.number, selectedRevision ? selectedRevision.name : '')"></p>
+                                        <div class="game-text" x-html="selectedRevision ? renderMarkdown(selectedRevision.body) : ''"></div>
+                                    </div>
+                                    <div x-show="historyMode === 'changes'">
+                                        <p class="same" x-show="!previousRevision" x-text="pruned && selected > 1 ? 'This is the oldest revision still kept, so there is nothing to compare it with.' : 'This is the first version of the entry, so there is nothing to compare it with.'"></p>
+                                        <div class="game-text" x-show="!previousRevision" x-html="selectedRevision ? renderMarkdown(selectedRevision.body) : ''"></div>
+                                        <template x-if="previousRevision && selectedDiff">
+                                            <div class="detail-changes">
+                                                <p class="name-change" x-show="previousRevision.name !== selectedRevision.name"><span class="label">Session name</span><br><del x-text="previousRevision.name || 'none'"></del> → <ins x-text="selectedRevision.name || 'none'"></ins></p>
+                                                <div class="diff" x-show="selectedDiff.added || selectedDiff.removed" x-html="selectedDiff.html"></div>
+                                                <p class="same" x-show="!selectedDiff.added && !selectedDiff.removed">The text did not change in this revision.</p>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Not allowed to write -->
+                    <template x-if="screen === 'denied'">
+                        <div>
+                            <section class="title-block title-block--single">
+                                <div>
+                                    <span class="modal-eyebrow" x-text="eyebrow"></span>
+                                    <h1 class="page-title" tabindex="-1" x-html="titleHtml(true)"></h1>
+                                    <p class="byline" x-text="deniedText"></p>
+                                </div>
+                            </section>
+                            <p><a :href="url('')">Back to the entry</a></p>
+                        </div>
+                    </template>
+
+                    <p class="ornament" aria-hidden="true">❦ ❦ ❦</p>
+                </div>
+            </template>
+        </main>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal confirm-modal" :class="{ 'modal-open': confirmDialog.open }" @click.self="closeConfirm(false)" @keydown.escape.window="confirmDialog.open && closeConfirm(false)" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+        <div class="modal-content confirm-modal-content">
+            <div class="modal-header">
+                <div>
+                    <span class="modal-eyebrow" x-text="confirmDialog.eyebrow"></span>
+                    <h2 id="confirmModalTitle" x-text="confirmDialog.title"></h2>
+                </div>
+                <button type="button" class="modal-close" @click="closeConfirm(false)" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-form">
+                <p class="confirm-modal-message" x-text="confirmDialog.message"></p>
+                <div class="modal-actions">
+                    <button type="button" :class="confirmDialog.danger ? 'btn-confirm-danger' : 'submit-btn'" @click="closeConfirm(true)" x-text="confirmDialog.confirmLabel"></button>
+                    <button type="button" class="btn-cancel" x-ref="confirmCancelBtn" @click="closeConfirm(false)">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/notifications.js?v=9"></script>
+    <script src="/campaigns.js?v=53"></script>
+    <script src="/static/journal.js?v=1"></script>
+</body>
+</html>
