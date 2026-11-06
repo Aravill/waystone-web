@@ -76,6 +76,11 @@ type Store interface {
 	CountUnreadNotifications(userID string) (int, error)
 	MarkNotificationRead(userID, id string) error
 	MarkAllNotificationsRead(userID string) error
+	GetJournalSummaries(campaignID string) (map[string]models.JournalSummary, error)
+	GetJournalEntry(sessionID string) (*models.JournalEntry, error)
+	GetJournalRevisions(sessionID string) (entryID string, revs []models.JournalRevision, err error)
+	SaveJournalRevision(campaignID, sessionID, entryID string, baseRevision int, rev models.JournalRevision, keepRevisions int) (models.JournalSaveResult, error)
+	DeleteJournalEntry(sessionID string) error
 	Backup(path string) error
 	Close() error
 }
@@ -207,6 +212,16 @@ func seedIfEmpty() error {
 				}); err != nil {
 					return fmt.Errorf("failed to seed session response: %w", err)
 				}
+			}
+			entryID, base := "", 0
+			for _, rev := range seeded.Journal {
+				result, err := store.SaveJournalRevision(session.CampaignID, session.ID, entryID, base, models.JournalRevision{
+					AuthorID: rev.AuthorID, Name: rev.Name, Body: rev.Body, Note: rev.Note,
+				}, JournalKeepRevisions)
+				if err != nil {
+					return fmt.Errorf("failed to seed journal entry: %w", err)
+				}
+				entryID, base = result.EntryID, result.Revision.Number
 			}
 		}
 	}

@@ -162,10 +162,21 @@ func seedUser(id, username, name, nickname string) models.User {
 	}
 }
 
-// SeedSession is a seeded session plus its players' responses (user ID → participation).
+// SeedRevision is one saved version of a seeded journal entry. The first revision's author is the
+// entry's author; later ones are saved in order, each against the one before.
+type SeedRevision struct {
+	AuthorID string
+	Name     string
+	Body     string
+	Note     string
+}
+
+// SeedSession is a seeded session plus its players' responses (user ID → participation)
+// and, optionally, the revisions of its journal entry.
 type SeedSession struct {
 	Session   models.CampaignSession
 	Responses map[string]models.ParticipationStatus
+	Journal   []SeedRevision
 }
 
 // InitialSessions returns Age of Sojourn's weekly history (twelve past weeks,
@@ -212,6 +223,15 @@ func InitialSessions() []SeedSession {
 			r[adamID] = models.Tentative
 		}
 		add(weeks, status, r)
+	}
+	// Journal entries on two played sessions (index = weeks + 12): one written by three people, one by one.
+	seeded[10].Journal = []SeedRevision{
+		{AuthorID: royID, Name: "The Cold Road", Note: "First draft", Body: "We left the ford at dawn and followed the Karrow road north. By noon the mule had stopped twice and the rain had not stopped at all.\n\nThe waystone at the third bend was dark."},
+		{AuthorID: adamID, Name: "The Cold Road", Note: "Added the toll-keeper", Body: "We left the ford at dawn and followed the Karrow road north. By noon the mule had stopped twice and the rain had not stopped at all.\n\nOld Hesk took two silver at the toll and told us the stone had been warm since midsummer.\n\nThe waystone at the third bend was dark."},
+		{AuthorID: testyID, Name: "The Dark Waystone", Note: "Named the session", Body: "We left the ford at dawn and followed the Karrow road north. By noon the mule had stopped twice and the rain had not stopped at all.\n\nOld Hesk took two silver at the toll and told us the stone had been warm since midsummer.\n\nThe waystone at the third bend was dark, and **cold**. Nobody touched it."},
+	}
+	seeded[8].Journal = []SeedRevision{
+		{AuthorID: simonID, Name: "Ash on the Wind", Note: "First draft", Body: "The village at Karrow Ford had burned before we got there. The ash smelled of cloves.\n\nWe found one survivor, a boy who only says *up, up, up*."},
 	}
 	add(1, models.SessionConfirmed, responses(models.Accepted, royID, adamID, simonID))
 	add(2, models.SessionSuggested, responses(models.Accepted, royID))
