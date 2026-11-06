@@ -42,6 +42,6 @@ Waystone Web: Go (stdlib `net/http`, SQLite via `modernc.org/sqlite`, local user
 
 ## Git
 
-- Don't commit until asked. Commit subjects: lower case, ≤6 words, **no** `feat:`/`fix:` prefixes; put details in the body. Small logical commits.
+- Commit and push each finished logical chunk as you go, without being asked (`commit-as-you-go` skill). Never commit directly to `main`. Commit subjects: lower case, ≤6 words, **no** `feat:`/`fix:` prefixes; put details in the body. Small logical commits.
 - Branches use type prefixes: `feat/...`, `fix/...`, `chore/...`; worktrees go under `.claude/worktrees/` with matching names (`feat-...`).
 - PRs are squash-merged with titles like `feat/admin users`.

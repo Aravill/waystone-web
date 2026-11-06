@@ -6,8 +6,8 @@ description: Implementation workflow for this repo. Use for any feature, fix, or
 # coding
 
 1. **Plan.** If the user supplied a plan, use it as-is and skip this step. Otherwise launch a `Plan` subagent (default model) to produce a concrete plan: files to touch, existing helpers to reuse, routes to register in `api/router.go`, Store interface changes. Show the plan to the user before implementing if it's non-trivial.
-2. **Worktree.** Create the worktree under `.claude/worktrees/` only, named after the branch with its type prefix (branch `feat/session-export` → `.claude/worktrees/feat-session-export`), branched from `main`:
-   `git worktree add .claude/worktrees/<type>-<name> -b <type>/<name> main`
+2. **Worktree.** Create the worktree under `.claude/worktrees/` only, named after the branch with its type prefix (branch `feat/session-export` → `.claude/worktrees/feat-session-export`), branched from the latest main:
+   `git fetch origin && git worktree add .claude/worktrees/<type>-<name> -b <type>/<name> origin/main`
 3. **Implement.** Launch a `general-purpose` subagent with `model: "sonnet"` to execute the plan inside the worktree. Give it the plan plus the relevant CLAUDE.md conventions. Use `model: "haiku"` for trivial, mechanical changes.
 4. **Rules for the implementation:**
    - Minimal, surgical changes; no broad refactors unless asked.
@@ -15,5 +15,5 @@ description: Implementation workflow for this repo. Use for any feature, fix, or
    - Do not add or modify tests unless the user explicitly asks.
    - UI work follows `STYLE_GUIDE.md`.
 5. **Verify** in the worktree: `go build ./... && go vet ./...`.
-6. **Do not commit.** Wait until the user asks (then use the `commit` skill) or commits themselves.
+6. **Commit and push as you go.** Each finished logical chunk gets its own commit and push, per the `commit-as-you-go` skill, including any implementation subagent's work. Don't merge.
 7. **Finish** with a short pull-request-style summary: what changed, why, and anything the user should check manually (e.g. pages to click through).
