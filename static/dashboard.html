@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Waystone - Home</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
-    <script src="/static/theme.js?v=5"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=61">
-    <link rel="stylesheet" href="dashboard.css?v=10">
-    <link rel="stylesheet" href="/static/notifications.css?v=9">
+    <script src="/static/theme.js?v=6"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=64">
+    <link rel="stylesheet" href="dashboard.css?v=12">
+    <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body x-data="dashboardPage()">
@@ -19,85 +19,151 @@
         <nav class="nav-bar" aria-label="Main">
             <a href="/" class="nav-item active" aria-current="page" data-page="dashboard">Home</a>
             <a href="/campaigns" class="nav-item" data-page="campaigns">Games</a>
-            <a href="/profile" class="nav-item" data-page="profile">Profile</a>
             <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
         </nav>
         <div class="header-right">
-            <span class="user-name" x-text="displayName"></span>
-            <button @click="handleLogout()" class="logout-btn">Logout</button>
+            <details class="user-menu">
+                <summary><span class="user-menu-avatar" aria-hidden="true" x-text="(displayName || '?').charAt(0).toUpperCase()"></span><span class="user-menu-name" x-text="displayName"></span><span class="user-menu-caret" aria-hidden="true">&#9662;</span></summary>
+                <div class="user-menu-panel">
+                    <a href="/profile">Profile</a>
+                    <button type="button" @click="handleLogout()">Log out</button>
+                </div>
+            </details>
         </div>
     </div>
 
-    <div class="container">
-        <h1 class="page-title"><span class="drop-cap">H</span>ome</h1>
-        <p class="page-subtitle">Three roads lead from this stone &middot; one lies open</p>
-        <p class="home-intro">
-            Waystone is a gathering place for the Waystone Discord community: schedule sessions,
-            sign up for games, and find your way between the roads below. It is built for our
-            members and still growing, so if something is broken or there is a feature you would
-            like to see, leave your feedback on Discord.
-        </p>
-        <a href="https://discord.gg/waystone" class="discord-invite-btn" target="_blank" rel="noopener noreferrer">Join our Discord &rarr;</a>
-        <div class="dashboard">
-            <h2 class="section-header">Choose thy road</h2>
+    <main class="container">
+        <h1 class="page-title"><span class="drop-cap">W</span>ell met<span x-show="displayName">, <span x-text="displayName"></span></span></h1>
+        <p class="page-subtitle" x-show="loaded" x-text="subtitle"></p>
 
-            <div class="modules-grid">
-                <!-- Games (Active) -->
-                <a href="/campaigns" class="module-card active stone-1">
-                    <svg class="stone-outline" viewBox="0 0 320 420" aria-hidden="true">
-                        <path class="stone-body" d="M40 404L56 142Q60 62 104 36Q160 12 214 34Q258 60 264 142L280 404Z"/>
-                        <path class="stone-carve" d="M52 392L68 146Q72 76 112 52Q160 30 206 50Q244 74 252 146L268 392"/>
-                        <path class="stone-ground" d="M10 404H310"/>
-                        <path class="stone-wear" d="M266 168L256 182L262 196M72 250L84 258M64 330l9 -6M247 300l-7 12M96 372c2 -3 5 -3 6 0M226 366c2 -3 5 -3 6 0"/>
-                        <path class="stone-wear" d="M30 404L28 395M30 404L34 397M262 404L260 396M262 404L266 398M268 404L272 400M110 404L108 398M112 404L116 399"/>
-                    </svg>
-                    <div class="card-inner">
-                        <svg class="stone-rune" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.5 2.5 L7 17"/><path d="M5 15 L9 19"/><path d="M7 17 L4 20"/><circle cx="3.2" cy="20.8" r="1.1"/><path d="M2.5 2.5 L17 17"/><path d="M15 19 L19 15"/><path d="M17 17 L20 20"/><circle cx="20.8" cy="20.8" r="1.1"/><path class="type-icon__fill" d="M12 6 L15.5 7.5 V11.5 Q15.5 15 12 17 Q8.5 15 8.5 11.5 V7.5 Z"/><path d="M12 8 V15"/></svg>
-                        <h3>Games</h3>
-                        <p class="description">Session scheduling &amp; sign-ups</p>
-                        <span class="status-badge">&#10022; Open road</span>
-                    </div>
-                </a>
+        <p class="home-status" x-show="loading && !loaded">Gathering thy agenda...</p>
+        <div class="game-error" role="alert" x-show="loadError">
+            <p x-text="loadError"></p>
+            <button type="button" class="campaign-action-btn" @click="loadAgenda()">Try again</button>
+        </div>
 
-                <!-- Chat (Disabled) -->
-                <div aria-disabled="true" class="module-card disabled stone-2">
-                    <svg class="stone-outline" viewBox="0 0 320 420" aria-hidden="true">
-                        <path class="stone-body" d="M44 404L52 124L66 62Q72 38 100 33L222 28Q250 30 258 64L278 404Z"/>
-                        <path class="stone-carve" d="M56 392L63 128L76 72Q81 52 104 47L220 42Q240 44 245 68L266 392"/>
-                        <path class="stone-ground" d="M10 404H310"/>
-                        <path class="stone-wear" d="M62 190L74 200L68 214M248 250l-10 8l6 14M250 330h-8M80 320c2 -3 5 -3 6 0M96 330c2 -3 5 -3 6 0M70 300c2 -3 5 -3 6 0"/>
-                        <path class="stone-wear" d="M30 404L28 396M30 404L34 398M286 404L284 397M286 404L290 399M292 404L296 401M190 404L188 398M192 404L196 399"/>
-                    </svg>
-                    <div class="card-inner">
-                        <svg class="stone-rune" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 3C12 4 7.5 9.5 6 18"/><path d="M20 3C19.5 9 15.5 13 9 14"/><path d="M11 9.5H15.5"/><path d="M6 18L3.5 21"/></svg>
-                        <h3>Chat</h3>
-                        <p class="description">Interactive games</p>
-                        <span class="status-badge coming-soon">&#10023; Coming soon</span>
+        <!-- Session in progress: the one filled block on the page -->
+        <section class="home-now" x-show="agenda.in_progress.length > 0" x-cloak aria-labelledby="nowHeading">
+            <h2 id="nowHeading" class="section-header">At the table now</h2>
+            <template x-for="s in agenda.in_progress" :key="s.id">
+                <article class="now-card">
+                    <p class="now-marker"><span aria-hidden="true">●</span> In session</p>
+                    <h3 class="now-title"><a :href="gameUrl(s)" x-text="s.campaign.title"></a></h3>
+                    <p class="now-when" x-text="nowWhen(s)"></p>
+                    <p class="now-dm"><span aria-hidden="true">♛</span> <span class="visually-hidden">Dungeon master: </span><span x-text="dmName(s)"></span></p>
+                    <div class="now-players" x-show="acceptedUsers(s).length > 0">
+                        <span class="visually-hidden">At the table: </span>
+                        <template x-for="u in acceptedUsers(s)" :key="u.id">
+                            <span :title="u.display_name" x-html="userAvatarHtml(u, false)"></span>
+                        </template>
                     </div>
-                </div>
+                    <p class="now-mine" x-show="s.role === 'player'" x-text="mineText(s)"></p>
+                    <a class="now-open" :href="gameUrl(s)">Open the game</a>
+                </article>
+            </template>
+        </section>
 
-                <!-- Codex (Disabled) -->
-                <div aria-disabled="true" class="module-card disabled stone-3">
-                    <svg class="stone-outline" viewBox="0 0 320 420" aria-hidden="true">
-                        <path class="stone-body" d="M38 404L56 112Q60 52 94 32L168 24L194 42L214 34Q252 52 260 112L284 404Z"/>
-                        <path class="stone-carve" d="M50 392L68 116Q72 66 100 48L166 40L196 60L214 50Q240 64 247 116L271 392"/>
-                        <path class="stone-ground" d="M10 404H310"/>
-                        <path class="stone-wear" d="M178 40L186 56L196 52M72 220l10 6M240 220l-8 10l4 12M66 340l9 -4M262 330l-7 8M230 372c2 -3 5 -3 6 0M244 366c2 -3 5 -3 6 0"/>
-                        <path class="stone-wear" d="M26 404L24 396M26 404L30 398M296 404L294 397M296 404L300 399M80 404L78 398M82 404L86 399"/>
-                    </svg>
-                    <div class="card-inner">
-                        <svg class="stone-rune" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5C6 4.5 9 4.8 12 7C15 4.8 18 4.5 21 5.5V18.5C18 17.5 15 17.8 12 20C9 17.8 6 17.5 3 18.5Z"/><path d="M12 7V20"/></svg>
-                        <h3>Codex</h3>
-                        <p class="description">World database</p>
-                        <span class="status-badge coming-soon">&#10023; Coming soon</span>
+        <div class="home-columns" x-show="loaded" x-cloak>
+            <div class="home-main">
+                <!-- A new visitor: the introduction and a way in -->
+                <section class="home-welcome" x-show="isNewcomer">
+                    <p class="home-intro">
+                        Waystone is a gathering place for the Waystone Discord community: schedule sessions,
+                        sign up for games, and find your way between the roads below. It is built for our
+                        members and still growing.
+                    </p>
+                    <a href="/campaigns" class="btn-link-primary">See the games &rarr;</a>
+                </section>
+
+                <section x-show="agenda.awaiting.length > 0" aria-labelledby="awaitsHeading">
+                    <h2 id="awaitsHeading" class="section-header">Awaits thy reply</h2>
+                    <div class="rl-list">
+                        <template x-for="s in agenda.awaiting" :key="s.id">
+                            <article class="rl">
+                                <div class="rl-day">
+                                    <span x-text="dayParts(s).month"></span>
+                                    <b x-text="dayParts(s).day"></b>
+                                    <span x-text="dayParts(s).weekday"></span>
+                                </div>
+                                <div class="rl-body">
+                                    <h3 class="rl-title"><a :href="gameUrl(s)" x-text="s.campaign.title"></a></h3>
+                                    <p class="rl-meta" x-text="awaitMeta(s)"></p>
+                                    <div class="session-actions session-replies" role="group" :aria-label="'Thy reply for ' + s.campaign.title">
+                                        <button type="button" class="btn-response btn-response--accepted" :disabled="busy" @click="reply('Accepted', s)">Aye</button>
+                                        <button type="button" class="btn-response btn-response--tentative" :disabled="busy" @click="reply('Tentative', s)">Perhaps</button>
+                                        <button type="button" class="btn-response btn-response--declined" :disabled="busy" @click="reply('Declined', s)">Nay</button>
+                                    </div>
+                                </div>
+                            </article>
+                        </template>
                     </div>
-                </div>
+                </section>
+
+                <section x-show="agenda.ahead.length > 0" aria-labelledby="aheadHeading">
+                    <h2 id="aheadHeading" class="section-header">The road ahead</h2>
+                    <div class="ledger" role="list">
+                        <template x-for="s in agenda.ahead" :key="s.id">
+                            <div class="ledger-row agenda-row-home" role="listitem">
+                                <span class="ledger-date" x-text="shortDate(s)"></span>
+                                <span class="ledger-time" x-text="timeRange(s)"></span>
+                                <a class="ledger-game" :href="gameUrl(s)" x-text="s.campaign.title"></a>
+                                <span class="ledger-tag"><span class="panel-status-tag" :class="`chip-${s.status}`" x-text="statusLabel(s)"></span></span>
+                                <span class="ledger-mine" :class="mineClass(s)" x-html="mineHtml(s)"></span>
+                            </div>
+                        </template>
+                    </div>
+                    <p class="home-more">
+                        <span x-text="zoneNote"></span>
+                        <a class="text-link" href="/profile#calendar-sync">Add to my calendar app</a>
+                    </p>
+                </section>
+
+                <p class="home-status" x-show="!isNewcomer && agenda.awaiting.length === 0 && agenda.ahead.length === 0 && agenda.in_progress.length === 0">Nothing awaits thee, and no session is on the calendar.</p>
             </div>
-            <p class="ornament" aria-hidden="true">&#10086; &#10086; &#10086;</p>
-        </div>
-    </div>
 
-    <script src="/static/notifications.js?v=9"></script>
-    <script src="dashboard.js?v=1"></script>
+            <aside class="home-side">
+                <section x-show="agenda.games.length > 0" aria-labelledby="gamesHeading">
+                    <h2 id="gamesHeading" class="section-header">Thy games</h2>
+                    <div class="ledger" role="list">
+                        <template x-for="g in agenda.games" :key="g.id">
+                            <div class="ledger-row game-row-home" role="listitem">
+                                <div>
+                                    <a class="ledger-game" :href="'/games/' + encodeURIComponent(g.id)" x-text="g.title"></a>
+                                    <p class="ledger-meta" x-text="gameMeta(g)"></p>
+                                </div>
+                                <span class="profile-status" :class="'status-' + statusClass(g.status)" x-text="g.status"></span>
+                            </div>
+                        </template>
+                    </div>
+                    <p class="home-more">
+                        <a class="text-link" href="/campaigns">All games</a>
+                        <span x-show="agenda.open_to_join_count > 0" x-text="agenda.open_to_join_count + ' open to join'"></span>
+                    </p>
+                </section>
+
+                <section>
+                    <h2 class="section-header">Roads yet to open</h2>
+                    <div class="roads">
+                        <div class="road">
+                            <svg viewBox="0 0 64 78" aria-hidden="true"><path d="M10 74L13 24Q15 8 26 4L46 3Q52 6 54 24L58 74Z"/><path d="M2 74H62"/></svg>
+                            <b>Chat</b>Interactive games
+                        </div>
+                        <div class="road">
+                            <svg viewBox="0 0 64 78" aria-hidden="true"><path d="M8 74L12 22Q14 8 24 4L36 2L42 7L46 4Q54 10 56 22L60 74Z"/><path d="M2 74H62"/></svg>
+                            <b>Codex</b>World database
+                        </div>
+                    </div>
+                </section>
+
+                <p class="home-fine">Something broken, or a feature you'd like? <a href="https://discord.gg/waystone" target="_blank" rel="noopener noreferrer">Tell us on Discord</a></p>
+            </aside>
+        </div>
+    </main>
+
+    <div class="message" :class="messageType" x-show="messageVisible" role="status" x-text="messageText"></div>
+
+    <script src="/static/notifications.js?v=10"></script>
+    <script src="/campaigns.js?v=54"></script>
+    <script src="dashboard.js?v=3"></script>
 </body>
 </html>

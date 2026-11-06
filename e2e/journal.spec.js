@@ -565,14 +565,15 @@ test.describe('navigation', () => {
     await expect(crumb.getByRole('link', { name: 'Games' })).toHaveAttribute('href', `/campaigns#campaign-${world.id}`);
     await expect(crumb.locator('[aria-current="page"]')).toContainText('Journal E2E');
     await expect(page.locator('.game-close')).toHaveCount(0);
-    await expect(page.locator('.game-sheet-head').getByText('×')).toHaveCount(0);
+    await expect(page.locator('.game-head').getByText('×')).toHaveCount(0);
   });
 
   test('change password shows the main nav, and hides it on a forced change', async ({ page }) => {
     await loginAs(page, 'testy');
     await page.goto('/change-password');
     const nav = page.getByRole('navigation', { name: 'Main' });
-    await expect(nav.getByRole('link', { name: 'Profile' })).toHaveAttribute('aria-current', 'page');
+    await expect(nav.getByRole('link', { name: 'Games' })).toBeVisible(); // Profile moved into the user menu
+    await expect(nav.getByRole('link', { name: 'Profile' })).toHaveCount(0);
     await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toContainText('Profile');
 
     // A forced change: the same page with must_change_password set on the current user

@@ -32,14 +32,14 @@
     position: absolute;
     top: 0;
     right: 0;
-    min-width: 1rem;
-    height: 1rem;
+    min-width: 1.1875rem;
+    height: 1.1875rem;
     padding: 0 0.25rem;
-    border-radius: 0.5rem;
+    border-radius: 0.6rem;
     background: var(--rubric);
     color: var(--bg);
-    font-size: 0.625rem;
-    line-height: 1rem;
+    font-size: 0.8125rem;
+    line-height: 1.1875rem;
     text-align: center;
     letter-spacing: 0;
 }
@@ -68,9 +68,7 @@
 
 .notif-panel-title {
     color: var(--muted);
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1875rem;
+    font-size: 0.875rem;
 }
 
 .notif-markall {
@@ -83,11 +81,9 @@
     color: var(--rubric);
     cursor: pointer;
     font-family: inherit;
-    font-size: 0.75rem;
+    font-size: 0.875rem;
     text-decoration: underline;
     text-underline-offset: 0.25rem;
-    text-transform: uppercase;
-    letter-spacing: 0.125rem;
 }
 
 .notif-markall:disabled {
@@ -132,7 +128,7 @@
 .notif-time {
     margin-top: 0.25rem;
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: 0.875rem;
 }
 
 @media (max-width: 768px) {

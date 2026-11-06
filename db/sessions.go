@@ -46,3 +46,9 @@ func SaveManualSession(session models.CampaignSession, attendeeIDs []string) err
 func DeleteManualSession(sessionID string) error {
 	return GetStore().DeleteManualSession(sessionID)
 }
+
+// GetUnannouncedConfirmedSessions returns confirmed, non-manual sessions dated between
+// fromDate and toDate (inclusive, YYYY-MM-DD) that have no session_started notification yet.
+func GetUnannouncedConfirmedSessions(fromDate, toDate string) ([]models.CampaignSession, error) {
+	return GetStore().GetUnannouncedConfirmedSessions(fromDate, toDate)
+}

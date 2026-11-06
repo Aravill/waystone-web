@@ -29,6 +29,7 @@ func main() {
 	defer stop()
 
 	db.StartBackups(ctx)
+	api.StartSessionStartNotifier(ctx)
 
 	port := os.Getenv("PORT")
 	if port == "" {

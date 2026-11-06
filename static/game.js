@@ -16,6 +16,8 @@ window.gamePage = function () {
         loading: true,
         notFound: false,
         showAll: false,
+        taleOpen: false, // phones fold a long tale to three lines
+        taleCanFold: false,
         selectedId: null, // a session id from upcoming or played; null shows the company
         panelOpened: false, // the first load picks the opening selection, later loads keep it
         recording: false,
@@ -47,6 +49,7 @@ window.gamePage = function () {
                 return;
             }
             this.gameId = decodeURIComponent(location.pathname.split('/')[2] || '');
+            window.addEventListener('resize', () => this.measureTale());
             await this.load();
             if (new URLSearchParams(location.search).get('updated') === '1') {
                 this.showMessage('Game updated', 'success');
@@ -89,6 +92,7 @@ window.gamePage = function () {
                 }
                 this.notFound = false;
                 this.loadError = '';
+                this.$nextTick(() => this.measureTale());
                 document.title = 'Waystone - ' + (this.campaign.title || 'Game');
             } catch (error) {
                 if (seq === this.loadSeq) this.loadError = 'Could not load the game: ' + error.message;
@@ -147,9 +151,9 @@ window.gamePage = function () {
         get selectedPlayedList() {
             return this.selectedPlayed ? [this.selectedPlayed] : [];
         },
-        // Blank cells that finish the last row of the seven-column Ahead grid.
-        get aheadFillers() {
-            return Array.from({ length: (7 - (this.upcoming.length % 7)) % 7 }, (_, i) => i);
+        // The session the viewer owes a reply on: the phone layout shows it right under the lede.
+        get replySession() {
+            return this.upcoming.find((s) => this.awaitsMe(s)) || null;
         },
         // The DM, then each player with how many played sessions they attended.
         get company() {
@@ -192,14 +196,26 @@ window.gamePage = function () {
             return this.isDM ? (parseInt(this.campaign?.pending_signups_count, 10) || 0) : 0;
         },
 
+        // Dates are set in the text face: "Fri, Oct 30, 2026", "Fri, Nov 13", "Friday, Nov 20".
         formatDate(dateStr) {
-            return parseDateLocal(dateStr).toLocaleDateString('default', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+            return parseDateLocal(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
         },
         formatShort(dateStr) {
-            return parseDateLocal(dateStr).toLocaleDateString('default', { weekday: 'short', day: 'numeric', month: 'short' });
+            return formatShortDate(dateStr);
         },
         formatHeading(dateStr, withYear = false) {
-            return parseDateLocal(dateStr).toLocaleDateString('default', { weekday: 'long', day: 'numeric', month: 'long', ...(withYear ? { year: 'numeric' } : {}) });
+            return parseDateLocal(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', ...(withYear ? { year: 'numeric' } : {}) });
+        },
+        // Fold the tale on phones only when it is longer than three lines.
+        measureTale() {
+            const el = document.getElementById('taleText');
+            if (!el || !window.matchMedia('(max-width: 900px)').matches) { this.taleCanFold = false; return; }
+            // Measure unfolded, then put the fold back
+            const folded = el.classList.contains('is-folded');
+            el.classList.remove('is-folded');
+            const overflows = el.scrollHeight > parseFloat(getComputedStyle(el).lineHeight) * 3 + 2;
+            if (folded) el.classList.add('is-folded');
+            this.taleCanFold = overflows;
         },
         // Times use an en dash here; the calendar spec pins the hyphen form there.
         timeRange(s) {
@@ -207,17 +223,46 @@ window.gamePage = function () {
             return s.duration > 0 ? `${s.time}–${getSessionEndTime(s)}` : s.time;
         },
         sessionMeta(s) {
-            let meta = s.time ? this.timeRange(s) : 'Time not recorded';
+            let meta = s.time ? timeWithZone(this.timeRange(s), s) : 'Time not recorded';
             if (s.time && s.duration > 0) meta += ` · ${getDurationLabel(s)}`;
-            if (s.time && s.timezone && s.timezone !== getDefaultTimezone()) meta += ` · ${s.timezone}`;
             return meta;
+        },
+        upcomingTime(s) {
+            return s.time ? timeWithZone(this.timeRange(s), s) : 'Time not recorded';
+        },
+        playedTime(s) {
+            return s.time ? timeWithZone(this.timeRange(s), s) : 'Time not recorded';
+        },
+        // Ahead rows: "3 aye, 1 no reply" (members only; zero counts are left out).
+        aheadCounts(s) {
+            const c = getSessionCounts(s);
+            return [[c.accepted, 'aye'], [c.tentative, 'perhaps'], [c.declined, 'nay'], [c.awaiting, 'no reply']]
+                .filter(([n]) => n > 0).map(([n, word]) => `${n} ${word}`).join(', ');
+        },
+        // The viewer's own reply on an Ahead row, with a glyph so colour never carries it alone.
+        aheadMine(s) {
+            if (!this.isPlayer) return '';
+            const p = s.current_user_participation;
+            if (p === 'Accepted') return REPLY_GLYPHS.accepted + ' ' + replyWord(p);
+            if (p === 'Tentative') return '? ' + replyWord(p);
+            if (p === 'Declined') return REPLY_GLYPHS.declined + ' ' + replyWord(p);
+            return this.awaitsMe(s) ? 'Thy reply?' : 'No reply yet';
+        },
+        aheadMineClass(s) {
+            const p = s.current_user_participation;
+            return p === 'Accepted' ? 'reply-accepted' : p === 'Tentative' ? 'reply-tentative' : p === 'Declined' ? 'reply-nay' : this.awaitsMe(s) ? 'is-you' : 'reply-none';
+        },
+        // Phone reply block: "18:00–22:00 CET, proposed by ♛ X. 1 aye, 3 no reply."
+        replyBlockMeta(s) {
+            const counts = this.aheadCounts(s);
+            return `${this.upcomingTime(s)}, proposed by ♛ ${this.campaign?.dm_user?.display_name || 'the DM'}.${counts ? ' ' + counts + '.' : ''}`;
         },
         // The DM is marked in the name too, not by colour alone.
         attendeeName(u) {
             return (u.display_name || u.name || 'Unknown') + (u.id === this.campaign?.dm ? ' (DM)' : '');
         },
         rosterName(u) {
-            return (u.id && u.id === this.campaign?.dm ? '♛ ' : '') + (u.display_name || u.name || 'Unknown');
+            return u.display_name || u.name || 'Unknown';
         },
         guestLetter(name) {
             return (name.match(/[\p{L}\p{N}]/u)?.[0] || '?').toUpperCase();
@@ -240,10 +285,10 @@ window.gamePage = function () {
         },
         cellLabel(s) {
             const parts = [`${s.status} session`, this.formatShort(s.date)];
-            if (s.time) parts.push(this.timeRange(s));
+            if (s.time) parts.push(this.upcomingTime(s));
             if (this.isMember) {
                 const c = getSessionCounts(s);
-                parts.push(`${c.accepted} accepted, ${c.tentative} tentative, ${c.declined} declined, ${c.awaiting} awaiting`);
+                parts.push(`${c.accepted} aye, ${c.tentative} perhaps, ${c.declined} nay, ${c.awaiting} no reply yet`);
             }
             if (this.isStrongCandidate(s)) parts.push('strong candidate');
             if (this.awaitsMe(s)) parts.push('awaiting your reply');
@@ -263,9 +308,8 @@ window.gamePage = function () {
             return s.status === 'Suggested' ? 'Suggested session' : 'Confirmed session';
         },
         upcomingMeta(s) {
-            const duration = s.duration > 0 ? `${getDurationLabel(s)} · ` : '';
-            const zone = s.timezone && s.timezone !== getDefaultTimezone() ? ` · ${s.timezone}` : '';
-            return `${duration}proposed by ♛ ${this.campaign?.dm_user?.display_name || 'the DM'}${zone}`;
+            const duration = s.duration > 0 ? `${getDurationWords(s)}, ` : '';
+            return `${duration}proposed by ♛ ${this.campaign?.dm_user?.display_name || 'the DM'}`;
         },
         playedMeta(s) {
             const duration = s.duration > 0 ? `${getDurationLabel(s)} · ` : '';
@@ -282,12 +326,13 @@ window.gamePage = function () {
         },
         upcomingRoster(s) {
             const kinds = { Accepted: 'accepted', Tentative: 'tentative', Declined: 'declined' };
-            const labels = { accepted: 'Aye', tentative: 'Perhaps', declined: 'Nay', awaiting: 'Awaiting' };
             const order = ['accepted', 'tentative', 'declined', 'awaiting'];
             return (s.replies || [])
                 .map((r) => {
                     const kind = kinds[r.participation] || 'awaiting';
-                    return { key: `${kind}-${r.user.id}`, user: r.user, label: labels[kind], cls: `participation-${kind === 'awaiting' ? 'pending' : kind}`, kind };
+                    // The awaited reply is the viewer's own: ask for it in rubric; others stay quiet
+                    const you = kind === 'awaiting' && r.user.id === this.currentUserId && s.status === 'Suggested';
+                    return { key: `${kind}-${r.user.id}`, user: r.user, label: you ? 'Thy reply?' : replyWord(r.participation), cls: `participation-${kind === 'awaiting' ? 'pending' : kind}`, kind, you };
                 })
                 .sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
         },
@@ -443,7 +488,7 @@ window.gamePage = function () {
                 'DELETE', 'Session deleted', 'Failed to delete session');
             if (done) this.focusPanel('.panel-heading');
         },
-        async postAction(url, method, fallback, errorPrefix, body) {
+        async postAction(url, method, fallback, errorPrefix, body, successText) {
             if (this.busy) return false;
             this.busy = true;
             try {
@@ -458,7 +503,7 @@ window.gamePage = function () {
                 if (!response.ok) {
                     this.showMessage(data.error || errorPrefix, 'error');
                 } else {
-                    const msg = data.message || fallback;
+                    const msg = successText || data.message || fallback;
                     this.showMessage(msg.charAt(0).toUpperCase() + msg.slice(1), 'success');
                 }
                 await this.load();
@@ -476,7 +521,9 @@ window.gamePage = function () {
 
         async toggleFollow() {
             const following = !!this.campaign.is_following;
-            await this.postAction(`/api/campaigns/${encodeURIComponent(this.campaign.id)}/follow`, following ? 'DELETE' : 'PUT', following ? 'Unfollowed' : 'Following', 'Failed to update follow');
+            const title = this.campaign.title;
+            await this.postAction(`/api/campaigns/${encodeURIComponent(this.campaign.id)}/follow`, following ? 'DELETE' : 'PUT', following ? 'Unfollowed' : 'Following', 'Failed to update follow', undefined,
+                following ? `No longer following ${title}` : `Now following ${title}`);
         },
 
         async withdraw() {

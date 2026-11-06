@@ -16,6 +16,20 @@
     const SUN = '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>';
     const MOON = '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>';
 
+    // The header's user menu is a native <details>: close it on an outside click or Escape.
+    document.addEventListener('click', (event) => {
+        document.querySelectorAll('details.user-menu[open]').forEach((menu) => {
+            if (!menu.contains(event.target)) menu.removeAttribute('open');
+        });
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        document.querySelectorAll('details.user-menu[open]').forEach((menu) => {
+            menu.removeAttribute('open');
+            menu.querySelector('summary')?.focus();
+        });
+    });
+
     document.addEventListener('DOMContentLoaded', () => {
         const header = document.querySelector('.header-right');
         if (!header) return;

@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Users - Waystone</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
-    <script src="/static/theme.js?v=5"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=61">
-    <link rel="stylesheet" href="/static/notifications.css?v=9">
+    <script src="/static/theme.js?v=6"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=64">
+    <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
     <style>
         [x-cloak] { display: none !important; }
@@ -20,17 +20,16 @@
             min-height: 2.5rem;
             background: none;
             color: var(--ink);
-            border: 1px solid var(--line);
+            border: 1px solid var(--ctl);
             cursor: pointer;
             font-family: inherit;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.125rem;
+            font-size: 0.90625rem;
+            font-weight: 500;
             transition: color 0.15s, background-color 0.15s, border-color 0.15s;
             white-space: nowrap;
         }
         .action-btn:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-        .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .action-btn:disabled { color: var(--muted); border: 1px dashed var(--line); cursor: not-allowed; }
         .action-btn.danger { color: var(--rubric); border-color: var(--rubric); }
         .action-btn.danger:hover { background: var(--rubric); color: var(--bg); }
         /* Add buttons sit beside inputs, so they must not stretch */
@@ -49,10 +48,10 @@
         /* Table */
         table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
         th, td { text-align: left; padding: 0.625rem 0.5rem; }
-        th { color: var(--muted); border-bottom: 1px solid var(--ink); font-size: 0.75rem; font-weight: 400; text-transform: uppercase; letter-spacing: 0.125rem; }
+        th { color: var(--muted); border-bottom: 1px solid var(--ink); font-size: 0.875rem; font-weight: 500; }
         tbody tr { border-bottom: 1px solid var(--line); }
         tbody tr:hover { background: var(--folio); }
-        .admin-tag { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.125rem; }
+        .admin-tag { font-size: 0.8125rem; }
         .admin-tag--danger { color: var(--rubric); }
         .admin-tag--ok { color: var(--verdigris); }
         .admin-tag--muted { color: var(--muted); }
@@ -67,12 +66,16 @@
         <nav class="nav-bar" aria-label="Main">
             <a href="/" class="nav-item" data-page="dashboard">Home</a>
             <a href="/campaigns" class="nav-item" data-page="campaigns">Games</a>
-            <a href="/profile" class="nav-item" data-page="profile">Profile</a>
             <a href="/admin/users" class="nav-item active" aria-current="page" data-page="admin-users" x-show="isAdmin">Admin</a>
         </nav>
         <div class="header-right">
-            <span class="user-name" x-text="displayName"></span>
-            <button @click="logout()" class="logout-btn">Logout</button>
+            <details class="user-menu">
+                <summary><span class="user-menu-avatar" aria-hidden="true" x-text="(displayName || '?').charAt(0).toUpperCase()"></span><span class="user-menu-name" x-text="displayName"></span><span class="user-menu-caret" aria-hidden="true">&#9662;</span></summary>
+                <div class="user-menu-panel">
+                    <a href="/profile">Profile</a>
+                    <button type="button" @click="logout()">Log out</button>
+                </div>
+            </details>
         </div>
     </div>
 
@@ -97,13 +100,13 @@
             </p>
             <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                 <code x-text="invite && invite.url" style="user-select: all; word-break: break-all;"></code>
-                <button @click="copyInvite()" class="action-btn">copy</button>
-                <button @click="invite = null" class="action-btn">dismiss</button>
+                <button @click="copyInvite()" class="action-btn">Copy</button>
+                <button @click="invite = null" class="action-btn">Dismiss</button>
             </div>
         </div>
 
         <!-- Message area -->
-        <div x-show="messageVisible" x-text="messageText"
+        <div x-show="messageVisible" x-text="messageText" role="status"
             :class="messageType === 'error' ? 'message error' : 'message success'"
             style="display: none;"></div>
 
@@ -130,22 +133,22 @@
                             <td x-text="user.username"></td>
                             <td x-text="user.nickname || user.name || '—'"></td>
                             <td>
-                                <span x-show="user.blocked" class="admin-tag admin-tag--danger">✗ blocked</span>
-                                <span x-show="!user.blocked && !user.must_change_password" class="admin-tag admin-tag--ok">● active</span>
-                                <span x-show="!user.blocked && user.must_change_password" class="admin-tag admin-tag--muted">… pending first login</span>
+                                <span x-show="user.blocked" class="admin-tag admin-tag--danger">✗ Blocked</span>
+                                <span x-show="!user.blocked && !user.must_change_password" class="admin-tag admin-tag--ok">● Active</span>
+                                <span x-show="!user.blocked && user.must_change_password" class="admin-tag admin-tag--muted">… Pending first login</span>
                             </td>
                             <td>
-                                <span x-show="user.roles && user.roles.includes('admin')" class="admin-tag">♛ admin</span>
+                                <span x-show="user.roles && user.roles.includes('admin')" class="admin-tag">♛ Admin</span>
                                 <span x-show="!user.roles || !user.roles.includes('admin')" class="admin-tag admin-tag--muted">—</span>
                             </td>
                             <td>
                                 <div style="display: flex; gap: 0.375rem; flex-wrap: wrap;">
-                                    <button x-show="!user.is_env_admin" @click="confirmAction(user.must_change_password ? 'new invite' : 'reset password', (user.must_change_password ? 'create a new invite for ' + user.username + '? any earlier invite or temporary password stops working.' : 'reset password for ' + user.username + '? their current password stops working and a new invite link is created.'), () => resetPassword(user))" class="action-btn" x-text="user.must_change_password ? 'new invite' : 'reset password'"></button>
-                                    <button x-show="!user.blocked && !user.is_env_admin" @click="confirmAction('block user', 'block ' + user.username + '?', () => blockUser(user.id))" class="action-btn danger">block</button>
-                                    <button x-show="user.blocked" @click="unblockUser(user.id)" class="action-btn">unblock</button>
-                                    <button x-show="!user.roles || !user.roles.includes('admin')" @click="confirmAction('make admin', 'promote ' + user.username + ' to admin?', () => makeAdmin(user.id))" class="action-btn">make admin</button>
-                                    <button x-show="user.roles && user.roles.includes('admin') && !user.is_env_admin" @click="confirmAction('remove admin', 'remove admin from ' + user.username + '?', () => removeAdmin(user.id))" class="action-btn danger">remove admin</button>
-                                    <button x-show="!user.is_env_admin" @click="confirmAction('remove user', 'permanently remove ' + user.username + '?', () => removeUser(user.id))" class="action-btn danger">remove</button>
+                                    <button x-show="!user.is_env_admin" @click="confirmAction(user.must_change_password ? 'New invite' : 'Reset password', (user.must_change_password ? 'Create a new invite for ' + user.username + '? Any earlier invite or temporary password stops working.' : 'Reset password for ' + user.username + '? Their current password stops working and a new invite link is created.'), () => resetPassword(user))" class="action-btn" x-text="user.must_change_password ? 'New invite' : 'Reset password'"></button>
+                                    <button x-show="!user.blocked && !user.is_env_admin" @click="confirmAction('Block user', 'Block ' + user.username + '?', () => blockUser(user.id))" class="action-btn danger">Block</button>
+                                    <button x-show="user.blocked" @click="unblockUser(user.id)" class="action-btn">Unblock</button>
+                                    <button x-show="!user.roles || !user.roles.includes('admin')" @click="confirmAction('Make admin', 'Promote ' + user.username + ' to admin?', () => makeAdmin(user.id))" class="action-btn">Make admin</button>
+                                    <button x-show="user.roles && user.roles.includes('admin') && !user.is_env_admin" @click="confirmAction('Remove admin', 'Remove admin from ' + user.username + '?', () => removeAdmin(user.id))" class="action-btn danger">Remove admin</button>
+                                    <button x-show="!user.is_env_admin" @click="confirmAction('Remove user', 'Permanently remove ' + user.username + '?', () => removeUser(user.id))" class="action-btn danger">Remove</button>
                                 </div>
                             </td>
                         </tr>
@@ -183,10 +186,10 @@
                             <td x-text="s.name"></td>
                             <td>
                                 <div style="display: flex; gap: 0.375rem; flex-wrap: wrap;">
-                                    <button @click="renameSystem(s)" class="action-btn">rename</button>
-                                    <label class="action-btn" style="cursor: pointer;">logo<input type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif" @change="uploadLogo(s.id, $event.target.files[0]); $event.target.value = ''"></label>
-                                    <button x-show="s.logo_url" @click="removeLogo(s.id)" class="action-btn danger">remove logo</button>
-                                    <button @click="confirmAction('delete system', 'delete ' + s.name + '? games using it keep the name as plain text.', () => deleteSystem(s.id))" class="action-btn danger">delete</button>
+                                    <button @click="renameSystem(s)" class="action-btn">Rename</button>
+                                    <label class="action-btn" style="cursor: pointer;">Logo<input type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif" @change="uploadLogo(s.id, $event.target.files[0]); $event.target.value = ''"></label>
+                                    <button x-show="s.logo_url" @click="removeLogo(s.id)" class="action-btn danger">Remove logo</button>
+                                    <button @click="confirmAction('Delete system', 'Delete ' + s.name + '? games using it keep the name as plain text.', () => deleteSystem(s.id))" class="action-btn danger">Delete</button>
                                 </div>
                             </td>
                         </tr>
@@ -232,7 +235,7 @@
                                 <td x-text="p.display_name"></td>
                                 <td>
                                     <div style="display: flex; gap: 0.375rem; flex-wrap: wrap;">
-                                        <button @click="confirmAction('remove player', 'remove ' + p.display_name + ' from this game?', () => removePlayer(p.id))" class="action-btn danger">remove</button>
+                                        <button @click="confirmAction('Remove player', 'Remove ' + p.display_name + ' from this game?', () => removePlayer(p.id))" class="action-btn danger">Remove</button>
                                     </div>
                                 </td>
                             </tr>
@@ -258,7 +261,7 @@
         </div>
     </main>
 
-    <script src="/static/notifications.js?v=9"></script>
-    <script src="/admin-users.js?v=7"></script>
+    <script src="/static/notifications.js?v=10"></script>
+    <script src="/admin-users.js?v=8"></script>
 </body>
 </html>

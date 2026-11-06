@@ -1,188 +1,361 @@
+/* Home page. Spec: STYLE_GUIDE.md "Home". Mock-up: docs/design/mockups/ux-home-games.dc.html */
 [x-cloak] { display: none !important; }
 
-/* Short note under the page title on what Waystone is for */
+.home-status {
+    margin-top: 1.5rem;
+    color: var(--muted);
+}
+
+/* Short note on what Waystone is for, shown only to someone with no games yet */
 .home-intro {
     max-width: 40rem;
-    margin-top: 1rem;
     color: var(--ink);
-    font-size: 0.9375rem;
-    line-height: 1.6;
 }
 
-/* Secondary button styles come from the shared base in styles.css */
-.discord-invite-btn {
+.home-welcome {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+/* Text-weight link that reads as the way in */
+.btn-link-primary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    background: var(--ink);
+    color: var(--bg);
+    border: 1px solid var(--ink);
+    font-size: 0.90625rem;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.btn-link-primary:hover {
+    opacity: 0.85;
+}
+
+.home-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 21.25rem;
+    gap: 2.5rem;
+    margin-top: 1.75rem;
+}
+
+.home-main,
+.home-side {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    min-width: 0;
+}
+
+.home-columns h2,
+.home-now h2 {
+    margin: 0 0 0.75rem;
+}
+
+/* Session in progress: the one filled block on the page. --bg on --verdigris is 5.9:1 in
+   parchment and 7.7:1 in candlelight; "● In session" says it without colour. */
+.home-now {
+    margin-top: 1.75rem;
+}
+
+.now-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--verdigris);
+    color: var(--bg);
+}
+
+.now-card + .now-card {
     margin-top: 1rem;
 }
 
-/* Modules Grid: a row of waystones */
-.modules-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 20rem));
-    justify-content: center;
-    gap: 1.75rem;
-    width: 100%;
-}
-
-/* Module Card Base: a standing stone drawn in hairlines */
-.module-card {
-    position: relative;
-    aspect-ratio: 320 / 420;
-    cursor: pointer;
+.now-open {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    margin-top: 0.5rem;
+    padding: 0 1.25rem;
+    background: var(--bg);
+    color: var(--verdigris) !important;
+    font-weight: 500;
     text-decoration: none;
-    color: inherit;
-    display: block;
 }
 
-.module-card:focus-visible {
-    outline: 2px solid var(--rubric);
-    outline-offset: 2px;
+.now-open:hover {
+    opacity: 0.85;
 }
 
-.stone-outline {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    fill: none;
-    stroke: var(--line);
-    stroke-width: 1.25;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+.ledger-mine.reply-none { color: var(--muted); }
+
+.now-card a {
+    color: var(--bg);
 }
 
-.stone-outline path {
-    vector-effect: non-scaling-stroke;
-    transition: fill 0.15s, stroke 0.15s;
+.now-marker {
+    margin: 0;
+    font-size: 0.90625rem;
+    font-weight: 600;
 }
 
-.stone-outline .stone-body {
-    fill: var(--bg);
+.now-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 400;
+    line-height: 1.15;
 }
 
-.stone-outline .stone-ground,
-.stone-outline .stone-wear {
-    stroke: var(--muted);
+.now-title a {
+    text-decoration: none;
 }
 
-.card-inner {
-    position: relative;
-    z-index: 1;
+.now-title a:hover,
+.now-title a:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 0.25rem;
+}
+
+.now-card :focus-visible {
+    outline-color: var(--bg);
+}
+
+.now-when,
+.now-dm,
+.now-mine {
+    margin: 0;
+    font-size: 0.9375rem;
+}
+
+.now-mine {
+    font-weight: 600;
+}
+
+.now-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin: 0.25rem 0;
+}
+
+/* The red-letter reply card: red because it needs the viewer's reply */
+.rl-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.rl {
+    display: grid;
+    grid-template-columns: 4.75rem minmax(0, 1fr);
+    gap: 0 1.25rem;
+    padding: 1.125rem 1.25rem;
+    border: 1px solid var(--rubric);
+}
+
+.rl-day {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
-    text-align: center;
-    gap: 0.875rem;
-    width: 100%;
-    height: 100%;
-    padding: 22% 24% 0;
-}
-
-.stone-rune {
-    width: 48px;
-    height: 48px;
-    flex: none;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    color: var(--ink);
-    transition: color 0.15s;
-}
-
-.stone-rune .type-icon__fill {
-    fill: var(--bg);
-}
-
-/* Active stone */
-.module-card.active .stone-body,
-.module-card.active .stone-carve {
-    stroke: var(--ink);
-}
-
-.module-card.active:hover .stone-body,
-.module-card.active:focus-visible .stone-body {
-    fill: var(--folio);
-    stroke: var(--rubric);
-}
-
-.module-card.active:hover .stone-carve,
-.module-card.active:focus-visible .stone-carve {
-    stroke: var(--rubric);
-}
-
-.module-card.active:hover .stone-rune,
-.module-card.active:focus-visible .stone-rune {
+    padding-right: 1.125rem;
+    border-right: 1px solid var(--line);
     color: var(--rubric);
+    line-height: 1.1;
+    text-align: center;
 }
 
-.module-card.active:hover .stone-rune .type-icon__fill,
-.module-card.active:focus-visible .stone-rune .type-icon__fill {
-    fill: var(--folio);
+.rl-day b {
+    margin: 0.25rem 0;
+    font-size: 2.5rem;
+    font-weight: 600;
+    line-height: 1;
 }
 
-.module-card.active:hover .status-badge,
-.module-card.active:focus-visible .status-badge {
-    background: var(--folio);
+.rl-day span {
+    font-size: 0.875rem;
+    font-weight: 500;
 }
 
-/* Dormant stones */
-.module-card.disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-}
-
-.module-card.disabled .stone-body,
-.module-card.disabled .stone-carve {
-    stroke-dasharray: 4 4;
-}
-
-.module-card.disabled .stone-body {
-    stroke: var(--muted);
-}
-
-.module-card.disabled .stone-rune {
-    color: var(--muted);
-}
-
-/* Card Content */
-.module-card h3 {
+.rl-title {
+    margin: 0;
     font-family: var(--font-display);
+    font-size: 1.75rem;
     font-weight: 400;
-    font-size: 1.6875rem;
-    line-height: 1.2;
-    color: var(--ink);
+    line-height: 1.15;
 }
 
-.module-card .description {
+.rl-title a {
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.rl-title a:hover,
+.rl-title a:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 0.25rem;
+}
+
+.rl-meta {
+    margin: 0.1875rem 0 0.75rem;
+    color: var(--muted);
+    font-size: 0.90625rem;
+}
+
+.rl .session-actions {
+    margin-bottom: 0;
+}
+
+/* Ledger rows: date, time, game, status, your reply */
+.agenda-row-home {
+    grid-template-columns: 7.375rem 8.375rem minmax(0, 1fr) 7.625rem 7.75rem;
+}
+
+.ledger-date {
+    font-weight: 600;
+}
+
+.ledger-time,
+.ledger-meta {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.90625rem;
+}
+
+.ledger-game {
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    line-height: 1.2;
+    text-decoration: none;
+}
+
+.ledger-game:hover,
+.ledger-game:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 0.25rem;
+}
+
+.ledger-mine {
+    font-size: 0.9375rem;
+}
+
+.ledger-mine.reply-accepted { font-weight: 500; }
+.ledger-mine.reply-nay { color: var(--ink); }
+.ledger-mine.is-you { color: var(--rubric); font-weight: 600; }
+
+.game-row-home {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.home-more {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    margin: 0.625rem 0 0;
+    color: var(--muted);
+    font-size: 0.90625rem;
+}
+
+.home-more .text-link {
+    min-height: 0;
+}
+
+/* Roads yet to open: dashed stones, not clickable */
+.roads {
+    display: flex;
+    align-items: flex-end;
+    gap: 1.125rem;
+}
+
+.road {
+    flex: 1;
     color: var(--muted);
     font-size: 0.875rem;
-    font-style: italic;
+    line-height: 1.3;
+    text-align: center;
 }
 
-/* Status Badge */
-.status-badge {
-    display: inline-block;
-    margin-top: auto;
-    margin-bottom: 16%;
-    padding: 0.1875rem 0.5rem;
-    background: var(--bg);
-    transition: background-color 0.15s;
-    font-size: 0.6875rem;
-    letter-spacing: 0.125rem;
-    border: 1px solid var(--ink);
-    color: var(--ink);
-    text-transform: uppercase;
+.road svg {
+    display: block;
+    width: 4rem;
+    height: 4.875rem;
+    margin: 0 auto 0.25rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
 }
 
-.status-badge.coming-soon {
-    border: 1px dashed var(--line);
+.road b {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 1.1875rem;
+    font-weight: 400;
+}
+
+.home-fine {
+    margin: 0;
     color: var(--muted);
+    font-size: 0.90625rem;
 }
 
+@media (max-width: 900px) {
+    .home-columns {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1.75rem;
+    }
+
+    .home-now h2,
+    .home-columns h2 {
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Phones: the reply is on the first screen; the ledger drops time and status */
 @media (max-width: 768px) {
-    .module-card h3 {
-        font-size: 1.4375rem;
+    .now-title {
+        font-size: 1.625rem;
+    }
+
+    .rl {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 0.875rem;
+    }
+
+    .rl-day {
+        flex-direction: row;
+        gap: 0.5rem;
+        justify-content: flex-start;
+        margin-bottom: 0.5rem;
+        padding: 0 0 0.5rem;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .rl-day b {
+        margin: 0;
+        font-size: 1.75rem;
+    }
+
+    .rl-title {
+        font-size: 1.5rem;
+    }
+
+    .agenda-row-home {
+        grid-template-columns: 7rem minmax(0, 1fr) auto;
+        gap: 0.25rem 0.625rem;
+    }
+
+    .agenda-row-home .ledger-time,
+    .agenda-row-home .ledger-tag {
+        display: none;
     }
 }

@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Waystone</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
-    <script src="/static/theme.js?v=5"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=61">
+    <script src="/static/theme.js?v=6"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=64">
     <style>
         .login-container {
             display: flex;
@@ -47,9 +47,7 @@
         .login-subtitle {
             margin: 0.5rem 0 1rem;
             color: var(--muted);
-            font-size: 0.75rem;
-            letter-spacing: 0.1875rem;
-            text-transform: uppercase;
+            font-size: 0.90625rem;
         }
 
         .login-box .ornament {
@@ -88,7 +86,7 @@
                     <input id="password" type="password" autocomplete="current-password" required>
                 </div>
                 <button type="submit" id="loginBtn" class="submit-btn">Enter</button>
-                <div id="message" class="message"></div>
+                <div id="message" class="message" role="status"></div>
             </form>
             <p class="login-footer">No seal yet? Ask an admin to add you to the roll.</p>
         </div>

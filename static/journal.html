@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Waystone - Journal</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
-    <script src="/static/theme.js?v=5"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=61">
-    <link rel="stylesheet" href="/static/notifications.css?v=9">
+    <script src="/static/theme.js?v=6"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=64">
+    <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page" x-data="journalPage()">
@@ -18,12 +18,16 @@
         <nav class="nav-bar" aria-label="Main">
             <a href="/" class="nav-item" data-page="dashboard">Home</a>
             <a href="/campaigns" class="nav-item active" aria-current="page" data-page="campaigns">Games</a>
-            <a href="/profile" class="nav-item" data-page="profile">Profile</a>
             <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
         </nav>
         <div class="header-right">
-            <span class="user-name" x-text="displayName"></span>
-            <button @click="handleLogout()" class="logout-btn">Logout</button>
+            <details class="user-menu">
+                <summary><span class="user-menu-avatar" aria-hidden="true" x-text="(displayName || '?').charAt(0).toUpperCase()"></span><span class="user-menu-name" x-text="displayName"></span><span class="user-menu-caret" aria-hidden="true">&#9662;</span></summary>
+                <div class="user-menu-panel">
+                    <a href="/profile">Profile</a>
+                    <button type="button" @click="handleLogout()">Log out</button>
+                </div>
+            </details>
         </div>
     </div>
 
@@ -55,7 +59,7 @@
                             <section class="title-block">
                                 <div>
                                     <span class="modal-eyebrow" x-text="eyebrow"></span>
-                                    <h1 class="page-title" tabindex="-1" x-html="titleHtml(true)"></h1>
+                                    <h1 class="page-title" tabindex="-1" x-html="titleHtml(false)"></h1>
                                     <p class="byline" x-show="entry" x-text="entry ? journalByline(entry) : ''"></p>
                                     <p class="byline" x-show="!entry" x-text="emptyNote"></p>
                                 </div>
@@ -78,7 +82,7 @@
                                 <aside class="split-side">
                                     <div>
                                         <p class="modal-eyebrow">Who wrote it</p>
-                                        <h2 class="panel-heading"><span class="drop-cap">T</span>he scribes</h2>
+                                        <h2 class="panel-heading">The scribes</h2>
                                     </div>
                                     <ul class="people">
                                         <template x-for="sc in scribes" :key="sc.user_id">
@@ -226,7 +230,7 @@
                             <section class="title-block title-block--single">
                                 <div>
                                     <span class="modal-eyebrow" x-text="'History · ' + revisions.length + ' revision' + (revisions.length === 1 ? '' : 's')"></span>
-                                    <h1 class="page-title" tabindex="-1" x-html="titleHtml(true)"></h1>
+                                    <h1 class="page-title" tabindex="-1" x-html="titleHtml(false)"></h1>
                                     <p class="byline" x-text="journalByline(entry)"></p>
                                     <p class="byline" x-show="pruned">Only the latest 200 revisions are kept.</p>
                                 </div>
@@ -288,7 +292,7 @@
                             <section class="title-block title-block--single">
                                 <div>
                                     <span class="modal-eyebrow" x-text="eyebrow"></span>
-                                    <h1 class="page-title" tabindex="-1" x-html="titleHtml(true)"></h1>
+                                    <h1 class="page-title" tabindex="-1" x-html="titleHtml(false)"></h1>
                                     <p class="byline" x-text="deniedText"></p>
                                 </div>
                             </section>
@@ -322,8 +326,8 @@
         </div>
     </div>
 
-    <script src="/static/notifications.js?v=9"></script>
-    <script src="/campaigns.js?v=53"></script>
+    <script src="/static/notifications.js?v=10"></script>
+    <script src="/campaigns.js?v=54"></script>
     <script src="/static/journal.js?v=1"></script>
 </body>
 </html>

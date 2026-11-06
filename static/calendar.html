@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Waystone - Calendar</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
-    <script src="/static/theme.js?v=5"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=61">
-    <link rel="stylesheet" href="/static/notifications.css?v=9">
+    <script src="/static/theme.js?v=6"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=64">
+    <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body x-data="calendarPage()">
@@ -18,12 +18,16 @@
         <nav class="nav-bar" aria-label="Main">
             <a href="/" class="nav-item" data-page="dashboard">Home</a>
             <a href="/campaigns" class="nav-item active" aria-current="page" data-page="campaigns">Games</a>
-            <a href="/profile" class="nav-item" data-page="profile">Profile</a>
             <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
         </nav>
         <div class="header-right">
-            <span class="user-name" x-text="displayName"></span>
-            <button @click="handleLogout()" class="logout-btn">Logout</button>
+            <details class="user-menu">
+                <summary><span class="user-menu-avatar" aria-hidden="true" x-text="(displayName || '?').charAt(0).toUpperCase()"></span><span class="user-menu-name" x-text="displayName"></span><span class="user-menu-caret" aria-hidden="true">&#9662;</span></summary>
+                <div class="user-menu-panel">
+                    <a href="/profile">Profile</a>
+                    <button type="button" @click="handleLogout()">Log out</button>
+                </div>
+            </details>
         </div>
     </div>
 
@@ -54,23 +58,23 @@
                     <section class="calendar-head">
                         <div>
                             <p class="modal-eyebrow">Calendar of sessions</p>
-                            <h1 class="page-title"><span class="drop-cap" x-text="(campaign.title || '').charAt(0)"></span><span x-text="(campaign.title || '').slice(1)"></span></h1>
+                            <h1 class="page-title" x-text="campaign.title"></h1>
                         </div>
-                        <a href="/profile#calendar-sync" class="calendar-sync-link">Sync to calendar &rarr;</a>
+                        <a href="/profile#calendar-sync" class="calendar-sync-link">Add to my calendar app</a>
                     </section>
                     <div class="calendar-layout">
                         <div class="calendar-main" x-ref="calendarMain">
                             <!-- Month Navigation -->
                             <div class="calendar-nav">
                                 <button type="button" class="nav-btn" @click="previousMonth()" aria-label="Previous month">&lsaquo;</button>
-                                <span class="current-month" x-text="formatMonthYear()"></span>
+                                <span class="current-month"><span class="month-name" x-text="formatMonthName()"></span> <span class="month-year" x-text="formatYear()"></span></span>
                                 <button type="button" class="nav-btn" @click="nextMonth()" aria-label="Next month">&rsaquo;</button>
                                 <div class="calendar-legend">
                                     <span class="legend-item legend-confirmed">confirmed</span>
                                     <span class="legend-item legend-suggested">suggested</span>
                                     <span class="legend-item legend-cancelled">cancelled</span>
                                 </div>
-                                <div class="calendar-message message" :class="messageType" x-show="messageVisible" x-text="messageText"></div>
+                                <div class="calendar-message message" :class="messageType" x-show="messageVisible" role="status" x-text="messageText"></div>
                             </div>
 
                             <!-- Calendar Grid -->
@@ -115,10 +119,7 @@
                                                     <span class="day-number" x-text="day.getDate()"></span>
                                                     <span class="day-overflow" x-show="getCellOverflow(day) > 0">+<span x-text="getCellOverflow(day)"></span><span class="day-overflow-word"> more</span></span>
                                                 </div>
-                                                <div class="day-time">
-                                                    <span class="day-time-full" x-text="getSessionTimeRange(s)"></span>
-                                                    <span class="day-time-short" x-text="s.time"></span>
-                                                </div>
+                                                <div class="day-time" x-text="s.time"></div>
                                                 <div class="day-cancelled-word" x-show="s.status === 'Cancelled'">cancelled</div>
                                                 <div class="day-tally" x-show="s.status !== 'Cancelled'">
                                                     <template x-for="c in getTally(s)" :key="c.kind">
@@ -133,10 +134,10 @@
                                 </template>
                             </div>
                             <div class="calendar-reply-key" x-show="!sessionClipboard">
-                                <span class="reply-accepted" x-html="replyGlyph('accepted') + ' aye'"></span>
+                                <span class="reply-accepted" x-html="replyGlyph('accepted') + ' said aye'"></span>
                                 <span class="reply-tentative">? perhaps</span>
                                 <span class="reply-declined" x-html="replyGlyph('declined') + ' nay'"></span>
-                                <span class="reply-awaiting">… awaiting</span>
+                                <span class="reply-awaiting">… no reply yet</span>
                                 <span><span class="legend-star" aria-hidden="true">✦</span> strong candidate</span>
                             </div>
                         </div>
@@ -158,12 +159,12 @@
                             <template x-if="selectedDay">
                                 <div>
                                     <p class="modal-eyebrow">Selected day</p>
-                                    <h3 class="panel-heading"><span class="drop-cap" x-text="formatDayHeading(selectedDay).charAt(0)"></span><span x-text="formatDayHeading(selectedDay).slice(1)"></span></h3>
+                                    <h3 class="panel-heading" x-text="formatDayHeading(selectedDay)"></h3>
                                     <p class="panel-empty" x-show="getSelectedDaySessions().length === 0">No sessions on this day.</p>
                                     <template x-for="s in getSelectedDaySessions()" :key="s.id">
                                         <div class="panel-session" :class="{ 'awaits-reply': !isCurrentUserDM && s.status === 'Suggested' && !s.current_user_participation }">
                                             <div class="panel-session-head">
-                                                <span class="panel-session-time" x-text="getSessionTimeRange(s)"></span>
+                                                <span class="panel-session-time" x-text="getSessionTimeRangeZone(s)"></span>
                                                 <span class="panel-status-tag" :class="`chip-${s.status}`" x-text="s.status"></span>
                                             </div>
                                             <div class="panel-session-meta" x-text="getSessionMeta(s)"></div>
@@ -174,14 +175,13 @@
                                                     <div class="roster-row" :class="`avatars-${row.cls}`">
                                                         <span class="roster-avatar" x-html="avatarHtml(row.user)"></span>
                                                         <span class="roster-name" x-text="row.user.display_name || row.user.name || 'Unknown'"></span>
-                                                        <span class="roster-said" :class="`reply-${row.kind}`"><span x-html="replyGlyph(row.kind)"></span> <span x-text="row.label"></span></span>
+                                                        <span class="roster-said" :class="[`reply-${row.kind}`, row.you ? 'is-you' : '']"><span x-html="replyGlyph(row.kind)"></span> <span x-text="row.label"></span></span>
                                                     </div>
                                                 </template>
                                             </div>
 
                                             <div class="player-responses" x-show="!isCurrentUserDM && s.status !== 'Cancelled'">
-                                                <p class="pending-notice"><span aria-hidden="true">✦</span> Thy reply</p>
-                                                <div class="session-actions session-replies">
+                                                <div class="session-actions session-replies" role="group" aria-label="Thy reply">
                                                     <button type="button" class="btn-response btn-response--accepted"
                                                             :class="{ 'selected': s.current_user_participation === 'Accepted' }"
                                                             @click="submitResponse('Accepted', s)">Aye</button>
@@ -219,7 +219,7 @@
                                     <template x-for="s in sessions" :key="s.id">
                                         <button type="button" class="agenda-row" :class="`chip-${s.status}`" @click="selectDay(parseDateLocal(s.date))">
                                             <span class="agenda-date" x-text="formatAgendaDate(s)"></span>
-                                            <span class="agenda-time" x-text="getSessionTimeRange(s)"></span>
+                                            <span class="agenda-time" x-text="getSessionTimeRangeZone(s)"></span>
                                             <span class="agenda-status" x-text="s.status"></span>
                                         </button>
                                     </template>
@@ -293,8 +293,8 @@
     </div>
 
 
-    <script src="/static/notifications.js?v=9"></script>
-    <script src="/campaigns.js?v=53"></script>
-    <script src="/static/calendar.js?v=1"></script>
+    <script src="/static/notifications.js?v=10"></script>
+    <script src="/campaigns.js?v=54"></script>
+    <script src="/static/calendar.js?v=3"></script>
 </body>
 </html>
