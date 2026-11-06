@@ -1,0 +1,1483 @@
+<title>Waystone Game Journal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
+<style>
+/* Layout: the game page is the sheet from game-detail.dc.html, with the journal under each Played
+   row and in the session panel. Journal pages follow the calendar page: breadcrumb, title, then
+   two panes split by an ink rule. History is revision list + diff.
+   Tokens are STYLE_GUIDE.md's. Session numbers are Courier: the display face's old-style
+   numerals make "31" read as "3I". */
+:root {
+    --bg: #F2EAD8; --folio: #E6DBC2; --ink: #2B241C; --muted: #6B5E4B;
+    --line: rgba(43, 36, 28, 0.4);
+    --rubric: #8E2A1E; --verdigris: #355E52; --ochre: #7A5A12;
+    --text: 'Courier Prime', 'Courier New', monospace;
+    --display: 'IM Fell English SC', Georgia, serif;
+    --black: 'UnifrakturMaguntia', 'IM Fell English SC', serif;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+        --line: rgba(232, 220, 196, 0.3);
+        --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
+        color-scheme: dark;
+    }
+}
+:root[data-theme="dark"] {
+    --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+    --line: rgba(232, 220, 196, 0.3);
+    --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
+    color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--text); font-size: 1rem; line-height: 1.6;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0 8rem;
+}
+a { color: var(--rubric); text-underline-offset: 4px; }
+:focus-visible { outline: 2px solid var(--rubric); outline-offset: 2px; }
+h1:focus { outline: none; }
+.wrap { max-width: 72.5rem; margin: 0 auto; }
+
+/* Header (as in the app) */
+.header {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 1.75rem 0 1.125rem; border-bottom: 3px double var(--ink);
+}
+.logo { font-family: var(--black); font-size: 2.125rem; color: var(--ink); text-decoration: none; line-height: 1; }
+.nav { display: flex; gap: 1.75rem; flex-wrap: wrap; }
+.nav a {
+    padding: .5rem 0; color: var(--muted); text-decoration: none; font-size: .875rem;
+    letter-spacing: 2px; text-transform: uppercase; border-bottom: 2px solid transparent;
+}
+.nav a.active { color: var(--ink); border-bottom-color: var(--rubric); }
+.header-right { display: flex; align-items: center; gap: 1rem; font-size: .875rem; }
+
+/* Buttons */
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
+    font-family: var(--text); font-size: .8125rem; letter-spacing: 2px; text-transform: uppercase;
+    min-height: 2.5rem; padding: 0 1rem; border: 1px solid var(--line); background: none; color: var(--ink);
+    cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+}
+.btn:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn--primary { background: var(--ink); color: var(--bg); border-color: var(--ink); min-height: 2.75rem; }
+.btn--primary:hover { opacity: .85; }
+.btn--danger { color: var(--rubric); border-color: var(--rubric); }
+.btn--danger:hover { background: var(--rubric); border-color: var(--rubric); color: var(--bg); }
+.link-btn {
+    font: inherit; color: var(--rubric); background: none; border: 0; padding: 0; cursor: pointer;
+    text-decoration: underline; text-underline-offset: 4px;
+}
+
+/* Title block */
+.crumb { display: inline-block; margin-top: 2rem; font-size: .8125rem; letter-spacing: 2px; text-transform: uppercase; }
+.title-block {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem 2rem; align-items: end;
+    padding: 1.25rem 0 1.75rem; border-bottom: 1px solid var(--ink);
+}
+.kicker { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.type-mark { display: inline-flex; align-items: center; gap: .5rem; font-size: .75rem; letter-spacing: 3px; text-transform: uppercase; }
+.type-mark svg { width: 1.75rem; height: 1.75rem; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.system { font-style: italic; color: var(--muted); font-size: .875rem; }
+.badge { font-size: .6875rem; letter-spacing: 2px; text-transform: uppercase; padding: 3px 8px; border: 1px solid currentColor; }
+.badge--ongoing { color: var(--verdigris); }
+h1 {
+    font-family: var(--display); font-weight: 400; font-size: 2.75rem; line-height: 1.1;
+    margin: .75rem 0 .5rem; text-wrap: balance; overflow-wrap: anywhere;
+}
+.drop-cap { font-family: var(--black); color: var(--rubric); font-size: 3.5rem; }
+.t-no { font-family: var(--text); font-size: .8em; }
+.lede { margin: 0; max-width: 60ch; color: var(--muted); font-size: 1.0625rem; }
+.byline { margin: 0; color: var(--muted); font-size: .9375rem; }
+.actions { display: flex; flex-wrap: wrap; gap: .625rem; justify-content: flex-end; }
+.eyebrow { font-size: .75rem; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+
+h2 {
+    font-family: var(--display); font-weight: 400; font-size: 1.5rem; color: var(--rubric);
+    margin: 0 0 1rem; display: flex; align-items: baseline; gap: .75rem; flex-wrap: wrap;
+}
+h2 .count { font-family: var(--text); font-size: .75rem; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+
+/* Rendered Markdown: .game-text in styles.css */
+.md { max-width: 65ch; overflow-wrap: anywhere; }
+.md p, .md ul, .md ol, .md blockquote { margin: 0 0 1rem; }
+.md ul, .md ol { padding-left: 1.5rem; }
+.md blockquote { padding-left: 1rem; border-left: 1px solid var(--ink); color: var(--muted); font-style: italic; }
+.md h3, .md h4 { margin: 1.5rem 0 .5rem; font-family: var(--display); font-weight: 400; color: var(--rubric); }
+.md h3 { font-size: 1.25rem; }
+.md h4 { font-size: 1.0625rem; }
+.md > :first-child { margin-top: 0; }
+
+/* People */
+.people { list-style: none; margin: 0; padding: 0; display: grid; gap: .875rem; }
+.person { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .875rem; align-items: center; }
+.person-name { display: block; overflow-wrap: anywhere; }
+.person-role { display: block; font-size: .75rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.person--dm .person-name { color: var(--rubric); font-weight: 700; }
+.person--lead { padding-bottom: .875rem; border-bottom: 1px solid var(--line); }
+.you { color: var(--muted); font-weight: 400; }
+.avatar {
+    width: 2.5rem; height: 2.5rem; border: 1px solid var(--line); background: var(--folio);
+    display: grid; place-items: center; font-family: var(--display); font-size: 1.25rem; color: var(--rubric); flex: none;
+}
+.avatar--sm { width: 1.875rem; height: 1.875rem; font-size: 1rem; }
+.panel-foot { padding-top: .875rem; border-top: 1px solid var(--line); font-size: .875rem; color: var(--muted); }
+
+/* The game page: the sheet, ledger and panel from styles.css */
+.wrap--game { max-width: 83rem; }
+.wrap--game .header { max-width: 80rem; margin-inline: auto; }
+.game-sheet { margin-top: 2rem; background: var(--bg); border: 1px solid var(--ink); outline: 1px solid var(--ink); outline-offset: .3125rem; }
+.game-sheet h2 { margin: 0; }
+.game-sheet h1 { margin: .875rem 0 .625rem; }
+.game-sheet-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 1rem; padding: 1.25rem 1.5rem; border-bottom: 3px double var(--ink); }
+.game-title-block { flex: 1 1 30rem; min-width: 0; }
+.game-head-actions { display: flex; align-items: center; gap: 1rem; }
+.game-layout { display: flex; gap: 1.75rem; padding: 1.5rem; }
+.game-main { display: flex; flex: 1 1 0; flex-direction: column; gap: 2rem; min-width: 0; }
+.game-tale { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
+.game-panel { flex: 0 0 23.75rem; min-width: 0; padding-left: 1.75rem; border-left: 1px solid var(--ink); }
+.game-panel-inner { position: sticky; top: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+.game-panel-states, .game-panel-state { display: flex; flex-direction: column; gap: 1rem; }
+.game-seats { margin: 0; padding-top: .875rem; border-top: 1px solid var(--line); font-size: .875rem; color: var(--muted); }
+.game-foot { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr)); gap: .5rem; padding-top: 1rem; border-top: 1px solid var(--ink); }
+.game-foot .btn { padding-inline: .5rem; }
+.game-chronicle { min-width: 0; padding-top: 2rem; border-top: 1px solid var(--ink); }
+.game-ledger-nav { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem 1rem; margin-bottom: .75rem; }
+.game-ledger-label { padding: .5rem; border-bottom: 1px solid var(--ink); text-align: center; color: var(--muted); font-size: .75rem; letter-spacing: 2px; text-transform: uppercase; }
+.game-count { font-size: .75rem; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+.calendar-legend { display: flex; flex-wrap: wrap; gap: .875rem; margin-left: auto; color: var(--muted); font-size: .75rem; }
+.legend-item::before { content: ''; display: inline-block; width: .625rem; height: .625rem; margin-right: .375rem; vertical-align: -1px; border: 1px solid var(--ink); }
+.legend-confirmed::before { border-color: var(--verdigris); background: var(--verdigris); }
+.legend-suggested::before { border-style: dashed; }
+.calendar-reply-key { color: var(--muted); display: flex; flex-wrap: wrap; gap: .25rem 1rem; margin-top: .625rem; font-size: .75rem; }
+.reply-glyph { display: inline-block; width: 1em; height: 1em; vertical-align: -.125em; fill: none; stroke: currentColor; stroke-width: 2.25; stroke-linecap: square; }
+.reply-accepted { color: var(--verdigris); }
+.reply-tentative { color: var(--ochre); }
+.reply-declined, .reply-awaiting { color: var(--rubric); }
+.game-ahead-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-left: 1px solid var(--line); }
+.game-cell { position: relative; display: block; aspect-ratio: 1; min-width: 0; padding: 0; container-type: inline-size; overflow: hidden; background: var(--bg); border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--ink); font: inherit; text-align: left; }
+button.game-cell { cursor: pointer; transition: background-color .15s; }
+button.game-cell:hover { background: var(--folio); }
+.game-cell:focus-visible { outline-offset: -2px; }
+.game-cell.is-selected, .game-cell.is-selected:hover { background: var(--folio); outline: 2px solid var(--rubric); outline-offset: -2px; }
+.day-frame { position: absolute; inset: 2cqw; display: flex; flex-direction: column; gap: 2cqw; padding: 3.5cqw 4cqw; border: 1px dashed var(--ink); }
+.frame-Confirmed { border: 1px solid var(--verdigris); background: color-mix(in srgb, var(--verdigris) 10%, var(--bg)); }
+.day-number { display: block; font-size: clamp(.6875rem, 11.5cqw, .875rem); line-height: 1.2; color: var(--ink); }
+.day-time { color: var(--muted); font-size: clamp(.6875rem, 10cqw, .78rem); line-height: 1.2; white-space: nowrap; }
+.day-tally { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: auto; padding-top: 2cqw; border-top: 1px solid var(--line); text-align: center; }
+.frame-Confirmed .day-tally { border-top-color: var(--verdigris); }
+.day-tally > * { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 2px; font-size: clamp(.6875rem, 11cqw, .875rem); line-height: 1.15; }
+.day-tally > * + * { border-left: 1px solid var(--line); }
+.day-tally b { font-size: inherit; font-weight: 700; }
+.day-tally .tally-zero { color: var(--muted); }
+.day-tally .tally-zero b { font-weight: 400; }
+.game-played-nav { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0 .75rem; margin-top: 2rem; border-bottom: 1px solid var(--ink); }
+.game-played-nav .game-ledger-label { grid-column: 2; border-bottom: 0; }
+.game-record { grid-column: 3; justify-self: end; min-height: 2.5rem; font-size: .875rem; }
+
+/* Played rows: the button selects the session; the journal line sits under it as a real link */
+.game-entries { margin: 0; padding: 0; list-style: none; }
+.game-row { border-bottom: 1px solid var(--line); transition: background-color .15s; }
+.game-row:has(.game-entry:hover) { background: var(--folio); }
+.game-row.is-selected { background: var(--folio); outline: 2px solid var(--rubric); outline-offset: -2px; }
+.game-entry { display: grid; grid-template-columns: 3.25rem minmax(0, 1fr) auto; gap: .5rem .75rem; width: 100%; padding: .875rem .75rem .375rem .5rem; background: none; border: 0; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.game-entry:focus-visible { outline-offset: -2px; }
+.game-entry-no { font-size: 1.375rem; line-height: 1.1; color: var(--rubric); font-variant-numeric: tabular-nums; }
+.game-entry-date { display: block; }
+.game-entry-meta { display: block; color: var(--muted); font-size: .875rem; font-variant-numeric: tabular-nums; }
+.game-attendees { display: flex; flex-wrap: wrap; gap: .25rem; justify-content: flex-end; align-self: center; }
+.game-attendees .avatar { border: 2px solid var(--verdigris); }
+.game-attendees .attendee--dm { position: relative; display: inline-flex; }
+.game-attendees .attendee--dm .avatar { border-color: var(--rubric); }
+.attendee--dm::after { content: "♛"; position: absolute; right: -.25rem; bottom: -.375rem; color: var(--rubric); background: var(--bg); font-size: .75rem; line-height: 1; pointer-events: none; }
+.game-row.is-selected .attendee--dm::after, .game-row:has(.game-entry:hover) .attendee--dm::after { background: var(--folio); }
+.entry-line { display: grid; gap: .125rem; padding: 0 .75rem .875rem 4.5rem; min-width: 0; }
+.entry-link { font-family: var(--display); font-size: 1.3125rem; line-height: 1.25; overflow-wrap: anywhere; justify-self: start; }
+.entry-none { font-style: italic; color: var(--muted); }
+.session-by { font-size: .875rem; color: var(--muted); }
+.session-by a { color: var(--rubric); }
+.more { margin-top: 1rem; }
+
+/* The panel */
+.panel-heading { margin: 0; font-family: var(--display); font-size: 1.5rem; font-weight: 400; line-height: 1.2; text-wrap: balance; }
+.panel-heading .drop-cap { font-size: 2.125rem; }
+.panel-session { padding: 1rem; border: 1px solid var(--line); }
+.panel-session-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem; }
+.panel-session-time { font-weight: 700; }
+.panel-status-tag { padding: .125rem .375rem; border: 1px solid; font-size: .6875rem; letter-spacing: 2px; text-transform: uppercase; }
+.chip-Confirmed { color: var(--verdigris); }
+.chip-Suggested { border-style: dashed; }
+.chip-Played { color: var(--muted); }
+.panel-session-meta { color: var(--muted); font-size: .8125rem; margin: .25rem 0 .75rem; }
+.panel-empty { color: var(--muted); font-size: .875rem; margin: 0; }
+.roster { display: flex; flex-direction: column; }
+.roster-row { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .5rem; padding: .375rem 0; border-bottom: 1px solid var(--line); }
+.roster-row:last-child { border-bottom: none; }
+.roster-row .avatar { border-width: 2px; }
+.roster-name { flex: 1 1 5rem; min-width: 0; font-size: .9375rem; line-height: 1.25; overflow-wrap: break-word; }
+.roster-name.is-dm { color: var(--rubric); font-weight: 700; }
+.roster-said { flex: none; width: 5.75rem; font-size: .8125rem; font-weight: 700; line-height: 1.2; }
+.roster-said.game-detail { width: auto; color: var(--muted); font-weight: 400; }
+.avatars-accepted .avatar { border-color: var(--verdigris); }
+.avatars-declined .avatar { border-color: var(--rubric); opacity: .6; }
+.btn-close { width: 100%; }
+
+/* The journal block in the panel */
+.panel-journal { display: grid; gap: .5rem; border-color: var(--ink); }
+.journal-title { font-family: var(--display); font-size: 1.3125rem; line-height: 1.25; overflow-wrap: anywhere; }
+.journal-excerpt { margin: 0; font-size: .9375rem; }
+.panel-journal .session-by { margin: 0; }
+.journal-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .25rem; }
+.journal-actions .btn { flex: 1 1 auto; padding-inline: .625rem; }
+
+/* Journal pages: the calendar page's two panes, split by an ink rule */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) 23.75rem; gap: 1.75rem; padding-top: 2rem; align-items: start; }
+.split > * { min-width: 0; }
+.split-side { display: grid; gap: 1rem; padding-left: 1.75rem; border-left: 1px solid var(--ink); }
+.split-side .panel-foot { margin: 0; }
+
+@media (max-width: 1024px) {
+    .game-layout { flex-direction: column; }
+    .game-panel, .game-panel-inner { display: contents; }
+    .game-foot { order: -2; padding: 0 0 1.5rem; border-top: 0; border-bottom: 1px solid var(--ink); }
+    .game-panel-states { order: 1; padding-top: 1.5rem; border-top: 1px solid var(--ink); }
+    .game-ahead-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .game-cell--filler:nth-child(n+6) { display: none; }
+    .split { grid-template-columns: minmax(0, 1fr); }
+    .split-side { padding: 1.5rem 0 0; border-left: 0; border-top: 1px solid var(--ink); }
+}
+@media (max-width: 560px) {
+    .game-sheet-head, .game-layout { padding: 1rem; }
+    .game-ahead-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .game-cell--filler:nth-child(n+4) { display: none; }
+    .calendar-legend { margin-left: 0; }
+    .game-played-nav { grid-template-columns: 1fr; }
+    .game-played-nav .game-ledger-label, .game-record { grid-column: 1; }
+    .game-record { justify-self: center; }
+    .game-entry { grid-template-columns: 2.5rem minmax(0, 1fr); }
+    .game-attendees { grid-column: 2; justify-content: flex-start; }
+    .entry-line { padding-left: 3.75rem; }
+}
+
+/* Entry */
+.entry-nav {
+    display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem 2rem;
+    margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--ink); max-width: 65ch;
+}
+.entry-nav a:only-child.is-next { margin-left: auto; }
+.entry-nav .is-next { text-align: right; }
+
+/* Editor */
+.field { display: grid; gap: .25rem; }
+.label { font-size: .75rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.hint { font-size: .8125rem; color: var(--muted); margin: 0; overflow-wrap: anywhere; }
+input[type="text"], textarea {
+    font-family: inherit; font-size: 1rem; color: var(--ink); background: transparent; width: 100%; min-width: 0;
+}
+input[type="text"] { border: none; border-bottom: 1px solid var(--ink); padding: .625rem 2px; border-radius: 0; }
+input[type="text"]:focus { outline: none; border-bottom: 2px solid var(--rubric); padding-bottom: calc(.625rem - 1px); }
+input::placeholder, textarea::placeholder { color: var(--muted); }
+.edit-form { display: grid; gap: 1.5rem; padding-top: 1.5rem; }
+.title-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .75rem; }
+.title-fixed { font-family: var(--display); font-size: 1.75rem; line-height: 1.2; white-space: nowrap; }
+.title-row input { flex: 1 1 14rem; font-family: var(--display); font-size: 1.75rem; line-height: 1.2; }
+.editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; align-items: stretch; }
+.pane { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .375rem; min-width: 0; }
+textarea { border: 1px solid var(--line); border-radius: 0; padding: .875rem 1rem; min-height: 28rem; resize: vertical; line-height: 1.55; }
+textarea:focus { outline: none; border-color: var(--rubric); box-shadow: inset 0 0 0 1px var(--rubric); }
+.preview { border: 1px dashed var(--line); padding: .875rem 1rem; overflow-wrap: anywhere; min-width: 0; }
+.preview-title { font-family: var(--display); font-size: 1.5rem; line-height: 1.2; margin: 0 0 .875rem; padding-bottom: .625rem; border-bottom: 1px solid var(--line); }
+.tabs { display: none; gap: 0; }
+.tab {
+    font-family: var(--text); font-size: .8125rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
+    background: none; border: 0; border-bottom: 2px solid transparent; min-height: 2.5rem; padding: 0 1rem 0 0; margin-right: .75rem; cursor: pointer;
+}
+.tab[aria-selected="true"], .tab[aria-pressed="true"] { color: var(--ink); border-bottom-color: var(--rubric); }
+.form-foot { display: flex; flex-wrap: wrap; gap: .625rem; align-items: center; }
+.notice { border: 1px solid var(--rubric); padding: 1rem 1.25rem; display: grid; gap: .75rem; }
+.notice p { margin: 0; }
+.notice-title { color: var(--rubric); font-weight: 700; }
+
+/* History */
+.history { display: grid; grid-template-columns: 22rem minmax(0, 1fr); gap: 2rem 1.75rem; padding-top: 2rem; align-items: start; }
+.revs { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink); }
+.rev-item { border-bottom: 1px solid var(--line); }
+.rev {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .125rem .75rem; width: 100%; text-align: left;
+    font: inherit; color: inherit; background: none; border: 0; padding: .875rem .625rem; cursor: pointer; transition: background .15s;
+}
+.rev:hover { background: var(--folio); }
+.rev[aria-current="true"] { background: var(--folio); outline: 2px solid var(--rubric); outline-offset: -2px; }
+.rev .avatar { grid-row: span 3; }
+.rev-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .125rem .625rem; }
+.rev-no { font-weight: 700; }
+.tag { font-size: .6875rem; letter-spacing: 2px; text-transform: uppercase; padding: 0 6px; border: 1px solid currentColor; color: var(--verdigris); }
+.rev-meta { font-size: .8125rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rev-note { font-size: .9375rem; overflow-wrap: anywhere; }
+.rev-delta { font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.plus { color: var(--verdigris); }
+.minus { color: var(--rubric); }
+.detail { display: grid; gap: 1rem; min-width: 0; padding-left: 1.75rem; border-left: 1px solid var(--ink); }
+.detail-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: .75rem 1.5rem; }
+.detail-title { font-family: var(--display); font-size: 1.5rem; color: var(--rubric); margin: 0; font-weight: 400; }
+.detail-sub { margin: 0; color: var(--muted); font-size: .875rem; }
+.toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem 1.5rem; border-bottom: 1px solid var(--line); }
+.legend { font-size: .8125rem; color: var(--muted); }
+.diff { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9375rem; line-height: 1.65; }
+ins { color: var(--verdigris); background: color-mix(in srgb, var(--verdigris) 12%, var(--bg)); text-decoration: underline; text-underline-offset: 3px; }
+del { color: var(--rubric); background: color-mix(in srgb, var(--rubric) 10%, var(--bg)); text-decoration: line-through; }
+.gap { display: block; color: var(--muted); font-size: .8125rem; letter-spacing: 2px; padding: .5rem 0; border-block: 1px dotted var(--line); margin: .5rem 0; }
+.name-change { margin: 0; padding-bottom: .875rem; border-bottom: 1px solid var(--line); }
+.same { color: var(--muted); font-style: italic; margin: 0; }
+
+/* Merge */
+.merge-summary { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; padding: 1.25rem 0 .25rem; font-size: .9375rem; }
+.merge-ok { color: var(--verdigris); }
+.merge-todo { color: var(--rubric); font-weight: 700; }
+.conflicts { display: grid; gap: 1.5rem; padding-top: 1rem; }
+.conflict { border: 1px solid var(--rubric); padding: 1.25rem 1.5rem; display: grid; gap: 1rem; min-width: 0; }
+.conflict--done { border-color: var(--line); }
+.conflict-head { margin: 0; font-family: var(--text); font-weight: 700; font-size: .8125rem; letter-spacing: 2px; text-transform: uppercase; color: var(--rubric); }
+.conflict--done .conflict-head { color: var(--verdigris); }
+.context { margin: 0; font-size: .875rem; color: var(--muted); font-style: italic; overflow-wrap: anywhere; }
+.versions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.version { border: 1px solid var(--line); padding: .75rem 1rem; display: grid; gap: .5rem; align-content: start; min-width: 0; transition: background .15s, border-color .15s; }
+.version--picked { background: var(--folio); border-color: var(--ink); }
+.version--picked ins, .version--picked del { background: none; }
+.version-name { font-family: var(--display); font-size: 1.375rem; line-height: 1.25; overflow-wrap: anywhere; }
+.picks { display: flex; flex-wrap: wrap; gap: .5rem; }
+.picks .btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.conflict-text { min-height: 9rem; }
+.unresolved { color: var(--rubric); font-style: italic; border: 1px dashed var(--rubric); padding: .25rem .625rem; font-family: var(--text); font-size: .9375rem; }
+p.unresolved { margin: 0 0 1rem; }
+.merge-result { padding-top: 2.5rem; }
+.merge-foot { padding-top: 1.5rem; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn--primary:disabled:hover { opacity: .5; }
+
+/* Restore dialog */
+dialog {
+    background: var(--bg); color: var(--ink); border: 1px solid var(--ink); outline: 1px solid var(--ink); outline-offset: 5px;
+    padding: 1.5rem; width: min(32rem, calc(100vw - 3rem));
+}
+dialog::backdrop { background: rgba(0, 0, 0, .5); }
+.dlg-head { display: flex; justify-content: space-between; align-items: start; gap: 1rem; padding-bottom: .75rem; border-bottom: 3px double var(--ink); }
+.dlg-title { font-family: var(--display); font-size: 1.75rem; line-height: 1.15; font-weight: 400; margin: .125rem 0 0; }
+.dlg-close { width: 2.5rem; height: 2.5rem; padding: 0; flex: none; font-size: 1.25rem; letter-spacing: 0; }
+dialog p { margin: 1rem 0 1.25rem; }
+
+/* Messages */
+.message {
+    position: fixed; z-index: 5; bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+    left: max(16px, env(safe-area-inset-left, 0px)); max-width: min(34rem, calc(100vw - 32px));
+    padding: .625rem 1rem; font-size: .875rem; border: 1px solid; background: var(--bg);
+}
+.message.success { color: var(--verdigris); }
+.message.error { color: var(--rubric); }
+.message.info { color: var(--muted); }
+.ornament { text-align: center; color: var(--muted); letter-spacing: 12px; margin-top: 3rem; }
+
+/* Mock-up controls: not part of the design */
+.mock-bar {
+    position: fixed; z-index: 6; left: 0; right: 0; bottom: 0; background: var(--folio); border-top: 1px dashed var(--ink);
+    padding: .5rem max(16px, env(safe-area-inset-right, 0px)) calc(.5rem + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+    display: flex; flex-wrap: wrap; align-items: center; gap: .375rem .625rem; font-size: .8125rem;
+}
+.mock-bar .btn { min-height: 2.25rem; padding: 0 .625rem; font-size: .6875rem; letter-spacing: 1px; }
+.mock-bar .btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.mock-bar .spacer { flex: 1 1 auto; }
+
+@media (max-width: 768px) {
+    body { padding-block-end: 10rem; }
+    h1 { font-size: 2.125rem; }
+    .drop-cap { font-size: 2.75rem; }
+    .title-block { grid-template-columns: minmax(0, 1fr); }
+    .actions { justify-content: flex-start; }
+    .history { grid-template-columns: minmax(0, 1fr); }
+    .detail { padding: 1.5rem 0 0; border-left: 0; border-top: 1px solid var(--ink); }
+    .tabs { display: flex; }
+    .editor { grid-template-columns: minmax(0, 1fr); }
+    .editor .pane > .label { display: none; }
+    .editor[data-tab="write"] .pane--preview, .editor[data-tab="preview"] .pane--write { display: none; }
+    textarea { min-height: 22rem; }
+    .title-fixed, .title-row input { font-size: 1.5rem; }
+    .versions { grid-template-columns: minmax(0, 1fr); }
+    .conflict { padding: 1rem; }
+    .picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .picks .btn { padding: .375rem .5rem; letter-spacing: 1px; }
+    .mock-bar { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; }
+    .mock-bar .btn { flex: none; }
+    .mock-bar > span:first-child { flex: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+    <header class="header">
+        <a href="#game" class="logo">Waystone</a>
+        <nav class="nav" aria-label="Main">
+            <a href="#game">Home</a>
+            <a href="#game" class="active" aria-current="page">Games</a>
+            <a href="#game">Profile</a>
+        </nav>
+        <div class="header-right"><span id="whoami"></span><button class="btn" type="button" data-act="noop">Logout</button></div>
+    </header>
+    <main id="main"></main>
+</div>
+
+<dialog id="restoreDlg" aria-labelledby="dlgTitle">
+    <div class="dlg-head">
+        <div><span class="eyebrow">History</span><h2 id="dlgTitle" class="dlg-title" style="color:inherit;display:block"></h2></div>
+        <button type="button" class="btn dlg-close" data-act="restore-cancel" aria-label="Close">&times;</button>
+    </div>
+    <p id="dlgText"></p>
+    <div class="form-foot">
+        <button type="button" class="btn btn--primary" data-act="restore-confirm">Restore</button>
+        <button type="button" class="btn" data-act="restore-cancel">Cancel</button>
+    </div>
+</dialog>
+
+<dialog id="deleteDlg" aria-labelledby="delTitle">
+    <div class="dlg-head">
+        <div><span class="eyebrow">Journal</span><h2 id="delTitle" class="dlg-title" style="color:inherit;display:block"></h2></div>
+        <button type="button" class="btn dlg-close" data-act="delete-cancel" aria-label="Close">&times;</button>
+    </div>
+    <p id="delText"></p>
+    <div class="form-foot">
+        <button type="button" class="btn btn--danger" data-act="delete-confirm">Delete entry</button>
+        <button type="button" class="btn" data-act="delete-cancel">Cancel</button>
+    </div>
+</dialog>
+
+<div id="message" class="message" role="status" hidden></div>
+
+<div class="mock-bar" aria-label="Mock-up controls">
+    <span>Mock-up. View as:</span>
+    <button type="button" class="btn" data-act="viewer" data-viewer="wren">Wren, player</button>
+    <button type="button" class="btn" data-act="viewer" data-viewer="aldric">Aldric, DM</button>
+    <button type="button" class="btn" data-act="viewer" data-viewer="visitor">Visitor</button>
+    <button type="button" class="btn sim-btn" id="simOther" data-act="simulate" data-kind="other" hidden>Tobin saves: other paragraph</button>
+    <button type="button" class="btn sim-btn" id="simSame" data-act="simulate" data-kind="same" hidden>Tobin saves: same paragraph</button>
+    <span class="spacer"></span>
+    <button type="button" class="btn" data-act="theme">Toggle theme</button>
+</div>
+
+<script>
+// Copied from static/game.js so the preview and the entry render exactly like the game description.
+function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function renderMarkdown(text) {
+    const src = escapeHtml(String(text || '').replace(/\0/g, '').replace(/\r\n?/g, '\n'));
+    const inline = (line) => {
+        const links = [];
+        let out = line.replace(/\[([^\[\]\n]{1,300})\]\(((?:[^()\s]|\([^()\s]*\)){1,2000})\)/g, (m, label, url) => {
+            if (!/^(https?:\/\/|mailto:)\S+$/i.test(url)) return m;
+            links.push(`<a href="${url}" target="_blank" rel="noopener noreferrer nofollow">${label}</a>`);
+            return `\0${links.length - 1}\0`;
+        });
+        out = out
+            .replace(/\*\*(?=[^\s*])([^\n]{1,1000}?)\*\*/g, '<strong>$1</strong>')
+            .replace(/(^|[^*\w])\*([^*\s][^*\n]*?)\*(?![*\w])/g, '$1<em>$2</em>')
+            .replace(/(^|[^\w])_([^_\s][^_\n]*?)_(?!\w)/g, '$1<em>$2</em>');
+        return out.replace(/\0(\d+)\0/g, (m, i) => links[Number(i)]);
+    };
+    const kindOf = (l) => /^[-*]\s+/.test(l) ? 'ul' : /^\d+\.\s+/.test(l) ? 'ol' : /^&gt;\s?/.test(l) ? 'quote' : 'text';
+    const strip = { ul: /^[-*]\s+/, ol: /^\d+\.\s+/, quote: /^&gt;\s?/ };
+    const renderRun = (kind, lines) => {
+        if (kind === 'text') return `<p>${lines.map(inline).join('<br>')}</p>`;
+        const items = lines.map((l) => inline(l.replace(strip[kind], '')));
+        if (kind === 'quote') return '<blockquote>' + items.join('<br>') + '</blockquote>';
+        return `<${kind}>` + items.map((i) => `<li>${i}</li>`).join('') + `</${kind}>`;
+    };
+    const blocks = src.split(/\n[ \t]*\n/).map((b) => b.trim()).filter(Boolean);
+    return blocks.map((block) => {
+        let lines = block.split('\n');
+        let out = '';
+        const head = lines[0].match(/^(#{1,3})\s+(.*)$/);
+        if (head) {
+            const tag = head[1].length === 3 ? 'h4' : 'h3';
+            out += `<${tag}>${inline(head[2])}</${tag}>`;
+            lines = lines.slice(1);
+        }
+        let run = [], kind = '';
+        for (const line of lines) {
+            const k = kindOf(line);
+            if (run.length && k !== kind) {
+                out += renderRun(kind, run);
+                run = [];
+            }
+            kind = k;
+            run.push(line);
+        }
+        return out + (run.length ? renderRun(kind, run) : '');
+    }).join('');
+}
+
+/* ---------- Sample data ---------- */
+const GAME = 'Age of Sojourn';
+const PLAYED = 31;
+const OLDER_WRITTEN = 26; // entries on the sessions older than the five shown here
+const people = {
+    aldric: { name: 'Aldric', dm: true },
+    mira: { name: 'Mira' },
+    tobin: { name: 'Tobin' },
+    wren: { name: 'Wren' },
+    sable: { name: 'Sable' },
+};
+const sessions = [
+    { no: 31, date: 'Thu 29 Oct 2026', time: '19:00 – 22:00 · 3 h', at: ['aldric', 'mira', 'tobin', 'wren', 'sable'] },
+    { no: 30, date: 'Thu 15 Oct 2026', time: '19:00 – 22:30 · 3½ h', at: ['aldric', 'mira', 'tobin', 'sable'] },
+    { no: 29, date: 'Thu 1 Oct 2026', time: '19:00 – 22:00 · 3 h', at: ['aldric', 'mira', 'wren', 'sable'] },
+    { no: 28, date: 'Sat 19 Sep 2026', time: '15:00 – 19:00 · 4 h', at: ['aldric', 'mira', 'tobin', 'wren'] },
+    { no: 27, date: 'Thu 3 Sep 2026', time: '19:00 – 22:00 · 3 h', at: ['aldric', 'tobin', 'wren', 'sable'] },
+];
+
+const r1 = `We left Karrow at first light with three days of food and a mule named Bishop.
+
+# The climb
+
+The pass was snowed in by noon. Sable found an old goat track along the north face, and we roped up.
+
+- Lost the saddlebags on the second ledge
+- Tobin's cloak caught fire, which nobody can explain
+- Wren heard singing under the ice
+
+# The top
+
+We reached the cairn at dusk. The waystone is cracked through the middle, and the crack is warm.
+
+> Whoever lit this stone did not mean to come back.
+
+That was scratched on the back, in old Karrish. We made camp and nobody slept.`;
+
+const r2 = r1
+    .replace('We left Karrow at first light with three days of food and a mule named Bishop.',
+        'We left Karrow at first light with three days of food and a mule named Bishop.\n\nBefore the pass we paid the toll-keeper, Old Hesk, two silver and a promise. **Remember the promise.** Hesk says the stone has been warm since midsummer.')
+    .replace('which nobody can explain', 'which was *not* his fault');
+
+const r3 = r2
+    .replace('north face', 'east face')
+    .replace('in old Karrish.', 'in old Karrish, as Wren read it.');
+
+const r4 = r3.replace(/We reached the cairn at dusk[\s\S]*$/,
+    'We reached the cairn at dusk, and I single-handedly held off three ice wraiths while the others took notes. The stone is fine. Everything is fine.');
+
+const entries = {
+    31: [
+        { n: 1, by: 'mira', at: '30 Oct 2026, 09:12', note: 'First draft', name: 'The Ascent', body: r1 },
+        { n: 2, by: 'tobin', at: '30 Oct 2026, 20:41', note: 'Added the toll-keeper', name: 'The Ascent', body: r2 },
+        { n: 3, by: 'aldric', at: '31 Oct 2026, 11:05', note: 'Named the session, fixed the route', name: 'The Summit', body: r3 },
+        { n: 4, by: 'tobin', at: '2 Nov 2026, 18:22', note: 'Rewrote the ending', name: 'The Summit', body: r4 },
+        { n: 5, by: 'mira', at: '2 Nov 2026, 21:14', note: '', restoredFrom: 3, name: 'The Summit', body: r3 },
+    ],
+    30: [
+        { n: 1, by: 'aldric', at: '16 Oct 2026, 08:30', note: 'First draft', name: 'The Long Climb',
+          body: 'Three days up the Karrow road. Mostly weather.\n\n# What we learned\n\n- The bridge guards answer to Old Hesk, not the council\n- Someone has been through ahead of us, and they had horses\n\nSable bought a map. Mira thinks it is forged. **We are using it anyway.**' },
+    ],
+    28: [
+        { n: 1, by: 'wren', at: '20 Sep 2026, 10:02', note: 'First draft', name: 'Ash on the Wind',
+          body: 'The village at Karrow Ford burned before we got there. The ash smelled of cloves.\n\nWe found one survivor, a boy who only says *up, up, up*.' },
+        { n: 2, by: 'wren', at: '20 Sep 2026, 18:47', note: 'Added the boy\'s name', name: 'Ash on the Wind',
+          body: 'The village at Karrow Ford burned before we got there. The ash smelled of cloves.\n\nWe found one survivor, a boy named Ilo who only says *up, up, up*.' },
+    ],
+    27: [
+        { n: 1, by: 'tobin', at: '4 Sep 2026, 12:15', note: 'First draft', name: '',
+          body: 'Short one. We argued with the council for two hours, took their coin, and left for Karrow at the end of the night.' },
+    ],
+};
+
+/* ---------- State and helpers ---------- */
+const state = { viewer: 'wren', edit: null, hist: null, route: null, selected: null };
+const main = document.getElementById('main');
+const esc = escapeHtml;
+const canWrite = () => state.viewer !== 'visitor';
+const session = (no) => sessions.find((s) => s.no === no);
+const latest = (no) => (entries[no] || []).at(-1);
+const nameOf = (id) => people[id].name;
+const isYou = (id) => id === state.viewer;
+const shortDate = (at) => at.includes(',') ? at.split(',')[0].replace(/ \d{4}$/, '') : at;
+
+function titleHtml(no, name, cap) {
+    const head = cap ? `<span class="drop-cap">${GAME[0]}</span>${GAME.slice(1)}` : GAME;
+    return `${head} <span class="t-no">${no}</span>${name ? ': ' + esc(name) : ''}`;
+}
+function titleText(no, name) {
+    return `${GAME} ${no}${name ? ': ' + name : ''}`;
+}
+function avatar(id, sm) {
+    return `<span class="avatar${sm ? ' avatar--sm' : ''}" title="${esc(nameOf(id))}" aria-hidden="true">${esc(nameOf(id)[0])}</span>`;
+}
+function amenders(revs) {
+    const author = revs[0].by;
+    return [...new Set(revs.slice(1).map((r) => r.by))].filter((id) => id !== author);
+}
+function bylineText(revs) {
+    const others = amenders(revs).map(nameOf);
+    return `Penned by ${nameOf(revs[0].by)}` + (others.length ? ` · amended by ${others.join(', ')}` : '');
+}
+function revNote(r) {
+    if (r.restoredFrom) return `↺ Restored revision ${r.restoredFrom}`;
+    if (r.mergedFrom) return `Merged with ${nameOf(r.mergedFrom.by)}'s revision ${r.mergedFrom.n}` + (r.note ? `: ${r.note}` : '');
+    return r.note;
+}
+
+// Word-level LCS diff. Long unchanged stretches collapse to a marker.
+function diffWords(a, b) {
+    const A = a.match(/\s+|\S+/g) || [], B = b.match(/\s+|\S+/g) || [];
+    let s = 0;
+    while (s < A.length && s < B.length && A[s] === B[s]) s++;
+    let e = 0;
+    while (e < A.length - s && e < B.length - s && A[A.length - 1 - e] === B[B.length - 1 - e]) e++;
+    const X = A.slice(s, A.length - e), Y = B.slice(s, B.length - e);
+    const L = Array.from({ length: X.length + 1 }, () => new Uint16Array(Y.length + 1));
+    for (let i = X.length - 1; i >= 0; i--) {
+        for (let j = Y.length - 1; j >= 0; j--) {
+            L[i][j] = X[i] === Y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+        }
+    }
+    const segs = [];
+    const push = (t, v) => {
+        const last = segs.at(-1);
+        if (last && last.t === t) last.v += v; else segs.push({ t, v });
+    };
+    if (s) push('=', A.slice(0, s).join(''));
+    let i = 0, j = 0;
+    while (i < X.length || j < Y.length) {
+        if (i < X.length && j < Y.length && X[i] === Y[j]) { push('=', X[i]); i++; j++; }
+        else if (i < X.length && (j === Y.length || L[i + 1][j] >= L[i][j + 1])) { push('-', X[i]); i++; }
+        else { push('+', Y[j]); j++; }
+    }
+    if (e) push('=', A.slice(A.length - e).join(''));
+    const words = (t) => segs.filter((g) => g.t === t).reduce((n, g) => n + (g.v.match(/\S+/g) || []).length, 0);
+    return { segs: tidySegs(segs), added: words('+'), removed: words('-') };
+}
+// Absorb one- or two-word matches between changes, so a rewritten passage reads as
+// one removal followed by one addition: removed text first, then added.
+function tidySegs(segs) {
+    const out = [];
+    let del = '', ins = '';
+    const flush = () => {
+        if (del) out.push({ t: '-', v: del });
+        if (ins) out.push({ t: '+', v: ins });
+        del = ''; ins = '';
+    };
+    segs.forEach((g, idx) => {
+        if (g.t === '-') del += g.v;
+        else if (g.t === '+') ins += g.v;
+        else if ((del || ins) && idx < segs.length - 1 && !g.v.includes('\n') && (g.v.match(/\S+/g) || []).length <= 2) {
+            del += g.v; ins += g.v;
+        } else {
+            flush();
+            out.push(g);
+        }
+    });
+    flush();
+    return out;
+}
+function diffHtml(segs) {
+    return segs.map((g, idx) => {
+        if (g.t === '+') return `<ins>${esc(g.v)}</ins>`;
+        if (g.t === '-') return `<del>${esc(g.v)}</del>`;
+        const paras = g.v.split(/\n\s*\n/);
+        const first = idx === 0, last = idx === segs.length - 1;
+        // Keep the paragraph touching each change; collapse the rest.
+        const keepHead = first ? 0 : 1, keepTail = last ? 0 : 1;
+        const hidden = paras.length - keepHead - keepTail;
+        if (hidden < 1) return esc(g.v);
+        const label = `<span class="gap">⋯ ${hidden} unchanged paragraph${hidden === 1 ? '' : 's'} ⋯</span>`;
+        const head = keepHead ? esc(paras[0]) : '';
+        const tail = keepTail ? esc(paras.at(-1)) : '';
+        return head + label + tail;
+    }).join('');
+}
+
+// Three-way merge by paragraph. Paragraphs unchanged in both versions anchor the comparison;
+// between anchors, a change on one side is taken and different changes on both sides conflict.
+const toParas = (t) => String(t).split(/\n[ \t]*\n/).map((p) => p.trim()).filter(Boolean);
+function lcsPairs(x, y) {
+    const L = Array.from({ length: x.length + 1 }, () => new Uint16Array(y.length + 1));
+    for (let i = x.length - 1; i >= 0; i--) {
+        for (let j = y.length - 1; j >= 0; j--) {
+            L[i][j] = x[i] === y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+        }
+    }
+    const pairs = new Map();
+    let i = 0, j = 0;
+    while (i < x.length && j < y.length) {
+        if (x[i] === y[j]) { pairs.set(i, j); i++; j++; }
+        else if (L[i + 1][j] >= L[i][j + 1]) i++;
+        else j++;
+    }
+    return pairs;
+}
+function merge3(baseText, mineText, theirsText) {
+    const base = toParas(baseText), mine = toParas(mineText), theirs = toParas(theirsText);
+    const toMine = lcsPairs(base, mine), toTheirs = lcsPairs(base, theirs);
+    const same = (a, b) => a.length === b.length && a.every((p, i) => p === b[i]);
+    const parts = [];
+    let auto = 0, nextId = 1;
+    const addOk = (paras) => {
+        if (!paras.length) return;
+        const last = parts.at(-1);
+        if (last && !last.conflict) last.paras.push(...paras); else parts.push({ paras: [...paras] });
+    };
+    let b = 0, m = 0, t = 0;
+    const anchors = [...toMine.keys()].filter((i) => toTheirs.has(i));
+    anchors.push(base.length); // end of text
+    for (const anchor of anchors) {
+        const bs = base.slice(b, anchor);
+        const ms = mine.slice(m, anchor < base.length ? toMine.get(anchor) : mine.length);
+        const ts = theirs.slice(t, anchor < base.length ? toTheirs.get(anchor) : theirs.length);
+        const mineChanged = !same(bs, ms), theirsChanged = !same(bs, ts);
+        if (mineChanged && theirsChanged && !same(ms, ts)) {
+            parts.push({ conflict: true, id: 'c' + nextId++, base: bs, mine: ms, theirs: ts, choice: '', text: '' });
+        } else {
+            if (mineChanged || theirsChanged) auto++;
+            addOk(mineChanged ? ms : ts);
+        }
+        if (anchor < base.length) {
+            addOk([base[anchor]]);
+            b = anchor + 1; m = toMine.get(anchor) + 1; t = toTheirs.get(anchor) + 1;
+        }
+    }
+    return { parts, auto };
+}
+function mergeName(base, mine, theirs) {
+    if (mine === theirs || theirs === base) return { name: mine };
+    if (mine === base) return { name: theirs };
+    return { conflict: { id: 'name', isName: true, mine, theirs, choice: '', text: mine } };
+}
+const conflictsOf = (m) => [...(m.nameConflict ? [m.nameConflict] : []), ...m.parts.filter((p) => p.conflict)];
+const resolvedParas = (c) =>
+    c.choice === 'mine' ? c.mine : c.choice === 'theirs' ? c.theirs :
+    c.choice === 'both' ? [...c.mine, ...c.theirs] : toParas(c.text);
+function mergedText(m) {
+    return m.parts.flatMap((p) => p.conflict ? resolvedParas(p) : p.paras).join('\n\n');
+}
+function mergedName(m) {
+    const c = m.nameConflict;
+    if (!c) return m.name;
+    return (c.choice === 'mine' ? c.mine : c.choice === 'theirs' ? c.theirs : c.text).trim();
+}
+
+function showMessage(text, type) {
+    const m = document.getElementById('message');
+    m.textContent = (type === 'success' ? '✓ ' : type === 'error' ? '✗ ' : '') + text;
+    m.className = 'message ' + type;
+    m.hidden = false;
+    clearTimeout(showMessage.t);
+    showMessage.t = setTimeout(() => { m.hidden = true; }, 5000);
+}
+
+/* ---------- Views ---------- */
+// Same breadcrumb as the calendar page. The last item is the current page.
+function crumbs(...items) {
+    const sep = '<span aria-hidden="true"> › </span>';
+    return '<nav class="crumb" aria-label="Breadcrumb">' + items.map(([label, href], i) =>
+        i === items.length - 1 ? `<span aria-current="page">${esc(label)}</span>` : `<a href="${href}">${esc(label)}</a>`
+    ).join(sep) + '</nav>';
+}
+const GLYPH = {
+    accepted: '<svg class="reply-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13l5 6L20 5"/></svg>',
+    tentative: '?',
+    declined: '<svg class="reply-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>',
+    awaiting: '…',
+};
+const LONG = { Thu: 'Thursday', Sat: 'Saturday', Oct: 'October', Sep: 'September', Nov: 'November' };
+const longDate = (d) => d.split(' ').map((w) => LONG[w] || w).join(' ');
+const ahead = [
+    { id: 'a1', short: 'Thu 12 Nov', date: 'Thu 12 Nov 2026', status: 'Confirmed', eyebrow: 'The next session', tally: [3, 0, 0, 1] },
+    { id: 'a2', short: 'Thu 19 Nov', date: 'Thu 19 Nov 2026', status: 'Suggested', eyebrow: 'Suggested session', tally: [1, 0, 0, 3] },
+];
+const COMPANY = ['aldric', 'mira', 'tobin', 'wren', 'sable'];
+const COUNTS = { aldric: 31, mira: 29, tobin: 28, wren: 27, sable: 26 };
+
+function excerpt(body) {
+    const para = toParas(body).find((p) => !/^#/.test(p)) || '';
+    const plain = para.replace(/[*_>#]/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').trim();
+    return plain.length > 130 ? plain.slice(0, 130).trimEnd() + '…' : plain;
+}
+function attendeeAvatar(id) {
+    return `<span class="${people[id].dm ? 'attendee--dm' : ''}" title="${esc(nameOf(id))}${people[id].dm ? ' (DM)' : ''}">${avatar(id, true)}</span>`;
+}
+function rosterRow(id, detail, cls) {
+    const dm = people[id].dm;
+    const you = isYou(id) ? ' <span class="you">(you)</span>' : '';
+    return `<div class="roster-row ${cls || ''}">
+        ${avatar(id, true)}
+        <span class="roster-name${dm ? ' is-dm' : ''}">${dm ? '♛ ' : ''}${esc(nameOf(id))}${you}</span>
+        ${detail}
+    </div>`;
+}
+
+function playedRow(s) {
+    const revs = entries[s.no];
+    const selected = state.selected === String(s.no);
+    let line;
+    if (revs) {
+        line = `<a class="entry-link" href="#entry-${s.no}">${esc(revs.at(-1).name || 'Unnamed entry')}</a>
+            <span class="session-by">${esc(bylineText(revs))}</span>`;
+    } else {
+        line = `<span class="entry-none">No entry yet</span>` +
+            (canWrite() ? `<span class="session-by"><a href="#edit-${s.no}">✎ Write the entry →</a></span>` : '');
+    }
+    return `<li class="game-row${selected ? ' is-selected' : ''}">
+        <button type="button" class="game-entry" data-act="select-session" data-no="${s.no}" aria-pressed="${selected}"
+            aria-label="Session ${s.no}, ${s.date}, ${s.at.length} there. Show details.">
+            <span class="game-entry-no" aria-hidden="true">${s.no}</span>
+            <span><span class="game-entry-date">${s.date}</span><span class="game-entry-meta">${s.time}</span></span>
+            <span class="game-attendees" aria-hidden="true">${s.at.map(attendeeAvatar).join('')}</span>
+        </button>
+        <div class="entry-line">${line}</div>
+    </li>`;
+}
+function aheadCell(a) {
+    const selected = state.selected === a.id;
+    const kinds = ['accepted', 'tentative', 'declined', 'awaiting'];
+    return `<button type="button" class="game-cell${selected ? ' is-selected' : ''}" data-act="select-session" data-no="${a.id}" aria-pressed="${selected}"
+            aria-label="${a.status} session, ${a.date}, 19:00 to 22:00">
+        <span class="day-frame frame-${a.status}">
+            <span class="day-number"><b>${a.short}</b></span>
+            <span class="day-time">19:00–22:00</span>
+            <span class="day-tally">${kinds.map((k, i) => `<span class="reply-${k}${a.tally[i] ? '' : ' tally-zero'}"><span>${GLYPH[k]}</span><b>${a.tally[i]}</b></span>`).join('')}</span>
+        </span>
+    </button>`;
+}
+
+function panelJournal(s) {
+    const revs = entries[s.no];
+    if (!revs) {
+        return `<div class="panel-session panel-journal">
+            <p class="eyebrow">The journal</p>
+            <p class="panel-empty">Nobody has written the entry for this session yet.</p>
+            ${canWrite() ? `<a class="btn btn--primary" href="#edit-${s.no}">Write the entry</a>` : ''}
+        </div>`;
+    }
+    const cur = revs.at(-1);
+    return `<div class="panel-session panel-journal">
+        <p class="eyebrow">The journal</p>
+        <a class="journal-title" href="#entry-${s.no}">${titleHtml(s.no, cur.name)}</a>
+        <p class="journal-excerpt">${esc(excerpt(cur.body))}</p>
+        <p class="session-by">${esc(bylineText(revs))}</p>
+        <div class="journal-actions">
+            <a class="btn btn--primary" href="#entry-${s.no}">Read the entry</a>
+            <a class="btn" href="#history-${s.no}">History · ${revs.length}</a>
+        </div>
+    </div>`;
+}
+function panelHtml() {
+    const sel = state.selected;
+    const a = ahead.find((x) => x.id === sel);
+    const s = sel && !a ? session(Number(sel)) : null;
+    const heading = (t) => `<h3 class="panel-heading"><span class="drop-cap">${esc(t[0])}</span>${esc(t.slice(1))}</h3>`;
+    if (a) {
+        return `<div class="game-panel-state">
+            <div><p class="eyebrow">${a.eyebrow}</p>${heading(longDate(a.date))}</div>
+            <div class="panel-session">
+                <div class="panel-session-head">
+                    <span class="panel-session-time">19:00–22:00</span>
+                    <span class="panel-status-tag chip-${a.status}">${a.status}</span>
+                </div>
+                <div class="panel-session-meta">3 h · proposed by ♛ Aldric</div>
+                <p class="panel-empty">The roster and replies stay as they are today, so this mock-up leaves them out.</p>
+            </div>
+            <button type="button" class="btn btn-close" data-act="show-company">Show the company</button>
+        </div>`;
+    }
+    if (s) {
+        const [range, ...rest] = s.time.split(' · ');
+        const absent = COMPANY.filter((id) => !s.at.includes(id));
+        const there = s.at.map((id) => rosterRow(id, `<span class="roster-said reply-accepted">${GLYPH.accepted} There</span>`, 'avatars-accepted'));
+        const away = absent.map((id) => rosterRow(id, `<span class="roster-said reply-declined">${GLYPH.declined} Absent</span>`, 'avatars-declined'));
+        return `<div class="game-panel-state">
+            <div><p class="eyebrow">Session ${s.no}</p>${heading(longDate(s.date))}</div>
+            ${panelJournal(s)}
+            <div class="panel-session">
+                <div class="panel-session-head">
+                    <span class="panel-session-time">${range.replace(' – ', '–')}</span>
+                    <span class="panel-status-tag chip-Played">Played</span>
+                </div>
+                <div class="panel-session-meta">${rest.join(' · ')} · ${s.at.length} of ${COMPANY.length} at the table</div>
+                <div class="roster">${there.concat(away).join('')}</div>
+            </div>
+            <button type="button" class="btn btn-close" data-act="show-company">Show the company</button>
+        </div>`;
+    }
+    const rows = COMPANY.map((id) => rosterRow(id, `<span class="roster-said game-detail">${COUNTS[id]} of ${PLAYED}</span>`));
+    return `<div class="game-panel-state">
+        <div><p class="eyebrow">Who rides</p>${heading('The company')}</div>
+        <div class="roster">${rows.join('')}</div>
+        <p class="game-seats">4 / 5 seats · sign-ups closed</p>
+    </div>`;
+}
+
+function viewGame() {
+    const written = OLDER_WRITTEN + sessions.filter((s) => entries[s.no]).length;
+    const member = canWrite(), dm = state.viewer === 'aldric';
+    const fillers = '<div class="game-cell game-cell--filler" aria-hidden="true"></div>'.repeat(7 - ahead.length);
+    return `
+    ${crumbs(['Games', '#game'], [GAME])}
+    <div class="game-sheet">
+        <div class="game-sheet-head">
+            <div class="game-title-block">
+                <div class="kicker">
+                    <span class="type-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M8 4h8l-2 3 2 3H8z"/><path d="M4 21 9 9M20 21 15 9"/></svg>Campaign · D&amp;D 5e</span>
+                    <span class="badge badge--ongoing">● Ongoing</span>
+                </div>
+                <h1 tabindex="-1">${GAME}</h1>
+                <p class="lede">The waystones along the Karrow road are going dark, one by one. A company of hired walkers is sent up the mountain to learn why.</p>
+            </div>
+            ${member ? '<div class="game-head-actions"><button type="button" class="link-btn" data-act="noop">Open calendar →</button></div>' : ''}
+        </div>
+        <div class="game-layout">
+            <div class="game-main">
+                <section class="game-tale">
+                    <h2>§ The tale</h2>
+                    <div class="md"><p>Every road in the north is marked by a waystone, and every waystone has burned without fuel for as long as anyone has kept records. This spring they began to fail, starting at the coast and moving inland.</p>
+                    <p>We play every other Thursday evening, roughly three hours. Expect travel, weather and a mountain that does not want you on it.</p></div>
+                </section>
+                <section class="game-chronicle">
+                    <div class="game-ledger-nav">
+                        <h2>§ The chronicle</h2>
+                        <span class="game-count">${PLAYED} sessions played · ${written} in the journal</span>
+                        <div class="calendar-legend"><span class="legend-item legend-confirmed">confirmed</span><span class="legend-item legend-suggested">suggested</span></div>
+                    </div>
+                    <div class="game-ledger-label">Ahead</div>
+                    <div class="game-ahead-grid">${ahead.map(aheadCell).join('')}${fillers}</div>
+                    <div class="calendar-reply-key">
+                        <span class="reply-accepted">${GLYPH.accepted} aye</span><span class="reply-tentative">? perhaps</span><span class="reply-declined">${GLYPH.declined} nay</span><span class="reply-awaiting">… awaiting</span>
+                    </div>
+                    <div class="game-played-nav">
+                        <div class="game-ledger-label">Played</div>
+                        ${dm ? '<button type="button" class="link-btn game-record" data-act="noop">+ Record a past session</button>' : ''}
+                    </div>
+                    <ol class="game-entries" reversed>${sessions.map(playedRow).join('')}</ol>
+                    <button class="link-btn more" type="button" data-act="noop">Show all ${PLAYED} sessions ↓</button>
+                </section>
+            </div>
+            <aside class="game-panel" aria-label="Session details">
+                <div class="game-panel-inner">
+                    <div class="game-panel-states" id="gamePanelStates" aria-live="polite">${panelHtml()}</div>
+                    <div class="game-foot">
+                        ${member ? '<button class="btn" type="button" data-act="noop">Calendar</button>' : '<button class="btn" type="button" data-act="noop">Follow</button>'}
+                        ${dm ? '<button class="btn" type="button" data-act="noop">Sign-ups</button><button class="btn" type="button" data-act="noop">Edit</button>' : ''}
+                        ${member && !dm ? '<button class="btn" type="button" data-act="noop">Leave</button>' : ''}
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>`;
+}
+
+function viewEntry(no) {
+    const revs = entries[no], s = session(no);
+    if (!revs) {
+        return `
+        ${crumbs(['Games', '#game'], [GAME, '#game'], [`Session ${no}`])}
+        <section class="title-block"><div>
+            <span class="eyebrow">Journal · Session ${no} · ${s.date}</span>
+            <h1 tabindex="-1">${titleHtml(no, '', true)}</h1>
+            <p class="byline">Nobody has written this entry yet.</p>
+        </div></section>`;
+    }
+    const cur = revs.at(-1);
+    const counts = {};
+    revs.forEach((r) => { counts[r.by] = (counts[r.by] || 0) + 1; });
+    const nums = Object.keys(entries).map(Number).sort((a, b) => a - b);
+    const idx = nums.indexOf(no);
+    const prev = nums[idx - 1], next = nums[idx + 1];
+    const navLink = (n, cls, arrowL, arrowR) => n
+        ? `<a class="${cls}" href="#entry-${n}">${arrowL}${n}${latest(n).name ? ': ' + esc(latest(n).name) : ''}${arrowR}</a>` : '';
+    const scribes = Object.keys(counts).sort((a, b) => (a === revs[0].by ? -1 : b === revs[0].by ? 1 : 0)).map((id) => {
+        const label = (id === revs[0].by ? 'Author · ' : '') + `${counts[id]} revision${counts[id] === 1 ? '' : 's'}`;
+        const you = isYou(id) ? ' <span class="you">(you)</span>' : '';
+        return `<li class="person${people[id].dm ? ' person--dm' : ''}${id === revs[0].by ? ' person--lead' : ''}">
+            ${avatar(id)}<span><span class="person-name">${people[id].dm ? '♛ ' : ''}${esc(nameOf(id))}${you}</span><span class="person-role">${label}</span></span>
+        </li>`;
+    }).join('');
+    return `
+    ${crumbs(['Games', '#game'], [GAME, '#game'], [`Session ${no}`])}
+    <section class="title-block">
+        <div>
+            <span class="eyebrow">Journal · Session ${no} · ${s.date}</span>
+            <h1 tabindex="-1">${titleHtml(no, cur.name, true)}</h1>
+            <p class="byline">${esc(bylineText(revs))}</p>
+        </div>
+        <div class="actions">
+            ${state.viewer === 'aldric' ? '<button type="button" class="btn btn--danger" data-act="delete-open">Delete</button>' : ''}
+            <a class="btn" href="#history-${no}">History · ${revs.length}</a>
+            ${canWrite() ? `<a class="btn btn--primary" href="#edit-${no}">Edit</a>` : ''}
+        </div>
+    </section>
+    <div class="split">
+        <article>
+            <div class="md">${renderMarkdown(cur.body)}</div>
+            <nav class="entry-nav" aria-label="Other entries">
+                ${navLink(prev, 'is-prev', '← ', '')}
+                ${navLink(next, 'is-next', '', ' →')}
+            </nav>
+        </article>
+        <aside class="split-side">
+            <div><p class="eyebrow">Who wrote it</p><h2 class="panel-heading" style="color:inherit;display:block"><span class="drop-cap">T</span>he scribes</h2></div>
+            <ul class="people">${scribes}</ul>
+            <p class="panel-foot">Last changed ${esc(shortDate(cur.at))} by ${esc(nameOf(cur.by))}.<br><a href="#history-${no}">See all ${revs.length} revision${revs.length === 1 ? '' : 's'} →</a></p>
+            <p class="panel-foot">At the table<span style="display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.375rem" aria-label="${s.at.map(nameOf).join(', ')}">${s.at.map((id) => avatar(id, true)).join('')}</span></p>
+        </aside>
+    </div>`;
+}
+
+function ensureDraft(no) {
+    if (state.edit && state.edit.no === no) return state.edit;
+    const cur = latest(no);
+    state.edit = { no, name: cur ? cur.name : '', body: cur ? cur.body : '', note: '', base: cur ? cur.n : 0, tab: 'write', merge: null, mergedFrom: null, error: '' };
+    return state.edit;
+}
+function viewEdit(no) {
+    const d = ensureDraft(no), s = session(no), isNew = !entries[no];
+    if (d.merge) return viewMerge(no);
+    return `
+    ${isNew
+        ? crumbs(['Games', '#game'], [GAME, '#game'], [`Write session ${no}`])
+        : crumbs(['Games', '#game'], [GAME, '#game'], [`Session ${no}`, '#entry-' + no], ['Edit'])}
+    <section class="title-block" style="grid-template-columns:minmax(0,1fr)">
+        <div>
+            <span class="eyebrow">Journal · Session ${no} · ${s.date}</span>
+            <h1 tabindex="-1">${isNew ? 'Write the entry' : 'Edit the entry'}</h1>
+            <p class="byline">${isNew ? 'You will be listed as the author. Other players and the DM can amend it afterwards.' : esc(bylineText(entries[no])) + ` · saving adds revision ${latest(no).n + 1}`}</p>
+        </div>
+    </section>
+    <form class="edit-form" id="editForm" novalidate>
+        <div class="field">
+            <label class="label" for="fName">Session name (optional)</label>
+            <div class="title-row">
+                <span class="title-fixed">${GAME} <span class="t-no">${no}</span>:</span>
+                <input type="text" id="fName" maxlength="80" placeholder="The Summit" value="${esc(d.name)}">
+            </div>
+            <p class="hint">The game title and number come from the session and can't be edited.</p>
+        </div>
+        <div class="field">
+            <div class="tabs" role="group" aria-label="Editor view">
+                <button type="button" class="tab" data-act="tab" data-tab="write" aria-pressed="${d.tab === 'write'}">Write</button>
+                <button type="button" class="tab" data-act="tab" data-tab="preview" aria-pressed="${d.tab === 'preview'}">Preview</button>
+            </div>
+            <div class="editor" id="editor" data-tab="${d.tab}">
+                <div class="pane pane--write">
+                    <label class="label" for="fBody">The entry</label>
+                    <textarea id="fBody" placeholder="What happened at the table?">${esc(d.body)}</textarea>
+                </div>
+                <div class="pane pane--preview">
+                    <span class="label">Preview</span>
+                    <div class="preview">
+                        <p class="preview-title" id="pvTitle">${titleHtml(no, d.name)}</p>
+                        <div class="md" id="pvBody">${renderMarkdown(d.body)}</div>
+                    </div>
+                </div>
+            </div>
+            <p class="hint" style="margin-top:.5rem">Formatting, same as the game description: **bold** · *italic* · # heading · - list · 1. list · &gt; quote · [link](https://…)</p>
+        </div>
+        <div class="field" style="max-width:40rem">
+            <label class="label" for="fNote">What changed (optional)</label>
+            <input type="text" id="fNote" maxlength="120" placeholder="${isNew ? 'First draft' : 'Fixed the name of the pass'}" value="${esc(d.note)}">
+        </div>
+        <div id="notice">${noticeHtml()}</div>
+        <div class="form-foot">
+            <button type="submit" class="btn btn--primary">${isNew ? 'Save entry' : 'Save changes'}</button>
+            <button type="button" class="btn" data-act="cancel-edit">Cancel</button>
+        </div>
+    </form>`;
+}
+function noticeHtml() {
+    const d = state.edit;
+    if (!d) return '';
+    if (d.error) return `<div class="notice" role="alert"><p>${esc(d.error)}</p></div>`;
+    return '';
+}
+
+function viewMerge(no) {
+    const d = state.edit, m = d.merge, s = session(no);
+    const who = nameOf(m.by), conflicts = conflictsOf(m);
+    const cards = conflicts.map((c, i) => conflictCard(c, i, conflicts.length, who, m)).join('');
+    return `
+    ${crumbs(['Games', '#game'], [GAME, '#game'], [`Session ${no}`, '#entry-' + no], ['Combine changes'])}
+    <section class="title-block" style="grid-template-columns:minmax(0,1fr)">
+        <div>
+            <span class="eyebrow">Journal · Session ${no} · ${s.date}</span>
+            <h1 tabindex="-1">Combine your changes</h1>
+            <p class="byline">${esc(who)} saved revision ${m.theirsN} while you were writing. Nothing has been lost: your text is safe here, and ${esc(who)}'s is in the history.</p>
+        </div>
+    </section>
+    <div class="merge-summary" id="mergeSummary" role="status">${mergeSummaryHtml()}</div>
+    <div class="conflicts">${cards}</div>
+    <section class="merge-result">
+        <h2>§ The merged entry</h2>
+        <div class="preview"><div id="mergePv">${mergePreviewHtml()}</div></div>
+    </section>
+    <div class="form-foot merge-foot">
+        <button type="button" class="btn btn--primary" id="mergeSave" data-act="merge-save"${conflicts.every(isResolved) ? '' : ' disabled'}>Save merged entry</button>
+        <button type="button" class="btn" data-act="merge-back">Back to my draft</button>
+    </div>`;
+}
+const isResolved = (c) => !!c.choice && (c.choice !== 'edit' || c.isName || toParas(c.text).length > 0);
+function mergeSummaryHtml() {
+    const m = state.edit.merge, list = conflictsOf(m);
+    const open = list.filter((c) => !isResolved(c)).length;
+    const auto = m.auto ? `<span class="merge-ok">✓ ${m.auto} other change${m.auto === 1 ? '' : 's'} combined automatically</span>` : '';
+    const todo = open
+        ? `<span class="merge-todo">✦ ${open} of ${list.length} conflict${list.length === 1 ? '' : 's'} still to decide</span>`
+        : `<span class="merge-ok">✓ All conflicts decided. Check the result and save.</span>`;
+    return auto + todo;
+}
+function conflictCard(c, i, total, who, m) {
+    const label = c.isName ? 'Session name' : 'Paragraph';
+    const parts = m.parts, at = parts.indexOf(c);
+    const trim = (t) => t.length > 110 ? t.slice(0, 110).trimEnd() + '…' : t;
+    const before = !c.isName && at > 0 && !parts[at - 1].conflict ? parts[at - 1].paras.at(-1) : '';
+    const after = !c.isName && at >= 0 && at < parts.length - 1 && !parts[at + 1].conflict ? parts[at + 1].paras[0] : '';
+    const version = (paras) => {
+        if (c.isName) return `<div class="version-name">${esc(paras || 'No name')}</div>`;
+        if (!paras.length) return '<p class="same">Removed this paragraph.</p>';
+        return `<div class="diff">${diffHtml(diffWords(c.base.join('\n\n'), paras.join('\n\n')).segs)}</div>`;
+    };
+    const pick = (value, text) => `<button type="button" class="btn" data-act="pick" data-id="${c.id}" data-pick="${value}" aria-pressed="${c.choice === value}">${c.choice === value ? '✓ ' : ''}${esc(text)}</button>`;
+    const picked = (value) => c.choice === value || c.choice === 'both' && (value === 'mine' || value === 'theirs') ? ' version--picked' : '';
+    const editor = c.choice !== 'edit' ? '' : c.isName
+        ? `<div class="field"><label class="label" for="c-${c.id}">Your wording</label><input type="text" id="c-${c.id}" data-conflict="${c.id}" maxlength="80" value="${esc(c.text)}"></div>`
+        : `<div class="field"><label class="label" for="c-${c.id}">Your wording</label><textarea id="c-${c.id}" class="conflict-text" data-conflict="${c.id}">${esc(c.text)}</textarea></div>`;
+    return `<article class="conflict${isResolved(c) ? ' conflict--done' : ''}" id="card-${c.id}" aria-labelledby="h-${c.id}">
+        <h3 class="conflict-head" id="h-${c.id}">${isResolved(c) ? '✓' : '✦'} Conflict ${i + 1} of ${total} · ${label}</h3>
+        ${before ? `<p class="context">${esc(trim(before))}</p>` : ''}
+        <div class="versions">
+            <div class="version${picked('mine')}"><span class="label">Yours</span>${version(c.mine)}</div>
+            <div class="version${picked('theirs')}"><span class="label">${esc(who)}'s</span>${version(c.theirs)}</div>
+        </div>
+        ${after ? `<p class="context">${esc(trim(after))}</p>` : ''}
+        <div class="picks" role="group" aria-label="Which version to keep">
+            ${pick('mine', 'Keep yours')}${pick('theirs', `Keep ${who}'s`)}${!c.isName && !c.base.length ? pick('both', 'Keep both') : ''}${pick('edit', c.isName ? 'Write it myself' : 'Combine by hand')}
+        </div>
+        ${editor}
+    </article>`;
+}
+function mergePreviewHtml() {
+    const d = state.edit, m = d.merge;
+    const nc = m.nameConflict;
+    const title = nc && !isResolved(nc)
+        ? `${GAME} <span class="t-no">${d.no}</span>: <span class="unresolved">name to be decided</span>`
+        : titleHtml(d.no, mergedName(m));
+    const list = conflictsOf(m);
+    const body = m.parts.map((p) => {
+        if (!p.conflict) return renderMarkdown(p.paras.join('\n\n'));
+        if (isResolved(p)) return renderMarkdown(resolvedParas(p).join('\n\n'));
+        return `<p class="unresolved">✦ Conflict ${list.indexOf(p) + 1} goes here once you decide</p>`;
+    }).join('');
+    return `<p class="preview-title">${title}</p><div class="md">${body}</div>`;
+}
+function refreshMergeStatus() {
+    const list = conflictsOf(state.edit.merge);
+    document.getElementById('mergeSummary').innerHTML = mergeSummaryHtml();
+    document.getElementById('mergePv').innerHTML = mergePreviewHtml();
+    document.getElementById('mergeSave').disabled = !list.every(isResolved);
+}
+
+function viewHistory(no) {
+    const revs = entries[no], cur = revs.at(-1);
+    if (!state.hist || state.hist.no !== no || !revs.some((r) => r.n === state.hist.sel)) {
+        state.hist = { no, sel: cur.n, mode: 'changes' };
+    }
+    const h = state.hist;
+    const list = [...revs].reverse().map((r) => {
+        const prev = revs.find((x) => x.n === r.n - 1);
+        const d = prev ? diffWords(prev.body, r.body) : null;
+        const delta = d
+            ? `<span class="rev-delta" aria-label="${d.added} words added, ${d.removed} removed"><span class="plus">+${d.added}</span> <span class="minus">−${d.removed}</span></span>`
+            : '<span class="rev-delta">New entry</span>';
+        return `<li class="rev-item"><button type="button" class="rev" data-act="select-rev" data-rev="${r.n}" aria-current="${r.n === h.sel}">
+            ${avatar(r.by)}
+            <span class="rev-head"><span class="rev-no">Revision ${r.n}</span>${r.n === cur.n ? '<span class="tag">✓ Current</span>' : ''}</span>
+            <span class="rev-meta">${esc(nameOf(r.by))}${isYou(r.by) ? ' (you)' : ''} · ${esc(r.at)}</span>
+            <span class="rev-note">${esc(revNote(r) || 'No note')} ${delta}</span>
+        </button></li>`;
+    }).join('');
+    return `
+    ${crumbs(['Games', '#game'], [GAME, '#game'], [`Session ${no}`, '#entry-' + no], ['History'])}
+    <section class="title-block" style="grid-template-columns:minmax(0,1fr)">
+        <div>
+            <span class="eyebrow">History · ${revs.length} revision${revs.length === 1 ? '' : 's'}</span>
+            <h1 tabindex="-1">${titleHtml(no, cur.name, true)}</h1>
+            <p class="byline">${esc(bylineText(revs))}</p>
+        </div>
+    </section>
+    <div class="history">
+        <ol class="revs" reversed aria-label="Revisions, newest first">${list}</ol>
+        <section class="detail" id="revDetail" aria-live="polite">${detailHtml(no)}</section>
+    </div>`;
+}
+function detailHtml(no) {
+    const revs = entries[no], h = state.hist, cur = revs.at(-1);
+    const r = revs.find((x) => x.n === h.sel);
+    const prev = revs.find((x) => x.n === r.n - 1);
+    let action;
+    if (r.n === cur.n) action = '<span class="legend">This is the current version.</span>';
+    else if (canWrite()) action = `<button type="button" class="btn btn--primary" data-act="restore-open">Restore this version</button>`;
+    else action = '<span class="legend">Only the DM and players can restore.</span>';
+
+    let bodyHtml;
+    if (h.mode === 'full') {
+        bodyHtml = `<p class="preview-title" style="margin:0">${titleHtml(no, r.name)}</p><div class="md">${renderMarkdown(r.body)}</div>`;
+    } else if (!prev) {
+        bodyHtml = `<p class="same">This is the first version of the entry, so there is nothing to compare it with.</p><div class="md">${renderMarkdown(r.body)}</div>`;
+    } else {
+        const d = diffWords(prev.body, r.body);
+        const nameChange = prev.name !== r.name
+            ? `<p class="name-change"><span class="label">Session name</span><br><del>${esc(prev.name || 'none')}</del> → <ins>${esc(r.name || 'none')}</ins></p>` : '';
+        const text = d.added || d.removed
+            ? `<div class="diff">${diffHtml(d.segs)}</div>`
+            : `<p class="same">The text did not change in this revision.</p>`;
+        bodyHtml = nameChange + text;
+    }
+    return `
+    <div class="detail-head">
+        <div>
+            <h2 class="detail-title" style="margin:0">§ Revision <span class="t-no">${r.n}</span></h2>
+            <p class="detail-sub">${esc(nameOf(r.by))} · ${esc(r.at)}${revNote(r) ? ' · ' + esc(revNote(r)) : ''}</p>
+        </div>
+        ${action}
+    </div>
+    <div class="toolbar">
+        <div role="group" aria-label="Show">
+            <button type="button" class="tab" data-act="hist-mode" data-mode="changes" aria-pressed="${h.mode === 'changes'}">Changes</button>
+            <button type="button" class="tab" data-act="hist-mode" data-mode="full" aria-pressed="${h.mode === 'full'}">Full text</button>
+        </div>
+        ${h.mode === 'changes' && prev ? `<span class="legend">Against revision ${prev.n}: <ins>added</ins> · <del>removed</del></span>` : ''}
+    </div>
+    ${bodyHtml}`;
+}
+
+/* ---------- Routing ---------- */
+function parseRoute() {
+    const m = location.hash.match(/^#(entry|edit|history)-(\d+)$/);
+    if (!m || !session(Number(m[2]))) return { view: 'game' };
+    return { view: m[1], no: Number(m[2]) };
+}
+function render(moveFocus) {
+    let r = parseRoute();
+    if (r.view === 'edit' && !canWrite()) r = { view: 'entry', no: r.no };
+    if (r.view === 'history' && !entries[r.no]) r = { view: 'entry', no: r.no };
+    state.route = r;
+    document.querySelector('.wrap').classList.toggle('wrap--game', r.view === 'game');
+    main.innerHTML =
+        r.view === 'entry' ? viewEntry(r.no) :
+        r.view === 'edit' ? viewEdit(r.no) :
+        r.view === 'history' ? viewHistory(r.no) : viewGame();
+    document.getElementById('whoami').textContent = state.viewer === 'visitor' ? 'Visitor' : nameOf(state.viewer);
+    document.querySelectorAll('[data-act="viewer"]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.viewer === state.viewer));
+    const canSim = r.view === 'edit' && !!entries[r.no], merging = !!state.edit?.merge;
+    document.getElementById('simOther').hidden = !canSim;
+    document.getElementById('simOther').textContent = merging ? 'Tobin saves again' : 'Tobin saves: other paragraph';
+    document.getElementById('simSame').hidden = !canSim || merging;
+    if (moveFocus) {
+        window.scrollTo(0, 0);
+        main.querySelector('h1')?.focus({ preventScroll: true });
+    }
+}
+function go(hash) {
+    if (location.hash === hash) render(true); else location.hash = hash;
+}
+window.addEventListener('hashchange', () => render(true));
+
+/* ---------- Saving ---------- */
+function saveEntry() {
+    const d = state.edit;
+    let name = d.name.trim(), body = d.body.trim();
+    d.error = '';
+    if (!body) {
+        d.error = 'Write some text before saving the entry.';
+        document.getElementById('notice').innerHTML = noticeHtml();
+        return;
+    }
+    const cur = latest(d.no);
+    if (cur && cur.n !== d.base) {
+        const base = entries[d.no].find((r) => r.n === d.base);
+        const merge = merge3(base.body, body, cur.body);
+        const nameResult = mergeName(base.name, name, cur.name);
+        const m = { ...merge, by: cur.by, theirsN: cur.n, name: nameResult.name || '', nameConflict: nameResult.conflict || null };
+        if (conflictsOf(m).length) {
+            d.merge = m;
+            render(true);
+            return;
+        }
+        body = mergedText(m);
+        name = m.name;
+        d.mergedFrom = { by: cur.by, n: cur.n };
+        d.base = cur.n;
+    }
+    if (cur && cur.name === name && toParas(cur.body).join('\n\n') === toParas(body).join('\n\n')) {
+        showMessage(d.mergedFrom ? `Your changes were already in ${nameOf(d.mergedFrom.by)}'s revision, so no revision was saved.` : 'Nothing changed, so no revision was saved.', 'info');
+        state.edit = null;
+        go('#entry-' + d.no);
+        return;
+    }
+    const n = cur ? cur.n + 1 : 1;
+    (entries[d.no] = entries[d.no] || []).push({
+        n, by: state.viewer, at: 'just now', note: d.note.trim() || (cur ? '' : 'First draft'), name, body, mergedFrom: d.mergedFrom,
+    });
+    const merged = d.mergedFrom;
+    state.edit = null;
+    showMessage(merged ? `Merged with ${nameOf(merged.by)}'s changes and saved as revision ${n}` : cur ? `Saved as revision ${n}` : 'Entry saved', 'success');
+    go('#entry-' + d.no);
+}
+
+/* ---------- Events ---------- */
+main.addEventListener('input', (ev) => {
+    const d = state.edit;
+    if (!d) return;
+    if (ev.target.id === 'fName') {
+        d.name = ev.target.value;
+        document.getElementById('pvTitle').innerHTML = titleHtml(d.no, d.name.trim());
+    } else if (ev.target.id === 'fBody') {
+        d.body = ev.target.value;
+        document.getElementById('pvBody').innerHTML = renderMarkdown(d.body);
+    } else if (ev.target.id === 'fNote') {
+        d.note = ev.target.value;
+    } else if (ev.target.dataset.conflict && d.merge) {
+        conflictsOf(d.merge).find((c) => c.id === ev.target.dataset.conflict).text = ev.target.value;
+        refreshMergeStatus();
+    }
+});
+main.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    saveEntry();
+});
+// Mock-up only: stages an edit by Tobin and a matching change in your draft.
+function simulate(kind) {
+    const d = state.edit, cur = latest(d.no);
+    const add = (paras, i, text) => { if (i >= 0 && i < paras.length) paras[i] += ' ' + text; };
+    const theirs = toParas(cur.body);
+    const lastI = theirs.length - 1;
+    if (d.merge) {
+        add(theirs, lastI, 'Bishop walked into camp at dawn.');
+        entries[d.no].push({ n: cur.n + 1, by: 'tobin', at: 'just now', note: 'One more detail', name: cur.name, body: theirs.join('\n\n') });
+        showMessage('Tobin saved again. Your choices will be merged with it when you save.', 'info');
+        return;
+    }
+    const mine = toParas(d.body);
+    let name = cur.name;
+    add(mine, 0, 'Sable said it was too early.');
+    if (kind === 'same') {
+        add(theirs, 0, 'Bishop bit Tobin before we reached the gate.');
+        const plain = theirs.findIndex((p, i) => i >= 2 && i < lastI && !/^([-*#>]|\d+\.)/.test(p));
+        add(theirs, plain, 'Hesk never told us why.');
+        if (lastI > 1) add(mine, lastI, 'Wren kept watch anyway.');
+        if (cur.name) {
+            name = 'The Cold Summit';
+            d.name = 'The Cracked Stone';
+        }
+    } else {
+        add(theirs, lastI, 'Bishop walked into camp at dawn.');
+    }
+    d.body = mine.join('\n\n');
+    entries[d.no].push({ n: cur.n + 1, by: 'tobin', at: 'just now', note: 'Added a detail', name, body: theirs.join('\n\n') });
+    render(false);
+    showMessage('Tobin saved, and your draft was edited too. Now press Save changes.', 'info');
+}
+document.addEventListener('click', (ev) => {
+    const el = ev.target.closest('[data-act]');
+    if (!el) return;
+    const act = el.dataset.act;
+    if (act === 'noop') {
+        showMessage('Not part of this mock-up.', 'info');
+    } else if (act === 'theme') {
+        const root = document.documentElement;
+        const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+        root.dataset.theme = dark ? 'light' : 'dark';
+    } else if (act === 'viewer') {
+        state.viewer = el.dataset.viewer;
+        render(false);
+    } else if (act === 'tab') {
+        state.edit.tab = el.dataset.tab;
+        document.getElementById('editor').dataset.tab = el.dataset.tab;
+        document.querySelectorAll('[data-act="tab"]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.tab === state.edit.tab));
+    } else if (act === 'cancel-edit') {
+        const no = state.edit.no;
+        state.edit = null;
+        go(entries[no] ? '#entry-' + no : '#game');
+    } else if (act === 'simulate') {
+        simulate(el.dataset.kind);
+    } else if (act === 'pick') {
+        const m = state.edit.merge, c = conflictsOf(m).find((x) => x.id === el.dataset.id);
+        c.choice = el.dataset.pick;
+        if (c.choice === 'edit' && !c.isName && !c.text) c.text = [...c.mine, ...c.theirs].join('\n\n');
+        render(false);
+        main.querySelector(`[data-id="${c.id}"][data-pick="${c.choice}"]`)?.focus({ preventScroll: true });
+    } else if (act === 'merge-back') {
+        // Keeps the draft and its starting revision, so saving merges again.
+        const d = state.edit;
+        d.merge = null;
+        render(true);
+    } else if (act === 'merge-save') {
+        const d = state.edit, m = d.merge;
+        d.body = mergedText(m);
+        d.name = mergedName(m);
+        d.mergedFrom = { by: m.by, n: m.theirsN };
+        d.base = m.theirsN;
+        d.merge = null;
+        saveEntry();
+    } else if (act === 'select-session' || act === 'show-company') {
+        const back = act === 'show-company' ? state.selected : el.dataset.no;
+        state.selected = act === 'show-company' ? null : el.dataset.no;
+        render(false);
+        main.querySelector(`[data-act="select-session"][data-no="${back}"]`)?.focus({ preventScroll: true });
+        if (act === 'select-session' && matchMedia('(max-width: 1024px)').matches) document.getElementById('gamePanelStates').scrollIntoView();
+    } else if (act === 'select-rev') {
+        state.hist.sel = Number(el.dataset.rev);
+        const no = state.hist.no;
+        render(false);
+        main.querySelector(`[data-rev="${state.hist.sel}"]`)?.focus({ preventScroll: true });
+        if (matchMedia('(max-width: 768px)').matches) document.getElementById('revDetail').scrollIntoView();
+    } else if (act === 'hist-mode') {
+        state.hist.mode = el.dataset.mode;
+        document.getElementById('revDetail').innerHTML = detailHtml(state.hist.no);
+        main.querySelector(`[data-mode="${state.hist.mode}"]`)?.focus();
+    } else if (act === 'restore-open') {
+        const h = state.hist, revs = entries[h.no], r = revs.find((x) => x.n === h.sel);
+        document.getElementById('dlgTitle').innerHTML = `Restore revision <span class="t-no">${r.n}</span>?`;
+        document.getElementById('dlgText').textContent =
+            `The entry goes back to ${nameOf(r.by)}'s version from ${shortDate(r.at)}. This saves as revision ${revs.at(-1).n + 1}. The current version stays in the history, so you can undo this.`;
+        document.getElementById('restoreDlg').showModal();
+    } else if (act === 'delete-open') {
+        const no = state.route.no, revs = entries[no];
+        document.getElementById('delTitle').innerHTML = `Delete the entry for session <span class="t-no">${no}</span>?`;
+        document.getElementById('delText').textContent =
+            `This deletes "${titleText(no, latest(no).name)}" and all ${revs.length} of its revisions, including text written by other people. It cannot be undone. The session itself stays, and someone can write a new entry for it.`;
+        document.getElementById('deleteDlg').showModal();
+    } else if (act === 'delete-cancel') {
+        document.getElementById('deleteDlg').close();
+    } else if (act === 'delete-confirm') {
+        const no = state.route.no;
+        delete entries[no];
+        state.hist = null;
+        if (state.edit && state.edit.no === no) state.edit = null;
+        document.getElementById('deleteDlg').close();
+        showMessage(`Entry for session ${no} deleted`, 'success');
+        go('#game');
+    } else if (act === 'restore-cancel') {
+        document.getElementById('restoreDlg').close();
+    } else if (act === 'restore-confirm') {
+        const h = state.hist, revs = entries[h.no], r = revs.find((x) => x.n === h.sel);
+        const n = revs.at(-1).n + 1;
+        revs.push({ n, by: state.viewer, at: 'just now', note: '', restoredFrom: r.n, name: r.name, body: r.body });
+        h.sel = n;
+        document.getElementById('restoreDlg').close();
+        render(false);
+        showMessage(`Restored revision ${r.n} as revision ${n}`, 'success');
+        main.querySelector(`[data-rev="${n}"]`)?.focus({ preventScroll: true });
+    }
+});
+
+render(false);
+</script>
