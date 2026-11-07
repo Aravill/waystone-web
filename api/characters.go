@@ -543,3 +543,13 @@ func HandleCampaignCharacter(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "character chosen"})
 }
+
+// acceptedNotificationData marks a signup_accepted notification so the inbox can add
+// "Choose your character" when the game's system is a known one.
+func acceptedNotificationData(campaign *models.Campaign) map[string]string {
+	byName, err := systemsByName()
+	if err != nil || campaignSystemID(byName, campaign) == "" {
+		return nil
+	}
+	return map[string]string{"characters": "1"}
+}

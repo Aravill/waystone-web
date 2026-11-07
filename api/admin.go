@@ -417,7 +417,7 @@ func adminAddPlayer(w http.ResponseWriter, r *http.Request, caller *models.User,
 	if updated == nil {
 		return
 	}
-	notify(caller.ID, []string{target.ID}, models.NotificationSignupAccepted, campaign, "", nil)
+	notify(caller.ID, []string{target.ID}, models.NotificationSignupAccepted, campaign, "", acceptedNotificationData(campaign))
 	if campaign.SignUpsOpen && !updated.SignUpsOpen {
 		notify("", []string{campaign.DM}, models.NotificationCampaignFull, campaign, "", map[string]string{
 			"player_count": strconv.Itoa(len(updated.Players)),
