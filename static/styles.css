@@ -4637,3 +4637,12 @@ select option {
 .picker-new {
     margin: 1rem 0;
 }
+
+.profile-character-meta {
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.profile-more {
+    margin: 0.75rem 0 0;
+}
