@@ -114,6 +114,7 @@ type campaignViewer struct {
 	unanswered     map[string]models.UnansweredSessions
 	sessions       map[string]campaignSessionSummary
 	systems        map[string]models.System
+	characters     map[string]models.CharacterAssignment // the viewer's active character per campaign
 }
 
 // loadCampaignViewer fetches the per-viewer data for campaigns. It returns an
@@ -144,6 +145,9 @@ func loadCampaignViewer(r *http.Request, campaigns []models.Campaign) (*campaign
 	}
 	if v.systems, err = systemsByName(); err != nil {
 		return nil, "failed to retrieve systems"
+	}
+	if v.characters, err = db.GetActiveAssignmentsByUser(v.userID); err != nil {
+		return nil, "failed to retrieve characters"
 	}
 
 	// Create a map for O(1) user lookup
@@ -193,6 +197,16 @@ func (v *campaignViewer) enrich(campaign models.Campaign) map[string]interface{}
 	if currentUserID != "" && campaign.DM == currentUserID {
 		pendingCount = v.pendingSignups[campaign.ID]
 	}
+	systemID := campaignSystemID(v.systems, &campaign)
+	mine, hasCharacter := v.characters[campaign.ID]
+	campaignObj["character_system_id"] = systemID
+	campaignObj["accepts_characters"] = systemID != ""
+	campaignObj["current_user_character"] = nil
+	if hasCharacter {
+		campaignObj["current_user_character"] = map[string]interface{}{"id": mine.CharacterID, "name": mine.CharacterName, "status": mine.CharacterStatus}
+	}
+	campaignObj["character_nudge"] = isPlayer && campaign.DM != currentUserID && systemID != "" && !hasCharacter &&
+		campaign.Status != models.Finished && campaign.Status != models.Cancelled
 	campaignObj["unanswered_sessions_count"] = unansweredCount
 	campaignObj["first_unanswered_session_date"] = firstUnanswered
 	campaignObj["pending_signups_count"] = pendingCount
@@ -273,6 +287,27 @@ func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string
 		return
 	}
 
+	assignments, err := db.GetCampaignAssignments(campaign.ID)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve characters")
+		return
+	}
+	// Who plays what now, and (for a player without one) the character from their last assignment here.
+	playerCharacters := map[string]interface{}{}
+	previous := ""
+	for _, a := range assignments { // oldest first, so the last ended one wins
+		if a.EndedAt == "" {
+			playerCharacters[a.UserID] = map[string]interface{}{"id": a.CharacterID, "name": a.CharacterName, "status": a.CharacterStatus}
+		} else if a.UserID == v.userID && a.CharacterName != "" {
+			previous = a.CharacterID
+		}
+	}
+	if _, has := playerCharacters[v.userID]; has {
+		previous = ""
+	}
+	obj["player_characters"] = playerCharacters
+	obj["previous_character_id"] = previous
+
 	list := make([]map[string]interface{}, 0, len(played))
 	for i := len(played) - 1; i >= 0; i-- {
 		s := played[i]
@@ -284,7 +319,7 @@ func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string
 			"duration":  s.Duration,
 			"timezone":  s.Timezone,
 			"manual":    s.Manual,
-			"attendees": playedAttendees(campaign, v.users, s, responses[s.ID]),
+			"attendees": playedAttendees(campaign, v.users, s, responses[s.ID], assignments),
 			"journal":   nil,
 		}
 		if j, ok := journals[s.ID]; ok {
@@ -322,7 +357,8 @@ func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string
 
 // playedAttendees lists who was at a played session. The DM runs every played session unless
 // a by-hand entry says they missed it.
-func playedAttendees(campaign *models.Campaign, users map[string]*models.User, s models.CampaignSession, responses []models.SessionResponse) []map[string]interface{} {
+// Players carry the character that was active on the session's date (assignments may be nil).
+func playedAttendees(campaign *models.Campaign, users map[string]*models.User, s models.CampaignSession, responses []models.SessionResponse, assignments []models.CharacterAssignment) []map[string]interface{} {
 	attendees := []map[string]interface{}{}
 	if dm, ok := users[campaign.DM]; ok && dm != nil && !s.DMAbsent {
 		attendees = append(attendees, userDisplayObject(dm))
@@ -332,13 +368,36 @@ func playedAttendees(campaign *models.Campaign, users map[string]*models.User, s
 			continue
 		}
 		if u, ok := users[resp.UserID]; ok && u != nil {
-			attendees = append(attendees, userDisplayObject(u))
+			obj := userDisplayObject(u)
+			if a := characterOnDate(assignments, resp.UserID, s.Date); a != nil {
+				obj["character"] = map[string]interface{}{"id": a.CharacterID, "name": a.CharacterName}
+			}
+			attendees = append(attendees, obj)
 		}
 	}
 	for _, name := range s.Guests {
 		attendees = append(attendees, guestDisplayObject(name))
 	}
 	return attendees
+}
+
+// characterOnDate is the user's assignment covering date d (YYYY-MM-DD): started on or before it and
+// not ended before it. The latest start wins (a same-day swap); nil when none covers it.
+func characterOnDate(assignments []models.CharacterAssignment, userID, d string) *models.CharacterAssignment {
+	var best *models.CharacterAssignment
+	for i := range assignments {
+		a := &assignments[i]
+		if a.UserID != userID || a.CharacterName == "" || len(a.StartedAt) < 10 || a.StartedAt[:10] > d {
+			continue
+		}
+		if a.EndedAt != "" && (len(a.EndedAt) < 10 || a.EndedAt[:10] < d) {
+			continue
+		}
+		if best == nil || a.StartedAt >= best.StartedAt {
+			best = a
+		}
+	}
+	return best
 }
 
 // guestDisplayObject is the attendee object for a named non-member: no id, no profile.

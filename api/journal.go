@@ -211,7 +211,7 @@ func handleGetJournal(w http.ResponseWriter, r *http.Request, campaignID, sessio
 			"duration":  session.Duration,
 			"timezone":  session.Timezone,
 			"manual":    session.Manual,
-			"attendees": playedAttendees(campaign, users, *session, responses),
+			"attendees": playedAttendees(campaign, users, *session, responses, nil),
 		},
 		"can_edit":   played && hasCampaignSessionAccess(campaign, userID),
 		"can_delete": manager,

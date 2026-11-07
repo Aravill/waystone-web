@@ -4568,3 +4568,72 @@ select option {
         gap: 0;
     }
 }
+
+/* Game page: characters in the company and the picker */
+.roster-character {
+    flex: 1 0 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+    padding-left: 2.375rem; /* under the name, past the avatar */
+    font-size: 0.875rem;
+}
+
+.roster-character-tbd {
+    color: var(--muted);
+}
+
+.picker-list {
+    margin: 0 0 1rem;
+    padding: 0;
+    border: 0;
+}
+
+.picker-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0.75rem 0.5rem;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+}
+
+.picker-option.is-selected {
+    background: var(--folio);
+    outline: 2px solid var(--rubric);
+    outline-offset: -2px;
+}
+
+.picker-option input[type="radio"] {
+    flex: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0.25rem 0 0;
+    padding: 0;
+    border: 0;
+    accent-color: var(--ink);
+}
+
+.picker-option-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.125rem 0.75rem;
+}
+
+.picker-option-name {
+    font-size: 1.0625rem;
+    font-weight: 500;
+}
+
+.picker-option-games {
+    flex: 1 0 100%;
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.picker-new {
+    margin: 1rem 0;
+}
