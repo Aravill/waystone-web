@@ -239,6 +239,28 @@ func seedIfEmpty() error {
 		}
 	}
 
+	// Characters and assignments point at seed users, so only add them when those users are seeded too.
+	if len(campaigns) == 0 && len(users) == 0 {
+		at := func(days int) string { return time.Now().AddDate(0, 0, days).UTC().Format(time.RFC3339) }
+		now := at(0)
+		for _, c := range config.InitialCharacters {
+			c.CreatedAt, c.UpdatedAt = now, now
+			if err := store.CreateCharacter(c); err != nil {
+				return fmt.Errorf("failed to seed character: %w", err)
+			}
+		}
+		for _, a := range config.InitialCharacterAssignments {
+			if _, err := store.AssignCharacter(a.CampaignID, a.UserID, a.CharacterID, at(a.StartDays)); err != nil {
+				return fmt.Errorf("failed to seed character assignment: %w", err)
+			}
+			if a.EndDays != 0 {
+				if _, err := store.EndCharacterAssignment(a.CampaignID, a.UserID, at(a.EndDays)); err != nil {
+					return fmt.Errorf("failed to end seeded character assignment: %w", err)
+				}
+			}
+		}
+	}
+
 	// Seed demo users if empty
 	if len(users) == 0 {
 		for _, user := range config.InitialUsers {
