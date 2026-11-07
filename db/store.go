@@ -82,6 +82,18 @@ type Store interface {
 	GetJournalRevisions(sessionID string) (entryID string, revs []models.JournalRevision, err error)
 	SaveJournalRevision(campaignID, sessionID, entryID string, baseRevision int, rev models.JournalRevision, keepRevisions int) (models.JournalSaveResult, error)
 	DeleteJournalEntry(sessionID string) error
+	CreateCharacter(c models.Character) error
+	GetCharacter(id string) (*models.Character, error)
+	GetCharactersByOwner(ownerID string) ([]models.Character, error)
+	UpdateCharacter(c models.Character) error
+	SetCharacterStatus(id string, status models.CharacterStatus) error
+	DeleteCharacter(id string) error
+	GetAssignmentsByCharacterIDs(ids []string) (map[string][]models.CharacterAssignment, error)
+	GetCampaignAssignments(campaignID string) ([]models.CharacterAssignment, error)
+	GetActiveAssignmentsByUser(userID string) (map[string]models.CharacterAssignment, error)
+	AssignCharacter(campaignID, userID, characterID, at string) (bool, error)
+	EndCharacterAssignment(campaignID, userID, at string) (*models.CharacterAssignment, error)
+	CountCharactersBySystem(systemID string) (int, error)
 	Backup(path string) error
 	Close() error
 }
