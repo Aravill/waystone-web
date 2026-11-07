@@ -316,16 +316,11 @@ func handleAdminSystemLogo(w http.ResponseWriter, r *http.Request, id string) {
 // systemInUse returns the 409 text when a game (by system name, case-insensitive) or a character
 // (by id) still uses the system, else "".
 func systemInUse(id string) (string, error) {
-	systems, err := db.GetAllSystems()
+	systems, err := systemsByID()
 	if err != nil {
 		return "", err
 	}
-	name := ""
-	for _, s := range systems {
-		if s.ID == id {
-			name = s.Name
-		}
-	}
+	name := systems[id].Name
 	if name == "" {
 		return "", nil // let DeleteSystem report not found
 	}

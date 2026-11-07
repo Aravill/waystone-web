@@ -1486,6 +1486,8 @@ var (
 	ErrJournalNotFound      = errors.New("journal entry not found")
 	ErrCharacterNotFound    = errors.New("character not found")
 	ErrCharacterAssigned    = errors.New("character has an active assignment")
+	ErrCharacterMismatch    = errors.New("character is not the user's or is in another system")
+	ErrNotPlayer            = errors.New("user is not a player of this game")
 )
 
 func (s *SQLiteStore) CreateCampaignSignup(signup models.CampaignSignup) error {
@@ -1709,12 +1711,15 @@ func (s *SQLiteStore) SetCampaignSignUpsOpen(campaignID string, open bool) error
 }
 
 // UpdateCampaignDetails updates a campaign's editable fields: text, type, system and desired player count.
-func (s *SQLiteStore) UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, system, desiredPlayerCount string) error {
+func (s *SQLiteStore) UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, system, desiredPlayerCount string, systemIDChanges bool) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	res, err := s.db.Exec(`UPDATE campaigns SET title = ?, summary = ?, description = ?, type = ?, system = ?, desired_player_count = ? WHERE id = ?`,
-		title, summary, description, campaignType, system, desiredPlayerCount, id)
+	// A resolved-system change is refused (ErrCharacterAssigned) while any player has an active
+	// character; the check and the write are one statement.
+	res, err := s.db.Exec(`UPDATE campaigns SET title = ?, summary = ?, description = ?, type = ?, system = ?, desired_player_count = ? WHERE id = ?
+		AND (? = 0 OR NOT EXISTS (SELECT 1 FROM character_assignments WHERE campaign_id = ? AND ended_at = ''))`,
+		title, summary, description, campaignType, system, desiredPlayerCount, id, systemIDChanges, id)
 	if err != nil {
 		return err
 	}
@@ -1723,7 +1728,14 @@ func (s *SQLiteStore) UpdateCampaignDetails(id, title, summary, description stri
 		return err
 	}
 	if n == 0 {
-		return ErrCampaignNotFound
+		var exists int
+		if err := s.db.QueryRow(`SELECT COUNT(*) FROM campaigns WHERE id = ?`, id).Scan(&exists); err != nil {
+			return err
+		}
+		if exists == 0 {
+			return ErrCampaignNotFound
+		}
+		return ErrCharacterAssigned
 	}
 	return nil
 }
@@ -2322,7 +2334,9 @@ func deleteJournalForSessions(tx *sql.Tx, sessionIDsQuery string, args ...interf
 
 const journalRevisionColumns = `number, author_id, name, body, note, restored_from, merged_with, created_at`
 
-type rowScanner interface{ Scan(dest ...interface{}) error }
+type rowScanner interface {
+	Scan(dest ...interface{}) error
+}
 
 func scanJournalRevision(row rowScanner) (models.JournalRevision, error) {
 	var r models.JournalRevision

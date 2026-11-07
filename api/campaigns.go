@@ -369,7 +369,7 @@ func playedAttendees(campaign *models.Campaign, users map[string]*models.User, s
 		}
 		if u, ok := users[resp.UserID]; ok && u != nil {
 			obj := userDisplayObject(u)
-			if a := characterOnDate(assignments, resp.UserID, s.Date); a != nil {
+			if a := characterOnDate(assignments, resp.UserID, s.Date, s.Timezone); a != nil {
 				obj["character"] = map[string]interface{}{"id": a.CharacterID, "name": a.CharacterName}
 			}
 			attendees = append(attendees, obj)
@@ -381,17 +381,37 @@ func playedAttendees(campaign *models.Campaign, users map[string]*models.User, s
 	return attendees
 }
 
-// characterOnDate is the user's assignment covering date d (YYYY-MM-DD): started on or before it and
-// not ended before it. The latest start wins (a same-day swap); nil when none covers it.
-func characterOnDate(assignments []models.CharacterAssignment, userID, d string) *models.CharacterAssignment {
+// characterOnDate is the user's assignment covering date d (YYYY-MM-DD) in the session's timezone
+// (UTC when unset or unknown): started on or before it and not ended before it. The latest start
+// wins (a same-day swap); nil when none covers it.
+func characterOnDate(assignments []models.CharacterAssignment, userID, d, timezone string) *models.CharacterAssignment {
+	loc := time.UTC
+	if timezone != "" {
+		if l, err := time.LoadLocation(timezone); err == nil {
+			loc = l
+		}
+	}
+	day := func(ts string) (string, bool) {
+		t, err := time.Parse(time.RFC3339, ts)
+		if err != nil {
+			return "", false
+		}
+		return t.In(loc).Format("2006-01-02"), true
+	}
 	var best *models.CharacterAssignment
 	for i := range assignments {
 		a := &assignments[i]
-		if a.UserID != userID || a.CharacterName == "" || len(a.StartedAt) < 10 || a.StartedAt[:10] > d {
+		if a.UserID != userID || a.CharacterName == "" {
 			continue
 		}
-		if a.EndedAt != "" && (len(a.EndedAt) < 10 || a.EndedAt[:10] < d) {
+		start, ok := day(a.StartedAt)
+		if !ok || start > d {
 			continue
+		}
+		if a.EndedAt != "" {
+			if end, ok := day(a.EndedAt); !ok || end < d {
+				continue
+			}
 		}
 		if best == nil || a.StartedAt >= best.StartedAt {
 			best = a
@@ -666,49 +686,29 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve systems")
 		return
 	}
-
-	if err := blockSystemChange(w, campaign, system); err != nil {
+	// Case-only changes resolve to the same id and pass.
+	byName, err := systemsByName()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve systems")
 		return
 	}
+	probe := *campaign
+	probe.System = system
+	idChanges := campaignSystemID(byName, campaign) != campaignSystemID(byName, &probe)
 
-	if err := db.UpdateCampaignDetails(campaignID, req.Title, req.Summary, req.Description, req.Type, system, playerCountString(req.DesiredPlayerCount)); err != nil {
+	if err := db.UpdateCampaignDetails(campaignID, req.Title, req.Summary, req.Description, req.Type, system, playerCountString(req.DesiredPlayerCount), idChanges); err != nil {
 		if errors.Is(err, db.ErrCampaignNotFound) {
 			writeJSONError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		if errors.Is(err, db.ErrCharacterAssigned) {
+			writeJSONError(w, http.StatusConflict, fmt.Sprintf("Players have characters in %s here. They must clear them before the system can change.", campaign.System))
 			return
 		}
 		writeJSONError(w, http.StatusInternalServerError, "failed to update game")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "game updated"})
-}
-
-// blockSystemChange writes a 409 (and returns an error) when the new system text would resolve to
-// a different system while players have active characters in the game. Case-only changes resolve
-// to the same id and pass.
-func blockSystemChange(w http.ResponseWriter, campaign *models.Campaign, newSystem string) error {
-	byName, err := systemsByName()
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve systems")
-		return err
-	}
-	probe := *campaign
-	probe.System = newSystem
-	if campaignSystemID(byName, campaign) == campaignSystemID(byName, &probe) {
-		return nil
-	}
-	assignments, err := db.GetCampaignAssignments(campaign.ID)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve characters")
-		return err
-	}
-	for _, a := range assignments {
-		if a.EndedAt == "" {
-			msg := fmt.Sprintf("Players have characters in %s here. They must clear them before the system can change.", campaign.System)
-			writeJSONError(w, http.StatusConflict, msg)
-			return errors.New(msg)
-		}
-	}
-	return nil
 }
 
 // handleDeleteCampaign is admin-only: DMs can edit their games but not delete

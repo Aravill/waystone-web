@@ -35,8 +35,8 @@ func GetActiveAssignmentsByUser(userID string) (map[string]models.CharacterAssig
 
 // AssignCharacter makes characterID the user's active character in the game (ending any other).
 // It reports whether anything changed.
-func AssignCharacter(campaignID, userID, characterID string) (bool, error) {
-	return GetStore().AssignCharacter(campaignID, userID, characterID, time.Now().UTC().Format(time.RFC3339))
+func AssignCharacter(campaignID, userID, characterID, systemID string) (bool, error) {
+	return GetStore().AssignCharacter(campaignID, userID, characterID, systemID, time.Now().UTC().Format(time.RFC3339))
 }
 
 // EndCharacterAssignment clears the user's active character in the game and returns it (nil if none).

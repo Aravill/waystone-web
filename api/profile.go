@@ -114,10 +114,11 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusInternalServerError, "failed to fetch systems")
 			return
 		}
+		sortCharacters(owned)
 		for _, c := range owned {
-			obj := map[string]interface{}{"id": c.ID, "name": c.Name, "status": c.Status, "system_name": "", "system_logo_url": ""}
+			obj := map[string]interface{}{"id": c.ID, "name": c.Name, "status": c.Status, "system": nil}
 			if sys, ok := systems[c.SystemID]; ok {
-				obj["system_name"], obj["system_logo_url"] = sys.Name, sys.LogoURL()
+				obj["system"] = systemToJSON(sys)
 			}
 			characters = append(characters, obj)
 		}

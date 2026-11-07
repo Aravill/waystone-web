@@ -143,12 +143,6 @@ func (v *characterViewer) characterJSON(c models.Character, assignments []models
 		"games":           v.characterGames(assignments),
 		"can_edit":        c.OwnerID == v.userID,
 		"can_set_status":  v.canSetStatus(c, assignments),
-		"has_active_game": false,
-	}
-	for _, a := range assignments {
-		if a.EndedAt == "" {
-			obj["has_active_game"] = true
-		}
 	}
 	if sys, ok := v.systems[c.SystemID]; ok {
 		obj["system"] = systemToJSON(sys)
@@ -160,6 +154,17 @@ func (v *characterViewer) characterJSON(c models.Character, assignments []models
 }
 
 var characterStatusOrder = map[models.CharacterStatus]int{models.CharacterAlive: 0, models.CharacterRetired: 1, models.CharacterDead: 2}
+
+// sortCharacters orders alive first, then retired, then dead, each by name.
+func sortCharacters(chars []models.Character) {
+	sort.SliceStable(chars, func(a, b int) bool {
+		sa, sb := characterStatusOrder[chars[a].Status], characterStatusOrder[chars[b].Status]
+		if sa != sb {
+			return sa < sb
+		}
+		return strings.ToLower(chars[a].Name) < strings.ToLower(chars[b].Name)
+	})
+}
 
 // HandleCharacters handles /api/characters (GET list, POST create).
 func HandleCharacters(w http.ResponseWriter, r *http.Request) {
@@ -193,13 +198,7 @@ func handleListCharacters(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve characters")
 		return
 	}
-	sort.SliceStable(chars, func(a, b int) bool {
-		sa, sb := characterStatusOrder[chars[a].Status], characterStatusOrder[chars[b].Status]
-		if sa != sb {
-			return sa < sb
-		}
-		return strings.ToLower(chars[a].Name) < strings.ToLower(chars[b].Name)
-	})
+	sortCharacters(chars)
 	ids := make([]string, 0, len(chars))
 	for _, c := range chars {
 		ids = append(ids, c.ID)
@@ -342,9 +341,7 @@ func handleUpdateCharacter(w http.ResponseWriter, r *http.Request, id string) {
 		writeJSONError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.Status == "" {
-		req.Status = c.Status
-	}
+	req.Status = c.Status // status changes go through /status so a concurrent change isn't overwritten
 	if msg := req.normalize(); msg != "" {
 		writeJSONError(w, http.StatusBadRequest, msg)
 		return
@@ -470,13 +467,7 @@ func HandleCampaignCharacter(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	isPlayer := false
-	for _, p := range campaign.Players {
-		if p == userID {
-			isPlayer = true
-		}
-	}
-	if !isPlayer || campaign.DM == userID {
+	if !isCampaignPlayer(campaign, userID) || campaign.DM == userID {
 		writeJSONError(w, http.StatusForbidden, "only players of this game can choose a character")
 		return
 	}
@@ -526,13 +517,16 @@ func HandleCampaignCharacter(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusConflict, "That character is in another system.")
 		return
 	}
-	changed, err := db.AssignCharacter(campaign.ID, userID, c.ID)
+	changed, err := db.AssignCharacter(campaign.ID, userID, c.ID, systemID)
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE") {
-			writeJSONError(w, http.StatusConflict, "you already have a character in this game")
-			return
+		switch {
+		case errors.Is(err, db.ErrCharacterMismatch):
+			writeJSONError(w, http.StatusConflict, "That character is in another system.")
+		case errors.Is(err, db.ErrNotPlayer):
+			writeJSONError(w, http.StatusForbidden, "only players of this game can choose a character")
+		default:
+			writeJSONError(w, http.StatusInternalServerError, "failed to choose character")
 		}
-		writeJSONError(w, http.StatusInternalServerError, "failed to choose character")
 		return
 	}
 	if changed {

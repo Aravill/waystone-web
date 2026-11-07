@@ -63,7 +63,7 @@ type Store interface {
 	SetCampaignSignupStatus(campaignID, userID string, status models.SignupStatus) error
 	WithdrawCampaignSignup(campaignID, userID string) (wasPlayer bool, err error)
 	SetCampaignSignUpsOpen(campaignID string, open bool) error
-	UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, system, desiredPlayerCount string) error
+	UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, system, desiredPlayerCount string, systemIDChanges bool) error
 	SetCampaignStatus(id string, status models.CampaignStatus) error
 	DeleteCampaign(id string) error
 	GetAllSystems() ([]models.System, error)
@@ -91,7 +91,7 @@ type Store interface {
 	GetAssignmentsByCharacterIDs(ids []string) (map[string][]models.CharacterAssignment, error)
 	GetCampaignAssignments(campaignID string) ([]models.CharacterAssignment, error)
 	GetActiveAssignmentsByUser(userID string) (map[string]models.CharacterAssignment, error)
-	AssignCharacter(campaignID, userID, characterID, at string) (bool, error)
+	AssignCharacter(campaignID, userID, characterID, systemID, at string) (bool, error)
 	EndCharacterAssignment(campaignID, userID, at string) (*models.CharacterAssignment, error)
 	CountCharactersBySystem(systemID string) (int, error)
 	Backup(path string) error
@@ -242,15 +242,17 @@ func seedIfEmpty() error {
 	// Characters and assignments point at seed users, so only add them when those users are seeded too.
 	if len(campaigns) == 0 && len(users) == 0 {
 		at := func(days int) string { return time.Now().AddDate(0, 0, days).UTC().Format(time.RFC3339) }
-		now := at(0)
+		created := at(-100)
+		systemOf := map[string]string{}
 		for _, c := range config.InitialCharacters {
-			c.CreatedAt, c.UpdatedAt = now, now
+			systemOf[c.ID] = c.SystemID
+			c.CreatedAt, c.UpdatedAt = created, created
 			if err := store.CreateCharacter(c); err != nil {
 				return fmt.Errorf("failed to seed character: %w", err)
 			}
 		}
 		for _, a := range config.InitialCharacterAssignments {
-			if _, err := store.AssignCharacter(a.CampaignID, a.UserID, a.CharacterID, at(a.StartDays)); err != nil {
+			if _, err := store.AssignCharacter(a.CampaignID, a.UserID, a.CharacterID, systemOf[a.CharacterID], at(a.StartDays)); err != nil {
 				return fmt.Errorf("failed to seed character assignment: %w", err)
 			}
 			if a.EndDays != 0 {

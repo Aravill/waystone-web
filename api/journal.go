@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -196,6 +197,12 @@ func handleGetJournal(w http.ResponseWriter, r *http.Request, campaignID, sessio
 		return
 	}
 
+	assignments, err := db.GetCampaignAssignments(campaign.ID)
+	if err != nil {
+		log.Printf("error fetching assignments: %v", err)
+		assignments = nil
+	}
+
 	var numberValue interface{} // null unless the session was played
 	if played {
 		numberValue = number
@@ -211,7 +218,7 @@ func handleGetJournal(w http.ResponseWriter, r *http.Request, campaignID, sessio
 			"duration":  session.Duration,
 			"timezone":  session.Timezone,
 			"manual":    session.Manual,
-			"attendees": playedAttendees(campaign, users, *session, responses, nil),
+			"attendees": playedAttendees(campaign, users, *session, responses, assignments),
 		},
 		"can_edit":   played && hasCampaignSessionAccess(campaign, userID),
 		"can_delete": manager,

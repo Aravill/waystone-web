@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"strings"
 	"time"
 	"waystone-web/models"
@@ -82,9 +83,9 @@ func (s *SQLiteStore) GetCharactersByOwner(ownerID string) ([]models.Character, 
 func (s *SQLiteStore) UpdateCharacter(c models.Character) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	res, err := s.db.Exec(`UPDATE characters SET system_id = ?, name = ?, description = ?, background = ?, status = ?, updated_at = ?
+	res, err := s.db.Exec(`UPDATE characters SET system_id = ?, name = ?, description = ?, background = ?, updated_at = ?
 		WHERE id = ? AND (system_id = ? OR NOT EXISTS (SELECT 1 FROM character_assignments WHERE character_id = ? AND ended_at = ''))`,
-		c.SystemID, c.Name, c.Description, c.Background, c.Status, c.UpdatedAt, c.ID, c.SystemID, c.ID)
+		c.SystemID, c.Name, c.Description, c.Background, c.UpdatedAt, c.ID, c.SystemID, c.ID)
 	if err != nil {
 		return err
 	}
@@ -224,7 +225,7 @@ func (s *SQLiteStore) GetActiveAssignmentsByUser(userID string) (map[string]mode
 
 // AssignCharacter makes characterID the user's active character in the game: any other active
 // assignment ends and a new one starts. It reports false when it was already the active one.
-func (s *SQLiteStore) AssignCharacter(campaignID, userID, characterID, at string) (bool, error) {
+func (s *SQLiteStore) AssignCharacter(campaignID, userID, characterID, systemID, at string) (bool, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	tx, err := s.db.Begin()
@@ -232,6 +233,31 @@ func (s *SQLiteStore) AssignCharacter(campaignID, userID, characterID, at string
 		return false, err
 	}
 	defer tx.Rollback()
+	var one int
+	if err := tx.QueryRow(`SELECT 1 FROM characters WHERE id = ? AND owner_id = ? AND system_id = ?`, characterID, userID, systemID).Scan(&one); err == sql.ErrNoRows {
+		return false, ErrCharacterMismatch
+	} else if err != nil {
+		return false, err
+	}
+	var playersJSON, dm string
+	if err := tx.QueryRow(`SELECT players, dm FROM campaigns WHERE id = ?`, campaignID).Scan(&playersJSON, &dm); err == sql.ErrNoRows {
+		return false, ErrCampaignNotFound
+	} else if err != nil {
+		return false, err
+	}
+	var players []string
+	if err := json.Unmarshal([]byte(playersJSON), &players); err != nil {
+		return false, err
+	}
+	isPlayer := false
+	for _, p := range players {
+		if p == userID {
+			isPlayer = true
+		}
+	}
+	if !isPlayer || dm == userID {
+		return false, ErrNotPlayer
+	}
 	var current string
 	err = tx.QueryRow(`SELECT character_id FROM character_assignments WHERE campaign_id = ? AND user_id = ? AND ended_at = ''`, campaignID, userID).Scan(&current)
 	if err != nil && err != sql.ErrNoRows {
