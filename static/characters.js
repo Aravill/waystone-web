@@ -69,9 +69,10 @@ function characterPageBase() {
         async loadSystems() {
             try {
                 const response = await fetch('/api/systems');
-                if (response.ok) this.systems = await response.json();
+                if (!response.ok) throw new Error('bad response');
+                this.systems = await response.json();
             } catch (error) {
-                this.showMessage('Could not load systems: ' + error.message, 'error');
+                this.showMessage('Could not load systems', 'error');
             }
         },
 
@@ -133,10 +134,10 @@ window.charactersPage = function () {
         },
 
         startCreate() {
-            this.form = emptyCharacterForm(this.systems[0]?.id || '');
+            this.form = emptyCharacterForm('');
             this.formError = '';
             this.creating = true;
-            this.$nextTick(() => document.getElementById('charName')?.focus());
+            this.$nextTick(() => document.getElementById('newName')?.focus());
         },
 
         async create() {
@@ -251,6 +252,11 @@ window.characterPage = function () {
             this.editing = true;
         },
 
+        cancelEdit() {
+            this.editing = false;
+            history.replaceState(null, '', location.pathname);
+        },
+
         async save() {
             this.formError = '';
             if (!this.form.name.trim()) {
@@ -268,6 +274,17 @@ window.characterPage = function () {
                 if (!response.ok) {
                     this.formError = data.error || 'Failed to save character';
                     return;
+                }
+                // Status goes through its own endpoint so an edit can't overwrite a concurrent change.
+                if (this.form.status !== this.character.status) {
+                    const sr = await fetch(`/api/characters/${encodeURIComponent(this.characterId)}/status`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: this.form.status })
+                    });
+                    if (!sr.ok) {
+                        this.showMessage((await sr.json()).error || 'Failed to change status', 'error');
+                    }
                 }
                 this.editing = false;
                 this.showMessage('Character saved', 'success');

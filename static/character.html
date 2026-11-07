@@ -6,7 +6,7 @@
     <title>Waystone - Character</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=7"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=70">
+    <link rel="stylesheet" href="/static/styles.css?v=71">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -51,7 +51,7 @@
                         <span x-html="statusHtml(character.status)"></span>
                     </div>
                     <h1 class="page-title" x-text="character.name"></h1>
-                    <p class="char-owner">Played by <span x-html="character.owner_user ? userAvatarHtml(character.owner_user) : ''"></span>
+                    <p class="char-owner">Played by <span x-html="character.owner_user ? userAvatarHtml(character.owner_user, false) : ''"></span>
                         <template x-if="character.owner_user"><a :href="character.owner_user.profile_url" x-text="ownerName"></a></template>
                     </p>
                     <div class="char-games" x-html="gameBadgesHtml(character.games)"></div>
@@ -94,7 +94,7 @@
 
                     <div class="game-form-btns">
                         <button type="submit" class="btn-create" :disabled="busy">Save</button>
-                        <button type="button" class="btn-cancel" :disabled="busy" @click="editing = false">Cancel</button>
+                        <button type="button" class="btn-cancel" :disabled="busy" @click="cancelEdit()">Cancel</button>
                     </div>
                 </form>
 
@@ -124,6 +124,6 @@
 
     <script src="/static/notifications.js?v=11"></script>
     <script src="/campaigns.js?v=57"></script>
-    <script src="/static/characters.js?v=1"></script>
+    <script src="/static/characters.js?v=2"></script>
 </body>
 </html>

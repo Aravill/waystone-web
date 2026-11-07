@@ -6,7 +6,7 @@
     <title>Waystone - Profile</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=7"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=70">
+    <link rel="stylesheet" href="/static/styles.css?v=71">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -153,7 +153,7 @@
                         <template x-for="c in characters" :key="c.id">
                             <a :href="'/characters/' + encodeURIComponent(c.id)" class="profile-campaign-row">
                                 <span class="profile-campaign-title" x-text="c.name"></span>
-                                <span class="profile-character-meta"><span x-text="c.system_name"></span> · <span x-text="characterStatus(c)"></span></span>
+                                <span class="profile-character-meta"><span x-text="c.system ? c.system.name : 'Unknown system'"></span> · <span x-html="statusHtml(c.status)"></span></span>
                             </a>
                         </template>
                     </div>
@@ -229,6 +229,8 @@
     </div>
 
     <script src="/static/notifications.js?v=11"></script>
-    <script src="profile.js?v=12"></script>
+    <script src="/campaigns.js?v=57"></script>
+    <script src="/static/characters.js?v=2"></script>
+    <script src="profile.js?v=13"></script>
 </body>
 </html>

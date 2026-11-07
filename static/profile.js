@@ -155,10 +155,7 @@ window.profilePage = function() {
             }
         },
         
-        // A glyph pairs with the word so the status never relies on colour.
-        characterStatus(c) {
-            return ({ alive: '● Alive', retired: '◐ Retired', dead: '✗ Dead' })[c.status] || c.status;
-        },
+        statusHtml: characterStatusHtml,
 
         get memberSince() {
             const ms = this.profile && this.profile.stats && this.profile.stats.member_since;
