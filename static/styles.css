@@ -4439,7 +4439,7 @@ select option {
 }
 
 .char-name {
-    font-family: 'IM Fell English SC', serif;
+    font-family: var(--font-display);
     font-size: 1.5rem;
     color: var(--ink);
 }
@@ -4598,6 +4598,11 @@ select option {
     padding: 0.75rem 0.5rem;
     border-bottom: 1px solid var(--line);
     cursor: pointer;
+}
+
+.picker-option:has(input:focus-visible) {
+    outline: 2px solid var(--rubric);
+    outline-offset: -2px;
 }
 
 .picker-option.is-selected {

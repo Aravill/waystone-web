@@ -6,7 +6,7 @@
     <title>Waystone - Game</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=7"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=70">
+    <link rel="stylesheet" href="/static/styles.css?v=71">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -422,7 +422,7 @@
 
     <!-- Character picker -->
     <div id="pickerModal" class="modal" :class="{ 'modal-open': picker.open }" @click.self="closePicker()" @keydown.escape.window="picker.open && closePicker()" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
-        <div class="modal-content picker-modal-content">
+        <div class="modal-content">
             <div class="modal-header">
                 <div>
                     <p class="modal-eyebrow" x-text="campaign ? campaign.title + (campaign.system ? ' · ' + campaign.system : '') : ''"></p>
@@ -432,9 +432,9 @@
             </div>
             <div class="modal-form">
                 <p x-show="picker.loading">Loading characters...</p>
-                <fieldset class="picker-list" x-show="!picker.loading && pickerCharacters.length > 0">
+                <fieldset class="picker-list" x-show="!picker.loading && picker.characters.length > 0">
                     <legend class="game-field-label">Choose one</legend>
-                    <template x-for="c in pickerCharacters" :key="c.id">
+                    <template x-for="c in picker.characters" :key="c.id">
                         <label class="picker-option" :class="{ 'is-selected': picker.selected === c.id }">
                             <input type="radio" name="pickCharacter" :value="c.id" x-model="picker.selected">
                             <span class="picker-option-body">
@@ -445,7 +445,7 @@
                         </label>
                     </template>
                 </fieldset>
-                <p class="panel-empty" x-show="!picker.loading && pickerCharacters.length === 0">Thou hast no characters in this system yet.</p>
+                <p class="panel-empty" x-show="!picker.loading && picker.characters.length === 0">Thou hast no characters in this system yet.</p>
 
                 <button type="button" class="text-link" x-show="!picker.loading && !picker.creating" @click="picker.creating = true">+ New character</button>
                 <div class="picker-new" x-show="picker.creating && !picker.loading">
@@ -469,7 +469,7 @@
 
     <script src="/static/notifications.js?v=11"></script>
     <script src="/campaigns.js?v=57"></script>
-    <script src="/static/characters.js?v=1"></script>
-    <script src="/static/game.js?v=10"></script>
+    <script src="/static/characters.js?v=2"></script>
+    <script src="/static/game.js?v=11"></script>
 </body>
 </html>

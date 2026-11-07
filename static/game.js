@@ -32,7 +32,7 @@ window.gamePage = function () {
         messageText: '',
         messageType: '',
         confirmDialog: { open: false, title: '', message: '', confirmLabel: '', resolve: null },
-        picker: { open: false, loading: false, busy: false, characters: [], selected: '', creating: false, form: { name: '', description: '' }, error: '' },
+        picker: { open: false, loading: false, busy: false, characters: [], selected: '', creating: false, form: { name: '' }, error: '' },
 
         async init() {
             try {
@@ -183,9 +183,6 @@ window.gamePage = function () {
         },
         get canPickCharacter() {
             return this.isPlayer && !this.isDM && this.acceptsCharacters;
-        },
-        get pickerCharacters() {
-            return this.picker.characters;
         },
         // Everyone who can be ticked in the record form: the DM, the players, and former players already on the session.
         get formPeople() {
@@ -546,7 +543,8 @@ window.gamePage = function () {
         // Character picker: the player's characters in the game's system, one chosen at a time.
         async openPicker() {
             if (!this.canPickCharacter) return;
-            this.picker = { open: true, loading: true, busy: false, characters: [], selected: '', creating: false, form: { name: '', description: '' }, error: '' };
+            this.pickerReturnFocus = document.activeElement;
+            this.picker = { open: true, loading: true, busy: false, characters: [], selected: '', creating: false, form: { name: '' }, error: '' };
             try {
                 const response = await fetch('/api/characters');
                 const data = await response.json();
@@ -565,6 +563,8 @@ window.gamePage = function () {
         },
         closePicker() {
             this.picker.open = false;
+            this.pickerReturnFocus?.focus?.();
+            this.pickerReturnFocus = null;
         },
         // The picked character's other active games, for the option's second line.
         otherGames(c) {
@@ -573,6 +573,7 @@ window.gamePage = function () {
         },
         characterStatusHtml,
         async createPickerCharacter() {
+            if (this.picker.busy) return;
             const name = this.picker.form.name.trim();
             if (!name) {
                 this.picker.error = 'Give your character a name.';
@@ -584,7 +585,7 @@ window.gamePage = function () {
                 const response = await fetch('/api/characters', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, system_id: this.campaign.character_system_id, description: this.picker.form.description })
+                    body: JSON.stringify({ name, system_id: this.campaign.character_system_id })
                 });
                 const data = await response.json();
                 if (!response.ok) {
@@ -592,7 +593,10 @@ window.gamePage = function () {
                     return;
                 }
                 // Pick the new one at once and save.
+                this.picker.characters.push({ id: data.character_id, name, status: 'alive', games: [] });
                 this.picker.selected = data.character_id;
+                this.picker.form.name = '';
+                this.picker.creating = false;
                 await this.confirmCharacter();
             } catch (error) {
                 this.picker.error = error.message;
