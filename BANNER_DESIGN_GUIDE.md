@@ -112,6 +112,7 @@ The 3-column track holds one clear action per banner. `Calendar` shows only to m
 |--------|---------|
 | Player owing a reply | **Reply** (rubric fill, spans 2 columns, links to `/games/{id}`), Calendar |
 | Player otherwise | Calendar. Leave moved to the game page |
+| Player with no character yet (known system, game not Finished or Cancelled, nothing owed) | **Choose character** (ink primary, spans 2 columns, links to `/games/{id}?character=1`), Calendar. The notice row reads "✦ Choose your character", but the banner is not `needs-action`: the outline stays quiet and Reply keeps the rubric fill |
 | DM | Sign-ups (primary only while there are pending sign-ups, with the count tab), Calendar, Edit |
 | Not a member, sign-ups open | **Sign up** (primary, spans 2), Follow |
 | Not a member, sign-ups closed | Follow only (no disabled button) |
