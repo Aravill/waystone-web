@@ -51,6 +51,27 @@ func systemsByName() (map[string]models.System, error) {
 	return m, nil
 }
 
+// systemsByID returns all known systems keyed by id.
+func systemsByID() (map[string]models.System, error) {
+	systems, err := db.GetAllSystems()
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]models.System, len(systems))
+	for _, s := range systems {
+		m[s.ID] = s
+	}
+	return m, nil
+}
+
+// campaignSystemID resolves a game's system text to a known system id ("" for blank or custom text).
+func campaignSystemID(byName map[string]models.System, c *models.Campaign) string {
+	if c.System == "" {
+		return ""
+	}
+	return byName[strings.ToLower(c.System)].ID
+}
+
 // canonicalSystemName returns the known system's spelling for a case-insensitive match, else name unchanged.
 func canonicalSystemName(name string) (string, error) {
 	if name == "" {

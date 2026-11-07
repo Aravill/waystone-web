@@ -45,6 +45,8 @@ func RegisterRoutes() {
 	// Protected API endpoints (wrapped with auth middleware)
 	http.Handle("/api/campaigns", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaigns)))
 	http.Handle("/api/campaigns/", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaignRoutes)))
+	http.Handle("/api/characters", middleware.AuthMiddleware(http.HandlerFunc(HandleCharacters)))
+	http.Handle("/api/characters/", middleware.AuthMiddleware(http.HandlerFunc(HandleCharacterRoutes)))
 	http.Handle("/api/version", middleware.AuthMiddleware(http.HandlerFunc(HandleVersion)))
 	http.Handle("/api/agenda", middleware.AuthMiddleware(http.HandlerFunc(HandleAgenda)))
 	http.Handle("/api/systems", middleware.AuthMiddleware(http.HandlerFunc(HandleSystems)))

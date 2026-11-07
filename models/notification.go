@@ -16,6 +16,7 @@ const (
 	NotificationSignupWithdrawn  NotificationType = "signup_withdrawn"
 	NotificationSignupsOpened    NotificationType = "signups_opened"
 	NotificationSessionStarted   NotificationType = "session_started"
+	NotificationCharacterStatus  NotificationType = "character_status"
 )
 
 type Notification struct {
