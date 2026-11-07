@@ -12,21 +12,22 @@ const test = base.test.extend({
     const testy = await apiAs('testy');
     const roy = await apiAs('roy');
     const admin = await apiAs(env.ADMIN_USERNAME);
-    const royId = (await (await roy.get('/auth/current-user')).json()).user_id;
-    const res = await testy.post('/api/campaigns', {
-      data: { title: `Characters E2E ${Date.now()}`, summary: 'A game for the characters test', description: 'Test game', type: 'Campaign', system: 'D&D 5e' },
-    });
-    expect(res.status(), 'create game').toBe(201);
-    const id = (await res.json()).campaign_id;
-    expect((await roy.post(`/api/campaigns/${id}/signups`)).status(), 'roy signs up').toBe(201);
-    expect((await testy.put(`/api/campaigns/${id}/signups/${royId}`, { data: { status: 'Accepted' } })).status(), 'accept roy').toBe(200);
-
-    const world = { id, characterIds: /** @type {string[]} */ ([]) };
-    await use(world);
-
-    await admin.delete(`/api/campaigns/${id}`);
-    for (const cid of world.characterIds) await roy.delete(`/api/characters/${cid}`);
-    await Promise.all([testy.dispose(), roy.dispose(), admin.dispose()]);
+    const world = { id: '', characterIds: /** @type {string[]} */ ([]) };
+    try {
+      const royId = (await (await roy.get('/auth/current-user')).json()).user_id;
+      const res = await testy.post('/api/campaigns', {
+        data: { title: `Characters E2E ${Date.now()}`, summary: 'A game for the characters test', description: 'Test game', type: 'Campaign', system: 'D&D 5e' },
+      });
+      expect(res.status(), 'create game').toBe(201);
+      world.id = (await res.json()).campaign_id;
+      expect((await roy.post(`/api/campaigns/${world.id}/signups`)).status(), 'roy signs up').toBe(201);
+      expect((await testy.put(`/api/campaigns/${world.id}/signups/${royId}`, { data: { status: 'Accepted' } })).status(), 'accept roy').toBe(200);
+      await use(world);
+    } finally {
+      if (world.id) expect((await admin.delete(`/api/campaigns/${world.id}`)).ok(), 'delete game').toBe(true);
+      for (const cid of world.characterIds) expect((await roy.delete(`/api/characters/${cid}`)).ok(), 'delete character').toBe(true);
+      await Promise.all([testy.dispose(), roy.dispose(), admin.dispose()]);
+    }
   },
 });
 

@@ -50,6 +50,7 @@ This document describes what must-have features are to be implemented before pre
     - [x] Game page - sheet with the full description (basic Markdown), the chronicle (upcoming sessions as calendar cells, played sessions with attendees) and a side panel for the selected session or the company (visible to all users; replies and rolls are for members)
     - [x] Reply to suggested sessions from the game page
     - [x] DMs record past sessions by hand (optional times, ticked attendees, named guests), edit and delete them
+    - [x] Characters - players keep a roster per system and assign one per game (history kept, shown in the chronicle); see `docs/design/characters.md`
 - [x] Profile
     - [x] Standard operations
         - [x] Changing nicknames
