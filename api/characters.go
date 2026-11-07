@@ -130,19 +130,19 @@ func (v *characterViewer) canSetStatus(c models.Character, assignments []models.
 
 func (v *characterViewer) characterJSON(c models.Character, assignments []models.CharacterAssignment) map[string]interface{} {
 	obj := map[string]interface{}{
-		"id":              c.ID,
-		"owner_id":        c.OwnerID,
-		"system_id":       c.SystemID,
-		"system":          nil,
-		"name":            c.Name,
-		"description":     c.Description,
-		"background":      c.Background,
-		"status":          c.Status,
-		"created_at":      c.CreatedAt,
-		"updated_at":      c.UpdatedAt,
-		"games":           v.characterGames(assignments),
-		"can_edit":        c.OwnerID == v.userID,
-		"can_set_status":  v.canSetStatus(c, assignments),
+		"id":             c.ID,
+		"owner_id":       c.OwnerID,
+		"system_id":      c.SystemID,
+		"system":         nil,
+		"name":           c.Name,
+		"description":    c.Description,
+		"background":     c.Background,
+		"status":         c.Status,
+		"created_at":     c.CreatedAt,
+		"updated_at":     c.UpdatedAt,
+		"games":          v.characterGames(assignments),
+		"can_edit":       c.OwnerID == v.userID,
+		"can_set_status": v.canSetStatus(c, assignments),
 	}
 	if sys, ok := v.systems[c.SystemID]; ok {
 		obj["system"] = systemToJSON(sys)
