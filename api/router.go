@@ -114,6 +114,17 @@ func RegisterRoutes() {
 		}
 		gamePage(w, r)
 	})))
+	charactersPage := ServePageWithFallback("characters.html")
+	characterPage := ServePageWithFallback("character.html")
+	http.Handle("/characters", middleware.AuthMiddleware(http.HandlerFunc(charactersPage)))
+	http.Handle("/characters/", middleware.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// /characters/ alone is the list; the detail page reads the id from the path
+		if strings.Trim(r.URL.Path, "/") == "characters" {
+			charactersPage(w, r)
+			return
+		}
+		characterPage(w, r)
+	})))
 	http.Handle("/games", http.RedirectHandler("/campaigns", http.StatusSeeOther))
 	http.Handle("/profile", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("profile.html"))))
 	http.Handle("/change-password", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("change-password.html"))))
