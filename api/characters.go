@@ -453,3 +453,93 @@ func handleCharacterStatus(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "message": "status updated", "character_status": req.Status})
 }
+
+// HandleCampaignCharacter handles /api/campaigns/{id}/character (PUT assign or swap, DELETE clear)
+// for the calling player. The DM never has a character.
+func HandleCampaignCharacter(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/campaigns/"), "/")
+	if len(parts) != 2 || parts[1] != "character" {
+		writeJSONError(w, http.StatusBadRequest, "invalid path")
+		return
+	}
+	if r.Method != http.MethodPut && r.Method != http.MethodDelete {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	campaign, userID, ok := loadCampaignAndUser(w, r, parts[0])
+	if !ok {
+		return
+	}
+	isPlayer := false
+	for _, p := range campaign.Players {
+		if p == userID {
+			isPlayer = true
+		}
+	}
+	if !isPlayer || campaign.DM == userID {
+		writeJSONError(w, http.StatusForbidden, "only players of this game can choose a character")
+		return
+	}
+	byName, err := systemsByName()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve systems")
+		return
+	}
+	systemID := campaignSystemID(byName, campaign)
+	if systemID == "" && r.Method == http.MethodPut {
+		writeJSONError(w, http.StatusConflict, "Characters need a known system. Ask an admin to add it.")
+		return
+	}
+
+	if r.Method == http.MethodDelete {
+		ended, err := db.EndCharacterAssignment(campaign.ID, userID)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "failed to clear character")
+			return
+		}
+		if ended != nil {
+			notify(userID, []string{campaign.DM}, models.NotificationCharacterCleared, campaign, "", map[string]string{
+				"character_id":   ended.CharacterID,
+				"character_name": ended.CharacterName,
+			})
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "character cleared"})
+		return
+	}
+
+	var req struct {
+		CharacterID string `json:"character_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.CharacterID == "" {
+		writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	c, ok := loadCharacter(w, req.CharacterID)
+	if !ok {
+		return
+	}
+	if c.OwnerID != userID {
+		writeJSONError(w, http.StatusForbidden, "you can only choose your own characters")
+		return
+	}
+	if c.SystemID != systemID {
+		writeJSONError(w, http.StatusConflict, "That character is in another system.")
+		return
+	}
+	changed, err := db.AssignCharacter(campaign.ID, userID, c.ID)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") {
+			writeJSONError(w, http.StatusConflict, "you already have a character in this game")
+			return
+		}
+		writeJSONError(w, http.StatusInternalServerError, "failed to choose character")
+		return
+	}
+	if changed {
+		notify(userID, []string{campaign.DM}, models.NotificationCharacterAssigned, campaign, "", map[string]string{
+			"character_id":   c.ID,
+			"character_name": c.Name,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "character chosen"})
+}

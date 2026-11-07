@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -256,6 +257,13 @@ func HandleAdminSystemActions(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "system renamed"})
 	case http.MethodDelete:
+		if msg, err := systemInUse(id); err != nil {
+			adminError(w, http.StatusInternalServerError, "failed to delete system")
+			return
+		} else if msg != "" {
+			adminError(w, http.StatusConflict, msg)
+			return
+		}
 		if err := db.DeleteSystem(id); err != nil {
 			systemWriteError(w, err, "failed to delete system")
 			return
@@ -303,6 +311,49 @@ func handleAdminSystemLogo(w http.ResponseWriter, r *http.Request, id string) {
 	default:
 		adminError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
+}
+
+// systemInUse returns the 409 text when a game (by system name, case-insensitive) or a character
+// (by id) still uses the system, else "".
+func systemInUse(id string) (string, error) {
+	systems, err := db.GetAllSystems()
+	if err != nil {
+		return "", err
+	}
+	name := ""
+	for _, s := range systems {
+		if s.ID == id {
+			name = s.Name
+		}
+	}
+	if name == "" {
+		return "", nil // let DeleteSystem report not found
+	}
+	campaigns, err := db.GetAllCampaigns()
+	if err != nil {
+		return "", err
+	}
+	games := 0
+	for _, c := range campaigns {
+		if strings.EqualFold(c.System, name) {
+			games++
+		}
+	}
+	chars, err := db.CountCharactersBySystem(id)
+	if err != nil {
+		return "", err
+	}
+	if games == 0 && chars == 0 {
+		return "", nil
+	}
+	return fmt.Sprintf("This system is in use by %s and %s. Migrating systems will come later.", plural(games, "game"), plural(chars, "character")), nil
+}
+
+func plural(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return fmt.Sprintf("%d %ss", n, noun)
 }
 
 func systemWriteError(w http.ResponseWriter, err error, fallback string) {

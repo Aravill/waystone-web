@@ -608,6 +608,10 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 		return
 	}
 
+	if err := blockSystemChange(w, campaign, system); err != nil {
+		return
+	}
+
 	if err := db.UpdateCampaignDetails(campaignID, req.Title, req.Summary, req.Description, req.Type, system, playerCountString(req.DesiredPlayerCount)); err != nil {
 		if errors.Is(err, db.ErrCampaignNotFound) {
 			writeJSONError(w, http.StatusNotFound, err.Error())
@@ -617,6 +621,35 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "game updated"})
+}
+
+// blockSystemChange writes a 409 (and returns an error) when the new system text would resolve to
+// a different system while players have active characters in the game. Case-only changes resolve
+// to the same id and pass.
+func blockSystemChange(w http.ResponseWriter, campaign *models.Campaign, newSystem string) error {
+	byName, err := systemsByName()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve systems")
+		return err
+	}
+	probe := *campaign
+	probe.System = newSystem
+	if campaignSystemID(byName, campaign) == campaignSystemID(byName, &probe) {
+		return nil
+	}
+	assignments, err := db.GetCampaignAssignments(campaign.ID)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve characters")
+		return err
+	}
+	for _, a := range assignments {
+		if a.EndedAt == "" {
+			msg := fmt.Sprintf("Players have characters in %s here. They must clear them before the system can change.", campaign.System)
+			writeJSONError(w, http.StatusConflict, msg)
+			return errors.New(msg)
+		}
+	}
+	return nil
 }
 
 // handleDeleteCampaign is admin-only: DMs can edit their games but not delete
