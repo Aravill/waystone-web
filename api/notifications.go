@@ -24,6 +24,7 @@ func campaignFollowerIDs(c *models.Campaign) []string {
 
 // notify stores one notification per recipient, skipping "", duplicates and the actor.
 // Errors are logged, never returned: notifications must not fail the main action.
+// campaign may be nil for notifications that belong to no game.
 func notify(actorID string, recipients []string, typ models.NotificationType, campaign *models.Campaign, sessionID string, data map[string]string) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	seen := map[string]bool{}
@@ -37,12 +38,15 @@ func notify(actorID string, recipients []string, typ models.NotificationType, ca
 		for k, v := range data {
 			d[k] = v
 		}
-		d["campaign_title"] = campaign.Title
+		campaignID := ""
+		if campaign != nil {
+			campaignID, d["campaign_title"] = campaign.ID, campaign.Title
+		}
 		batch = append(batch, models.Notification{
 			ID:         db.GenerateUUID(),
 			UserID:     id,
 			Type:       typ,
-			CampaignID: campaign.ID,
+			CampaignID: campaignID,
 			SessionID:  sessionID,
 			ActorID:    actorID,
 			Data:       d,

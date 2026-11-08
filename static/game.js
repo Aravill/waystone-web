@@ -1,5 +1,6 @@
 // Game detail page. Relies on campaigns.js (loaded first) for CAMPAIGN_TYPES, TYPE_ICON_PATHS,
-// campaignStatusClass, userAvatarHtml, escapeHtml, renderMarkdown and getDefaultTimezone.
+// campaignStatusClass, userAvatarHtml, escapeHtml, renderMarkdown and getDefaultTimezone, and on
+// characters.js for characterStatusHtml.
 
 // A blank record-session form. attendees holds ticked user ids; former holds ex-players kept on an edited session.
 function emptyForm() {
@@ -31,6 +32,7 @@ window.gamePage = function () {
         messageText: '',
         messageType: '',
         confirmDialog: { open: false, title: '', message: '', confirmLabel: '', resolve: null },
+        picker: { open: false, loading: false, busy: false, characters: [], selected: '', creating: false, form: { name: '' }, error: '' },
 
         async init() {
             try {
@@ -54,6 +56,10 @@ window.gamePage = function () {
             if (new URLSearchParams(location.search).get('updated') === '1') {
                 this.showMessage('Game updated', 'success');
                 history.replaceState(null, '', location.pathname);
+            }
+            if (new URLSearchParams(location.search).get('character') === '1') {
+                history.replaceState(null, '', location.pathname);
+                if (this.isPlayer && this.acceptsCharacters) this.openPicker();
             }
             const deleted = new URLSearchParams(location.search).get('entry_deleted');
             if (deleted !== null) {
@@ -159,10 +165,24 @@ window.gamePage = function () {
         get company() {
             const total = this.played.length;
             const attended = (id) => this.played.filter((s) => s.attendees.some((a) => a.id === id)).length;
-            const rows = (this.campaign?.dm_user ? [{ user: this.campaign.dm_user, dm: true, detail: 'Dungeon master' }] : []);
+            const rows = (this.campaign?.dm_user ? [{ user: this.campaign.dm_user, dm: true, detail: 'Dungeon master', character: null }] : []);
             return rows.concat((this.campaign?.player_users || []).map((u) => ({
-                user: u, dm: false, detail: total > 0 ? `${attended(u.id)} of ${total}` : ''
+                user: u, dm: false, detail: total > 0 ? `${attended(u.id)} of ${total}` : '',
+                character: this.campaign?.player_characters?.[u.id] || null
             })));
+        },
+        // Characters: only games with a known system take them, only players pick one, never the DM.
+        get acceptsCharacters() {
+            return !!this.campaign?.accepts_characters;
+        },
+        get myCharacter() {
+            return this.campaign?.current_user_character || null;
+        },
+        get characterNudge() {
+            return !!this.campaign?.character_nudge;
+        },
+        get canPickCharacter() {
+            return this.isPlayer && !this.isDM && this.acceptsCharacters;
         },
         // Everyone who can be ticked in the record form: the DM, the players, and former players already on the session.
         get formPeople() {
@@ -190,7 +210,12 @@ window.gamePage = function () {
         get pendingNotice() {
             if (this.unansweredCount > 0) return this.unansweredCount === 1 ? 'A session awaits thy reply' : `${this.unansweredCount} sessions await thy reply`;
             if (this.pendingCount > 0) return `${this.pendingCount} sign-up${this.pendingCount === 1 ? '' : 's'} to review`;
+            if (this.characterNudge) return 'Choose your character';
             return '';
+        },
+        // The character nudge is the notice itself (it has no other cause), so it carries the button.
+        get noticeIsCharacterNudge() {
+            return this.characterNudge && this.unansweredCount === 0 && this.pendingCount === 0;
         },
         get pendingCount() {
             return this.isDM ? (parseInt(this.campaign?.pending_signups_count, 10) || 0) : 0;
@@ -259,7 +284,7 @@ window.gamePage = function () {
         },
         // The DM is marked in the name too, not by colour alone.
         attendeeName(u) {
-            return (u.display_name || u.name || 'Unknown') + (u.id === this.campaign?.dm ? ' (DM)' : '');
+            return (u.display_name || u.name || 'Unknown') + (u.id === this.campaign?.dm ? ' (DM)' : '') + (u.character ? ` as ${u.character.name}` : '');
         },
         rosterName(u) {
             return u.display_name || u.name || 'Unknown';
@@ -337,7 +362,7 @@ window.gamePage = function () {
                 .sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
         },
         playedRoster(s) {
-            const there = s.attendees.map((u, i) => ({ key: u.id || 'guest-' + i, user: u, label: 'There', cls: 'participation-accepted', kind: 'accepted' }));
+            const there = s.attendees.map((u, i) => ({ key: u.id || 'guest-' + i, user: u, label: 'There', character: u.character || null, cls: 'participation-accepted', kind: 'accepted' }));
             const absent = this.playedAbsent(s).map((u) => ({ key: 'absent-' + u.id, user: u, label: 'Absent', cls: 'participation-declined', kind: 'declined' }));
             return there.concat(absent);
         },
@@ -512,6 +537,104 @@ window.gamePage = function () {
                 this.showMessage(`Error: ${error.message}`, 'error');
             } finally {
                 this.busy = false;
+            }
+        },
+
+        // Character picker: the player's characters in the game's system, one chosen at a time.
+        async openPicker() {
+            if (!this.canPickCharacter) return;
+            this.pickerReturnFocus = document.activeElement;
+            this.picker = { open: true, loading: true, busy: false, characters: [], selected: '', creating: false, form: { name: '' }, error: '' };
+            try {
+                const response = await fetch('/api/characters');
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Failed to load characters');
+                // The API lists alive characters first; any status can be picked.
+                this.picker.characters = data.characters.filter((c) => c.system_id === this.campaign.character_system_id);
+                const wanted = this.myCharacter?.id || this.campaign.previous_character_id || '';
+                this.picker.selected = this.picker.characters.some((c) => c.id === wanted) ? wanted : '';
+                this.picker.creating = this.picker.characters.length === 0;
+            } catch (error) {
+                this.picker.error = error.message;
+            } finally {
+                this.picker.loading = false;
+            }
+            this.$nextTick(() => document.querySelector('#pickerModal .modal-close')?.focus());
+        },
+        closePicker() {
+            this.picker.open = false;
+            this.pickerReturnFocus?.focus?.();
+            this.pickerReturnFocus = null;
+        },
+        // The picked character's other active games, for the option's second line.
+        otherGames(c) {
+            const names = (c.games || []).filter((g) => g.active && g.campaign_id !== this.campaign.id).map((g) => g.title);
+            return names.length ? 'Also in ' + names.join(', ') : '';
+        },
+        characterStatusHtml,
+        async createPickerCharacter() {
+            if (this.picker.busy) return;
+            const name = this.picker.form.name.trim();
+            if (!name) {
+                this.picker.error = 'Give your character a name.';
+                return;
+            }
+            this.picker.busy = true;
+            this.picker.error = '';
+            try {
+                const response = await fetch('/api/characters', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, system_id: this.campaign.character_system_id })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.picker.error = data.error || 'Failed to create character';
+                    return;
+                }
+                // Pick the new one at once and save.
+                this.picker.characters.push({ id: data.character_id, name, status: 'alive', games: [] });
+                this.picker.selected = data.character_id;
+                this.picker.form.name = '';
+                this.picker.creating = false;
+                await this.confirmCharacter();
+            } catch (error) {
+                this.picker.error = error.message;
+            } finally {
+                this.picker.busy = false;
+            }
+        },
+        async confirmCharacter() {
+            if (!this.picker.selected) {
+                this.picker.error = 'Choose a character, or clear your choice.';
+                return;
+            }
+            await this.sendCharacter('PUT', JSON.stringify({ character_id: this.picker.selected }), 'Character chosen');
+        },
+        async clearCharacter() {
+            await this.sendCharacter('DELETE', undefined, 'Character cleared');
+        },
+        async sendCharacter(method, body, success) {
+            this.picker.busy = true;
+            this.picker.error = '';
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.campaign.id)}/character`, {
+                    method,
+                    headers: body ? { 'Content-Type': 'application/json' } : {},
+                    body
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.picker.error = data.error || 'Failed to save your character';
+                    return;
+                }
+                this.closePicker();
+                this.showMessage(success, 'success');
+                await this.load();
+            } catch (error) {
+                this.picker.error = error.message;
+            } finally {
+                this.picker.busy = false;
             }
         },
 

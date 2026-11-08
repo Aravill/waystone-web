@@ -99,8 +99,12 @@
                         console.error('Failed to mark notification read:', error);
                     }
                 }
-                if (n.campaign_id && n.type === 'session_started') {
+                if (n.type === 'character_status' && (n.data || {}).character_id) {
+                    location.href = '/characters/' + encodeURIComponent(n.data.character_id);
+                } else if (n.campaign_id && (n.type === 'session_started' || n.type === 'character_assigned' || n.type === 'character_cleared')) {
                     location.href = '/games/' + encodeURIComponent(n.campaign_id);
+                } else if (n.campaign_id && n.type === 'signup_accepted' && (n.data || {}).characters) {
+                    location.href = '/games/' + encodeURIComponent(n.campaign_id) + '?character=1';
                 } else if (n.campaign_id) {
                     const anchor = 'campaign-' + n.campaign_id;
                     const target = location.pathname === '/campaigns' ? document.getElementById(anchor) : null;
@@ -143,7 +147,7 @@
                     case 'campaign_status':
                         return `"${title}" moved from ${d.from_status} to ${d.to_status}`;
                     case 'signup_accepted':
-                        return `Your sign-up for "${title}" was accepted`;
+                        return `Your sign-up for "${title}" was accepted` + (d.characters ? '. Choose your character' : '');
                     case 'signup_declined':
                         return `Your sign-up for "${title}" was declined`;
                     case 'player_kicked':
@@ -166,6 +170,12 @@
                         return `Sign-ups opened for "${title}"`;
                     case 'session_started':
                         return `A session of "${title}" has begun`;
+                    case 'character_assigned':
+                        return `${actor} now plays ${d.character_name} in "${title}"`;
+                    case 'character_cleared':
+                        return `${actor} removed their character ${d.character_name} from "${title}"`;
+                    case 'character_status':
+                        return `${actor} marked ${d.character_name} as ${d.to_status}`;
                     case 'session_confirmed':
                         return `${actor} confirmed the session for "${title}" on ${when}`;
                     default:

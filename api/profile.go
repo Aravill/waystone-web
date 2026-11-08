@@ -101,6 +101,29 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	characters := []map[string]interface{}{}
+	owned, err := db.GetCharactersByOwner(user.ID)
+	if err != nil {
+		log.Printf("error fetching characters: %v", err)
+		writeJSONError(w, http.StatusInternalServerError, "failed to fetch characters")
+		return
+	}
+	if len(owned) > 0 {
+		systems, err := systemsByID()
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "failed to fetch systems")
+			return
+		}
+		sortCharacters(owned)
+		for _, c := range owned {
+			obj := map[string]interface{}{"id": c.ID, "name": c.Name, "status": c.Status, "system": nil}
+			if sys, ok := systems[c.SystemID]; ok {
+				obj["system"] = systemToJSON(sys)
+			}
+			characters = append(characters, obj)
+		}
+	}
+
 	// Compute display_name
 	displayName := user.DisplayName()
 
@@ -165,7 +188,8 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 			"initials": initials,
 			"url":      avatarURL,
 		},
-		"is_self": isSelf,
+		"is_self":    isSelf,
+		"characters": characters,
 		"campaigns": map[string]interface{}{
 			"dm":      dmCampaigns,
 			"playing": playingCampaigns,

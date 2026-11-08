@@ -6,7 +6,7 @@
     <title>Waystone - Home</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=7"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=67">
+    <link rel="stylesheet" href="/static/styles.css?v=73">
     <link rel="stylesheet" href="dashboard.css?v=13">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
@@ -19,6 +19,7 @@
         <nav class="nav-bar" aria-label="Main">
             <a href="/" class="nav-item active" aria-current="page" data-page="dashboard">Home</a>
             <a href="/campaigns" class="nav-item" data-page="campaigns">Games</a>
+            <a href="/characters" class="nav-item" data-page="characters">Characters</a>
             <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
         </nav>
         <div class="header-right">
@@ -99,6 +100,21 @@
                     </div>
                 </section>
 
+                <section x-show="characterNudges.length > 0" aria-labelledby="characterHeading">
+                    <h2 id="characterHeading" class="section-header">Choose your character</h2>
+                    <div class="ledger" role="list">
+                        <template x-for="g in characterNudges" :key="g.id">
+                            <div class="ledger-row game-row-home" role="listitem">
+                                <div>
+                                    <a class="ledger-game" :href="'/games/' + encodeURIComponent(g.id)" x-text="g.title"></a>
+                                    <p class="ledger-meta" x-text="g.system"></p>
+                                </div>
+                                <a class="campaign-action-btn" :href="'/games/' + encodeURIComponent(g.id) + '?character=1'">Choose character</a>
+                            </div>
+                        </template>
+                    </div>
+                </section>
+
                 <section x-show="agenda.ahead.length > 0" aria-labelledby="aheadHeading">
                     <h2 id="aheadHeading" class="section-header">The road ahead</h2>
                     <div class="ledger" role="list">
@@ -117,7 +133,7 @@
                     </p>
                 </section>
 
-                <p class="home-status" x-show="!isNewcomer && agenda.awaiting.length === 0 && agenda.ahead.length === 0 && agenda.in_progress.length === 0">Nothing awaits thee, and no session is on the calendar.</p>
+                <p class="home-status" x-show="!isNewcomer && agenda.awaiting.length === 0 && agenda.ahead.length === 0 && agenda.in_progress.length === 0 && characterNudges.length === 0">Nothing awaits thee, and no session is on the calendar.</p>
             </div>
 
             <aside class="home-side">
@@ -161,8 +177,8 @@
 
     <div class="message" :class="messageType" x-show="messageVisible" role="status" x-text="messageText"></div>
 
-    <script src="/static/notifications.js?v=10"></script>
-    <script src="/campaigns.js?v=56"></script>
-    <script src="dashboard.js?v=4"></script>
+    <script src="/static/notifications.js?v=11"></script>
+    <script src="/campaigns.js?v=58"></script>
+    <script src="dashboard.js?v=5"></script>
 </body>
 </html>

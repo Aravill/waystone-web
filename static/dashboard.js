@@ -77,6 +77,11 @@ window.dashboardPage = function () {
             return a.games.length === 0 && a.in_progress.length === 0 && a.awaiting.length === 0 && a.ahead.length === 0;
         },
 
+        // Games where the viewer is an accepted player with no character yet (optional, so a nudge only).
+        get characterNudges() {
+            return this.agenda.games.filter((g) => g.character_nudge);
+        },
+
         // One line: what is on now, what awaits a reply, and the next game.
         get subtitle() {
             const a = this.agenda;
@@ -88,6 +93,10 @@ window.dashboardPage = function () {
             }
             if (a.awaiting.length > 0) {
                 parts.push(a.awaiting.length === 1 ? 'One session awaits thy reply.' : `${a.awaiting.length} sessions await thy reply.`);
+            }
+            const nudges = this.characterNudges.length;
+            if (nudges > 0) {
+                parts.push(nudges === 1 ? 'One game awaits thy character.' : `${nudges} games await thy character.`);
             }
             const next = a.ahead[0];
             if (next) {

@@ -6,7 +6,7 @@
     <title>Waystone - Profile</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=7"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=67">
+    <link rel="stylesheet" href="/static/styles.css?v=73">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -18,6 +18,7 @@
         <nav class="nav-bar" aria-label="Main">
             <a href="/" class="nav-item" data-page="dashboard">Home</a>
             <a href="/campaigns" class="nav-item" data-page="campaigns">Games</a>
+            <a href="/characters" class="nav-item" data-page="characters">Characters</a>
             <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
         </nav>
         <div class="header-right">
@@ -140,6 +141,26 @@
                 </div>
             </div>
 
+            <div class="profile-section" id="characters">
+                <h2 class="section-header">
+                    <button type="button" class="profile-toggle" @click="charactersOpen = !charactersOpen" :aria-expanded="charactersOpen" aria-controls="charactersPanel">
+                        Characters <span class="profile-toggle-caret" :class="{ 'is-open': charactersOpen }" aria-hidden="true">▸</span>
+                    </button>
+                </h2>
+                <div id="charactersPanel" x-show="charactersOpen" x-cloak>
+                    <div class="profile-campaigns">
+                        <p class="profile-empty" x-show="characters.length === 0">No characters yet.</p>
+                        <template x-for="c in characters" :key="c.id">
+                            <a :href="'/characters/' + encodeURIComponent(c.id)" class="profile-campaign-row">
+                                <span class="profile-campaign-title" x-text="c.name"></span>
+                                <span class="profile-character-meta"><span x-text="c.system ? c.system.name : 'Unknown system'"></span> · <span x-html="statusHtml(c.status)"></span></span>
+                            </a>
+                        </template>
+                    </div>
+                    <p class="profile-more" x-show="isSelf"><a class="text-link" href="/characters">Manage characters</a></p>
+                </div>
+            </div>
+
             <div class="profile-section" id="integrations" x-show="isSelf">
                 <h2 class="section-header">
                     <button type="button" class="profile-toggle" @click="integrationsOpen = !integrationsOpen" :aria-expanded="integrationsOpen" aria-controls="integrationsPanel">
@@ -207,7 +228,9 @@
         </div>
     </div>
 
-    <script src="/static/notifications.js?v=10"></script>
-    <script src="profile.js?v=11"></script>
+    <script src="/static/notifications.js?v=11"></script>
+    <script src="/campaigns.js?v=58"></script>
+    <script src="/static/characters.js?v=2"></script>
+    <script src="profile.js?v=13"></script>
 </body>
 </html>

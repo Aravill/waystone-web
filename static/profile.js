@@ -7,6 +7,7 @@ window.profilePage = function() {
         profile: null,
         dmCampaigns: [],
         playingCampaigns: [],
+        characters: [],
         isSelf: false,
         isEnvAdmin: false,
         needsProfileSetup: false,
@@ -17,6 +18,7 @@ window.profilePage = function() {
         avatarMenuOpen: false,
         accountOpen: false,
         gamesOpen: true,
+        charactersOpen: true,
         integrationsOpen: false,
         messageVisible: false,
         messageText: '',
@@ -145,6 +147,7 @@ window.profilePage = function() {
                 this.isSelf = profile.is_self || false;
                 this.dmCampaigns = Array.isArray(profile.campaigns?.dm) ? profile.campaigns.dm : [];
                 this.playingCampaigns = Array.isArray(profile.campaigns?.playing) ? profile.campaigns.playing : [];
+                this.characters = Array.isArray(profile.characters) ? profile.characters : [];
             } catch (error) {
                 this.showMessage('Error loading profile: ' + error.message, 'error');
             } finally {
@@ -152,6 +155,8 @@ window.profilePage = function() {
             }
         },
         
+        statusHtml: characterStatusHtml,
+
         get memberSince() {
             const ms = this.profile && this.profile.stats && this.profile.stats.member_since;
             if (!ms) return '\u2014';

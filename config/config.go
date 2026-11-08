@@ -29,6 +29,16 @@ const (
 	saltmarshID = "d81f5b2a-4c9e-4e37-8a05-2b7c6e1d9f07"
 	gooseID     = "73e6a0d4-1b8c-4f52-9d27-5a4c3b8e2f08"
 	thornsID    = "f4b29c85-6a1d-4b03-8e7f-3d9a5c2b1e09"
+
+	dnd5eID     = "3f1c5a52-6b0e-4f0b-9a57-1d2e8c7a0b11"
+	dnd2024ID   = "8a2d4e90-7c3b-4d1e-b6f4-5e9a1c0d2f22"
+	cyberpunkID = "c4b7e1d3-2a98-4f65-8e0c-9b3d6a1f7e33"
+
+	kaelID    = "a7e41c02-5b3d-4e68-9f10-2c8d6b1a3e51"
+	brannocID = "b8f52d13-6c4e-4f79-8a21-3d9e7c2b4f62"
+	iselleID  = "c9a63e24-7d5f-4a8a-9b32-4eaf8d3c5a73"
+	wrenID    = "dab74f35-8e60-4b9b-8c43-5fb09e4d6b84"
+	glitchID  = "ebc85046-9f71-4cac-9d54-60c1af5e7c95"
 )
 
 // InitialPasswords are preset passwords for the demo users, keyed by user ID.
@@ -43,9 +53,9 @@ var InitialPasswords = map[string]string{
 }
 
 var InitialSystems = []models.System{
-	{ID: "3f1c5a52-6b0e-4f0b-9a57-1d2e8c7a0b11", Name: "D&D 5e"},
-	{ID: "8a2d4e90-7c3b-4d1e-b6f4-5e9a1c0d2f22", Name: "D&D 2024"},
-	{ID: "c4b7e1d3-2a98-4f65-8e0c-9b3d6a1f7e33", Name: "Cyberpunk Red"},
+	{ID: dnd5eID, Name: "D&D 5e"},
+	{ID: dnd2024ID, Name: "D&D 2024"},
+	{ID: cyberpunkID, Name: "Cyberpunk Red"},
 }
 
 var InitialCampaigns = []models.Campaign{
@@ -122,6 +132,35 @@ var InitialCampaigns = []models.Campaign{
 var InitialSignups = []models.CampaignSignup{
 	{ID: "a1c3e5f7-2b4d-4f6a-8c0e-1d3f5a7c9e10", CampaignID: sojournID, UserID: miraID, Status: models.SignupPending},
 	{ID: "b2d4f6a8-3c5e-4a7b-9d1f-2e4a6b8d0f11", CampaignID: sojournID, UserID: corvinID, Status: models.SignupPending},
+}
+
+// InitialCharacters are demo characters in different statuses. CreatedAt and UpdatedAt are set when seeding.
+var InitialCharacters = []models.Character{
+	{ID: kaelID, OwnerID: royID, SystemID: dnd5eID, Name: "Kael Ashenford", Status: models.CharacterAlive,
+		Description: "A wiry **ranger** with a scarred cheek and a borrowed longbow.",
+		Background:  "Raised in the border villages of the Karrow, Kael guided caravans until the road went quiet.\n\n- Owes a debt to the toll-keeper\n- Never sleeps indoors"},
+	{ID: brannocID, OwnerID: adamID, SystemID: dnd5eID, Name: "Brannoc Stonehand", Status: models.CharacterDead,
+		Description: "A dwarven cleric of the forge-god.", Background: "Fell at the third waystone."},
+	{ID: iselleID, OwnerID: adamID, SystemID: dnd5eID, Name: "Iselle Vane", Status: models.CharacterAlive,
+		Description: "A *quiet* bard who joined the company after Brannoc's burial."},
+	{ID: wrenID, OwnerID: miraID, SystemID: dnd2024ID, Name: "Wren of the Tides", Status: models.CharacterAlive,
+		Description: "A half-elf smuggler with a lantern and no questions."},
+	{ID: glitchID, OwnerID: adamID, SystemID: cyberpunkID, Name: "Glitch", Status: models.CharacterRetired,
+		Description: "A netrunner who got out while she could."},
+}
+
+// SeedAssignment puts a seeded character in a game, StartDays days from now (negative = past).
+// EndDays != 0 ends it then; 0 leaves it active. Entries apply in order.
+type SeedAssignment struct {
+	CampaignID, UserID, CharacterID string
+	StartDays, EndDays              int
+}
+
+var InitialCharacterAssignments = []SeedAssignment{
+	{CampaignID: sojournID, UserID: royID, CharacterID: kaelID, StartDays: -95},
+	{CampaignID: sojournID, UserID: adamID, CharacterID: brannocID, StartDays: -95, EndDays: -42},
+	{CampaignID: sojournID, UserID: adamID, CharacterID: iselleID, StartDays: -42},
+	{CampaignID: saltmarshID, UserID: miraID, CharacterID: wrenID, StartDays: -30},
 }
 
 var InitialUsers = []models.User{

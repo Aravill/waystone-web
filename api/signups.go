@@ -337,7 +337,7 @@ func handleUpdateSignup(w http.ResponseWriter, r *http.Request, campaignID, targ
 		return
 	}
 	if req.Status == models.SignupAccepted && !wasPlayer {
-		notify(userID, []string{targetUserID}, models.NotificationSignupAccepted, campaign, "", nil)
+		notify(userID, []string{targetUserID}, models.NotificationSignupAccepted, campaign, "", acceptedNotificationData(campaign))
 	}
 	if req.Status == models.SignupDeclined {
 		notify(userID, []string{targetUserID}, models.NotificationSignupDeclined, campaign, "", nil)

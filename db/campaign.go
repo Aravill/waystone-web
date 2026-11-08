@@ -20,8 +20,8 @@ func GetNextCampaignID() string {
 	return GenerateUUID()
 }
 
-func UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, system, desiredPlayerCount string) error {
-	return GetStore().UpdateCampaignDetails(id, title, summary, description, campaignType, system, desiredPlayerCount)
+func UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, system, desiredPlayerCount string, systemIDChanges bool) error {
+	return GetStore().UpdateCampaignDetails(id, title, summary, description, campaignType, system, desiredPlayerCount, systemIDChanges)
 }
 
 func SetCampaignStatus(id string, status models.CampaignStatus) error {

@@ -6,7 +6,7 @@
     <title>Waystone - Game</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=7"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=67">
+    <link rel="stylesheet" href="/static/styles.css?v=73">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -18,6 +18,7 @@
         <nav class="nav-bar" aria-label="Main">
             <a href="/" class="nav-item" data-page="dashboard">Home</a>
             <a href="/campaigns" class="nav-item active" aria-current="page" data-page="campaigns">Games</a>
+            <a href="/characters" class="nav-item" data-page="characters">Characters</a>
             <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
         </nav>
         <div class="header-right">
@@ -63,7 +64,7 @@
                             </div>
                             <h1 class="page-title game-title" x-text="campaign.title"></h1>
                             <p class="game-lede" x-text="campaign.summary"></p>
-                            <p class="pending-notice" x-show="pendingNotice"><span aria-hidden="true">✦</span> <span x-text="pendingNotice"></span></p>
+                            <p class="pending-notice" x-show="pendingNotice"><span aria-hidden="true">✦</span> <span x-text="pendingNotice"></span> <button type="button" class="text-link" x-show="noticeIsCharacterNudge" @click="openPicker()">Choose →</button></p>
 
                             <!-- Phones: the reply you owe sits right under the lede, before the tale -->
                             <template x-if="replySession">
@@ -257,6 +258,7 @@
                                                                 <span class="game-you" x-show="r.user.id === currentUserId"> (you)</span>
                                                             </span>
                                                             <span class="roster-said" :class="`reply-${r.kind}`"><span x-html="replyGlyph(r.kind)"></span> <span x-text="r.label"></span></span>
+                                                            <template x-if="r.character"><span class="roster-character character-as"><span class="character-as-word"><span aria-hidden="true">❦ </span>as</span> <a class="character-as-name" :href="'/characters/' + encodeURIComponent(r.character.id)" x-text="r.character.name"></a></span></template>
                                                         </div>
                                                     </template>
                                                 </div>
@@ -288,10 +290,18 @@
                                                             <span class="game-you" x-show="r.user.id === currentUserId"> (you)</span>
                                                         </span>
                                                         <span class="roster-said game-detail" x-show="r.detail" x-text="r.detail"></span>
+                                                        <span class="roster-character" x-show="!r.dm && acceptsCharacters">
+                                                            <template x-if="r.character"><span class="character-as"><span class="character-as-word"><span aria-hidden="true">❦ </span>as</span> <a class="character-as-name" :href="'/characters/' + encodeURIComponent(r.character.id)" x-text="r.character.name"></a></span></template>
+                                                            <template x-if="!r.character"><span class="roster-character-tbd">character TBD</span></template>
+                                                            <template x-if="r.user.id === currentUserId && canPickCharacter">
+                                                                <button type="button" class="text-link" @click="openPicker()" x-text="r.character ? 'Change character' : 'Choose your character'"></button>
+                                                            </template>
+                                                        </span>
                                                     </div>
                                                 </template>
                                             </div>
                                             <p class="game-seats" x-text="seatsLabel"></p>
+                                            <p class="game-seats" x-show="isMember && !acceptsCharacters && campaign.status !== 'Finished' && campaign.status !== 'Cancelled'">Characters need a known system. Ask an admin to add it.</p>
                                         </div>
                                     </template>
                                 </div>
@@ -411,8 +421,56 @@
         </div>
     </div>
 
-    <script src="/static/notifications.js?v=10"></script>
-    <script src="/campaigns.js?v=56"></script>
-    <script src="/static/game.js?v=9"></script>
+    <!-- Character picker -->
+    <div id="pickerModal" class="modal" :class="{ 'modal-open': picker.open }" @click.self="closePicker()" @keydown.escape.window="picker.open && closePicker()" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <p class="modal-eyebrow" x-text="campaign ? campaign.title + (campaign.system ? ' · ' + campaign.system : '') : ''"></p>
+                    <h2 id="pickerTitle">Thy character</h2>
+                </div>
+                <button type="button" class="modal-close" @click="closePicker()" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-form">
+                <p x-show="picker.loading">Loading characters...</p>
+                <fieldset class="picker-list" x-show="!picker.loading && picker.characters.length > 0">
+                    <legend class="game-field-label">Choose one</legend>
+                    <template x-for="c in picker.characters" :key="c.id">
+                        <label class="picker-option" :class="{ 'is-selected': picker.selected === c.id }">
+                            <input type="radio" name="pickCharacter" :value="c.id" x-model="picker.selected">
+                            <span class="picker-option-body">
+                                <span class="picker-option-name" x-text="c.name"></span>
+                                <span x-html="characterStatusHtml(c.status)"></span>
+                                <span class="picker-option-games" x-show="otherGames(c)" x-text="otherGames(c)"></span>
+                            </span>
+                        </label>
+                    </template>
+                </fieldset>
+                <p class="panel-empty" x-show="!picker.loading && picker.characters.length === 0">Thou hast no characters in this system yet.</p>
+
+                <button type="button" class="text-link" x-show="!picker.loading && !picker.creating" @click="picker.creating = true">+ New character</button>
+                <div class="picker-new" x-show="picker.creating && !picker.loading">
+                    <div class="form-group">
+                        <label for="pickerName">New character</label>
+                        <input id="pickerName" type="text" maxlength="64" autocomplete="off" placeholder="Name" x-model="picker.form.name" @keydown.enter.prevent="createPickerCharacter()">
+                        <p class="form-hint" x-text="'Made in ' + (campaign ? campaign.system : '') + '. Add a description later from Characters.'"></p>
+                    </div>
+                    <button type="button" class="btn-action" :disabled="picker.busy" @click="createPickerCharacter()">Create and choose</button>
+                </div>
+
+                <p class="game-form-error" role="alert" x-show="picker.error" x-text="'✗ ' + picker.error"></p>
+                <div class="modal-actions">
+                    <button type="button" class="btn-create" :disabled="picker.busy || !picker.selected" @click="confirmCharacter()">Confirm</button>
+                    <button type="button" class="btn-cancel" @click="closePicker()">Cancel</button>
+                </div>
+                <p class="game-leave" x-show="myCharacter"><button type="button" class="text-link" :disabled="picker.busy" @click="clearCharacter()">Clear character (back to TBD)</button></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/notifications.js?v=11"></script>
+    <script src="/campaigns.js?v=58"></script>
+    <script src="/static/characters.js?v=2"></script>
+    <script src="/static/game.js?v=12"></script>
 </body>
 </html>

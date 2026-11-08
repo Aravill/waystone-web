@@ -737,6 +737,8 @@ window.campaignsPage = function () {
             const unansweredCount = isPlayer ? (parseInt(campaign?.unanswered_sessions_count, 10) || 0) : 0;
             const pendingSignupsCount = isDM ? (parseInt(campaign?.pending_signups_count, 10) || 0) : 0;
             const needsAction = unansweredCount > 0 || pendingSignupsCount > 0;
+            // Characters are optional: a nudge, never needs-action (the outline stays quiet).
+            const characterNudge = campaign?.character_nudge === true;
             const maxPlayers = parseInt(campaign?.desired_player_count, 10) || 0;
 
             // Facts: seats and sign-ups, then the next session.
@@ -774,7 +776,9 @@ window.campaignsPage = function () {
             } else if (isPlayer) {
                 buttonsHtml = (unansweredCount > 0
                     ? `<a class="campaign-action-btn campaign-reply-btn span-2" href="/games/${encodeURIComponent(campaign?.id ?? '')}">Reply</a>`
-                    : '') + calendarBtnHtml + editBtnHtml;
+                    : characterNudge
+                        ? `<a class="campaign-action-btn campaign-primary-btn campaign-character-btn" href="/games/${encodeURIComponent(campaign?.id ?? '')}?character=1">Choose<br>character</a>`
+                        : '') + calendarBtnHtml + editBtnHtml;
             } else if (signupStatus === 'Pending') {
                 buttonsHtml = `<button type="button" class="campaign-action-btn campaign-withdraw-btn" data-campaign-id="${id}" data-campaign-title="${escapeHtml(campaign?.title || '')}" data-withdraw-kind="withdraw" title="Withdraw your sign-up">Withdraw</button>${followBtnHtml}${editBtnHtml}`;
             } else if (signUpsOpen && signupStatus !== 'Declined' && signupStatus !== 'Kicked') {
@@ -820,6 +824,8 @@ window.campaignsPage = function () {
                 pendingNoticeHtml = `<p class="pending-notice"><span aria-hidden="true">✦</span> ${unansweredCount === 1 ? 'A session awaits thy reply' : `${unansweredCount} sessions await thy reply`}</p>`;
             } else if (pendingSignupsCount > 0) {
                 pendingNoticeHtml = `<p class="pending-notice"><span aria-hidden="true">✦</span> ${pendingSignupsCount} sign-up${pendingSignupsCount === 1 ? '' : 's'} to review</p>`;
+            } else if (characterNudge) {
+                pendingNoticeHtml = '<p class="pending-notice"><span aria-hidden="true">✦</span> Choose your character</p>';
             }
 
             return `
