@@ -777,7 +777,7 @@ window.campaignsPage = function () {
                 buttonsHtml = (unansweredCount > 0
                     ? `<a class="campaign-action-btn campaign-reply-btn span-2" href="/games/${encodeURIComponent(campaign?.id ?? '')}">Reply</a>`
                     : characterNudge
-                        ? `<a class="campaign-action-btn campaign-primary-btn span-2" href="/games/${encodeURIComponent(campaign?.id ?? '')}?character=1">Choose character</a>`
+                        ? `<a class="campaign-action-btn campaign-primary-btn campaign-character-btn" href="/games/${encodeURIComponent(campaign?.id ?? '')}?character=1">Choose<br>character</a>`
                         : '') + calendarBtnHtml + editBtnHtml;
             } else if (signupStatus === 'Pending') {
                 buttonsHtml = `<button type="button" class="campaign-action-btn campaign-withdraw-btn" data-campaign-id="${id}" data-campaign-title="${escapeHtml(campaign?.title || '')}" data-withdraw-kind="withdraw" title="Withdraw your sign-up">Withdraw</button>${followBtnHtml}${editBtnHtml}`;

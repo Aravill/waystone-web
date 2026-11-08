@@ -1365,6 +1365,12 @@ select option {
     opacity: 0.85;
 }
 
+/* "Choose / character" on two lines, so it keeps a single column like its neighbours */
+.campaign-row-bottom .campaign-character-btn {
+    text-align: center;
+    line-height: 1.15;
+}
+
 .campaign-action-count {
     position: absolute;
     top: -0.5rem;
