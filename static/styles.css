@@ -139,7 +139,6 @@
    body's clip (not hidden, so no scroll container and sticky still works) cuts the overflow
    itself. Pinch-zoom keeps working. */
 html { overflow-x: hidden; }
-body { overflow-x: clip; }
 
 body {
     font: 1rem/1.55 var(--font-text);
@@ -148,6 +147,7 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow-x: clip;
 }
 
 :focus-visible {
