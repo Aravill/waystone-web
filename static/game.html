@@ -6,7 +6,7 @@
     <title>Waystone - Game</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=7"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=71">
+    <link rel="stylesheet" href="/static/styles.css?v=72">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -258,6 +258,7 @@
                                                                 <span class="game-you" x-show="r.user.id === currentUserId"> (you)</span>
                                                             </span>
                                                             <span class="roster-said" :class="`reply-${r.kind}`"><span x-html="replyGlyph(r.kind)"></span> <span x-text="r.label"></span></span>
+                                                            <template x-if="r.character"><span class="roster-character character-as"><span class="character-as-word"><span aria-hidden="true">❦ </span>as</span> <a class="character-as-name" :href="'/characters/' + encodeURIComponent(r.character.id)" x-text="r.character.name"></a></span></template>
                                                         </div>
                                                     </template>
                                                 </div>
@@ -290,7 +291,7 @@
                                                         </span>
                                                         <span class="roster-said game-detail" x-show="r.detail" x-text="r.detail"></span>
                                                         <span class="roster-character" x-show="!r.dm && acceptsCharacters">
-                                                            <template x-if="r.character"><span>as <a :href="'/characters/' + encodeURIComponent(r.character.id)" x-text="r.character.name"></a></span></template>
+                                                            <template x-if="r.character"><span class="character-as"><span class="character-as-word"><span aria-hidden="true">❦ </span>as</span> <a class="character-as-name" :href="'/characters/' + encodeURIComponent(r.character.id)" x-text="r.character.name"></a></span></template>
                                                             <template x-if="!r.character"><span class="roster-character-tbd">character TBD</span></template>
                                                             <template x-if="r.user.id === currentUserId && canPickCharacter">
                                                                 <button type="button" class="text-link" @click="openPicker()" x-text="r.character ? 'Change character' : 'Choose your character'"></button>
@@ -470,6 +471,6 @@
     <script src="/static/notifications.js?v=11"></script>
     <script src="/campaigns.js?v=57"></script>
     <script src="/static/characters.js?v=2"></script>
-    <script src="/static/game.js?v=11"></script>
+    <script src="/static/game.js?v=12"></script>
 </body>
 </html>

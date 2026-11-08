@@ -4584,6 +4584,34 @@ select option {
     color: var(--muted);
 }
 
+/* "❧ as Kael Ashenford": the character's name in the display face, like a title in a chronicle */
+.character-as {
+    align-items: baseline;
+}
+
+.character-as-word {
+    color: var(--muted);
+    font-style: italic;
+}
+
+.character-as-word [aria-hidden] {
+    font-style: normal;
+}
+
+.character-as-name {
+    font-family: var(--font-display);
+    font-size: 1.1875rem;
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.character-as-name:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
 .picker-list {
     margin: 0 0 1rem;
     padding: 0;

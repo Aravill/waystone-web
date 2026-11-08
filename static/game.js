@@ -362,7 +362,7 @@ window.gamePage = function () {
                 .sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
         },
         playedRoster(s) {
-            const there = s.attendees.map((u, i) => ({ key: u.id || 'guest-' + i, user: u, label: u.character ? `There · as ${u.character.name}` : 'There', cls: 'participation-accepted', kind: 'accepted' }));
+            const there = s.attendees.map((u, i) => ({ key: u.id || 'guest-' + i, user: u, label: 'There', character: u.character || null, cls: 'participation-accepted', kind: 'accepted' }));
             const absent = this.playedAbsent(s).map((u) => ({ key: 'absent-' + u.id, user: u, label: 'Absent', cls: 'participation-declined', kind: 'declined' }));
             return there.concat(absent);
         },
