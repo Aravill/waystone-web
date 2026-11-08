@@ -1372,6 +1372,12 @@ select option {
     opacity: 0.85;
 }
 
+/* "Choose / character" on two lines, so it keeps a single column like its neighbours */
+.campaign-row-bottom .campaign-character-btn {
+    text-align: center;
+    line-height: 1.15;
+}
+
 .campaign-action-count {
     position: absolute;
     top: -0.5rem;
@@ -4398,4 +4404,291 @@ select option {
 /* The banners' padded cloth frames reach past a phone's edge; never let them scroll the page sideways */
 @media (max-width: 768px) {
     .campaigns-section { overflow-x: clip; overflow-clip-margin: 1rem; }
+}
+
+/* Characters: list, detail page and the game page's picker */
+.char-toolbar {
+    margin: 1.5rem 0;
+}
+
+.char-new-btn {
+    width: auto;
+}
+
+.char-form {
+    max-width: 40rem;
+    margin: 0 0 2rem;
+    padding: 0 0 1.5rem;
+    border-bottom: 1px solid var(--ink);
+}
+
+.char-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.char-list {
+    list-style: none;
+    margin: 1rem 0 2rem;
+    padding: 0;
+    border-top: 1px solid var(--ink);
+}
+
+.char-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) auto;
+    align-items: center;
+    gap: 0.5rem 1.5rem;
+    padding: 0.875rem 0.125rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.char-row-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.875rem;
+}
+
+.char-name {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    color: var(--ink);
+}
+
+.char-system {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--muted);
+    font-size: 0.90625rem;
+    font-style: italic;
+}
+
+.char-system-logo {
+    display: block;
+    height: 1.25rem;
+    max-width: 4rem;
+    object-fit: contain;
+}
+
+.char-status {
+    padding: 0 0.5rem;
+    border: 1px solid var(--verdigris);
+    color: var(--verdigris);
+    font-size: 0.84375rem;
+}
+
+.char-status--retired {
+    border-style: dashed;
+    border-color: var(--muted);
+    color: var(--muted);
+}
+
+.char-status--dead {
+    border-color: var(--muted);
+    color: var(--muted);
+    text-decoration: line-through;
+}
+
+.char-games {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 0.5rem;
+}
+
+.char-game {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.375rem;
+    padding: 0 0.5rem;
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    font-size: 0.84375rem;
+    text-decoration: none;
+}
+
+.char-game:hover {
+    background: var(--folio);
+}
+
+.char-game.is-ended {
+    border-style: dashed;
+    border-color: var(--muted);
+    color: var(--muted);
+}
+
+.char-game-state {
+    color: var(--muted);
+}
+
+.char-no-games {
+    color: var(--muted);
+    font-size: 0.90625rem;
+}
+
+.char-row-actions,
+.char-head-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.char-head {
+    display: grid;
+    gap: 0.75rem;
+    margin: 1.25rem 0 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--ink);
+}
+
+.char-head .page-title {
+    margin: 0;
+}
+
+.char-kicker {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.char-owner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    color: var(--muted);
+}
+
+.char-status-edit {
+    max-width: 14rem;
+    margin-bottom: 1.5rem;
+}
+
+.char-section {
+    max-width: 44rem;
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+    .char-row {
+        grid-template-columns: 1fr;
+    }
+
+    .char-form-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+}
+
+/* Game page: characters in the company and the picker */
+.roster-character {
+    flex: 1 0 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+    padding-left: 2.375rem; /* under the name, past the avatar */
+    font-size: 0.875rem;
+}
+
+.roster-character-tbd {
+    color: var(--muted);
+}
+
+/* "❧ as Kael Ashenford": the character's name in the display face, like a title in a chronicle */
+.character-as {
+    align-items: baseline;
+}
+
+.character-as-word {
+    color: var(--muted);
+    font-style: italic;
+}
+
+.character-as-word [aria-hidden] {
+    font-style: normal;
+}
+
+.character-as-name {
+    font-family: var(--font-display);
+    font-size: 1.1875rem;
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.character-as-name:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+.picker-list {
+    margin: 0 0 1rem;
+    padding: 0;
+    border: 0;
+}
+
+.picker-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0.75rem 0.5rem;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+}
+
+.picker-option:has(input:focus-visible) {
+    outline: 2px solid var(--rubric);
+    outline-offset: -2px;
+}
+
+.picker-option.is-selected {
+    background: var(--folio);
+    outline: 2px solid var(--rubric);
+    outline-offset: -2px;
+}
+
+.picker-option input[type="radio"] {
+    flex: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0.25rem 0 0;
+    padding: 0;
+    border: 0;
+    accent-color: var(--ink);
+}
+
+.picker-option-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.125rem 0.75rem;
+}
+
+.picker-option-name {
+    font-size: 1.0625rem;
+    font-weight: 500;
+}
+
+.picker-option-games {
+    flex: 1 0 100%;
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.picker-new {
+    margin: 1rem 0;
+}
+
+.profile-character-meta {
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.profile-more {
+    margin: 0.75rem 0 0;
 }

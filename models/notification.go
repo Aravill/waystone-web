@@ -3,19 +3,22 @@ package models
 type NotificationType string
 
 const (
-	NotificationCampaignStatus   NotificationType = "campaign_status"
-	NotificationSignupAccepted   NotificationType = "signup_accepted"
-	NotificationSignupDeclined   NotificationType = "signup_declined"
-	NotificationPlayerKicked     NotificationType = "player_kicked"
-	NotificationSessionSuggested NotificationType = "session_suggested"
-	NotificationSessionConfirmed NotificationType = "session_confirmed"
-	NotificationSessionCancelled NotificationType = "session_cancelled"
-	NotificationSignupCreated    NotificationType = "signup_created"
-	NotificationCampaignFull     NotificationType = "campaign_full"
-	NotificationPlayerLeft       NotificationType = "player_left"
-	NotificationSignupWithdrawn  NotificationType = "signup_withdrawn"
-	NotificationSignupsOpened    NotificationType = "signups_opened"
-	NotificationSessionStarted   NotificationType = "session_started"
+	NotificationCampaignStatus    NotificationType = "campaign_status"
+	NotificationSignupAccepted    NotificationType = "signup_accepted"
+	NotificationSignupDeclined    NotificationType = "signup_declined"
+	NotificationPlayerKicked      NotificationType = "player_kicked"
+	NotificationSessionSuggested  NotificationType = "session_suggested"
+	NotificationSessionConfirmed  NotificationType = "session_confirmed"
+	NotificationSessionCancelled  NotificationType = "session_cancelled"
+	NotificationSignupCreated     NotificationType = "signup_created"
+	NotificationCampaignFull      NotificationType = "campaign_full"
+	NotificationPlayerLeft        NotificationType = "player_left"
+	NotificationSignupWithdrawn   NotificationType = "signup_withdrawn"
+	NotificationSignupsOpened     NotificationType = "signups_opened"
+	NotificationSessionStarted    NotificationType = "session_started"
+	NotificationCharacterStatus   NotificationType = "character_status"
+	NotificationCharacterAssigned NotificationType = "character_assigned"
+	NotificationCharacterCleared  NotificationType = "character_cleared"
 )
 
 type Notification struct {

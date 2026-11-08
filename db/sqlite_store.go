@@ -208,6 +208,33 @@ func (s *SQLiteStore) initSchema() error {
 		FOREIGN KEY (user_id) REFERENCES users(id)
 	);
 
+	-- Foreign keys are off: character cascades are done by hand.
+	CREATE TABLE IF NOT EXISTS characters (
+		id TEXT PRIMARY KEY,
+		owner_id TEXT NOT NULL,
+		system_id TEXT NOT NULL,
+		name TEXT NOT NULL,
+		description TEXT NOT NULL DEFAULT '',
+		background TEXT NOT NULL DEFAULT '',
+		status TEXT NOT NULL DEFAULT 'alive',
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	);
+
+	CREATE TABLE IF NOT EXISTS character_assignments (
+		id TEXT PRIMARY KEY,
+		character_id TEXT NOT NULL,
+		campaign_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		started_at TEXT NOT NULL,
+		ended_at TEXT NOT NULL DEFAULT ''
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_characters_owner_id ON characters(owner_id);
+	CREATE INDEX IF NOT EXISTS idx_characters_system_id ON characters(system_id);
+	CREATE INDEX IF NOT EXISTS idx_character_assignments_character_id ON character_assignments(character_id);
+	CREATE INDEX IF NOT EXISTS idx_character_assignments_campaign_id ON character_assignments(campaign_id);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_character_assignments_active ON character_assignments(campaign_id, user_id) WHERE ended_at = '';
 	CREATE INDEX IF NOT EXISTS idx_journal_entries_campaign_id ON journal_entries(campaign_id);
 	CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at);
 	CREATE INDEX IF NOT EXISTS idx_notifications_campaign_id ON notifications(campaign_id);
@@ -860,6 +887,10 @@ func (s *SQLiteStore) AnonymizeUser(id string) error {
 			return err
 		}
 	}
+	// Characters stay (owner shows as "Deleted user"); the user leaves every game, so end the assignments.
+	if err := endUserAssignments(tx, ``, id, time.Now().UTC().Format(time.RFC3339)); err != nil {
+		return err
+	}
 
 	return tx.Commit()
 }
@@ -1453,6 +1484,10 @@ var (
 	ErrNotificationNotFound = errors.New("notification not found")
 	ErrJournalSessionGone   = errors.New("session not found")
 	ErrJournalNotFound      = errors.New("journal entry not found")
+	ErrCharacterNotFound    = errors.New("character not found")
+	ErrCharacterAssigned    = errors.New("character has an active assignment")
+	ErrCharacterMismatch    = errors.New("character is not the user's or is in another system")
+	ErrNotPlayer            = errors.New("user is not a player of this game")
 )
 
 func (s *SQLiteStore) CreateCampaignSignup(signup models.CampaignSignup) error {
@@ -1676,12 +1711,15 @@ func (s *SQLiteStore) SetCampaignSignUpsOpen(campaignID string, open bool) error
 }
 
 // UpdateCampaignDetails updates a campaign's editable fields: text, type, system and desired player count.
-func (s *SQLiteStore) UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, system, desiredPlayerCount string) error {
+func (s *SQLiteStore) UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, system, desiredPlayerCount string, systemIDChanges bool) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	res, err := s.db.Exec(`UPDATE campaigns SET title = ?, summary = ?, description = ?, type = ?, system = ?, desired_player_count = ? WHERE id = ?`,
-		title, summary, description, campaignType, system, desiredPlayerCount, id)
+	// A resolved-system change is refused (ErrCharacterAssigned) while any player has an active
+	// character; the check and the write are one statement.
+	res, err := s.db.Exec(`UPDATE campaigns SET title = ?, summary = ?, description = ?, type = ?, system = ?, desired_player_count = ? WHERE id = ?
+		AND (? = 0 OR NOT EXISTS (SELECT 1 FROM character_assignments WHERE campaign_id = ? AND ended_at = ''))`,
+		title, summary, description, campaignType, system, desiredPlayerCount, id, systemIDChanges, id)
 	if err != nil {
 		return err
 	}
@@ -1690,7 +1728,14 @@ func (s *SQLiteStore) UpdateCampaignDetails(id, title, summary, description stri
 		return err
 	}
 	if n == 0 {
-		return ErrCampaignNotFound
+		var exists int
+		if err := s.db.QueryRow(`SELECT COUNT(*) FROM campaigns WHERE id = ?`, id).Scan(&exists); err != nil {
+			return err
+		}
+		if exists == 0 {
+			return ErrCampaignNotFound
+		}
+		return ErrCharacterAssigned
 	}
 	return nil
 }
@@ -1714,7 +1759,7 @@ func (s *SQLiteStore) SetCampaignStatus(id string, status models.CampaignStatus)
 	return nil
 }
 
-// DeleteCampaign removes a campaign with its sessions, session responses, sign-ups and notifications.
+// DeleteCampaign removes a campaign with its sessions, session responses, sign-ups, character assignments and notifications.
 // The foreign_keys pragma is not enabled, so ON DELETE CASCADE does not fire and the
 // cascade is done by hand.
 func (s *SQLiteStore) DeleteCampaign(id string) error {
@@ -1740,6 +1785,9 @@ func (s *SQLiteStore) DeleteCampaign(id string) error {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM campaign_follows WHERE campaign_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM character_assignments WHERE campaign_id = ?`, id); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM notifications WHERE campaign_id = ?`, id); err != nil {
@@ -1833,6 +1881,9 @@ func (s *SQLiteStore) SetCampaignSignupStatus(campaignID, userID string, status 
 			}
 		}
 		players = remaining
+		if err := endUserAssignments(tx, campaignID, userID, time.Now().UTC().Format(time.RFC3339)); err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("invalid sign-up status: %s", status)
 	}
@@ -1917,6 +1968,9 @@ func (s *SQLiteStore) WithdrawCampaignSignup(campaignID, userID string) (bool, e
 		if _, err := tx.Exec(`UPDATE campaigns SET players = ? WHERE id = ?`, string(newPlayersJSON), campaignID); err != nil {
 			return false, err
 		}
+		if err := endUserAssignments(tx, campaignID, userID, time.Now().UTC().Format(time.RFC3339)); err != nil {
+			return false, err
+		}
 	}
 
 	if _, err := tx.Exec(`DELETE FROM campaign_signups WHERE campaign_id = ? AND user_id = ?`, campaignID, userID); err != nil {
@@ -1985,7 +2039,8 @@ func (s *SQLiteStore) RenameSystem(id, name string) error {
 	return tx.Commit()
 }
 
-// DeleteSystem removes the system row; campaigns keep their system text.
+// DeleteSystem removes the system row; campaigns keep their system text. The API refuses while
+// a game or character still uses the system.
 func (s *SQLiteStore) DeleteSystem(id string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -2279,7 +2334,9 @@ func deleteJournalForSessions(tx *sql.Tx, sessionIDsQuery string, args ...interf
 
 const journalRevisionColumns = `number, author_id, name, body, note, restored_from, merged_with, created_at`
 
-type rowScanner interface{ Scan(dest ...interface{}) error }
+type rowScanner interface {
+	Scan(dest ...interface{}) error
+}
 
 func scanJournalRevision(row rowScanner) (models.JournalRevision, error) {
 	var r models.JournalRevision

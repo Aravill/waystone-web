@@ -63,7 +63,7 @@ type Store interface {
 	SetCampaignSignupStatus(campaignID, userID string, status models.SignupStatus) error
 	WithdrawCampaignSignup(campaignID, userID string) (wasPlayer bool, err error)
 	SetCampaignSignUpsOpen(campaignID string, open bool) error
-	UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, system, desiredPlayerCount string) error
+	UpdateCampaignDetails(id, title, summary, description string, campaignType models.CampaignType, system, desiredPlayerCount string, systemIDChanges bool) error
 	SetCampaignStatus(id string, status models.CampaignStatus) error
 	DeleteCampaign(id string) error
 	GetAllSystems() ([]models.System, error)
@@ -82,6 +82,18 @@ type Store interface {
 	GetJournalRevisions(sessionID string) (entryID string, revs []models.JournalRevision, err error)
 	SaveJournalRevision(campaignID, sessionID, entryID string, baseRevision int, rev models.JournalRevision, keepRevisions int) (models.JournalSaveResult, error)
 	DeleteJournalEntry(sessionID string) error
+	CreateCharacter(c models.Character) error
+	GetCharacter(id string) (*models.Character, error)
+	GetCharactersByOwner(ownerID string) ([]models.Character, error)
+	UpdateCharacter(c models.Character) error
+	SetCharacterStatus(id string, status models.CharacterStatus) error
+	DeleteCharacter(id string) error
+	GetAssignmentsByCharacterIDs(ids []string) (map[string][]models.CharacterAssignment, error)
+	GetCampaignAssignments(campaignID string) ([]models.CharacterAssignment, error)
+	GetActiveAssignmentsByUser(userID string) (map[string]models.CharacterAssignment, error)
+	AssignCharacter(campaignID, userID, characterID, systemID, at string) (bool, error)
+	EndCharacterAssignment(campaignID, userID, at string) (*models.CharacterAssignment, error)
+	CountCharactersBySystem(systemID string) (int, error)
 	Backup(path string) error
 	Close() error
 }
@@ -223,6 +235,30 @@ func seedIfEmpty() error {
 					return fmt.Errorf("failed to seed journal entry: %w", err)
 				}
 				entryID, base = result.EntryID, result.Revision.Number
+			}
+		}
+	}
+
+	// Characters and assignments point at seed users, so only add them when those users are seeded too.
+	if len(campaigns) == 0 && len(users) == 0 {
+		at := func(days int) string { return time.Now().AddDate(0, 0, days).UTC().Format(time.RFC3339) }
+		created := at(-100)
+		systemOf := map[string]string{}
+		for _, c := range config.InitialCharacters {
+			systemOf[c.ID] = c.SystemID
+			c.CreatedAt, c.UpdatedAt = created, created
+			if err := store.CreateCharacter(c); err != nil {
+				return fmt.Errorf("failed to seed character: %w", err)
+			}
+		}
+		for _, a := range config.InitialCharacterAssignments {
+			if _, err := store.AssignCharacter(a.CampaignID, a.UserID, a.CharacterID, systemOf[a.CharacterID], at(a.StartDays)); err != nil {
+				return fmt.Errorf("failed to seed character assignment: %w", err)
+			}
+			if a.EndDays != 0 {
+				if _, err := store.EndCharacterAssignment(a.CampaignID, a.UserID, at(a.EndDays)); err != nil {
+					return fmt.Errorf("failed to end seeded character assignment: %w", err)
+				}
 			}
 		}
 	}

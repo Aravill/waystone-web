@@ -45,6 +45,8 @@ func RegisterRoutes() {
 	// Protected API endpoints (wrapped with auth middleware)
 	http.Handle("/api/campaigns", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaigns)))
 	http.Handle("/api/campaigns/", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaignRoutes)))
+	http.Handle("/api/characters", middleware.AuthMiddleware(http.HandlerFunc(HandleCharacters)))
+	http.Handle("/api/characters/", middleware.AuthMiddleware(http.HandlerFunc(HandleCharacterRoutes)))
 	http.Handle("/api/version", middleware.AuthMiddleware(http.HandlerFunc(HandleVersion)))
 	http.Handle("/api/agenda", middleware.AuthMiddleware(http.HandlerFunc(HandleAgenda)))
 	http.Handle("/api/systems", middleware.AuthMiddleware(http.HandlerFunc(HandleSystems)))
@@ -112,6 +114,17 @@ func RegisterRoutes() {
 		}
 		gamePage(w, r)
 	})))
+	charactersPage := ServePageWithFallback("characters.html")
+	characterPage := ServePageWithFallback("character.html")
+	http.Handle("/characters", middleware.AuthMiddleware(http.HandlerFunc(charactersPage)))
+	http.Handle("/characters/", middleware.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// /characters/ alone is the list; the detail page reads the id from the path
+		if strings.Trim(r.URL.Path, "/") == "characters" {
+			charactersPage(w, r)
+			return
+		}
+		characterPage(w, r)
+	})))
 	http.Handle("/games", http.RedirectHandler("/campaigns", http.StatusSeeOther))
 	http.Handle("/profile", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("profile.html"))))
 	http.Handle("/change-password", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("change-password.html"))))
@@ -168,6 +181,10 @@ func HandleCampaignRoutes(w http.ResponseWriter, r *http.Request) {
 		} else {
 			HandleCampaignSignupActions(w, r)
 		}
+		return
+	}
+	if len(parts) == 2 && parts[1] == "character" {
+		HandleCampaignCharacter(w, r)
 		return
 	}
 	if len(parts) == 2 && parts[1] == "follow" {

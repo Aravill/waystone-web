@@ -112,6 +112,7 @@ The 3-column track holds one clear action per banner. `Calendar` shows only to m
 |--------|---------|
 | Player owing a reply | **Reply** (rubric fill, spans 2 columns, links to `/games/{id}`), Calendar |
 | Player otherwise | Calendar. Leave moved to the game page |
+| Player with no character yet (known system, game not Finished or Cancelled, nothing owed) | **Choose character** (ink primary, one column with the words on two lines, "Choose / character", links to `/games/{id}?character=1`), Calendar. The notice row reads "✦ Choose your character", but the banner is not `needs-action`: the outline stays quiet and Reply keeps the rubric fill |
 | DM | Sign-ups (primary only while there are pending sign-ups, with the count tab), Calendar, Edit |
 | Not a member, sign-ups open | **Sign up** (primary, spans 2), Follow |
 | Not a member, sign-ups closed | Follow only (no disabled button) |
@@ -166,6 +167,7 @@ New variants follow the same recipe: a distinct silhouette, one or two wear mark
 
 ## Tried and rejected
 
+- **"Choose character" spanning two columns:** much wider than the buttons beside it; it now keeps one column with the words on two lines.
 - **The title as the visible link to the game page** (underlined on hover): replaced by clicking the whole banner, which already reacts to hover like something you pick up.
 - **The whole card rectangle as the click target:** the empty corners outside the silhouette also opened the game; the click, cursor and hover now all follow the cloth outline.
 - **A vine tendril** along the top in place of the headpiece: dropped in favour of the existing centred headpiece.

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waystone - Character</title>
+    <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+    <script src="/static/theme.js?v=7"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=74">
+    <link rel="stylesheet" href="/static/notifications.css?v=10">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
+</head>
+<body x-data="characterPage()">
+        <div class="header">
+        <div class="header-left">
+            <a href="/" class="logo">Waystone</a>
+        </div>
+        <nav class="nav-bar" aria-label="Main">
+            <a href="/" class="nav-item" data-page="dashboard">Home</a>
+            <a href="/campaigns" class="nav-item" data-page="campaigns">Games</a>
+            <a href="/characters" class="nav-item active" aria-current="page" data-page="characters">Characters</a>
+            <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
+        </nav>
+        <div class="header-right">
+            <details class="user-menu">
+                <summary><span class="user-menu-avatar" aria-hidden="true" x-text="(displayName || '?').charAt(0).toUpperCase()"></span><span class="user-menu-name" x-text="displayName"></span><span class="user-menu-caret" aria-hidden="true">&#9662;</span></summary>
+                <div class="user-menu-panel">
+                    <a href="/profile">Profile</a>
+                    <button type="button" @click="handleLogout()">Log out</button>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <main class="container">
+        <nav class="game-crumb" aria-label="Breadcrumb">
+            <a href="/characters">Characters</a>
+            <template x-if="character">
+                <span><span aria-hidden="true"> › </span><span aria-current="page" x-text="character.name"></span></span>
+            </template>
+        </nav>
+
+        <p x-show="loading">Loading character...</p>
+        <p x-show="notFound">This character could not be found. It may have been deleted.</p>
+
+        <template x-if="character">
+            <article class="char-page">
+                <header class="char-head">
+                    <div class="char-kicker">
+                        <span x-html="systemHtml(character.system)"></span>
+                        <span x-html="statusHtml(character.status)"></span>
+                    </div>
+                    <h1 class="page-title" x-text="character.name"></h1>
+                    <p class="char-owner">Played by <span x-html="character.owner_user ? userAvatarHtml(character.owner_user, false) : ''"></span>
+                        <template x-if="character.owner_user"><a :href="character.owner_user.profile_url" x-text="ownerName"></a></template>
+                    </p>
+                    <div class="char-games" x-html="gameBadgesHtml(character.games)"></div>
+                    <div class="char-head-actions">
+                        <button type="button" class="campaign-action-btn" x-show="character.can_edit && !editing" @click="startEdit()">Edit</button>
+                    </div>
+                </header>
+
+                <form class="char-form" x-show="editing" x-cloak @submit.prevent="save()" novalidate>
+                <div class="form-group">
+                    <label for="editName">Name</label>
+                    <input id="editName" type="text" maxlength="64" autocomplete="off" x-model="form.name">
+                </div>
+                <div class="char-form-row">
+                    <div class="form-group">
+                        <label for="editSystem">System</label>
+                        <select id="editSystem" x-model="form.system_id">
+                            <option value="" disabled>Choose a system</option>
+                            <template x-for="s in systems" :key="s.id"><option :value="s.id" x-text="s.name"></option></template>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editStatus">Status</label>
+                        <select id="editStatus" x-model="form.status">
+                            <template x-for="s in statuses" :key="s.value"><option :value="s.value" x-text="s.label"></option></template>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editDesc">Description</label>
+                    <textarea id="editDesc" rows="4" maxlength="10000" x-model="form.description"></textarea>
+                    <p class="form-hint">Basic Markdown: **bold**, *italic*, lists, links.</p>
+                </div>
+                <div class="form-group">
+                    <label for="editBg">Background</label>
+                    <textarea id="editBg" rows="6" maxlength="10000" x-model="form.background"></textarea>
+                    <p class="form-hint">Their backstory. Basic Markdown.</p>
+                </div>
+                <p class="game-form-error" role="alert" x-show="formError" x-text="'✗ ' + formError"></p>
+
+                    <div class="game-form-btns">
+                        <button type="submit" class="btn-create" :disabled="busy">Save</button>
+                        <button type="button" class="btn-cancel" :disabled="busy" @click="cancelEdit()">Cancel</button>
+                    </div>
+                </form>
+
+                <div class="char-status-edit" x-show="character.can_set_status && !character.can_edit">
+                    <label for="statusChoice">Status</label>
+                    <select id="statusChoice" x-model="statusChoice" @change="saveStatus()" :disabled="busy">
+                        <template x-for="s in statuses" :key="s.value"><option :value="s.value" x-text="s.label"></option></template>
+                    </select>
+                </div>
+
+                <div x-show="!editing">
+                    <section class="char-section" x-show="character.description">
+                        <h2 class="section-header">Description</h2>
+                        <div class="game-text" x-html="markdown(character.description)"></div>
+                    </section>
+                    <section class="char-section" x-show="character.background">
+                        <h2 class="section-header">Background</h2>
+                        <div class="game-text" x-html="markdown(character.background)"></div>
+                    </section>
+                    <p class="panel-empty" x-show="!character.description && !character.background">Nothing has been written about this character yet.</p>
+                </div>
+            </article>
+        </template>
+    </main>
+
+    <div id="message" class="message" :class="messageType" x-show="messageVisible" role="status" x-text="messageText"></div>
+
+    <script src="/static/notifications.js?v=11"></script>
+    <script src="/campaigns.js?v=58"></script>
+    <script src="/static/characters.js?v=2"></script>
+</body>
+</html>

@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -49,6 +50,27 @@ func systemsByName() (map[string]models.System, error) {
 		m[strings.ToLower(s.Name)] = s
 	}
 	return m, nil
+}
+
+// systemsByID returns all known systems keyed by id.
+func systemsByID() (map[string]models.System, error) {
+	systems, err := db.GetAllSystems()
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]models.System, len(systems))
+	for _, s := range systems {
+		m[s.ID] = s
+	}
+	return m, nil
+}
+
+// campaignSystemID resolves a game's system text to a known system id ("" for blank or custom text).
+func campaignSystemID(byName map[string]models.System, c *models.Campaign) string {
+	if c.System == "" {
+		return ""
+	}
+	return byName[strings.ToLower(c.System)].ID
 }
 
 // canonicalSystemName returns the known system's spelling for a case-insensitive match, else name unchanged.
@@ -235,6 +257,13 @@ func HandleAdminSystemActions(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "system renamed"})
 	case http.MethodDelete:
+		if msg, err := systemInUse(id); err != nil {
+			adminError(w, http.StatusInternalServerError, "failed to delete system")
+			return
+		} else if msg != "" {
+			adminError(w, http.StatusConflict, msg)
+			return
+		}
 		if err := db.DeleteSystem(id); err != nil {
 			systemWriteError(w, err, "failed to delete system")
 			return
@@ -282,6 +311,44 @@ func handleAdminSystemLogo(w http.ResponseWriter, r *http.Request, id string) {
 	default:
 		adminError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
+}
+
+// systemInUse returns the 409 text when a game (by system name, case-insensitive) or a character
+// (by id) still uses the system, else "".
+func systemInUse(id string) (string, error) {
+	systems, err := systemsByID()
+	if err != nil {
+		return "", err
+	}
+	name := systems[id].Name
+	if name == "" {
+		return "", nil // let DeleteSystem report not found
+	}
+	campaigns, err := db.GetAllCampaigns()
+	if err != nil {
+		return "", err
+	}
+	games := 0
+	for _, c := range campaigns {
+		if strings.EqualFold(c.System, name) {
+			games++
+		}
+	}
+	chars, err := db.CountCharactersBySystem(id)
+	if err != nil {
+		return "", err
+	}
+	if games == 0 && chars == 0 {
+		return "", nil
+	}
+	return fmt.Sprintf("This system is in use by %s and %s. Migrating systems will come later.", plural(games, "game"), plural(chars, "character")), nil
+}
+
+func plural(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return fmt.Sprintf("%d %ss", n, noun)
 }
 
 func systemWriteError(w http.ResponseWriter, err error, fallback string) {
