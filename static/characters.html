@@ -80,7 +80,7 @@
         </form>
 
         <p x-show="loading">Loading characters...</p>
-        <p class="panel-empty" x-show="!loading && characters.length === 0 && !creating">Thou hast no characters yet. Create one, then choose it on the page of a game thou playest in.</p>
+        <p class="panel-empty" x-show="!loading && characters.length === 0 && !creating">You don't have any characters yet. Create one, then pick it on the page of a game you play in.</p>
 
         <ul class="char-list">
             <template x-for="c in characters" :key="c.id">

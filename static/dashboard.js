@@ -65,7 +65,7 @@ window.dashboardPage = function () {
                 this.loadError = '';
             } catch (error) {
                 console.error('Failed to load the agenda:', error);
-                if (!quiet) this.loadError = 'Could not load thy agenda: ' + error.message;
+                if (!quiet) this.loadError = 'Could not load your agenda: ' + error.message;
             } finally {
                 if (seq === this.loadSeq) this.loading = false;
             }
@@ -92,18 +92,18 @@ window.dashboardPage = function () {
                 parts.push(`${list} ${names.length > 1 ? 'are' : 'is'} in session now.`);
             }
             if (a.awaiting.length > 0) {
-                parts.push(a.awaiting.length === 1 ? 'One session awaits thy reply.' : `${a.awaiting.length} sessions await thy reply.`);
+                parts.push(a.awaiting.length === 1 ? 'One session needs your reply.' : `${a.awaiting.length} sessions need your reply.`);
             }
             const nudges = this.characterNudges.length;
             if (nudges > 0) {
-                parts.push(nudges === 1 ? 'One game awaits thy character.' : `${nudges} games await thy character.`);
+                parts.push(nudges === 1 ? 'One game needs your character.' : `${nudges} games need your character.`);
             }
             const next = a.ahead[0];
             if (next) {
-                parts.push(`Thy next game is ${parseDateLocal(next.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}.`);
+                parts.push(`Your next game is ${parseDateLocal(next.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}.`);
             }
             if (parts.length === 0) {
-                parts.push(this.isNewcomer ? 'Thy road begins here.' : 'Nothing awaits thy reply.');
+                parts.push(this.isNewcomer ? 'Find a game to get started.' : 'No replies needed right now.');
             }
             return parts.join(' ');
         },
@@ -163,7 +163,7 @@ window.dashboardPage = function () {
             return (s.replies || []).filter((r) => r.participation === 'Accepted').map((r) => r.user);
         },
         mineText(s) {
-            return 'Thy reply: ' + (s.current_user_participation ? replyWord(s.current_user_participation) : 'no reply yet');
+            return 'Your reply: ' + (s.current_user_participation ? replyWord(s.current_user_participation) : 'no reply yet');
         },
 
         // The viewer's own reply on a row, with a glyph so colour never carries it alone.
@@ -173,7 +173,7 @@ window.dashboardPage = function () {
             if (p === 'Accepted') return REPLY_GLYPHS.accepted + ' ' + replyWord(p);
             if (p === 'Tentative') return '? ' + replyWord(p);
             if (p === 'Declined') return REPLY_GLYPHS.declined + ' ' + replyWord(p);
-            return s.status === 'Suggested' ? 'Thy reply?' : 'No reply yet';
+            return s.status === 'Suggested' ? 'Your reply?' : 'No reply yet';
         },
         mineClass(s) {
             const p = s.current_user_participation;
@@ -200,13 +200,13 @@ window.dashboardPage = function () {
                 }
                 const data = await response.json();
                 if (!response.ok) {
-                    this.showMessage(data.error || 'Failed to send thy reply', 'error');
+                    this.showMessage(data.error || 'Failed to send your reply', 'error');
                 } else {
-                    this.showMessage(`Thy reply for ${s.campaign.title}: ${replyWord(participation)}`, 'success');
+                    this.showMessage(`Your reply for ${s.campaign.title}: ${replyWord(participation)}`, 'success');
                 }
                 await this.loadAgenda(true);
             } catch (error) {
-                this.showMessage('Error sending thy reply: ' + error.message, 'error');
+                this.showMessage('Error sending your reply: ' + error.message, 'error');
             } finally {
                 this.busy = false;
             }

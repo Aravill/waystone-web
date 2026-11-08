@@ -26,7 +26,7 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 - Typewriter text (IBM Plex Mono) for everything you read. Old-style display type only for fixed titles, headings and the brand. Dates are never set in the display face: its old-style zero reads like a letter o
 - Minimal: square corners, hairline and double rules, no textures, shadows, gradients or glows
 - Decoration is typographic and sparse: `§`, `❦`, `✦`, `♛`. Never images of parchment, wax seals or scrolls
-- Light flavour copy ("Thy reply", "Aye / Perhaps / Nay") is welcome in headings and buttons, never in error messages or anything that has to be read precisely
+- Copy is plain, modern English ("Your reply", "Yes / Maybe / No"). The medieval feel comes from the visuals, never from archaic wording ("thy", "aye", "well met")
 - Mobile-first and responsive
 
 ---
@@ -87,7 +87,7 @@ The same tokens redefined. Applied with `[data-theme="dark"]` on `<html>`, and b
 
 ### Rules
 
-- One accent. `--rubric` is the only "look here" colour, and red means you: h2 words are ink with only the `§` rubric, avatar letters are ink, DM names are ink with a rubric crown (`♛`), and other players' "no reply yet" is muted. Rubric is the viewer's own awaited reply ("Thy reply?"), a text link, the Pitch status, a destructive action, an error or the active nav underline. Verdigris and ochre are only for state (success / tentative), never decoration.
+- One accent. `--rubric` is the only "look here" colour, and red means you: h2 words are ink with only the `§` rubric, avatar letters are ink, DM names are ink with a rubric crown (`♛`), and other players' "no reply yet" is muted. Rubric is the viewer's own awaited reply ("Your reply?"), a text link, the Pitch status, a destructive action, an error or the active nav underline. Verdigris and ochre are only for state (success / tentative), never decoration.
 - The disabled look is a dashed outline with muted text, never a fade (`opacity` drops text below 4.5:1).
 - Every token pair used for text meets 4.5:1 contrast on `--bg` in both themes. Check any new pairing.
 - Inverse elements (primary buttons) use `background: var(--ink); color: var(--bg)`, which flips correctly in dark mode.
@@ -182,7 +182,7 @@ The logo mark is the standing-stone from the mock-ups: a tapered stone with a do
 
 ```html
 <h1 class="page-title"><span class="drop-cap">G</span>ames</h1>
-<p class="page-subtitle">6 games, 1 awaits thy reply</p>
+<p class="page-subtitle">6 games, 1 awaits your reply</p>
 ```
 
 The drop cap goes on fixed page titles only (see Typography). Titles that show a game's name, the calendar's title and every panel heading have none. The subtitle summarises the page in one line, and counts what awaits the viewer when that's above zero.
