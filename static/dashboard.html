@@ -34,10 +34,10 @@
     </div>
 
     <main class="container">
-        <h1 class="page-title"><span class="drop-cap">W</span>ell met<span x-show="displayName">, <span x-text="displayName"></span></span></h1>
+        <h1 class="page-title"><span class="drop-cap">W</span>elcome<span x-show="displayName">, <span x-text="displayName"></span></span></h1>
         <p class="page-subtitle" x-show="loaded" x-text="subtitle"></p>
 
-        <p class="home-status" x-show="loading && !loaded">Gathering thy agenda...</p>
+        <p class="home-status" x-show="loading && !loaded">Loading your agenda...</p>
         <div class="game-error" role="alert" x-show="loadError">
             <p x-text="loadError"></p>
             <button type="button" class="campaign-action-btn" @click="loadAgenda()">Try again</button>
@@ -69,15 +69,15 @@
                 <!-- A new visitor: the introduction and a way in -->
                 <section class="home-welcome" x-show="isNewcomer">
                     <p class="home-intro">
-                        Waystone is a gathering place for the Waystone Discord community: schedule sessions,
-                        sign up for games, and find your way between the roads below. It is built for our
+                        Waystone is where the Waystone Discord community organises its games: schedule sessions,
+                        sign up for games, and keep track of what you play. It is built for our
                         members and still growing.
                     </p>
                     <a href="/campaigns" class="btn-link-primary">See the games &rarr;</a>
                 </section>
 
                 <section x-show="agenda.awaiting.length > 0" aria-labelledby="awaitsHeading">
-                    <h2 id="awaitsHeading" class="section-header">Awaits thy reply</h2>
+                    <h2 id="awaitsHeading" class="section-header">Waiting for your reply</h2>
                     <div class="rl-list">
                         <template x-for="s in agenda.awaiting" :key="s.id">
                             <article class="rl">
@@ -89,10 +89,10 @@
                                 <div class="rl-body">
                                     <h3 class="rl-title"><a :href="gameUrl(s)" x-text="s.campaign.title"></a></h3>
                                     <p class="rl-meta" x-text="awaitMeta(s)"></p>
-                                    <div class="session-actions session-replies" role="group" :aria-label="'Thy reply for ' + s.campaign.title">
-                                        <button type="button" class="btn-response btn-response--accepted" :disabled="busy" @click="reply('Accepted', s)">Aye</button>
-                                        <button type="button" class="btn-response btn-response--tentative" :disabled="busy" @click="reply('Tentative', s)">Perhaps</button>
-                                        <button type="button" class="btn-response btn-response--declined" :disabled="busy" @click="reply('Declined', s)">Nay</button>
+                                    <div class="session-actions session-replies" role="group" :aria-label="'Your reply for ' + s.campaign.title">
+                                        <button type="button" class="btn-response btn-response--accepted" :disabled="busy" @click="reply('Accepted', s)">Yes</button>
+                                        <button type="button" class="btn-response btn-response--tentative" :disabled="busy" @click="reply('Tentative', s)">Maybe</button>
+                                        <button type="button" class="btn-response btn-response--declined" :disabled="busy" @click="reply('Declined', s)">No</button>
                                     </div>
                                 </div>
                             </article>
@@ -116,7 +116,7 @@
                 </section>
 
                 <section x-show="agenda.ahead.length > 0" aria-labelledby="aheadHeading">
-                    <h2 id="aheadHeading" class="section-header">The road ahead</h2>
+                    <h2 id="aheadHeading" class="section-header">Coming up</h2>
                     <div class="ledger" role="list">
                         <template x-for="s in agenda.ahead" :key="s.id">
                             <div class="ledger-row agenda-row-home" role="listitem">
@@ -133,12 +133,12 @@
                     </p>
                 </section>
 
-                <p class="home-status" x-show="!isNewcomer && agenda.awaiting.length === 0 && agenda.ahead.length === 0 && agenda.in_progress.length === 0 && characterNudges.length === 0">Nothing awaits thee, and no session is on the calendar.</p>
+                <p class="home-status" x-show="!isNewcomer && agenda.awaiting.length === 0 && agenda.ahead.length === 0 && agenda.in_progress.length === 0 && characterNudges.length === 0">You're all caught up, and no sessions are scheduled.</p>
             </div>
 
             <aside class="home-side">
                 <section x-show="agenda.games.length > 0" aria-labelledby="gamesHeading">
-                    <h2 id="gamesHeading" class="section-header">Thy games</h2>
+                    <h2 id="gamesHeading" class="section-header">Your games</h2>
                     <div class="ledger" role="list">
                         <template x-for="g in agenda.games" :key="g.id">
                             <div class="ledger-row game-row-home" role="listitem">
@@ -157,7 +157,7 @@
                 </section>
 
                 <section>
-                    <h2 class="section-header">Roads yet to open</h2>
+                    <h2 class="section-header">Coming soon</h2>
                     <div class="roads">
                         <div class="road">
                             <svg viewBox="0 0 64 78" aria-hidden="true"><path d="M10 74L13 24Q15 8 26 4L46 3Q52 6 54 24L58 74Z"/><path d="M2 74H62"/></svg>

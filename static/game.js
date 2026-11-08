@@ -208,7 +208,7 @@ window.gamePage = function () {
             return this.isPlayer ? (parseInt(this.campaign?.unanswered_sessions_count, 10) || 0) : 0;
         },
         get pendingNotice() {
-            if (this.unansweredCount > 0) return this.unansweredCount === 1 ? 'A session awaits thy reply' : `${this.unansweredCount} sessions await thy reply`;
+            if (this.unansweredCount > 0) return this.unansweredCount === 1 ? 'A session needs your reply' : `${this.unansweredCount} sessions need your reply`;
             if (this.pendingCount > 0) return `${this.pendingCount} sign-up${this.pendingCount === 1 ? '' : 's'} to review`;
             if (this.characterNudge) return 'Choose your character';
             return '';
@@ -258,10 +258,10 @@ window.gamePage = function () {
         playedTime(s) {
             return s.time ? timeWithZone(this.timeRange(s), s) : 'Time not recorded';
         },
-        // Ahead rows: "3 aye, 1 no reply" (members only; zero counts are left out).
+        // Ahead rows: "3 yes, 1 no reply" (members only; zero counts are left out).
         aheadCounts(s) {
             const c = getSessionCounts(s);
-            return [[c.accepted, 'aye'], [c.tentative, 'perhaps'], [c.declined, 'nay'], [c.awaiting, 'no reply']]
+            return [[c.accepted, 'yes'], [c.tentative, 'maybe'], [c.declined, 'no'], [c.awaiting, 'no reply']]
                 .filter(([n]) => n > 0).map(([n, word]) => `${n} ${word}`).join(', ');
         },
         // The viewer's own reply on an Ahead row, with a glyph so colour never carries it alone.
@@ -271,13 +271,13 @@ window.gamePage = function () {
             if (p === 'Accepted') return REPLY_GLYPHS.accepted + ' ' + replyWord(p);
             if (p === 'Tentative') return '? ' + replyWord(p);
             if (p === 'Declined') return REPLY_GLYPHS.declined + ' ' + replyWord(p);
-            return this.awaitsMe(s) ? 'Thy reply?' : 'No reply yet';
+            return this.awaitsMe(s) ? 'Your reply?' : 'No reply yet';
         },
         aheadMineClass(s) {
             const p = s.current_user_participation;
             return p === 'Accepted' ? 'reply-accepted' : p === 'Tentative' ? 'reply-tentative' : p === 'Declined' ? 'reply-nay' : this.awaitsMe(s) ? 'is-you' : 'reply-none';
         },
-        // Phone reply block: "18:00–22:00 CET, proposed by ♛ X. 1 aye, 3 no reply."
+        // Phone reply block: "18:00–22:00 CET, proposed by ♛ X. 1 yes, 3 no reply."
         replyBlockMeta(s) {
             const counts = this.aheadCounts(s);
             return `${this.upcomingTime(s)}, proposed by ♛ ${this.campaign?.dm_user?.display_name || 'the DM'}.${counts ? ' ' + counts + '.' : ''}`;
@@ -313,7 +313,7 @@ window.gamePage = function () {
             if (s.time) parts.push(this.upcomingTime(s));
             if (this.isMember) {
                 const c = getSessionCounts(s);
-                parts.push(`${c.accepted} aye, ${c.tentative} perhaps, ${c.declined} nay, ${c.awaiting} no reply yet`);
+                parts.push(`${c.accepted} yes, ${c.tentative} maybe, ${c.declined} no, ${c.awaiting} no reply yet`);
             }
             if (this.isStrongCandidate(s)) parts.push('strong candidate');
             if (this.awaitsMe(s)) parts.push('awaiting your reply');
@@ -357,7 +357,7 @@ window.gamePage = function () {
                     const kind = kinds[r.participation] || 'awaiting';
                     // The awaited reply is the viewer's own: ask for it in rubric; others stay quiet
                     const you = kind === 'awaiting' && r.user.id === this.currentUserId && s.status === 'Suggested';
-                    return { key: `${kind}-${r.user.id}`, user: r.user, label: you ? 'Thy reply?' : replyWord(r.participation), cls: `participation-${kind === 'awaiting' ? 'pending' : kind}`, kind, you };
+                    return { key: `${kind}-${r.user.id}`, user: r.user, label: you ? 'Your reply?' : replyWord(r.participation), cls: `participation-${kind === 'awaiting' ? 'pending' : kind}`, kind, you };
                 })
                 .sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
         },

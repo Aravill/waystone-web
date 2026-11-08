@@ -75,10 +75,10 @@
                                     </div>
                                     <p class="panel-session-meta" x-text="replyBlockMeta(replySession)"></p>
                                     <p class="game-reply-who"><a href="#gamePanel" @click.prevent="pick(replySession.id)">Who?</a></p>
-                                    <div class="session-actions session-replies" role="group" aria-label="Thy reply">
-                                        <button type="button" class="btn-response btn-response--accepted" :disabled="busy" @click="reply('Accepted', replySession)">Aye</button>
-                                        <button type="button" class="btn-response btn-response--tentative" :disabled="busy" @click="reply('Tentative', replySession)">Perhaps</button>
-                                        <button type="button" class="btn-response btn-response--declined" :disabled="busy" @click="reply('Declined', replySession)">Nay</button>
+                                    <div class="session-actions session-replies" role="group" aria-label="Your reply">
+                                        <button type="button" class="btn-response btn-response--accepted" :disabled="busy" @click="reply('Accepted', replySession)">Yes</button>
+                                        <button type="button" class="btn-response btn-response--tentative" :disabled="busy" @click="reply('Tentative', replySession)">Maybe</button>
+                                        <button type="button" class="btn-response btn-response--declined" :disabled="busy" @click="reply('Declined', replySession)">No</button>
                                     </div>
                                 </div>
                             </template>
@@ -93,14 +93,14 @@
                     <div class="game-layout">
                         <div class="game-main">
                             <section class="game-tale" aria-labelledby="taleHeading">
-                                <h2 id="taleHeading" class="section-header">The tale</h2>
+                                <h2 id="taleHeading" class="section-header">About this game</h2>
                                 <div id="taleText" class="game-text" :class="{ 'is-folded': taleCanFold && !taleOpen }" x-html="descriptionHtml"></div>
-                                <p class="game-tale-more" x-show="taleCanFold"><button type="button" class="text-link" :aria-expanded="taleOpen.toString()" @click="taleOpen = !taleOpen" x-text="taleOpen ? 'Fold the tale' : 'Read the whole tale'"></button></p>
+                                <p class="game-tale-more" x-show="taleCanFold"><button type="button" class="text-link" :aria-expanded="taleOpen.toString()" @click="taleOpen = !taleOpen" x-text="taleOpen ? 'Show less' : 'Read more'"></button></p>
                             </section>
 
                             <section class="game-chronicle" aria-labelledby="chronicleHeading">
                                 <div class="game-ledger-nav">
-                                    <h2 id="chronicleHeading" class="section-header">The chronicle</h2>
+                                    <h2 id="chronicleHeading" class="section-header">Sessions</h2>
                                     <span class="game-count" x-text="played.length + ' session' + (played.length === 1 ? '' : 's') + ' played · ' + journalCount + ' in the journal'"></span>
                                 </div>
 
@@ -196,10 +196,10 @@
                                                     </template>
                                                 </div>
                                                 <div class="player-responses" x-show="isPlayer">
-                                                    <div class="session-actions session-replies" role="group" aria-label="Thy reply">
-                                                        <button type="button" class="btn-response btn-response--accepted" :class="{ 'selected': s.current_user_participation === 'Accepted' }" :aria-pressed="s.current_user_participation === 'Accepted'" :disabled="busy" @click="reply('Accepted', s)">Aye</button>
-                                                        <button type="button" class="btn-response btn-response--tentative" :class="{ 'selected': s.current_user_participation === 'Tentative' }" :aria-pressed="s.current_user_participation === 'Tentative'" :disabled="busy" @click="reply('Tentative', s)">Perhaps</button>
-                                                        <button type="button" class="btn-response btn-response--declined" :class="{ 'selected': s.current_user_participation === 'Declined' }" :aria-pressed="s.current_user_participation === 'Declined'" :disabled="busy" @click="reply('Declined', s)">Nay</button>
+                                                    <div class="session-actions session-replies" role="group" aria-label="Your reply">
+                                                        <button type="button" class="btn-response btn-response--accepted" :class="{ 'selected': s.current_user_participation === 'Accepted' }" :aria-pressed="s.current_user_participation === 'Accepted'" :disabled="busy" @click="reply('Accepted', s)">Yes</button>
+                                                        <button type="button" class="btn-response btn-response--tentative" :class="{ 'selected': s.current_user_participation === 'Tentative' }" :aria-pressed="s.current_user_participation === 'Tentative'" :disabled="busy" @click="reply('Tentative', s)">Maybe</button>
+                                                        <button type="button" class="btn-response btn-response--declined" :class="{ 'selected': s.current_user_participation === 'Declined' }" :aria-pressed="s.current_user_participation === 'Declined'" :disabled="busy" @click="reply('Declined', s)">No</button>
                                                     </div>
                                                 </div>
                                                 <div class="panel-dm-actions" x-show="isDM">
@@ -209,7 +209,7 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            <button type="button" class="text-link game-back" @click="showCompany()">Show the company</button>
+                                            <button type="button" class="text-link game-back" @click="showCompany()">Show the players</button>
                                         </div>
                                     </template>
 
@@ -269,15 +269,15 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            <button type="button" class="text-link game-back" @click="showCompany()">Show the company</button>
+                                            <button type="button" class="text-link game-back" @click="showCompany()">Show the players</button>
                                         </div>
                                     </template>
 
                                     <template x-if="!selectedUpcoming && !selectedPlayed && !recording">
                                         <div class="game-panel-state">
                                             <div>
-                                                <p class="modal-eyebrow">Who rides</p>
-                                                <h3 class="panel-heading" tabindex="-1">The company</h3>
+                                                <p class="modal-eyebrow">Who's playing</p>
+                                                <h3 class="panel-heading" tabindex="-1">Players</h3>
                                             </div>
                                             <div class="roster">
                                                 <template x-for="r in company" :key="r.user.id">
@@ -312,7 +312,7 @@
                                             <p class="modal-eyebrow">Off the calendar</p>
                                             <h3 class="panel-heading" tabindex="-1" x-text="formTitle"></h3>
                                         </div>
-                                        <p class="form-hint">For games played away from Waystone, or never put on the calendar. It takes its place in the chronicle by date.</p>
+                                        <p class="form-hint">For games played away from Waystone, or never put on the calendar. It's added to the session list by date.</p>
                                         <div class="form-group">
                                             <label for="recDate">Date</label>
                                             <input id="recDate" type="date" :max="today" x-model="form.date">
@@ -427,7 +427,7 @@
             <div class="modal-header">
                 <div>
                     <p class="modal-eyebrow" x-text="campaign ? campaign.title + (campaign.system ? ' · ' + campaign.system : '') : ''"></p>
-                    <h2 id="pickerTitle">Thy character</h2>
+                    <h2 id="pickerTitle">Your character</h2>
                 </div>
                 <button type="button" class="modal-close" @click="closePicker()" aria-label="Close">&times;</button>
             </div>
@@ -446,7 +446,7 @@
                         </label>
                     </template>
                 </fieldset>
-                <p class="panel-empty" x-show="!picker.loading && picker.characters.length === 0">Thou hast no characters in this system yet.</p>
+                <p class="panel-empty" x-show="!picker.loading && picker.characters.length === 0">You don't have any characters in this system yet.</p>
 
                 <button type="button" class="text-link" x-show="!picker.loading && !picker.creating" @click="picker.creating = true">+ New character</button>
                 <div class="picker-new" x-show="picker.creating && !picker.loading">

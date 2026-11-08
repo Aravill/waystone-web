@@ -48,7 +48,7 @@
                 </template>
 
                 <section class="games-section" x-show="myGames.length > 0" x-cloak>
-                    <h2 class="section-header">Thy games <small class="section-count" x-text="myGames.length"></small></h2>
+                    <h2 class="section-header">Your games <small class="section-count" x-text="myGames.length"></small></h2>
                     <div class="campaigns-list">
                         <template x-for="campaign in myGames" :key="campaign.id">
                             <div x-html="renderCampaignHtml(campaign)"></div>
@@ -86,7 +86,7 @@
     <div id="createCampaignModal" class="modal" :class="{ 'modal-open': modalOpen }" @click="handleModalBackdropClick($event)">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="modal-title-block"><p class="modal-eyebrow">The roll of games</p>
+                <div class="modal-title-block"><p class="modal-eyebrow">Games</p>
                 <h2 x-text="editingCampaignId ? 'Edit game' : 'Register game'"></h2></div>
                 <button type="button" class="modal-close" aria-label="Close" @click="closeModal()">&times;</button>
             </div>

@@ -337,7 +337,7 @@ const REPLY_GLYPHS = {
 };
 
 // Reply words, one vocabulary wherever a person reads a reply state (API values are unchanged).
-const REPLY_WORDS = { Accepted: 'Aye', Tentative: 'Perhaps', Declined: 'Nay', '': 'No reply yet' };
+const REPLY_WORDS = { Accepted: 'Yes', Tentative: 'Maybe', Declined: 'No', '': 'No reply yet' };
 function replyWord(participation) {
     return REPLY_WORDS[participation || ''] || REPLY_WORDS[''];
 }
@@ -821,7 +821,7 @@ window.campaignsPage = function () {
 
             let pendingNoticeHtml = '';
             if (unansweredCount > 0) {
-                pendingNoticeHtml = `<p class="pending-notice"><span aria-hidden="true">✦</span> ${unansweredCount === 1 ? 'A session awaits thy reply' : `${unansweredCount} sessions await thy reply`}</p>`;
+                pendingNoticeHtml = `<p class="pending-notice"><span aria-hidden="true">✦</span> ${unansweredCount === 1 ? 'A session needs your reply' : `${unansweredCount} sessions need your reply`}</p>`;
             } else if (pendingSignupsCount > 0) {
                 pendingNoticeHtml = `<p class="pending-notice"><span aria-hidden="true">✦</span> ${pendingSignupsCount} sign-up${pendingSignupsCount === 1 ? '' : 's'} to review</p>`;
             } else if (characterNudge) {
@@ -1081,12 +1081,12 @@ window.campaignsPage = function () {
                 || (isDM && (parseInt(c?.pending_signups_count, 10) || 0) > 0);
         },
 
-        // "6 games, 1 awaits thy reply": the page subtitle under the h1.
+        // "6 games, 1 awaits your reply": the page subtitle under the h1.
         gamesSubtitle() {
             const total = this.campaigns.length;
             const awaiting = this.campaigns.filter((c) => this.campaignNeedsAction(c)).length;
             const roll = `${total} game${total === 1 ? '' : 's'}`;
-            return awaiting > 0 ? `${roll}, ${awaiting} await${awaiting === 1 ? 's' : ''} thy reply` : roll;
+            return awaiting > 0 ? `${roll}, ${awaiting} await${awaiting === 1 ? 's' : ''} your reply` : roll;
         },
 
         avatarHtml(user, link = true) {

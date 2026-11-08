@@ -28,7 +28,7 @@ test('day panel lists a roster row per player', async ({ page, game }) => {
   await modal.getByRole('button', { name: /Suggested 20:30-/ }).click();
 
   const panel = modal.locator('.calendar-panel');
-  for (const [name, said] of [['Roy', 'Aye'], ['Adam', 'Perhaps'], ['Simon', 'Nay'], ['Testy', 'Thy reply?']]) {
+  for (const [name, said] of [['Roy', 'Yes'], ['Adam', 'Maybe'], ['Simon', 'No'], ['Testy', 'Your reply?']]) {
     await expect(panel.getByText(name, { exact: true })).toBeVisible();
     await expect(panel.locator('.roster-row').filter({ hasText: name })).toContainText(said);
   }
@@ -60,13 +60,13 @@ test('changing a reply updates the tally', async ({ page, game }) => {
   await cell.click();
   const panel = modal.locator('.calendar-panel');
 
-  await panel.getByRole('button', { name: /Aye$/ }).click();
-  await expect(panel.getByRole('button', { name: /Aye$/ })).toHaveClass(/selected/);
+  await panel.getByRole('button', { name: /Yes$/ }).click();
+  await expect(panel.getByRole('button', { name: /Yes$/ })).toHaveClass(/selected/);
   await expect(cell.locator('.reply-accepted b')).toHaveText('2');
   await expect(cell.locator('.reply-awaiting b')).toHaveText('2');
 
-  await panel.getByRole('button', { name: /Nay$/ }).click();
-  await expect(panel.getByRole('button', { name: /Nay$/ })).toHaveClass(/selected/);
+  await panel.getByRole('button', { name: /\bNo$/ }).click();
+  await expect(panel.getByRole('button', { name: /\bNo$/ })).toHaveClass(/selected/);
   await expect(cell.locator('.reply-accepted b')).toHaveText('1');
   await expect(cell.locator('.reply-declined b')).toHaveText('1');
   await expect(cell.locator('.reply-awaiting b')).toHaveText('2');

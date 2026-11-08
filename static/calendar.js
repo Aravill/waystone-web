@@ -335,7 +335,7 @@ window.calendarPage = function () {
             const parts = [`${s.status} ${this.getSessionTimeRange(s)}`];
             if (s.status !== 'Cancelled') {
                 const c = this.getSessionCounts(s);
-                parts[0] += `: ${c.accepted} aye, ${c.tentative} perhaps, ${c.declined} nay, ${c.awaiting} no reply yet`;
+                parts[0] += `: ${c.accepted} yes, ${c.tentative} maybe, ${c.declined} no, ${c.awaiting} no reply yet`;
             }
             if (this.isStrongCandidate(s)) parts.push('Strong candidate');
             const more = this.getCellOverflow(date);
@@ -351,7 +351,7 @@ window.calendarPage = function () {
             return this.getResponseGroups(session).flatMap((g) => g.users.map((user, i) => {
                 // The awaited reply is the viewer's own: ask for it in rubric; others stay quiet
                 const you = g.kind === 'awaiting' && !!user.id && user.id === this.currentUserId && session.status === 'Suggested';
-                return { key: `${g.kind}-${user.id || i}`, user, label: you ? 'Thy reply?' : g.label, cls: g.cls, kind: g.kind, you };
+                return { key: `${g.kind}-${user.id || i}`, user, label: you ? 'Your reply?' : g.label, cls: g.cls, kind: g.kind, you };
             }));
         },
 

@@ -135,9 +135,9 @@
                                 </template>
                             </div>
                             <div class="calendar-reply-key" x-show="!sessionClipboard">
-                                <span class="reply-accepted" x-html="replyGlyph('accepted') + ' said aye'"></span>
-                                <span class="reply-tentative">? perhaps</span>
-                                <span class="reply-declined" x-html="replyGlyph('declined') + ' nay'"></span>
+                                <span class="reply-accepted" x-html="replyGlyph('accepted') + ' yes'"></span>
+                                <span class="reply-tentative">? maybe</span>
+                                <span class="reply-declined" x-html="replyGlyph('declined') + ' no'"></span>
                                 <span class="reply-awaiting">… no reply yet</span>
                                 <span><span class="legend-star" aria-hidden="true">✦</span> strong candidate</span>
                             </div>
@@ -182,16 +182,16 @@
                                             </div>
 
                                             <div class="player-responses" x-show="!isCurrentUserDM && s.status !== 'Cancelled'">
-                                                <div class="session-actions session-replies" role="group" aria-label="Thy reply">
+                                                <div class="session-actions session-replies" role="group" aria-label="Your reply">
                                                     <button type="button" class="btn-response btn-response--accepted"
                                                             :class="{ 'selected': s.current_user_participation === 'Accepted' }"
-                                                            @click="submitResponse('Accepted', s)">Aye</button>
+                                                            @click="submitResponse('Accepted', s)">Yes</button>
                                                     <button type="button" class="btn-response btn-response--tentative"
                                                             :class="{ 'selected': s.current_user_participation === 'Tentative' }"
-                                                            @click="submitResponse('Tentative', s)">Perhaps</button>
+                                                            @click="submitResponse('Tentative', s)">Maybe</button>
                                                     <button type="button" class="btn-response btn-response--declined"
                                                             :class="{ 'selected': s.current_user_participation === 'Declined' }"
-                                                            @click="submitResponse('Declined', s)">Nay</button>
+                                                            @click="submitResponse('Declined', s)">No</button>
                                                 </div>
                                             </div>
 
