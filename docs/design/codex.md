@@ -18,6 +18,27 @@ backlinks and a graph view.
   graph, and FTS5 (supported by `modernc.org/sqlite`) gives full-text search. With one
   app process and a small group there's no case for Postgres or a graph database.
 
+### Alternatives considered: hosting ready-made wiki software
+
+Checked on 2026-11-08. The candidates were SilverBullet, LeafWiki, Otter Wiki,
+Wiki.js 3, Outline, BookStack, Kanka and MediaWiki. **Rejected**, because the Codex
+decisions depend on the app's own data, and an external wiki can't see it:
+- Session pages follow the journal rules: played sessions only, editable by the game's
+  DM and current players, frozen when the session is cancelled.
+- Character pages carry metadata only the owner controls, and their game assignments.
+- Link resolution depends on games and worlds.
+- Login: the app has its own local accounts. Outline needs an external OIDC login
+  provider. The others keep their own user lists or only support simple single-space
+  logins, so the app would have to become an OIDC provider or hand logins through
+  Caddy (`forward_auth`).
+- Weight: Wiki.js 3 needs PostgreSQL 17, and Outline needs Postgres, Redis and S3
+  storage.
+
+**Instead, reuse libraries:** a Markdown parser with wikilink support, CodeMirror 6
+(if chosen), a vendored graph library, and SQLite FTS5. Revisions already exist in
+the journal. *Fallback:* if the integrated Codex is dropped, SilverBullet behind
+Caddy is the closest match to Obsidian for a standalone lore space.
+
 ## Data model
 
 Names are provisional.
