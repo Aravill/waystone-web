@@ -1,22 +1,483 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
+	"io"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"unicode/utf8"
+	"waystone-web/db"
 	"waystone-web/models"
+
+	_ "golang.org/x/image/webp"
 )
 
-// Map pages: filled in with the map image and pin endpoints.
+const (
+	maxMapImageBytes = 25 << 20
+	maxMapImageSide  = 16384
+)
 
+// codexFileRe is the only shape of file name the file endpoint serves or removes.
+var codexFileRe = regexp.MustCompile(`^[0-9a-f-]{36}\.(png|jpg|webp)$`)
+
+var codexImageTypes = map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
+
+func codexImageURL(file string) string { return "/api/codex/files/" + file }
+
+// handleCodexMapRoutes serves the map-only endpoints under /api/codex/pages/{id}/.
+// It reports false when rest is not one of them.
 func handleCodexMapRoutes(w http.ResponseWriter, r *http.Request, id string, rest []string, method func(...string) bool) bool {
-	return false
+	switch {
+	case rest[0] == "images" && len(rest) == 1:
+		if method(http.MethodGet, http.MethodPost) {
+			if r.Method == http.MethodGet {
+				handleListMapImages(w, r, id)
+			} else {
+				handleUploadMapImage(w, r, id)
+			}
+		}
+	case rest[0] == "images" && len(rest) == 3 && rest[2] == "restore":
+		if method(http.MethodPost) {
+			handleRestoreMapImage(w, r, id, rest[1])
+		}
+	case rest[0] == "pins" && len(rest) == 1:
+		if method(http.MethodPost) {
+			handleAddPin(w, r, id)
+		}
+	case rest[0] == "pins" && len(rest) == 2:
+		if method(http.MethodPut, http.MethodDelete) {
+			if r.Method == http.MethodPut {
+				handleMovePin(w, r, id, rest[1])
+			} else {
+				handleDeletePin(w, r, id, rest[1])
+			}
+		}
+	case rest[0] == "pin-events" && len(rest) == 1:
+		if method(http.MethodGet) {
+			handlePinEvents(w, r, id)
+		}
+	case rest[0] == "pin-events" && len(rest) == 3 && rest[2] == "undo":
+		if method(http.MethodPost) {
+			handleUndoPinEvent(w, r, id, rest[1])
+		}
+	default:
+		return false
+	}
+	return true
 }
 
-func codexAddMapPayload(payload map[string]interface{}, page *models.Page) error { return nil }
+func codexMapError(w http.ResponseWriter, err error, what string) {
+	switch {
+	case errors.Is(err, db.ErrPinNotFound), errors.Is(err, db.ErrPinEventNotFound), errors.Is(err, db.ErrImageNotFound):
+		writeJSONError(w, http.StatusNotFound, err.Error())
+	case errors.Is(err, db.ErrPinEventUndone):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "already_undone"})
+	default:
+		codexStoreError(w, err, what)
+	}
+}
 
-func codexAddOnMaps(payload map[string]interface{}, backs []models.PageBacklink) error { return nil }
+func codexImageObject(users map[string]*models.User, img models.MapImage, current bool) map[string]interface{} {
+	return map[string]interface{}{
+		"id": img.ID, "url": codexImageURL(img.File), "width": img.Width, "height": img.Height,
+		"uploaded_by_user": journalUser(users, img.UploadedBy), "created_at": img.CreatedAt, "current": current,
+	}
+}
 
-func removeCodexFiles(files []string) {}
+func codexPinObject(pin models.MapPin, pages map[string]models.PageListItem) map[string]interface{} {
+	o := map[string]interface{}{"id": pin.ID, "x": pin.X, "y": pin.Y, "target_text": pin.TargetText, "status": "missing", "target": nil}
+	if t, ok := pages[pin.ToPageID]; ok {
+		o["status"] = "ok"
+		o["target"] = map[string]interface{}{"id": t.ID, "title": t.Title, "slug": codexSlug(t.Title), "kind": t.Kind}
+	}
+	return o
+}
+
+func codexPagesByID() (map[string]models.PageListItem, error) {
+	all, err := db.GetCodexPages()
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[string]models.PageListItem, len(all))
+	for _, p := range all {
+		byID[p.ID] = p
+	}
+	return byID, nil
+}
+
+// codexAddMapPayload adds the map's current image and pins to a page payload.
+func codexAddMapPayload(payload map[string]interface{}, page *models.Page) error {
+	images, err := db.GetMapImages(page.ID)
+	if err != nil {
+		return err
+	}
+	users, err := journalUsers()
+	if err != nil {
+		return err
+	}
+	pins, err := db.GetMapPins(page.ID)
+	if err != nil {
+		return err
+	}
+	pages, err := codexPagesByID()
+	if err != nil {
+		return err
+	}
+	var image interface{}
+	if len(images) > 0 {
+		image = codexImageObject(users, images[0], true)
+	}
+	pinList := make([]map[string]interface{}, 0, len(pins))
+	for _, p := range pins {
+		pinList = append(pinList, codexPinObject(p, pages))
+	}
+	payload["map"] = map[string]interface{}{"image": image, "images_count": len(images), "pins": pinList}
+	return nil
+}
+
+// codexAddOnMaps lists the maps that pin the page, with each map's current image for a thumbnail.
+func codexAddOnMaps(payload map[string]interface{}, backs []models.PageBacklink) error {
+	onMaps := []map[string]interface{}{}
+	for _, b := range backs {
+		if b.PinID == "" {
+			continue
+		}
+		o := map[string]interface{}{"map_id": b.PageID, "map_title": b.Title, "pin_id": b.PinID, "image_url": ""}
+		images, err := db.GetMapImages(b.PageID)
+		if err != nil {
+			return err
+		}
+		if len(images) > 0 {
+			o["image_url"] = codexImageURL(images[0].File)
+		}
+		onMaps = append(onMaps, o)
+	}
+	payload["on_maps"] = onMaps
+	return nil
+}
+
+func handleListMapImages(w http.ResponseWriter, r *http.Request, id string) {
+	if _, ok := codexUserID(w, r); !ok {
+		return
+	}
+	images, err := db.GetMapImages(id)
+	if err != nil {
+		codexServerError(w, "retrieve images")
+		return
+	}
+	users, err := journalUsers()
+	if err != nil {
+		codexServerError(w, "retrieve users")
+		return
+	}
+	list := make([]map[string]interface{}, 0, len(images))
+	for i, img := range images {
+		list = append(list, codexImageObject(users, img, i == 0))
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+// handleUploadMapImage takes the raw image as the request body (PNG, JPEG or WebP, 25 MB at most).
+func handleUploadMapImage(w http.ResponseWriter, r *http.Request, id string) {
+	userID, ok := codexUserID(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxMapImageBytes)
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeJSONError(w, http.StatusRequestEntityTooLarge, "the image must be 25 MB or smaller")
+			return
+		}
+		writeJSONError(w, http.StatusBadRequest, "failed to read the image")
+		return
+	}
+	ext, known := codexImageTypes[http.DetectContentType(data)]
+	if !known {
+		writeJSONError(w, http.StatusBadRequest, "the image must be a PNG, JPEG or WebP file")
+		return
+	}
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > maxMapImageSide || cfg.Height > maxMapImageSide {
+		writeJSONError(w, http.StatusBadRequest, "the image could not be read, or is larger than 16384 pixels on a side")
+		return
+	}
+	// Check the page before writing the file.
+	page, err := db.GetPage(id)
+	if err != nil {
+		codexServerError(w, "retrieve page")
+		return
+	}
+	if page == nil {
+		codexStoreError(w, db.ErrPageNotFound, "")
+		return
+	}
+	if page.Kind != models.PageMap {
+		codexStoreError(w, db.ErrNotAMap, "")
+		return
+	}
+	file := db.GenerateUUID() + ext
+	if err := writeCodexFile(file, data); err != nil {
+		log.Printf("failed to store map image: %v", err)
+		codexServerError(w, "store the image")
+		return
+	}
+	img := models.MapImage{ID: db.GenerateUUID(), PageID: id, File: file, Width: cfg.Width, Height: cfg.Height, UploadedBy: userID, CreatedAt: nowRFC3339()}
+	if err := db.AddMapImage(img); err != nil {
+		removeCodexFiles([]string{file})
+		codexStoreError(w, err, "save the image")
+		return
+	}
+	users, err := journalUsers()
+	if err != nil {
+		codexServerError(w, "retrieve users")
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]interface{}{"image": codexImageObject(users, img, true)})
+}
+
+// writeCodexFile stores data under the upload directory via a temp file and a rename.
+func writeCodexFile(name string, data []byte) error {
+	dir, err := db.UploadDir()
+	if err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(dir, ".upload-*")
+	if err != nil {
+		return err
+	}
+	_, werr := tmp.Write(data)
+	if cerr := tmp.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr != nil {
+		os.Remove(tmp.Name())
+		return werr
+	}
+	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
+		os.Remove(tmp.Name())
+		return err
+	}
+	if err := os.Rename(tmp.Name(), filepath.Join(dir, name)); err != nil {
+		os.Remove(tmp.Name())
+		return err
+	}
+	return nil
+}
+
+// removeCodexFiles deletes stored map images after their page is gone; failures are only logged.
+func removeCodexFiles(files []string) {
+	dir, err := db.UploadDir()
+	if err != nil {
+		log.Printf("cannot remove map images: %v", err)
+		return
+	}
+	for _, f := range files {
+		if !codexFileRe.MatchString(f) {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, f)); err != nil && !os.IsNotExist(err) {
+			log.Printf("failed to remove map image %s: %v", f, err)
+		}
+	}
+}
 
 func handleCodexFile(w http.ResponseWriter, r *http.Request, name string) {
-	writeJSONError(w, http.StatusNotFound, "not found")
+	if _, ok := codexUserID(w, r); !ok {
+		return
+	}
+	if !codexFileRe.MatchString(name) {
+		writeJSONError(w, http.StatusNotFound, "not found")
+		return
+	}
+	dir, err := db.UploadDir()
+	if err != nil {
+		codexServerError(w, "read the image")
+		return
+	}
+	ctype := map[string]string{".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp"}[filepath.Ext(name)]
+	h := w.Header()
+	h.Set("Content-Type", ctype)
+	h.Set("Cache-Control", "private, max-age=31536000, immutable")
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Content-Security-Policy", "default-src 'none'")
+	path := filepath.Join(dir, name)
+	if _, err := os.Stat(path); err != nil {
+		h.Del("Cache-Control")
+		writeJSONError(w, http.StatusNotFound, "not found")
+		return
+	}
+	http.ServeFile(w, r, path)
+}
+
+func handleRestoreMapImage(w http.ResponseWriter, r *http.Request, id, imageID string) {
+	userID, ok := codexUserID(w, r)
+	if !ok {
+		return
+	}
+	img, err := db.RestoreMapImage(id, imageID, userID)
+	if err != nil {
+		codexMapError(w, err, "restore the image")
+		return
+	}
+	users, err := journalUsers()
+	if err != nil {
+		codexServerError(w, "retrieve users")
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]interface{}{"image": codexImageObject(users, img, true)})
+}
+
+type pinRequest struct {
+	X          float64 `json:"x"`
+	Y          float64 `json:"y"`
+	TargetText string  `json:"target_text"`
+	CreatePage bool    `json:"create_page"` // add: create the lore page first (empty, in the map's world)
+}
+
+func validFraction(f float64) bool { return f >= 0 && f <= 1 }
+
+func handleAddPin(w http.ResponseWriter, r *http.Request, id string) {
+	userID, ok := codexUserID(w, r)
+	if !ok {
+		return
+	}
+	var req pinRequest
+	if !codexDecode(w, r, 4<<10, &req) {
+		return
+	}
+	text, valid := codexName(req.TargetText)
+	if !valid || !validFraction(req.X) || !validFraction(req.Y) {
+		writeJSONError(w, http.StatusBadRequest, "a pin needs a position on the map and a page title")
+		return
+	}
+	mapPage, err := db.GetPage(id)
+	if err != nil {
+		codexServerError(w, "retrieve map")
+		return
+	}
+	if mapPage == nil {
+		codexStoreError(w, db.ErrPageNotFound, "")
+		return
+	}
+	if mapPage.Kind != models.PageMap {
+		codexStoreError(w, db.ErrNotAMap, "")
+		return
+	}
+	if req.CreatePage {
+		page := models.Page{ID: db.GenerateUUID(), Kind: models.PageLore, WorldID: mapPage.WorldID, Title: text, AuthorID: userID}
+		if err := db.CreatePage(page, ""); err != nil {
+			codexStoreError(w, err, "create page")
+			return
+		}
+	}
+	pin, err := db.AddMapPin(models.MapPin{MapPageID: id, X: req.X, Y: req.Y, TargetText: text, CreatedBy: userID})
+	if err != nil {
+		codexMapError(w, err, "add the pin")
+		return
+	}
+	pages, err := codexPagesByID()
+	if err != nil {
+		codexServerError(w, "retrieve pages")
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]interface{}{"pin": codexPinObject(pin, pages)})
+}
+
+func handleMovePin(w http.ResponseWriter, r *http.Request, id, pinID string) {
+	userID, ok := codexUserID(w, r)
+	if !ok {
+		return
+	}
+	var req pinRequest
+	if !codexDecode(w, r, 4<<10, &req) {
+		return
+	}
+	if !validFraction(req.X) || !validFraction(req.Y) {
+		writeJSONError(w, http.StatusBadRequest, "a pin needs a position on the map")
+		return
+	}
+	if err := db.MoveMapPin(id, pinID, req.X, req.Y, userID); err != nil {
+		codexMapError(w, err, "move the pin")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+func handleDeletePin(w http.ResponseWriter, r *http.Request, id, pinID string) {
+	userID, ok := codexUserID(w, r)
+	if !ok {
+		return
+	}
+	if err := db.DeleteMapPin(id, pinID, userID); err != nil {
+		codexMapError(w, err, "remove the pin")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+func handlePinEvents(w http.ResponseWriter, r *http.Request, id string) {
+	if _, ok := codexUserID(w, r); !ok {
+		return
+	}
+	events, err := db.GetMapPinEvents(id, db.PinEventsKeep)
+	if err != nil {
+		codexServerError(w, "retrieve pin changes")
+		return
+	}
+	users, err := journalUsers()
+	if err != nil {
+		codexServerError(w, "retrieve users")
+		return
+	}
+	list := make([]map[string]interface{}, 0, len(events))
+	for _, e := range events {
+		var undone interface{}
+		if e.UndoneBy != "" {
+			undone = journalUser(users, e.UndoneBy)
+		}
+		list = append(list, map[string]interface{}{
+			"id": e.ID, "action": e.Action, "user": journalUser(users, e.UserID), "created_at": e.CreatedAt,
+			"undone_by_user": undone, "label": pinEventLabel(e),
+		})
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+func pinEventLabel(e models.MapPinEvent) string {
+	snap := e.After
+	if snap == "" {
+		snap = e.Before
+	}
+	var pin models.MapPin
+	_ = json.Unmarshal([]byte(snap), &pin)
+	name := strings.TrimSpace(pin.TargetText)
+	if utf8.RuneCountInString(name) > 60 {
+		name = string([]rune(name)[:60]) + "…"
+	}
+	verb := map[string]string{"add": "Added a pin for", "move": "Moved the pin for", "remove": "Removed the pin for"}[e.Action]
+	return verb + " “" + name + "”"
+}
+
+func handleUndoPinEvent(w http.ResponseWriter, r *http.Request, id, eventID string) {
+	userID, ok := codexUserID(w, r)
+	if !ok {
+		return
+	}
+	if err := db.UndoMapPinEvent(id, eventID, userID); err != nil {
+		codexMapError(w, err, "undo the pin change")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }

@@ -83,3 +83,23 @@ func MovePage(id, worldID string) error                { return GetStore().MoveP
 
 // DeletePage returns the map image files the caller should remove from disk.
 func DeletePage(id string) ([]string, error) { return GetStore().DeletePage(id) }
+
+func GetMapImages(pageID string) ([]models.MapImage, error) { return GetStore().GetMapImages(pageID) }
+func AddMapImage(img models.MapImage) error                 { return GetStore().AddMapImage(img) }
+func RestoreMapImage(pageID, imageID, userID string) (models.MapImage, error) {
+	return GetStore().RestoreMapImage(pageID, imageID, userID)
+}
+func GetMapPins(pageID string) ([]models.MapPin, error)  { return GetStore().GetMapPins(pageID) }
+func AddMapPin(pin models.MapPin) (models.MapPin, error) { return GetStore().AddMapPin(pin) }
+func MoveMapPin(mapID, pinID string, x, y float64, userID string) error {
+	return GetStore().MoveMapPin(mapID, pinID, x, y, userID)
+}
+func DeleteMapPin(mapID, pinID, userID string) error {
+	return GetStore().DeleteMapPin(mapID, pinID, userID)
+}
+func GetMapPinEvents(mapID string, limit int) ([]models.MapPinEvent, error) {
+	return GetStore().GetMapPinEvents(mapID, limit)
+}
+func UndoMapPinEvent(mapID, eventID, userID string) error {
+	return GetStore().UndoMapPinEvent(mapID, eventID, userID)
+}

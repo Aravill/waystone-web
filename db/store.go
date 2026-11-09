@@ -113,6 +113,15 @@ type Store interface {
 	SetPageAliases(id string, aliases []string) error
 	MovePage(id, worldID string) error
 	DeletePage(id string) ([]string, error)
+	GetMapImages(pageID string) ([]models.MapImage, error)
+	AddMapImage(img models.MapImage) error
+	RestoreMapImage(pageID, imageID, userID string) (models.MapImage, error)
+	GetMapPins(pageID string) ([]models.MapPin, error)
+	AddMapPin(pin models.MapPin) (models.MapPin, error)
+	MoveMapPin(mapID, pinID string, x, y float64, userID string) error
+	DeleteMapPin(mapID, pinID, userID string) error
+	GetMapPinEvents(mapID string, limit int) ([]models.MapPinEvent, error)
+	UndoMapPinEvent(mapID, eventID, userID string) error
 	Backup(path string) error
 	Close() error
 }
@@ -123,6 +132,7 @@ func Initialize() error {
 	if path == "" {
 		path = config.DBPath
 	}
+	dbPath = path
 	sqlStore, err := NewSQLiteStore(path)
 	if err != nil {
 		return fmt.Errorf("failed to initialize sqlite database: %w", err)
