@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=74">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=9">
+    <link rel="stylesheet" href="/static/codex.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -39,7 +39,7 @@
             <nav class="game-crumb" aria-label="Breadcrumb">
                 <a href="/codex">Codex</a>
                 <template x-for="(c, i) in crumbs" :key="i">
-                    <span :class="{ 'crumb-mid': c.mid, 'crumb-ellipsis': c.ellipsis }"><span aria-hidden="true"> › </span><a x-show="c.href" :href="c.href" x-text="c.label"></a><span x-show="!c.href" aria-current="page" x-text="c.label"></span></span>
+                    <span :class="{ 'crumb-mid': c.mid, 'crumb-ellipsis': c.ellipsis }"><span aria-hidden="true"> › </span><a x-show="c.href" :href="c.href" x-text="c.label"></a><span x-show="!c.href && c.ellipsis" aria-hidden="true" x-text="c.label"></span><span x-show="!c.href && !c.ellipsis" :aria-current="i === crumbs.length - 1 ? 'page' : null" x-text="c.label"></span></span>
                 </template>
             </nav>
 
@@ -130,9 +130,12 @@
                                 </div>
                                 <p class="same" x-show="world.pages.length === 0 && world.folders.length === 0">No pages yet. Start with "+ New page".</p>
                                 <p class="codex-tree-bar" x-show="!world.world.unsorted && !pageFilter.trim()">
-                                    <button type="button" class="text-link" @click="openNewFolder('')">+ New folder</button>
+                                    <button type="button" class="text-link" id="new-folder-btn" @click="openNewFolder('')">+ New folder</button>
                                 </p>
-                                <div class="codex-tree" x-show="!world.world.unsorted && !pageFilter.trim()" x-html="treeHtml" @click="onTreeClick($event)" @toggle.capture="onFolderToggle($event)"></div>
+                                <div class="codex-tree-wrap" @click.window="folderMenu.id && !$event.target.closest('.codex-menu, .codex-menu-btn') && closeFolderMenu()">
+                                    <div class="codex-tree" x-show="!world.world.unsorted && !pageFilter.trim()" x-html="treeHtml" @click="onTreeClick($event)" @toggle.capture="onFolderToggle($event)"></div>
+                                    <div class="codex-menu" role="menu" x-ref="folderMenu" x-show="folderMenu.id" x-html="folderMenu.html" :style="'top:' + folderMenu.top + 'px;right:' + folderMenu.right + 'px'" @click="onMenuClick($event)" @keydown="onMenuKey($event)"></div>
+                                </div>
                                 <ul class="page-list" x-show="world.world.unsorted || pageFilter.trim()">
                                     <template x-for="p in filteredPages" :key="p.id">
                                         <li><a :href="pageUrl(p)" x-text="(p.kind === 'map' ? '◈ ' : '') + p.title"></a><span class="muted" x-show="p.aliases.length" x-text="' · also ' + p.aliases.join(', ')"></span></li>
@@ -265,6 +268,14 @@
                             </ul>
                         </nav>
                         <article class="codex-article">
+                            <details class="codex-contents" x-show="toc.length >= 2">
+                                <summary>Contents</summary>
+                                <ul>
+                                    <template x-for="t in toc" :key="t.id">
+                                        <li><a :href="'#' + t.id" :class="{ sub: t.level === 3 }" x-text="t.text"></a></li>
+                                    </template>
+                                </ul>
+                            </details>
                             <h2 class="section-header" x-show="page.kind === 'map'">About this map</h2>
                             <div class="game-text codex-text" x-ref="body" @click="onBodyClick($event)" x-html="bodyHtml" x-effect="bodyHtml; $nextTick(() => buildToc())"></div>
                             <p class="same" x-show="!page.body.trim()">This page is empty. <a :href="pageUrl(page, '/edit')">Write it</a>.</p>
@@ -273,15 +284,22 @@
                         <aside class="codex-side">
                             <section class="codex-sum" aria-label="Summary">
                                 <p class="codex-sum-title" x-text="page.title"></p>
-                                <template x-for="m in pageData.on_maps.slice(0, 1)" :key="m.pin_id">
+                                <template x-for="m in sumMaps.slice(0, 1)" :key="m.pin_id">
                                     <div>
-                                        <a class="codex-sum-map" x-show="m.image_url" :href="pageUrl({ id: m.map_id, title: m.map_title }) + '?pin=' + encodeURIComponent(m.pin_id)" :aria-label="'Open ' + m.map_title">
-                                            <img :src="m.image_url" alt="">
-                                            <span class="codex-sum-pin" aria-hidden="true" :style="'left:' + (m.x * 100) + '%;top:' + (m.y * 100) + '%'">✦</span>
+                                        <a class="codex-sum-map" x-show="m.image_url" :href="mapPinUrl(m)" :aria-label="'Open ' + m.map_title">
+                                            <span class="codex-sum-frame">
+                                                <img :src="m.image_url" alt="">
+                                                <span class="codex-sum-pin" aria-hidden="true" :style="'left:' + (m.x * 100) + '%;top:' + (m.y * 100) + '%'">✦</span>
+                                            </span>
                                         </a>
-                                        <p class="codex-sum-cap">On the <a :href="pageUrl({ id: m.map_id, title: m.map_title }) + '?pin=' + encodeURIComponent(m.pin_id)" x-text="m.map_title"></a><span x-show="pageData.on_maps.length > 1" x-text="' and ' + (pageData.on_maps.length - 1) + ' more'"></span></p>
+                                        <p class="codex-sum-cap">On the <a :href="mapPinUrl(m)" x-text="m.map_title"></a></p>
                                     </div>
                                 </template>
+                                <ul class="codex-sum-maps" x-show="sumMaps.length > 1" aria-label="Other maps">
+                                    <template x-for="m in sumMaps.slice(1)" :key="m.pin_id">
+                                        <li>Also on the <a :href="mapPinUrl(m)" x-text="m.map_title"></a></li>
+                                    </template>
+                                </ul>
                                 <dl>
                                     <div class="codex-sum-row" x-show="page.aliases.length"><dt>Aliases</dt><dd x-text="page.aliases.join(', ')"></dd></div>
                                     <div class="codex-sum-row"><dt>World</dt><dd><a :href="'/codex/w/' + encodeURIComponent(page.world.id)" x-text="page.world.name"></a></dd></div>
@@ -617,6 +635,6 @@
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=2"></script>
     <script src="/static/codex-map.js?v=2"></script>
-    <script src="/static/codex.js?v=5"></script>
+    <script src="/static/codex.js?v=6"></script>
 </body>
 </html>

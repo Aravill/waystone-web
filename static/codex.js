@@ -111,12 +111,21 @@ function codexPageItemHtml(p) {
 function codexFolderHtml(n, depth) {
     const open = codexOpenState[n.id] === undefined ? depth === 0 : codexOpenState[n.id];
     const id = escapeHtml(n.id);
-    const btn = (act, label) => `<button type="button" class="text-link" data-act="${act}" data-id="${id}">${label}</button>`;
     const pages = n.pages.length ? `<ul class="page-list">${n.pages.map(codexPageItemHtml).join('')}</ul>` : '';
     return `<details class="codex-folder${depth >= 4 ? ' codex-folder--deep' : ''}" id="folder-${id}" data-id="${id}"${open ? ' open' : ''}>` +
-        `<summary><span class="codex-folder-name">${escapeHtml(n.name)}</span><span class="muted"> · ${n.count} ${n.count === 1 ? 'page' : 'pages'}</span></summary>` +
-        `<div class="codex-folder-body"><p class="codex-folder-actions">${btn('newPage', '+ Page')}${btn('newFolder', '+ Folder')}${btn('rename', 'Rename')}${btn('move', 'Move')}${btn('delete', 'Delete')}</p>` +
+        `<summary><span class="codex-folder-name">${escapeHtml(n.name)}</span><span class="muted"> · ${n.count} ${n.count === 1 ? 'page' : 'pages'}</span>` +
+        `<button type="button" class="codex-menu-btn" data-menu="${id}" aria-label="Actions for folder ${escapeHtml(n.name)}" aria-haspopup="menu" aria-expanded="false">⋯</button></summary>` +
+        `<div class="codex-folder-body">` +
         n.children.map((c) => codexFolderHtml(c, depth + 1)).join('') + pages + '</div></details>';
+}
+
+// The ⋯ menu's items; every label names the folder for screen readers.
+function codexFolderMenuHtml(f) {
+    const id = escapeHtml(f.id);
+    const name = escapeHtml(f.name);
+    const item = (act, label, aria, cls = '') => `<button type="button" role="menuitem" class="codex-menu-item${cls}" data-act="${act}" data-id="${id}" aria-label="${aria} ${name}">${label}</button>`;
+    return item('newPage', '+ Page', '+ Page in') + item('newFolder', '+ Folder', '+ Folder in') + item('rename', 'Rename', 'Rename') +
+        item('move', 'Move', 'Move') + item('delete', 'Delete', 'Delete', ' codex-menu-item--danger');
 }
 
 let codexMapCtl = null; // the mounted map viewer; kept out of Alpine's reactive state
@@ -145,6 +154,10 @@ window.codexPage = function () {
         tocActive: '',
         pageFilter: '',
         folderTarget: '',
+        folderRevealed: false, // the #folder-… deep link is applied on the first load only
+        toggledBy: null, // the folder a user just clicked, so only user toggles are saved
+        folderMenu: { id: '', top: 0, right: 0, html: '' },
+        tocHashDone: false,
         titles: [], // pages of the current page's world, for previews and the editor
         worldChoices: [],
         dlg: { type: '' },
@@ -276,7 +289,10 @@ window.codexPage = function () {
                     document.title = 'Waystone - Codex';
                 } else if (r.screen === 'world') {
                     codexLoadOpenState(data.world.id);
-                    this.revealFolderFromHash(data.folders);
+                    if (!this.folderRevealed) {
+                        this.folderRevealed = true;
+                        this.revealFolderFromHash(data.folders);
+                    }
                     this.world = data;
                     document.title = 'Waystone - ' + data.world.name;
                     this.$nextTick(() => this.scrollToFolder());
@@ -340,34 +356,104 @@ window.codexPage = function () {
                 : '';
             return tree.roots.map((r) => codexFolderHtml(r, 0)).join('') + pages;
         },
-        // #folder-{id} on the world page opens that folder and the ones above it.
-        revealFolderFromHash(folders) {
-            const m = /^#folder-(.+)$/.exec(decodeURIComponent(location.hash || ''));
-            if (!m) return;
+        // Marks a folder and the ones above it open.
+        openFolderChain(id, folders) {
             const byID = new Map(folders.map((f) => [f.id, f]));
-            for (let cur = m[1], hops = 0; byID.has(cur) && hops <= folders.length; hops++) {
+            for (let cur = id, hops = 0; byID.has(cur) && hops <= folders.length; hops++) {
                 codexOpenState[cur] = true;
                 cur = byID.get(cur).parent_id;
             }
+        },
+        // Keeps a folder (and its ancestors) open across the reload that follows a change.
+        keepFolderOpen(id) {
+            if (!id) return;
+            this.openFolderChain(id, this.world.folders);
+            codexSaveOpenState(this.world.world.id);
+        },
+        // #folder-{id} on the world page opens that folder and the ones above it.
+        revealFolderFromHash(folders) {
+            let hash;
+            try {
+                hash = decodeURIComponent(location.hash || '');
+            } catch (error) {
+                return;
+            }
+            const m = /^#folder-(.+)$/.exec(hash);
+            if (!m) return;
+            this.openFolderChain(m[1], folders);
             this.folderTarget = m[1];
         },
         scrollToFolder() {
             if (!this.folderTarget) return;
             const el = document.getElementById('folder-' + this.folderTarget);
             this.folderTarget = '';
-            if (el) el.scrollIntoView({ block: 'start' });
+            if (!el) return;
+            el.classList.add('codex-folder--target');
+            el.scrollIntoView({ block: 'start' });
         },
+        // After a reload, put keyboard focus back on a folder's row (or the New folder button).
+        focusFolder(id) {
+            this.$nextTick(() => {
+                const el = id && document.getElementById('folder-' + id);
+                (el ? el.querySelector(':scope > summary') : document.getElementById('new-folder-btn'))?.focus();
+            });
+        },
+        // Only toggles the user caused are saved; the ones fired while the tree renders are not.
         onFolderToggle(event) {
             const d = event.target;
-            if (!this.world || !d.matches || !d.matches('details.codex-folder')) return;
+            if (!this.world || !d.matches || !d.matches('details.codex-folder') || d !== this.toggledBy) return;
+            this.toggledBy = null;
             codexOpenState[d.dataset.id] = d.open;
             codexSaveOpenState(this.world.world.id);
         },
         onTreeClick(event) {
+            const sum = event.target.closest('summary');
+            const m = event.target.closest('button[data-menu]');
+            this.toggledBy = sum && !m ? sum.parentElement : null;
+            if (m) {
+                event.preventDefault();
+                if (this.folderMenu.id === m.dataset.menu) this.closeFolderMenu();
+                else this.openFolderMenu(m);
+            }
+        },
+        openFolderMenu(btn) {
+            const f = this.folderById(btn.dataset.menu);
+            if (!f) return;
+            this.closeFolderMenu();
+            const wrap = btn.closest('.codex-tree-wrap').getBoundingClientRect();
+            const b = btn.getBoundingClientRect();
+            btn.setAttribute('aria-expanded', 'true');
+            this.folderMenu = { id: f.id, top: b.bottom - wrap.top, right: wrap.right - b.right, html: codexFolderMenuHtml(f) };
+            this.$nextTick(() => this.$refs.folderMenu?.querySelector('button')?.focus());
+        },
+        closeFolderMenu(refocus = false) {
+            if (!this.folderMenu.id) return;
+            const btn = document.querySelector(`.codex-menu-btn[aria-expanded="true"]`);
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+            this.folderMenu = { id: '', top: 0, right: 0, html: '' };
+            if (refocus && btn) btn.focus();
+        },
+        onMenuKey(event) {
+            if (event.key === 'Escape') {
+                event.stopPropagation();
+                this.closeFolderMenu(true);
+                return;
+            }
+            const items = Array.from(this.$refs.folderMenu.querySelectorAll('button'));
+            const i = items.indexOf(document.activeElement);
+            if (event.key === 'ArrowDown') items[(i + 1) % items.length].focus();
+            else if (event.key === 'ArrowUp') items[(i - 1 + items.length) % items.length].focus();
+            else if (event.key === 'Home') items[0].focus();
+            else if (event.key === 'End') items[items.length - 1].focus();
+            else return;
+            event.preventDefault();
+        },
+        onMenuClick(event) {
             const b = event.target.closest('button[data-act]');
             if (!b) return;
             const id = b.dataset.id;
             const act = b.dataset.act;
+            this.closeFolderMenu();
             if (act === 'newPage') this.openCreatePage('lore', '', id);
             else if (act === 'newFolder') this.openNewFolder(id);
             else if (act === 'rename') this.openRenameFolder(id);
@@ -433,6 +519,14 @@ window.codexPage = function () {
         get bodyHtml() {
             return this.page ? codexMarkdown(this.page.body, this.linkLookup) : '';
         },
+        // The maps the page is pinned on, one entry per map (its first pin).
+        get sumMaps() {
+            const seen = new Set();
+            return (this.pageData ? this.pageData.on_maps : []).filter((m) => !seen.has(m.map_id) && seen.add(m.map_id));
+        },
+        mapPinUrl(m) {
+            return this.pageUrl({ id: m.map_id, title: m.map_title }) + '?pin=' + encodeURIComponent(m.pin_id);
+        },
         get scribes() {
             const p = this.page;
             return [...new Set([p.author_user, ...(p.amender_users || [])].map((u) => (u && u.display_name) || 'Unknown'))].join(', ');
@@ -446,7 +540,7 @@ window.codexPage = function () {
                 return;
             }
             const used = new Set();
-            this.toc = Array.from(body.querySelectorAll('h3, h4')).map((h) => {
+            this.toc = Array.from(body.querySelectorAll('h3, h4')).filter((h) => h.textContent.trim()).map((h) => {
                 const base = 'sec-' + codexSlug(h.textContent);
                 let id = base;
                 for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
@@ -455,6 +549,17 @@ window.codexPage = function () {
                 return { id, text: h.textContent.trim(), level: h.tagName === 'H3' ? 2 : 3 };
             });
             this.updateToc();
+            if (!this.tocHashDone && this.toc.length) {
+                this.tocHashDone = true;
+                let hash = location.hash.slice(1);
+                try {
+                    hash = decodeURIComponent(hash);
+                } catch (error) {
+                    // keep the raw hash
+                }
+                const t = this.toc.find((x) => x.id === hash);
+                if (t) document.getElementById(t.id)?.scrollIntoView({ block: 'start' });
+            }
         },
         updateToc() {
             let active = this.toc.length ? this.toc[0].id : '';
@@ -523,27 +628,30 @@ window.codexPage = function () {
         async openCreatePage(kind, title = '', folderId = null) {
             await this.ensureWorlds();
             const worldId = this.screen === 'world' ? this.world.world.id : this.page ? this.page.world.id : 'unsorted';
-            const folders = this.screen === 'world' ? this.world.folders || [] : await this.fetchFolders(worldId);
+            const folders = this.screen === 'world' ? this.world.folders || [] : (await this.fetchFolders(worldId)) || [];
             if (folderId === null) folderId = this.page ? this.page.folder_id || '' : '';
+            if (!folders.some((f) => f.id === folderId)) folderId = '';
             this.dlg = { type: 'createPage', kind, title, worldId, folders, folderId, error: '', busy: false };
             this.focusDlg();
         },
+        // The world's folders, [] for Unsorted, or null (after an error message) when the load failed.
         async fetchFolders(worldId) {
             if (!worldId || worldId === 'unsorted') return [];
             try {
-                const { response, data } = await this.send(`/api/codex/worlds/${encodeURIComponent(worldId)}`, 'GET');
+                const { response, data } = await this.send(`/api/codex/worlds/${encodeURIComponent(worldId)}/folders`, 'GET');
                 if (response.ok) return data.folders || [];
             } catch (error) {
                 console.error('Failed to load folders:', error);
             }
-            return [];
+            this.showMessage('Could not load the folders', 'error');
+            return null;
         },
         async onDlgWorldChange() {
             const d = this.dlg;
             const worldId = d.worldId;
             d.folderId = '';
             const folders = await this.fetchFolders(worldId);
-            if (this.dlg === d && d.worldId === worldId) d.folders = folders;
+            if (this.dlg === d && d.worldId === worldId) d.folders = folders || [];
         },
         openNewFolder(parentId) {
             this.dlg = { type: 'folder', folder: null, parentId, name: '', error: '', busy: false };
@@ -563,6 +671,7 @@ window.codexPage = function () {
         },
         async openPageFolder() {
             const folders = await this.fetchFolders(this.page.world.id);
+            if (!folders) return;
             this.dlg = { type: 'pageFolder', folders, excludeId: '', folderId: this.page.folder_id || '', error: '', busy: false };
             this.focusDlg();
         },
@@ -597,6 +706,7 @@ window.codexPage = function () {
                     return;
                 }
                 await this.load();
+                this.focusFolder(f.parent_id);
                 this.showMessage(response.ok ? 'Folder deleted' : 'That folder was already gone', response.ok ? 'success' : 'info');
             } catch (error) {
                 this.showMessage('Could not delete the folder: ' + error.message, 'error');
@@ -687,9 +797,10 @@ window.codexPage = function () {
                 this.failDlg(d, response, data);
                 return;
             }
-            if (!d.folder && d.parentId) codexOpenState[d.parentId] = true;
+            this.keepFolderOpen(d.parentId);
             this.closeDlg();
             await this.load();
+            this.focusFolder(d.folder ? d.folder.id : data.folder.id);
             this.showMessage(d.folder ? 'Folder renamed' : 'Folder created', 'success');
         },
         async submitFolderMove(d) {
@@ -702,9 +813,10 @@ window.codexPage = function () {
                 this.failDlg(d, response, data);
                 return;
             }
-            if (d.folderId) codexOpenState[d.folderId] = true;
+            this.keepFolderOpen(d.folderId);
             this.closeDlg();
             await this.load();
+            this.focusFolder(d.folder.id);
             this.showMessage('Folder moved', 'success');
         },
         async submitPageFolder(d) {

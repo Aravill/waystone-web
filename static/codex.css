@@ -548,6 +548,8 @@ button.wikilink {
 .codex-rail {
     position: sticky;
     top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
     font-size: 0.9rem;
 }
 
@@ -671,19 +673,37 @@ button.wikilink {
 }
 
 .codex-sum-map {
-    position: relative;
     display: block;
     border-bottom: 1px solid var(--line);
     background: var(--folio);
     line-height: 0;
+    text-align: center;
+}
+
+/* Shrink-wraps the whole image so the pin's percentages stay relative to what is visible. */
+.codex-sum-frame {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    vertical-align: top;
 }
 
 .codex-sum-map img {
     display: block;
-    width: 100%;
+    width: auto;
     height: auto;
+    max-width: 100%;
     max-height: 14rem;
-    object-fit: cover;
+}
+
+.codex-sum-maps {
+    margin: 0;
+    padding: 0.375rem 0.875rem;
+    border-bottom: 1px solid var(--line);
+    list-style: none;
+    color: var(--muted);
+    font-size: 0.84rem;
+    text-align: center;
 }
 
 .codex-sum-pin {
@@ -788,6 +808,14 @@ button.wikilink {
     text-align: center;
 }
 
+/* Contents box: the rail's stand-in where the rail is hidden. */
+.codex-contents {
+    display: none;
+    margin-bottom: 1rem;
+    border: 1px solid var(--ctl);
+    font-size: 0.9rem;
+}
+
 @media (max-width: 1100px) {
     .codex-grid,
     .codex-grid--rail {
@@ -796,6 +824,52 @@ button.wikilink {
 
     .codex-rail {
         display: none;
+    }
+
+    .codex-contents {
+        display: block;
+    }
+}
+
+.codex-contents > summary {
+    display: flex;
+    align-items: center;
+    min-height: 2.5rem;
+    padding: 0 0.875rem;
+    cursor: pointer;
+    font-family: var(--font-display);
+    font-size: 1.1875rem;
+}
+
+.codex-contents ul {
+    margin: 0;
+    padding: 0 0 0.375rem;
+    list-style: none;
+}
+
+.codex-contents a {
+    display: block;
+    padding: 0.5rem 0.875rem;
+    color: var(--ink);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+.codex-contents a.sub {
+    padding-left: 1.75rem;
+}
+
+.codex-contents a:hover {
+    background: var(--folio);
+}
+
+@media (max-width: 820px) {
+    .codex-contents > summary {
+        min-height: 2.75rem;
+    }
+
+    .codex-contents a {
+        padding-block: 0.75rem;
     }
 }
 
@@ -822,7 +896,10 @@ button.wikilink {
 }
 
 .codex-folder > summary {
-    padding: 0.375rem 0;
+    position: relative;
+    box-sizing: border-box;
+    min-height: 2.5rem;
+    padding: 0.5rem 2.75rem 0.5rem 0;
     cursor: pointer;
     overflow-wrap: anywhere;
 }
@@ -836,9 +913,11 @@ button.wikilink {
     font-weight: 600;
 }
 
-.codex-folder:target > summary .codex-folder-name {
-    text-decoration: underline double;
-    text-underline-offset: 0.2rem;
+.codex-folder--target > summary {
+    background: var(--folio);
+    outline: 2px solid var(--ink);
+    outline-offset: -2px;
+    padding-left: 0.5rem;
 }
 
 .codex-folder-body {
@@ -853,18 +932,85 @@ button.wikilink {
     border-left: none;
 }
 
-.codex-folder-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 1rem;
-    margin: 0.25rem 0 0.5rem;
-    font-size: 0.84rem;
+.codex-menu-btn {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    transform: translateY(-50%);
+    background: none;
+    border: 1px solid transparent;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
 }
 
-.codex-page .codex-folder-actions .text-link,
-.codex-page .codex-tree-bar .text-link,
-.codex-page .codex-sum-row .text-link {
-    min-height: 0;
+.codex-menu-btn:hover,
+.codex-menu-btn[aria-expanded="true"] {
+    background: var(--folio);
+    border-color: var(--ctl);
+}
+
+.codex-tree-wrap {
+    position: relative;
+}
+
+.codex-menu {
+    position: absolute;
+    z-index: 5;
+    display: grid;
+    min-width: 11rem;
+    max-width: calc(100vw - 2rem);
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    outline: 1px solid var(--ink);
+    outline-offset: 2px;
+}
+
+.codex-menu-item {
+    min-height: 2.5rem;
+    padding: 0 0.875rem;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 0.9rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.codex-menu-item:last-child {
+    border-bottom: none;
+}
+
+.codex-menu-item:hover,
+.codex-menu-item:focus-visible {
+    background: var(--folio);
+}
+
+.codex-menu-item--danger {
+    color: var(--rubric);
+}
+
+@media (max-width: 820px) {
+    .codex-folder > summary {
+        min-height: 2.75rem;
+    }
+
+    .codex-menu-btn {
+        width: 2.75rem;
+        height: 2.75rem;
+    }
+
+    .codex-menu-item,
+    .codex-sum-row .text-link,
+    .codex-tree-bar .text-link {
+        min-height: 2.75rem;
+    }
 }
 
 .codex-tree-label {
