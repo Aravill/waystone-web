@@ -5,3 +5,4 @@ playwright-report
 playwright.config.js
 package.json
 package-lock.json
+tools
