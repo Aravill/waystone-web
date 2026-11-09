@@ -50,9 +50,9 @@
         const markers = new Map();
 
         function iconFor(p) {
-            const kind = p.target ? p.target.kind : '';
-            const cls = ['codex-pin', kind === 'map' ? 'codex-pin--map' : '', p.status !== 'ok' ? 'codex-pin--missing' : '', p.id === openId ? 'codex-pin--open' : ''];
-            return L.divIcon({ className: cls.filter(Boolean).join(' '), html: kind === 'map' ? '◈' : '✦', iconSize: [30, 30], iconAnchor: [15, 15] });
+            const hasMap = !!(p.target && p.target.has_map);
+            const cls = ['codex-pin', hasMap ? 'codex-pin--map' : '', p.status !== 'ok' ? 'codex-pin--missing' : '', p.id === openId ? 'codex-pin--open' : ''];
+            return L.divIcon({ className: cls.filter(Boolean).join(' '), html: hasMap ? '◈' : '✦', iconSize: [30, 30], iconAnchor: [15, 15] });
         }
 
         function render(list) {

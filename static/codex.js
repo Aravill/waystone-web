@@ -105,7 +105,7 @@ function codexFolderOptions(folders, excludeId = '') {
 
 function codexPageItemHtml(p) {
     const also = p.aliases.length ? `<span class="muted"> · also ${escapeHtml(p.aliases.join(', '))}</span>` : '';
-    return `<li><a href="${codexPageUrl(p)}">${p.kind === 'map' ? '◈ ' : ''}${escapeHtml(p.title)}</a>${also}</li>`;
+    return `<li><a href="${codexPageUrl(p)}">${p.has_map ? '◈ ' : ''}${escapeHtml(p.title)}</a>${also}</li>`;
 }
 
 function codexFolderHtml(n, depth) {
@@ -305,10 +305,10 @@ window.codexPage = function () {
                     if (r.screen === 'edit' && !this.draft) await this.initDraft();
                     if (r.screen === 'history') {
                         await this.loadHistory(Number(new URLSearchParams(location.search).get('r')) || 0);
-                        if (data.page.kind === 'map') await this.loadMapHistory();
+                        await this.loadMapHistory();
                     }
                     if (r.screen === 'page') await this.loadTitles();
-                    if (r.screen === 'page' && data.page.kind === 'map') this.$nextTick(() => this.mountMap());
+                    if (r.screen === 'page' && data.map.image) this.$nextTick(() => this.mountMap());
                 }
             } catch (error) {
                 if (seq === this.loadSeq) this.loadError = 'Could not load the Codex: ' + error.message;
@@ -343,10 +343,10 @@ window.codexPage = function () {
         recentHtml(r, withWorld) {
             const note = r.note ? ` · ${escapeHtml(r.note)}` : '';
             const where = withWorld ? ` · ${escapeHtml(r.world.name)}` : '';
-            return `<a href="${codexPageUrl({ id: r.page_id, title: r.title })}">${r.kind === 'map' ? '◈ ' : ''}${escapeHtml(r.title)}</a><span class="muted"> · revision ${r.number} by ${escapeHtml(r.author_user.display_name)}${where}${note} · ${escapeHtml(this.shortDate(r.created_at))}</span>`;
+            return `<a href="${codexPageUrl({ id: r.page_id, title: r.title })}">${escapeHtml(r.title)}</a><span class="muted"> · revision ${r.number} by ${escapeHtml(r.author_user.display_name)}${where}${note} · ${escapeHtml(this.shortDate(r.created_at))}</span>`;
         },
         get worldMaps() {
-            return this.world ? this.world.pages.filter((p) => p.kind === 'map') : [];
+            return this.world ? this.world.pages.filter((p) => p.has_map) : [];
         },
         get treeHtml() {
             if (!this.world || this.world.world.unsorted) return '';
@@ -454,7 +454,7 @@ window.codexPage = function () {
             const id = b.dataset.id;
             const act = b.dataset.act;
             this.closeFolderMenu();
-            if (act === 'newPage') this.openCreatePage('lore', '', id);
+            if (act === 'newPage') this.openCreatePage('', id);
             else if (act === 'newFolder') this.openNewFolder(id);
             else if (act === 'rename') this.openRenameFolder(id);
             else if (act === 'move') this.openMoveFolder(id);
@@ -519,7 +519,10 @@ window.codexPage = function () {
         get bodyHtml() {
             return this.page ? codexMarkdown(this.page.body, this.linkLookup) : '';
         },
-        // The maps the page is pinned on, one entry per map (its first pin).
+        // The pages the page is pinned on, one entry per page (its first pin).
+        get hasMap() {
+            return !!(this.pageData && this.pageData.map && this.pageData.map.image);
+        },
         get sumMaps() {
             const seen = new Set();
             return (this.pageData ? this.pageData.on_maps : []).filter((m) => !seen.has(m.map_id) && seen.add(m.map_id));
@@ -585,7 +588,7 @@ window.codexPage = function () {
             const a = event.target.closest('a.wikilink--missing');
             if (!a) return;
             event.preventDefault();
-            this.openCreatePage('lore', a.dataset.text);
+            this.openCreatePage(a.dataset.text);
         },
 
         // ---- Dialogs ----
@@ -594,7 +597,7 @@ window.codexPage = function () {
         },
         get dlgTitle() {
             const d = this.dlg;
-            if (d.type === 'createPage') return d.kind === 'map' ? 'New map' : 'New page';
+            if (d.type === 'createPage') return 'New page';
             return { world: d.world ? 'Edit world' : 'New world', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another world', folder: d.folder ? 'Rename folder' : 'New folder', folderMove: 'Move folder', pageFolder: 'Change folder' }[d.type] || '';
         },
         get dlgSubmit() {
@@ -625,13 +628,13 @@ window.codexPage = function () {
             this.dlg = { type: '' };
         },
         // folderId: the folder to prefill; a page's missing links and pins start in its own folder.
-        async openCreatePage(kind, title = '', folderId = null) {
+        async openCreatePage(title = '', folderId = null) {
             await this.ensureWorlds();
             const worldId = this.screen === 'world' ? this.world.world.id : this.page ? this.page.world.id : 'unsorted';
             const folders = this.screen === 'world' ? this.world.folders || [] : (await this.fetchFolders(worldId)) || [];
             if (folderId === null) folderId = this.page ? this.page.folder_id || '' : '';
             if (!folders.some((f) => f.id === folderId)) folderId = '';
-            this.dlg = { type: 'createPage', kind, title, worldId, folders, folderId, error: '', busy: false };
+            this.dlg = { type: 'createPage', title, worldId, folders, folderId, error: '', busy: false };
             this.focusDlg();
         },
         // The world's folders, [] for Unsorted, or null (after an error message) when the load failed.
@@ -772,7 +775,7 @@ window.codexPage = function () {
                 d.error = 'Give the page a title.';
                 return;
             }
-            const { response, data } = await this.send('/api/codex/pages', 'POST', { kind: d.kind, title, world_id: d.worldId, folder_id: d.folderId || '' });
+            const { response, data } = await this.send('/api/codex/pages', 'POST', { title, world_id: d.worldId, folder_id: d.folderId || '' });
             if (response.status === 201) {
                 this.saved = true;
                 window.location.href = codexPageUrl({ id: data.page.id, title }, '/edit');
@@ -903,7 +906,7 @@ window.codexPage = function () {
                 if (!this.page || t.id === this.page.id) continue;
                 const alias = t.aliases.find((a) => codexNorm(a).includes(q));
                 if (q && !codexNorm(t.title).includes(q) && !alias) continue;
-                options.push({ key: t.id, kind: 'page', title: t.title, label: (t.kind === 'map' ? '◈ ' : '✦ ') + t.title + (alias && !codexNorm(t.title).includes(q) ? ` (also known as ${alias})` : '') });
+                options.push({ key: t.id, kind: 'page', title: t.title, label: (t.has_map ? '◈ ' : '✦ ') + t.title + (alias && !codexNorm(t.title).includes(q) ? ` (also known as ${alias})` : '') });
             }
             const typed = this.pinDlg.query.trim().split(/\s+/).join(' ');
             const exists = this.titles.some((t) => [t.title, ...t.aliases].some((n) => codexNorm(n) === q));
@@ -939,7 +942,7 @@ window.codexPage = function () {
                 const pin = pinId && m.pins.find((p) => p.id === pinId);
                 if (pin) {
                     codexMapCtl.focusPin(pin.id);
-                    if (!pin.target || pin.target.kind !== 'map') this.openPanel(pin);
+                    if (pin.target) this.openPanel(pin);
                 }
             } catch (error) {
                 this.showMessage('Could not show the map: ' + error.message, 'error');
@@ -963,10 +966,6 @@ window.codexPage = function () {
         onPinClick(pin) {
             this.pinMenu = null;
             if (this.movingPin) return;
-            if (pin.target && pin.target.kind === 'map') {
-                window.location.href = codexPageUrl(pin.target);
-                return;
-            }
             this.openPanel(pin);
         },
         async openPanel(pin) {
@@ -988,18 +987,17 @@ window.codexPage = function () {
                 if (panel) panel.loading = false;
             }
         },
-        // Links inside the panel stay in the panel; a link to another map opens that map.
+        // Links inside the panel stay in the panel.
         onPanelClick(event) {
             const a = event.target.closest('a.wikilink');
             if (!a) return;
             if (a.classList.contains('wikilink--missing')) {
                 event.preventDefault();
-                this.openCreatePage('lore', a.dataset.text);
+                this.openCreatePage(a.dataset.text);
                 return;
             }
             const id = (a.getAttribute('href').split('/')[3] || '');
-            const target = this.panel.data.links.map((l) => l.page).find((p) => p && p.id === id);
-            if (!id || (target && target.kind === 'map')) return;
+            if (!id) return;
             event.preventDefault();
             this.loadPanelPage(decodeURIComponent(id));
         },
@@ -1154,12 +1152,45 @@ window.codexPage = function () {
                 if (response.status === 201) {
                     await this.reloadMap();
                     this.$nextTick(() => this.mountMap());
-                    this.showMessage('Image uploaded', 'success');
+                    this.showMessage(current ? 'Image replaced' : 'Map added', 'success');
                 } else {
                     this.showMessage(this.sentence(data.error || 'Failed to upload the image'), 'error');
                 }
             } catch (error) {
                 this.showMessage('Error uploading the image: ' + error.message, 'error');
+            } finally {
+                this.busy = false;
+            }
+        },
+        async removeMap() {
+            if (this.busy || !this.hasMap) return;
+            const n = this.pageData.map.pins.length;
+            const ok = await this.askConfirm({
+                eyebrow: this.page.title,
+                title: 'Remove the map?',
+                message: `The map image and its ${this.countLabel(n, 'pin')} are removed from this page. The page text stays. The image and the pin changes stay in the page history, where you can restore the image or undo pin removals.`,
+                confirmLabel: 'Remove map',
+                danger: true
+            });
+            if (!ok) return;
+            this.busy = true;
+            try {
+                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/map`, 'DELETE');
+                if (response.ok) {
+                    if (codexMapCtl) {
+                        codexMapCtl.destroy();
+                        codexMapCtl = null;
+                    }
+                    this.panel = null;
+                    this.pinMenu = null;
+                    this.movingPin = '';
+                    await this.reloadMap();
+                    this.showMessage('Map removed', 'success');
+                } else {
+                    this.showMessage(this.sentence(data.error || 'Failed to remove the map'), 'error');
+                }
+            } catch (error) {
+                this.showMessage('Error removing the map: ' + error.message, 'error');
             } finally {
                 this.busy = false;
             }
@@ -1214,7 +1245,7 @@ window.codexPage = function () {
             const ok = await this.askConfirm({
                 eyebrow: 'Codex',
                 title: `Delete “${p.title}”?`,
-                message: `This deletes the page and all ${p.revision_count} of its revisions${p.kind === 'map' ? ', its map images and pins' : ''}. It cannot be undone. Links to it become missing links.`,
+                message: `This deletes the page and all ${p.revision_count} of its revisions${this.hasMap ? ', its map images and pins' : ''}. It cannot be undone. Links to it become missing links.`,
                 confirmLabel: 'Delete page',
                 danger: true
             });

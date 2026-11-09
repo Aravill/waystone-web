@@ -242,13 +242,20 @@ button.wikilink {
 }
 
 /* Maps */
+/* The map is the first section of the article column, so it lays itself out by the column's own
+   width (container query), not the viewport's. */
 .map-block {
-    padding-top: 1.5rem;
+    container-type: inline-size;
+    margin-bottom: 1.5rem;
+}
+
+.map-block .section-header {
+    margin-top: 0;
 }
 
 .map-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 23.75rem;
+    grid-template-columns: minmax(0, 1fr) 15rem;
     gap: 1.25rem;
     align-items: start;
 }
@@ -416,18 +423,6 @@ button.wikilink {
     border-top: 1px solid var(--line);
 }
 
-.map-empty {
-    display: grid;
-    justify-items: start;
-    gap: 0.75rem;
-    padding: 2rem;
-    border: 1px dashed var(--line);
-}
-
-.map-empty p {
-    margin: 0;
-}
-
 .pin-key {
     display: flex;
     flex-wrap: wrap;
@@ -522,7 +517,7 @@ button.wikilink {
     padding-top: 1rem;
 }
 
-@media (max-width: 900px) {
+@container (max-width: 640px) {
     .map-layout {
         grid-template-columns: minmax(0, 1fr);
     }
@@ -1037,4 +1032,8 @@ button.wikilink {
     .crumb-ellipsis {
         display: inline;
     }
+}
+
+.map-layout + p {
+    margin-top: 1.25rem;
 }
