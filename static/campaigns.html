@@ -122,6 +122,14 @@
                     </datalist>
                     <small class="form-hint">Pick a known system or type your own</small>
                 </div>
+                <div class="form-group" x-show="editingCampaignId">
+                    <label for="campaignWorld">World</label>
+                    <select id="campaignWorld" name="world_id" x-model="formData.world_id">
+                        <option value="">No world</option>
+                        <template x-for="w in worlds" :key="w.id"><option :value="w.id" x-text="w.name"></option></template>
+                    </select>
+                    <small class="form-hint">Shown on the world's page in the <a href="/codex">Codex</a>. It doesn't change any links.</small>
+                </div>
                 <div class="form-group">
                     <label for="campaignPlayerCount">Desired player count</label>
                     <input type="number" id="campaignPlayerCount" name="desired_player_count" x-model.number="formData.desired_player_count" min="1" step="1">
@@ -291,6 +299,6 @@
     </div>
 
     <script src="/static/notifications.js?v=11"></script>
-    <script src="campaigns.js?v=58"></script>
+    <script src="campaigns.js?v=59"></script>
 </body>
 </html>

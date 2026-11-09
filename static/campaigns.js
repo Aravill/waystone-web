@@ -378,6 +378,7 @@ window.campaignsPage = function () {
         isAdmin: false,
         currentUserId: '',
         campaigns: [],
+        worlds: [],
         loading: true,
         modalOpen: false,
         messageVisible: false,
@@ -389,6 +390,7 @@ window.campaignsPage = function () {
             description: '',
             type: 'Campaign',
             system: '',
+            world_id: '',
             desired_player_count: ''
         },
         systems: [],
@@ -569,8 +571,19 @@ window.campaignsPage = function () {
 
         openModal() {
             this.editingCampaignId = '';
-            this.formData = { title: '', summary: '', description: '', type: 'Campaign', system: '', desired_player_count: '' };
+            this.formData = { title: '', summary: '', description: '', type: 'Campaign', system: '', world_id: '', desired_player_count: '' };
             this.modalOpen = true;
+        },
+
+        // The Codex worlds a game can be set in (editing only).
+        async loadWorlds() {
+            if (this.worlds.length) return;
+            try {
+                const response = await fetch('/api/codex');
+                if (response.ok) this.worlds = (await response.json()).worlds;
+            } catch (error) {
+                console.error('Failed to load worlds:', error);
+            }
         },
 
         openEditModal(campaignId) {
@@ -578,6 +591,7 @@ window.campaignsPage = function () {
             if (!c) {
                 return;
             }
+            this.loadWorlds();
             this.editingCampaignId = c.id;
             this.formData = {
                 title: c.title || '',
@@ -585,6 +599,7 @@ window.campaignsPage = function () {
                 description: c.description || '',
                 type: c.type || 'Campaign',
                 system: c.system || '',
+                world_id: c.world_id || '',
                 desired_player_count: parseInt(c.desired_player_count, 10) || ''
             };
             this.modalOpen = true;
@@ -602,7 +617,7 @@ window.campaignsPage = function () {
         },
 
         async handleCreateCampaign() {
-            const { title, summary, description, type, system, desired_player_count } = this.formData;
+            const { title, summary, description, type, system, world_id, desired_player_count } = this.formData;
             if (!title || !summary || !description) {
                 this.showMessage('Title, summary and description are required', 'error');
                 return;
@@ -619,7 +634,7 @@ window.campaignsPage = function () {
                 const response = await fetch(editing ? `/api/campaigns/${encodeURIComponent(this.editingCampaignId)}` : '/api/campaigns', {
                     method: editing ? 'PUT' : 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, summary, description, type, system: (system || '').trim(), desired_player_count: Number(desired_player_count) || 0 })
+                    body: JSON.stringify({ title, summary, description, type, system: (system || '').trim(), desired_player_count: Number(desired_player_count) || 0, ...(editing ? { world_id } : {}) })
                 });
                 if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
                     window.location.href = '/login.html';
