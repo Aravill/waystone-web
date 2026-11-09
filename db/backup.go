@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -39,8 +40,8 @@ func StartBackups(ctx context.Context) {
 		return
 	}
 
-	runBackup(dir, keep)
 	go func() {
+		runBackup(dir, keep)
 		ticker := time.NewTicker(backupInterval)
 		defer ticker.Stop()
 		for {
@@ -61,17 +62,14 @@ func runBackup(dir string, keep int) {
 	tmp := filepath.Join(dir, ".tmp-"+name)
 	_ = os.Remove(tmp)
 
-	if err := Backup(tmp); err != nil {
+	if err := snapshotDB(tmp, final); err != nil {
 		log.Printf("Backup failed: %v", err)
 		_ = os.Remove(tmp)
-		return
+	} else {
+		log.Printf("Backup written: %s", final)
 	}
-	if err := os.Rename(tmp, final); err != nil {
-		log.Printf("Backup failed: %v", err)
-		_ = os.Remove(tmp)
-		return
-	}
-	log.Printf("Backup written: %s", final)
+	// The images are mirrored even when the snapshot failed.
+	mirrorUploads(filepath.Join(dir, "uploads"))
 
 	files, err := filepath.Glob(filepath.Join(dir, "waystone-*.db"))
 	if err != nil {
@@ -85,4 +83,77 @@ func runBackup(dir string, keep int) {
 		}
 		files = files[1:]
 	}
+}
+
+func snapshotDB(tmp, final string) error {
+	if err := Backup(tmp); err != nil {
+		return err
+	}
+	return os.Rename(tmp, final)
+}
+
+// mirrorUploads copies Codex map images that are not yet in the mirror directory, or whose size
+// differs (a broken earlier copy). Uploaded files never change (their names are random), so a
+// same-sized copy is already backed up. Only files named like uploads are mirrored. It never deletes from the mirror: images of deleted pages stay until you clear them by hand.
+func mirrorUploads(mirror string) {
+	src, err := UploadDir()
+	if err != nil {
+		log.Printf("Upload backup failed: %v", err)
+		return
+	}
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		log.Printf("Upload backup failed: %v", err)
+		return
+	}
+	if err := os.MkdirAll(mirror, 0o755); err != nil {
+		log.Printf("Upload backup failed: %v", err)
+		return
+	}
+	copied := 0
+	for _, e := range entries {
+		if !e.Type().IsRegular() || !UploadFileRe.MatchString(e.Name()) {
+			continue
+		}
+		dst := filepath.Join(mirror, e.Name())
+		if si, err := e.Info(); err != nil {
+			continue
+		} else if di, err := os.Stat(dst); err == nil && di.Size() == si.Size() {
+			continue
+		}
+		if err := copyFile(filepath.Join(src, e.Name()), dst); err != nil {
+			log.Printf("Upload backup failed for %s: %v", e.Name(), err)
+			continue
+		}
+		copied++
+	}
+	if copied > 0 {
+		log.Printf("Upload backup: copied %d new file(s) to %s", copied, mirror)
+	}
+}
+
+// copyFile copies via a temp name so a half-written file is never taken for a finished one.
+func copyFile(from, to string) error {
+	in, err := os.Open(from)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	tmp := filepath.Join(filepath.Dir(to), ".tmp-"+filepath.Base(to))
+	out, err := os.Create(tmp)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(out, in)
+	if err == nil {
+		err = out.Sync()
+	}
+	if cerr := out.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return os.Rename(tmp, to)
 }

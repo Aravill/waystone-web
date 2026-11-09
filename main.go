@@ -39,7 +39,8 @@ func main() {
 	api.RegisterRoutes()
 
 	// Timeouts guard against slow clients holding connections open. ReadTimeout
-	// covers the largest upload (1MB avatar); no handler streams responses.
+	// covers the largest upload (1MB avatar); no handler streams responses. The map
+	// image upload (25MB) extends its own deadlines.
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%s", port),
 		ReadHeaderTimeout: 10 * time.Second,

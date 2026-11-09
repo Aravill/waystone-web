@@ -175,6 +175,7 @@ func (v *campaignViewer) enrich(campaign models.Campaign) map[string]interface{}
 		"sign_ups_open":              campaign.SignUpsOpen,
 		"desired_player_count":       campaign.DesiredPlayerCount,
 		"system":                     campaign.System,
+		"world_id":                   campaign.WorldID,
 		"system_logo_url":            v.systems[strings.ToLower(campaign.System)].LogoURL(),
 		"can_manage":                 v.isAdmin || (currentUserID != "" && campaign.DM == currentUserID),
 		"allowed_status_transitions": campaign.Status.AllowedTransitions(),
@@ -580,6 +581,7 @@ type campaignRequest struct {
 	Type               models.CampaignType `json:"type"`
 	DesiredPlayerCount int                 `json:"desired_player_count"`
 	System             string              `json:"system"`
+	WorldID            *string             `json:"world_id"` // update only: the Codex world the game is set in; "" clears it
 }
 
 // normalize trims the text fields and returns a validation error message, or "" if valid.
@@ -692,6 +694,22 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve systems")
 		return
 	}
+	// Validate the world before anything is saved ("unsorted" and "" both mean no world).
+	newWorld := campaign.WorldID
+	if userID, _ := r.Context().Value("user_id").(string); req.WorldID != nil && codexAllowedFor(userID) {
+		newWorld = codexWorldParam(*req.WorldID)
+		if newWorld != "" {
+			world, err := db.GetWorld(newWorld)
+			if err != nil {
+				writeJSONError(w, http.StatusInternalServerError, "failed to retrieve world")
+				return
+			}
+			if world == nil {
+				writeJSONError(w, http.StatusBadRequest, db.ErrWorldNotFound.Error())
+				return
+			}
+		}
+	}
 	probe := *campaign
 	probe.System = system
 	idChanges := campaignSystemID(byName, campaign) != campaignSystemID(byName, &probe)
@@ -707,6 +725,16 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 		}
 		writeJSONError(w, http.StatusInternalServerError, "failed to update game")
 		return
+	}
+	if newWorld != campaign.WorldID {
+		if err := db.SetCampaignWorld(campaignID, newWorld); err != nil {
+			if errors.Is(err, db.ErrWorldNotFound) {
+				writeJSONError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			writeJSONError(w, http.StatusInternalServerError, "failed to set the game's world")
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "game updated"})
 }

@@ -20,6 +20,8 @@ services:
       - BACKUP_DIR=${BACKUP_DIR:-/root/backups}
       - BACKUP_KEEP=${BACKUP_KEEP:-14}
       - DB_PATH=${DB_PATH:-}
+      - UPLOAD_DIR=${UPLOAD_DIR:-}
+      - CODEX_ADMIN_ONLY=${CODEX_ADMIN_ONLY:-true}
     restart: unless-stopped
     volumes:
       - waystone-data:/root/data

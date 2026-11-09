@@ -94,6 +94,44 @@ type Store interface {
 	AssignCharacter(campaignID, userID, characterID, systemID, at string) (bool, error)
 	EndCharacterAssignment(campaignID, userID, at string) (*models.CharacterAssignment, error)
 	CountCharactersBySystem(systemID string) (int, error)
+	GetWorlds() ([]models.World, error)
+	GetWorld(id string) (*models.World, error)
+	CreateWorld(w models.World) error
+	UpdateWorld(id, name, description string) error
+	DeleteWorld(id string) error
+	SetCampaignWorld(campaignID, worldID string) error
+	GetCodexPages() ([]models.PageListItem, error)
+	GetPage(id string) (*models.Page, error)
+	GetPageLinks(fromID string) ([]models.PageLink, error)
+	GetBacklinks(id string) ([]models.PageBacklink, error)
+	GetWantedPages(worldID string) ([]models.WantedPage, error)
+	GetPageRevisions(id string) ([]models.PageRevision, error)
+	GetPageRevision(id string, number int) (models.PageRevision, error)
+	GetRecentRevisions(worldID *string, limit int) ([]models.RecentRevision, error)
+	CreatePage(p models.Page, body string) error
+	SavePageRevision(id string, base int, rev models.PageRevision, keep int) (models.PageSaveResult, error)
+	RenamePage(id, newTitle, userID string, keep int) (int, error)
+	SetPageAliases(id string, aliases []string) error
+	MovePage(id, worldID string) error
+	GetFolders(worldID string) ([]models.Folder, error)
+	GetFolder(id string) (*models.Folder, error)
+	CreateFolder(f models.Folder) error
+	RenameFolder(id, name string) error
+	MoveFolder(id, newParentID string) error
+	DeleteFolder(id string) (pages, folders int, err error)
+	SetPageFolder(pageID, folderID string) error
+	DeletePage(id string) ([]string, error)
+	GetMapImages(pageID string) ([]models.MapImage, error)
+	AddMapImage(img models.MapImage) error
+	RestoreMapImage(pageID, imageID, userID string) (models.MapImage, error)
+	RemoveMap(pageID, userID string) (int, error)
+	GetMapPins(pageID string) ([]models.MapPin, error)
+	AddMapPin(pin models.MapPin) (models.MapPin, error)
+	AddMapPinWithNewPage(page models.Page, pin models.MapPin) (models.MapPin, error)
+	MoveMapPin(mapID, pinID string, x, y float64, userID string) error
+	DeleteMapPin(mapID, pinID, userID string) error
+	GetMapPinEvents(mapID string, limit int) ([]models.MapPinEvent, error)
+	UndoMapPinEvent(mapID, eventID, userID string) error
 	Backup(path string) error
 	Close() error
 }
@@ -104,6 +142,7 @@ func Initialize() error {
 	if path == "" {
 		path = config.DBPath
 	}
+	dbPath = path
 	sqlStore, err := NewSQLiteStore(path)
 	if err != nil {
 		return fmt.Errorf("failed to initialize sqlite database: %w", err)
@@ -260,6 +299,13 @@ func seedIfEmpty() error {
 					return fmt.Errorf("failed to end seeded character assignment: %w", err)
 				}
 			}
+		}
+	}
+
+	// The demo Codex world links to the seeded game, so it is added with the characters.
+	if len(campaigns) == 0 && len(users) == 0 {
+		if err := seedCodex(); err != nil {
+			return err
 		}
 	}
 
