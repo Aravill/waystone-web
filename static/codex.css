@@ -25,6 +25,7 @@
 }
 
 .wikilink--missing,
+.codex-page .game-text a.wikilink--missing,
 button.wikilink--missing {
     color: var(--muted);
     text-decoration: underline dashed;
@@ -191,9 +192,9 @@ button.wikilink {
     font-family: inherit;
 }
 
-.cm-tooltip-autocomplete ul li[aria-selected] {
-    background: var(--folio);
-    color: var(--ink);
+.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] {
+    background: var(--folio) !important; /* the library's own selected colour is blue */
+    color: var(--ink) !important;
 }
 
 /* Stale save */
