@@ -227,6 +227,16 @@ Each played session can have one entry, written in the game description's Markdo
 - **History:** revisions newest first with a +/- word count, and the selected one as a diff against the one before, or its full text. Restoring asks first and saves a new revision. The newest 200 revisions are kept, and the page says so once older ones are gone.
 - **Buttons:** primary is `.submit-btn` (set to `width: auto` outside a form column), secondary `.campaign-action-btn`, Delete `.btn-danger`. Confirmations reuse the game page's modal. Errors are plain and precise.
 
+### Codex
+
+`/codex` is the world database, built on the journal's page styles (`<body class="journal-page codex-page">` plus `codex.css`). Worlds are folders: a page lives in exactly one world, or in the shared Unsorted folder, and a `[[Title]]` link only reaches pages of its own world. Home shows world cards (a dashed card for Unsorted) and recent changes; a world page lists its maps, pages, games, **Wanted pages** (link targets nobody has written yet) and recent changes.
+
+- **Link states** (state is never colour alone): an existing page is a rubric text link with a solid underline, as links always are. A missing page is `--muted` text with a **dashed** underline and the title "No page yet. Click to create."; clicking opens the create dialog in the same world. Old revisions show links as plain dotted underlines because their status is not known. The editor marks `[[links]]` the same way (`.cm-wikilink`, `--missing`).
+- **Pins** are 30px square marks on the map: `✦` for a lore page, `◈` with a double border for a map (clicking drills down), a **dashed** outline when the page doesn't exist, filled ink while the pin is open in the side panel. A pin's tooltip is the page title.
+- **Map page:** a double-ruled stage (zoom +/- and Fit top left), a 380px side panel (stacked below at <= 900px), a hint line and a pin key. Clicking an empty spot opens a small menu ("+ Add pin here", "Cancel"), then a picker over the world's pages with a "New page" choice. Move pin and Remove pin live in the panel.
+- **Stale save:** a rubric-bordered notice "§ X saved revision N while you were editing" with a word diff (added underlined on a verdigris tint, removed struck through in muted ink) and the buttons "Save mine on top" (primary), "Discard mine" (rubric outline). There is no merge screen.
+- Editor, history, confirm and form dialogs reuse the journal and `.modal` components. Rename, Aliases and Move are separate dialogs, never part of the editor.
+
 ### Buttons
 
 Square, sentence case, 14.5px at weight 500 (reply buttons 15px), min-height 42px (46px for reply buttons, 44px for primary actions on touch). No transitions longer than 0.15s, no lift, no glow.
