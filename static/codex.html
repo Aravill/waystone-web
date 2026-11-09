@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=74">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=8">
+    <link rel="stylesheet" href="/static/codex.css?v=9">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -39,7 +39,7 @@
             <nav class="game-crumb" aria-label="Breadcrumb">
                 <a href="/codex">Codex</a>
                 <template x-for="(c, i) in crumbs" :key="i">
-                    <span><span aria-hidden="true"> › </span><a x-show="c.href" :href="c.href" x-text="c.label"></a><span x-show="!c.href" aria-current="page" x-text="c.label"></span></span>
+                    <span :class="{ 'crumb-mid': c.mid, 'crumb-ellipsis': c.ellipsis }"><span aria-hidden="true"> › </span><a x-show="c.href" :href="c.href" x-text="c.label"></a><span x-show="!c.href" aria-current="page" x-text="c.label"></span></span>
                 </template>
             </nav>
 
@@ -128,8 +128,12 @@
                                     <label for="pageFilter" class="label">Find a page</label>
                                     <input type="search" id="pageFilter" x-model="pageFilter" placeholder="Title or alias">
                                 </div>
-                                <p class="same" x-show="world.pages.length === 0">No pages yet. Start with "+ New page".</p>
-                                <ul class="page-list">
+                                <p class="same" x-show="world.pages.length === 0 && world.folders.length === 0">No pages yet. Start with "+ New page".</p>
+                                <p class="codex-tree-bar" x-show="!world.world.unsorted && !pageFilter.trim()">
+                                    <button type="button" class="text-link" @click="openNewFolder('')">+ New folder</button>
+                                </p>
+                                <div class="codex-tree" x-show="!world.world.unsorted && !pageFilter.trim()" x-html="treeHtml" @click="onTreeClick($event)" @toggle.capture="onFolderToggle($event)"></div>
+                                <ul class="page-list" x-show="world.world.unsorted || pageFilter.trim()">
                                     <template x-for="p in filteredPages" :key="p.id">
                                         <li><a :href="pageUrl(p)" x-text="(p.kind === 'map' ? '◈ ' : '') + p.title"></a><span class="muted" x-show="p.aliases.length" x-text="' · also ' + p.aliases.join(', ')"></span></li>
                                     </template>
@@ -281,6 +285,7 @@
                                 <dl>
                                     <div class="codex-sum-row" x-show="page.aliases.length"><dt>Aliases</dt><dd x-text="page.aliases.join(', ')"></dd></div>
                                     <div class="codex-sum-row"><dt>World</dt><dd><a :href="'/codex/w/' + encodeURIComponent(page.world.id)" x-text="page.world.name"></a></dd></div>
+                                    <div class="codex-sum-row" x-show="page.world.id !== 'unsorted'"><dt>Folder</dt><dd><span x-text="page.folder_path.length ? page.folder_path.map((f) => f.name).join(' › ') : 'Top level'"></span> <button type="button" class="text-link" @click="openPageFolder()">Change</button></dd></div>
                                     <div class="codex-sum-row"><dt>Started</dt><dd x-text="page.author_user.display_name + ', ' + shortDate(page.created_at)"></dd></div>
                                     <div class="codex-sum-row"><dt>Scribes</dt><dd x-text="scribes"></dd></div>
                                     <div class="codex-sum-row"><dt>Revisions</dt><dd><a :href="pageUrl(page, '/history')" x-text="page.revision_count"></a></dd></div>
@@ -476,8 +481,33 @@
                         </div>
                         <div class="form-group">
                             <label for="dWorld">World</label>
-                            <select id="dWorld" x-model="dlg.worldId">
+                            <select id="dWorld" x-model="dlg.worldId" @change="onDlgWorldChange()">
                                 <template x-for="w in worldChoices" :key="w.id"><option :value="w.id" x-text="w.name"></option></template>
+                            </select>
+                        </div>
+                        <div class="form-group" x-show="dlg.folders && dlg.folders.length">
+                            <label for="dFolder">Folder</label>
+                            <select id="dFolder" x-model="dlg.folderId">
+                                <template x-for="o in folderOptions(dlg.folders)" :key="o.id"><option :value="o.id" x-text="o.label"></option></template>
+                            </select>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'folder'">
+                    <div>
+                        <div class="form-group">
+                            <label for="dFolderName">Folder name</label>
+                            <input type="text" id="dFolderName" maxlength="80" x-model="dlg.name" x-ref="dlgFocus">
+                            <p class="hint">Folders only sort pages. Links and page titles work the same wherever a page is filed.</p>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'folderMove' || dlg.type === 'pageFolder'">
+                    <div>
+                        <div class="form-group">
+                            <label for="dFolderPick" x-text="dlg.type === 'pageFolder' ? 'Folder' : 'Move into'"></label>
+                            <select id="dFolderPick" x-model="dlg.folderId" x-ref="dlgFocus">
+                                <template x-for="o in folderOptions(dlg.folders, dlg.excludeId)" :key="o.id"><option :value="o.id" x-text="o.label" :disabled="o.disabled"></option></template>
                             </select>
                         </div>
                     </div>
@@ -587,6 +617,6 @@
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=2"></script>
     <script src="/static/codex-map.js?v=2"></script>
-    <script src="/static/codex.js?v=4"></script>
+    <script src="/static/codex.js?v=5"></script>
 </body>
 </html>

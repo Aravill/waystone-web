@@ -38,6 +38,87 @@ function codexMarkdown(body, lookup) {
     });
 }
 
+// Folder tree. Folders only sort pages. Open/closed state is kept per world in localStorage and
+// is deliberately not reactive, so toggling a folder never re-renders the tree.
+let codexOpenState = {};
+const codexOpenKey = (worldId) => 'codex-folders-open:' + worldId;
+
+function codexLoadOpenState(worldId) {
+    try {
+        codexOpenState = JSON.parse(localStorage.getItem(codexOpenKey(worldId))) || {};
+    } catch (error) {
+        codexOpenState = {};
+    }
+}
+
+function codexSaveOpenState(worldId) {
+    try {
+        localStorage.setItem(codexOpenKey(worldId), JSON.stringify(codexOpenState));
+    } catch (error) {
+        // storage may be blocked; the tree still works
+    }
+}
+
+// Builds { roots, pages } from the flat folder and page lists. A folder whose parent is missing
+// is shown at the top, and a cycle can't loop: only reachable folders are walked.
+function codexFolderTree(folders, pages) {
+    const nodes = new Map(folders.map((f) => [f.id, { id: f.id, name: f.name, parent: f.parent_id, children: [], pages: [], count: 0 }]));
+    const roots = [];
+    for (const n of nodes.values()) {
+        const parent = nodes.get(n.parent);
+        (parent && parent !== n ? parent.children : roots).push(n);
+    }
+    const rootPages = [];
+    for (const p of pages) {
+        const n = nodes.get(p.folder_id);
+        (n ? n.pages : rootPages).push(p);
+    }
+    const byName = (a, b) => (codexNorm(a.name) < codexNorm(b.name) ? -1 : codexNorm(a.name) > codexNorm(b.name) ? 1 : 0);
+    const seen = new Set();
+    const finish = (n) => {
+        seen.add(n.id);
+        n.children.sort(byName);
+        n.count = n.pages.length;
+        for (const c of n.children) {
+            if (!seen.has(c.id)) n.count += finish(c);
+        }
+        return n.count;
+    };
+    roots.sort(byName);
+    roots.forEach(finish);
+    return { roots, pages: rootPages };
+}
+
+// Folders in tree order with a path label ("Places › Cities"); excludeId's subtree is disabled.
+function codexFolderOptions(folders, excludeId = '') {
+    const { roots } = codexFolderTree(folders || [], []);
+    const out = [{ id: '', label: 'Top level', disabled: false }];
+    const walk = (n, trail, blocked) => {
+        const path = [...trail, n.name];
+        const off = blocked || n.id === excludeId;
+        out.push({ id: n.id, label: path.join(' › '), disabled: off });
+        n.children.forEach((c) => walk(c, path, off));
+    };
+    roots.forEach((r) => walk(r, [], false));
+    return out;
+}
+
+function codexPageItemHtml(p) {
+    const also = p.aliases.length ? `<span class="muted"> · also ${escapeHtml(p.aliases.join(', '))}</span>` : '';
+    return `<li><a href="${codexPageUrl(p)}">${p.kind === 'map' ? '◈ ' : ''}${escapeHtml(p.title)}</a>${also}</li>`;
+}
+
+function codexFolderHtml(n, depth) {
+    const open = codexOpenState[n.id] === undefined ? depth === 0 : codexOpenState[n.id];
+    const id = escapeHtml(n.id);
+    const btn = (act, label) => `<button type="button" class="text-link" data-act="${act}" data-id="${id}">${label}</button>`;
+    const pages = n.pages.length ? `<ul class="page-list">${n.pages.map(codexPageItemHtml).join('')}</ul>` : '';
+    return `<details class="codex-folder${depth >= 4 ? ' codex-folder--deep' : ''}" id="folder-${id}" data-id="${id}"${open ? ' open' : ''}>` +
+        `<summary><span class="codex-folder-name">${escapeHtml(n.name)}</span><span class="muted"> · ${n.count} ${n.count === 1 ? 'page' : 'pages'}</span></summary>` +
+        `<div class="codex-folder-body"><p class="codex-folder-actions">${btn('newPage', '+ Page')}${btn('newFolder', '+ Folder')}${btn('rename', 'Rename')}${btn('move', 'Move')}${btn('delete', 'Delete')}</p>` +
+        n.children.map((c) => codexFolderHtml(c, depth + 1)).join('') + pages + '</div></details>';
+}
+
 let codexMapCtl = null; // the mounted map viewer; kept out of Alpine's reactive state
 
 window.codexPage = function () {
@@ -63,6 +144,7 @@ window.codexPage = function () {
         toc: [],
         tocActive: '',
         pageFilter: '',
+        folderTarget: '',
         titles: [], // pages of the current page's world, for previews and the editor
         worldChoices: [],
         dlg: { type: '' },
@@ -152,7 +234,15 @@ window.codexPage = function () {
             const s = this.screen;
             if (s === 'world' && this.world) return [{ label: this.world.world.name, href: '' }];
             if (!this.page) return [];
+            const worldHref = '/codex/w/' + encodeURIComponent(this.page.world.id) + '/' + encodeURIComponent(codexSlug(this.page.world.name));
             const list = [{ label: this.page.world.name, href: '/codex/w/' + encodeURIComponent(this.page.world.id) }];
+            // Folder crumbs link to the world page with that folder opened. With more than two
+            // folders the middle ones collapse to "…" on narrow screens (CSS).
+            const path = this.page.folder_path || [];
+            path.forEach((f, i) => {
+                if (path.length > 2 && i === 1) list.push({ label: '…', href: '', ellipsis: true });
+                list.push({ label: f.name, href: `${worldHref}#folder-${encodeURIComponent(f.id)}`, mid: path.length > 2 && i > 0 && i < path.length - 1 });
+            });
             if (s === 'page') return [...list, { label: this.page.title, href: '' }];
             return [...list, { label: this.page.title, href: this.pageUrl(this.page) }, { label: s === 'edit' ? 'Edit' : 'History', href: '' }];
         },
@@ -185,8 +275,11 @@ window.codexPage = function () {
                     this.home = data;
                     document.title = 'Waystone - Codex';
                 } else if (r.screen === 'world') {
+                    codexLoadOpenState(data.world.id);
+                    this.revealFolderFromHash(data.folders);
                     this.world = data;
                     document.title = 'Waystone - ' + data.world.name;
+                    this.$nextTick(() => this.scrollToFolder());
                 } else {
                     this.pageData = data;
                     document.title = 'Waystone - ' + data.page.title;
@@ -238,6 +331,54 @@ window.codexPage = function () {
         },
         get worldMaps() {
             return this.world ? this.world.pages.filter((p) => p.kind === 'map') : [];
+        },
+        get treeHtml() {
+            if (!this.world || this.world.world.unsorted) return '';
+            const tree = codexFolderTree(this.world.folders, this.world.pages);
+            const pages = tree.pages.length
+                ? `<p class="codex-tree-label muted">Not in a folder</p><ul class="page-list">${tree.pages.map(codexPageItemHtml).join('')}</ul>`
+                : '';
+            return tree.roots.map((r) => codexFolderHtml(r, 0)).join('') + pages;
+        },
+        // #folder-{id} on the world page opens that folder and the ones above it.
+        revealFolderFromHash(folders) {
+            const m = /^#folder-(.+)$/.exec(decodeURIComponent(location.hash || ''));
+            if (!m) return;
+            const byID = new Map(folders.map((f) => [f.id, f]));
+            for (let cur = m[1], hops = 0; byID.has(cur) && hops <= folders.length; hops++) {
+                codexOpenState[cur] = true;
+                cur = byID.get(cur).parent_id;
+            }
+            this.folderTarget = m[1];
+        },
+        scrollToFolder() {
+            if (!this.folderTarget) return;
+            const el = document.getElementById('folder-' + this.folderTarget);
+            this.folderTarget = '';
+            if (el) el.scrollIntoView({ block: 'start' });
+        },
+        onFolderToggle(event) {
+            const d = event.target;
+            if (!this.world || !d.matches || !d.matches('details.codex-folder')) return;
+            codexOpenState[d.dataset.id] = d.open;
+            codexSaveOpenState(this.world.world.id);
+        },
+        onTreeClick(event) {
+            const b = event.target.closest('button[data-act]');
+            if (!b) return;
+            const id = b.dataset.id;
+            const act = b.dataset.act;
+            if (act === 'newPage') this.openCreatePage('lore', '', id);
+            else if (act === 'newFolder') this.openNewFolder(id);
+            else if (act === 'rename') this.openRenameFolder(id);
+            else if (act === 'move') this.openMoveFolder(id);
+            else if (act === 'delete') this.deleteFolder(id);
+        },
+        folderOptions(folders, excludeId) {
+            return codexFolderOptions(folders, excludeId);
+        },
+        folderById(id) {
+            return this.world.folders.find((f) => f.id === id);
         },
         get filteredPages() {
             const q = codexNorm(this.pageFilter);
@@ -344,24 +485,24 @@ window.codexPage = function () {
 
         // ---- Dialogs ----
         get dlgEyebrow() {
-            return { createPage: 'Codex', world: 'Codex', rename: 'Page', aliases: 'Page', move: 'Page' }[this.dlg.type] || '';
+            return { createPage: 'Codex', world: 'Codex', rename: 'Page', aliases: 'Page', move: 'Page', folder: 'Folder', folderMove: 'Folder', pageFolder: 'Page' }[this.dlg.type] || '';
         },
         get dlgTitle() {
             const d = this.dlg;
             if (d.type === 'createPage') return d.kind === 'map' ? 'New map' : 'New page';
-            return { world: d.world ? 'Edit world' : 'New world', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another world' }[d.type] || '';
+            return { world: d.world ? 'Edit world' : 'New world', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another world', folder: d.folder ? 'Rename folder' : 'New folder', folderMove: 'Move folder', pageFolder: 'Change folder' }[d.type] || '';
         },
         get dlgSubmit() {
             const d = this.dlg;
             if (d.type === 'createPage') return d.busy ? 'Creating...' : 'Create';
-            return d.busy ? 'Saving...' : d.type === 'move' ? 'Move page' : d.type === 'world' && !d.world ? 'Create world' : 'Save';
+            return d.busy ? 'Saving...' : d.type === 'move' ? 'Move page' : d.type === 'folderMove' ? 'Move folder' : (d.type === 'world' && !d.world) || (d.type === 'folder' && !d.folder) ? 'Create' + (d.type === 'world' ? ' world' : ' folder') : 'Save';
         },
         get moveWarning() {
             const n = this.pageData?.incoming_count || 0;
             const here = this.page?.world.name;
             return (n > 0
                 ? `${this.countLabel(n, 'link')} from ${here} will turn into missing links, because links only reach pages in their own world. `
-                : '') + "This page's own links are checked again in the new world.";
+                : '') + "This page's own links are checked again in the new world, and it goes to the top level of its folders.";
         },
         async ensureWorlds() {
             if (this.worldChoices.length) return;
@@ -378,11 +519,88 @@ window.codexPage = function () {
         closeDlg() {
             this.dlg = { type: '' };
         },
-        async openCreatePage(kind, title = '') {
+        // folderId: the folder to prefill; a page's missing links and pins start in its own folder.
+        async openCreatePage(kind, title = '', folderId = null) {
             await this.ensureWorlds();
             const worldId = this.screen === 'world' ? this.world.world.id : this.page ? this.page.world.id : 'unsorted';
-            this.dlg = { type: 'createPage', kind, title, worldId, error: '', busy: false };
+            const folders = this.screen === 'world' ? this.world.folders || [] : await this.fetchFolders(worldId);
+            if (folderId === null) folderId = this.page ? this.page.folder_id || '' : '';
+            this.dlg = { type: 'createPage', kind, title, worldId, folders, folderId, error: '', busy: false };
             this.focusDlg();
+        },
+        async fetchFolders(worldId) {
+            if (!worldId || worldId === 'unsorted') return [];
+            try {
+                const { response, data } = await this.send(`/api/codex/worlds/${encodeURIComponent(worldId)}`, 'GET');
+                if (response.ok) return data.folders || [];
+            } catch (error) {
+                console.error('Failed to load folders:', error);
+            }
+            return [];
+        },
+        async onDlgWorldChange() {
+            const d = this.dlg;
+            const worldId = d.worldId;
+            d.folderId = '';
+            const folders = await this.fetchFolders(worldId);
+            if (this.dlg === d && d.worldId === worldId) d.folders = folders;
+        },
+        openNewFolder(parentId) {
+            this.dlg = { type: 'folder', folder: null, parentId, name: '', error: '', busy: false };
+            this.focusDlg();
+        },
+        openRenameFolder(id) {
+            const f = this.folderById(id);
+            if (!f) return;
+            this.dlg = { type: 'folder', folder: f, name: f.name, error: '', busy: false };
+            this.focusDlg();
+        },
+        openMoveFolder(id) {
+            const f = this.folderById(id);
+            if (!f) return;
+            this.dlg = { type: 'folderMove', folder: f, folders: this.world.folders, excludeId: id, folderId: f.parent_id || '', error: '', busy: false };
+            this.focusDlg();
+        },
+        async openPageFolder() {
+            const folders = await this.fetchFolders(this.page.world.id);
+            this.dlg = { type: 'pageFolder', folders, excludeId: '', folderId: this.page.folder_id || '', error: '', busy: false };
+            this.focusDlg();
+        },
+        async deleteFolder(id) {
+            const f = this.folderById(id);
+            if (!f) return;
+            const pages = this.world.pages.filter((p) => p.folder_id === id).length;
+            const subs = this.world.folders.filter((x) => x.parent_id === id).length;
+            const parent = this.folderById(f.parent_id);
+            const moves = pages + subs
+                ? `Its ${this.countLabel(pages, 'page')} and ${this.countLabel(subs, 'folder')} will move up into ${parent ? '“' + parent.name + '”' : 'the top level'}.`
+                : 'It is empty.';
+            const ok = await this.askConfirm({
+                eyebrow: 'Folder',
+                title: `Delete the folder “${f.name}”?`,
+                message: `${moves} Nothing else is deleted.`,
+                confirmLabel: 'Delete folder'
+            });
+            if (!ok) return;
+            try {
+                const { response, data } = await this.send(`/api/codex/folders/${encodeURIComponent(id)}`, 'DELETE');
+                if (response.status === 401) {
+                    this.showMessage('Your login has expired. Log in again, then try once more.', 'error');
+                    return;
+                }
+                if (data.code === 'folder_name_taken') {
+                    this.showMessage('A folder inside it has the same name as one next to it. Rename one of them first.', 'error');
+                    return;
+                }
+                if (!response.ok && response.status !== 404) {
+                    this.showMessage(this.sentence(data.error || 'Could not delete the folder'), 'error');
+                    return;
+                }
+                await this.load();
+                this.showMessage(response.ok ? 'Folder deleted' : 'That folder was already gone', response.ok ? 'success' : 'info');
+            } catch (error) {
+                this.showMessage('Could not delete the folder: ' + error.message, 'error');
+            }
         },
         openCreateWorld() {
             this.dlg = { type: 'world', world: null, name: '', description: '', error: '', busy: false };
@@ -421,6 +639,9 @@ window.codexPage = function () {
                 else if (d.type === 'rename') await this.submitRename(d);
                 else if (d.type === 'aliases') await this.submitAliases(d);
                 else if (d.type === 'move') await this.submitMove(d);
+                else if (d.type === 'folder') await this.submitFolder(d);
+                else if (d.type === 'folderMove') await this.submitFolderMove(d);
+                else if (d.type === 'pageFolder') await this.submitPageFolder(d);
             } catch (error) {
                 d.error = 'Something went wrong: ' + error.message;
             } finally {
@@ -432,6 +653,7 @@ window.codexPage = function () {
             if (response.status === 401) d.error = 'Your login has expired. Log in again, then try once more.';
             else if (response.status === 404) d.error = this.sentence(data.error || 'That no longer exists');
             else if (data.code === 'name_taken') d.error = this.conflictText(data);
+            else if (data.code === 'folder_name_taken') d.error = 'A folder with that name already exists there.';
             else d.error = this.sentence(data.error || 'Request failed');
         },
         async submitCreatePage(d) {
@@ -440,13 +662,60 @@ window.codexPage = function () {
                 d.error = 'Give the page a title.';
                 return;
             }
-            const { response, data } = await this.send('/api/codex/pages', 'POST', { kind: d.kind, title, world_id: d.worldId });
+            const { response, data } = await this.send('/api/codex/pages', 'POST', { kind: d.kind, title, world_id: d.worldId, folder_id: d.folderId || '' });
             if (response.status === 201) {
                 this.saved = true;
                 window.location.href = codexPageUrl({ id: data.page.id, title }, '/edit');
                 return;
             }
             this.failDlg(d, response, data);
+        },
+        async submitFolder(d) {
+            const name = d.name.trim();
+            if (!name) {
+                d.error = 'Give the folder a name.';
+                return;
+            }
+            if (d.folder && name === d.folder.name) {
+                this.closeDlg();
+                return;
+            }
+            const { response, data } = d.folder
+                ? await this.send(`/api/codex/folders/${encodeURIComponent(d.folder.id)}`, 'PUT', { name })
+                : await this.send(`/api/codex/worlds/${encodeURIComponent(this.world.world.id)}/folders`, 'POST', { name, parent_id: d.parentId });
+            if (!response.ok) {
+                this.failDlg(d, response, data);
+                return;
+            }
+            if (!d.folder && d.parentId) codexOpenState[d.parentId] = true;
+            this.closeDlg();
+            await this.load();
+            this.showMessage(d.folder ? 'Folder renamed' : 'Folder created', 'success');
+        },
+        async submitFolderMove(d) {
+            if ((d.folderId || '') === (d.folder.parent_id || '')) {
+                this.closeDlg();
+                return;
+            }
+            const { response, data } = await this.send(`/api/codex/folders/${encodeURIComponent(d.folder.id)}`, 'PUT', { parent_id: d.folderId || '' });
+            if (!response.ok) {
+                this.failDlg(d, response, data);
+                return;
+            }
+            if (d.folderId) codexOpenState[d.folderId] = true;
+            this.closeDlg();
+            await this.load();
+            this.showMessage('Folder moved', 'success');
+        },
+        async submitPageFolder(d) {
+            const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/folder`, 'PUT', { folder_id: d.folderId || '' });
+            if (!response.ok) {
+                this.failDlg(d, response, data);
+                return;
+            }
+            this.closeDlg();
+            await this.load();
+            this.showMessage('Folder changed', 'success');
         },
         async submitWorld(d) {
             const name = d.name.trim();
