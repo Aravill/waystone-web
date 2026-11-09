@@ -236,3 +236,290 @@ button.wikilink {
         border-top: 1px solid var(--ink);
     }
 }
+
+/* Maps */
+.map-block {
+    padding-top: 1.5rem;
+}
+
+.map-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 23.75rem;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.map-stage {
+    position: relative;
+    min-width: 0;
+    border: 1px solid var(--ink);
+    outline: 1px solid var(--ink);
+    outline-offset: 3px;
+}
+
+.codex-map,
+.codex-map.leaflet-container {
+    height: 70vh;
+    min-height: 22rem;
+    background: var(--folio);
+    font-family: inherit;
+}
+
+.codex-map .leaflet-bar,
+.codex-map .leaflet-bar a {
+    border-radius: 0;
+}
+
+.codex-map .leaflet-bar {
+    border: 1px solid var(--ink);
+    box-shadow: none;
+}
+
+.codex-map .leaflet-bar a {
+    background: var(--bg);
+    color: var(--ink);
+    border-bottom: 1px solid var(--line);
+    font-family: inherit;
+    text-decoration: none;
+    width: auto;
+    min-width: 30px;
+    padding: 0 0.25rem;
+}
+
+.codex-map .leaflet-bar a:hover,
+.codex-map .leaflet-bar a:focus-visible {
+    background: var(--folio);
+}
+
+.codex-map .leaflet-tooltip {
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    background: var(--bg);
+    color: var(--ink);
+    box-shadow: none;
+    font-family: inherit;
+}
+
+.codex-map .leaflet-tooltip-top::before {
+    border-top-color: var(--ink);
+}
+
+.codex-pin {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    box-sizing: border-box;
+    background: var(--bg);
+    border: 2px solid var(--ink);
+    color: var(--ink);
+    font-size: 16px;
+    line-height: 1;
+}
+
+.codex-pin--map {
+    border-style: double;
+    border-width: 4px;
+}
+
+.codex-pin--missing {
+    border-style: dashed;
+    color: var(--muted);
+}
+
+.codex-pin--open {
+    background: var(--ink);
+    color: var(--bg);
+}
+
+.codex-map .leaflet-marker-draggable {
+    cursor: grab;
+}
+
+.map-menu {
+    position: absolute;
+    z-index: 1000;
+    display: grid;
+    min-width: 11rem;
+    border: 1px solid var(--ink);
+    background: var(--bg);
+}
+
+.map-menu button {
+    padding: 0.625rem 0.875rem;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.map-menu button:last-child {
+    border-bottom: none;
+    color: var(--muted);
+}
+
+.map-menu button:hover,
+.map-menu button:focus-visible {
+    background: var(--folio);
+}
+
+.map-banner {
+    position: absolute;
+    z-index: 1000;
+    left: 50%;
+    bottom: 0.75rem;
+    transform: translateX(-50%);
+    margin: 0;
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--rubric);
+    background: var(--bg);
+}
+
+.map-panel {
+    min-width: 0;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--line);
+    min-height: 12rem;
+}
+
+.map-panel-body {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.map-panel-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.875rem;
+    font-weight: 400;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.map-panel .game-text {
+    overflow-wrap: anywhere;
+}
+
+.map-panel-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--line);
+}
+
+.map-empty {
+    display: grid;
+    justify-items: start;
+    gap: 0.75rem;
+    padding: 2rem;
+    border: 1px dashed var(--line);
+}
+
+.map-empty p {
+    margin: 0;
+}
+
+.pin-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.pin-key li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.codex-pin--key {
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+}
+
+.codex-pin--key.codex-pin--map {
+    border-width: 3px;
+}
+
+.map-link {
+    display: grid;
+    gap: 0.375rem;
+}
+
+.map-thumb {
+    display: block;
+    max-width: 7.5rem;
+    max-height: 5rem;
+    border: 1px solid var(--line);
+    object-fit: cover;
+}
+
+.pin-options {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0.5rem 0 1rem;
+    padding: 0;
+    list-style: none;
+    max-height: 16rem;
+    overflow-y: auto;
+}
+
+.pin-options button {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+
+.pin-options button:hover,
+.pin-options button:focus-visible {
+    background: var(--folio);
+    border-color: var(--ink);
+}
+
+.image-list {
+    display: grid;
+    gap: 0.875rem;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.image-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+}
+
+.pin-event {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+}
+
+.map-history {
+    padding-top: 1rem;
+}
+
+@media (max-width: 900px) {
+    .map-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

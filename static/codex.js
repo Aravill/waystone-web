@@ -36,6 +36,8 @@ function codexMarkdown(body, lookup) {
     });
 }
 
+let codexMapCtl = null; // the mounted map viewer; kept out of Alpine's reactive state
+
 window.codexPage = function () {
     return {
         displayName: 'User',
@@ -65,6 +67,13 @@ window.codexPage = function () {
         conflict: null,
         editor: null,
         editorReady: false,
+        // Map
+        pinMenu: null, // { x, y, px, py } where an empty spot was clicked
+        panel: null, // { pin, loading, data } for the pin shown in the side panel
+        movingPin: '',
+        pinDlg: { open: false, x: 0, y: 0, query: '', busy: false, error: '' },
+        images: [],
+        pinEvents: [],
         // History
         revisions: [],
         pruned: false,
@@ -101,10 +110,7 @@ window.codexPage = function () {
             });
             await this.load();
             this.showArrivalMessage();
-            this.initMap();
         },
-
-        initMap() {},
 
         // /codex, /codex/w/{id}[/slug], /codex/p/{id}/{slug}[/edit|/history]
         parseRoute() {
@@ -169,8 +175,12 @@ window.codexPage = function () {
                         history.replaceState(null, '', this.pageUrl(data.page) + (r.screen === 'page' ? '' : '/' + r.screen) + location.search);
                     }
                     if (r.screen === 'edit' && !this.draft) await this.initDraft();
-                    if (r.screen === 'history') await this.loadHistory(Number(new URLSearchParams(location.search).get('r')) || 0);
+                    if (r.screen === 'history') {
+                        await this.loadHistory(Number(new URLSearchParams(location.search).get('r')) || 0);
+                        if (data.page.kind === 'map') await this.loadMapHistory();
+                    }
                     if (r.screen === 'page') await this.loadTitles();
+                    if (r.screen === 'page' && data.page.kind === 'map') this.$nextTick(() => this.mountMap());
                 }
             } catch (error) {
                 if (seq === this.loadSeq) this.loadError = 'Could not load the Codex: ' + error.message;
@@ -442,6 +452,302 @@ window.codexPage = function () {
                 return;
             }
             this.failDlg(d, response, data);
+        },
+
+        // ---- Map ----
+        get panelHtml() {
+            const d = this.panel && this.panel.data;
+            if (!d) return '';
+            const map = new Map(d.links.map((l) => [codexNorm(l.text), l.page]));
+            return codexMarkdown(d.page.body, (text) => map.get(codexNorm(text)) || null);
+        },
+        get pinOptions() {
+            const q = codexNorm(this.pinDlg.query);
+            const options = [];
+            for (const t of this.titles) {
+                if (!this.page || t.id === this.page.id) continue;
+                const alias = t.aliases.find((a) => codexNorm(a).includes(q));
+                if (q && !codexNorm(t.title).includes(q) && !alias) continue;
+                options.push({ key: t.id, kind: 'page', title: t.title, label: (t.kind === 'map' ? '◈ ' : '✦ ') + t.title + (alias && !codexNorm(t.title).includes(q) ? ` (also known as ${alias})` : '') });
+            }
+            const typed = this.pinDlg.query.trim().split(/\s+/).join(' ');
+            const exists = this.titles.some((t) => [t.title, ...t.aliases].some((n) => codexNorm(n) === q));
+            const list = options.slice(0, 30);
+            if (typed && !exists && !/[\[\]|]/.test(typed)) {
+                list.push({ key: 'new', kind: 'new', title: typed, label: `New page “${typed}” in ${this.page ? this.page.world.name : ''}` });
+            }
+            return list;
+        },
+        async mountMap() {
+            const m = this.pageData && this.pageData.map;
+            const el = this.$refs.mapEl;
+            if (!m || !m.image || !el) return;
+            try {
+                if (codexMapCtl && (codexMapCtl.el !== el || codexMapCtl.imageUrl !== m.image.url)) {
+                    codexMapCtl.destroy();
+                    codexMapCtl = null;
+                }
+                if (codexMapCtl) {
+                    codexMapCtl.setPins(m.pins);
+                    return;
+                }
+                codexMapCtl = await window.mountCodexMap(el, {
+                    image: m.image,
+                    pins: m.pins,
+                    onPinClick: (pin) => this.onPinClick(pin),
+                    onMapClick: (info) => { this.pinMenu = info; },
+                    onPinMove: (id, x, y) => this.onPinMove(id, x, y)
+                });
+                const pinId = new URLSearchParams(location.search).get('pin');
+                const pin = pinId && m.pins.find((p) => p.id === pinId);
+                if (pin) {
+                    codexMapCtl.focusPin(pin.id);
+                    if (!pin.target || pin.target.kind !== 'map') this.openPanel(pin);
+                }
+            } catch (error) {
+                this.showMessage('Could not show the map: ' + error.message, 'error');
+            }
+        },
+        onPinClick(pin) {
+            this.pinMenu = null;
+            if (this.movingPin) return;
+            if (pin.target && pin.target.kind === 'map') {
+                window.location.href = codexPageUrl(pin.target);
+                return;
+            }
+            this.openPanel(pin);
+        },
+        async openPanel(pin) {
+            this.panel = { pin, loading: !!pin.target, data: null };
+            if (codexMapCtl) codexMapCtl.setOpen(pin.id);
+            if (pin.target) await this.loadPanelPage(pin.target.id);
+        },
+        async loadPanelPage(id) {
+            const panel = this.panel;
+            if (panel) panel.loading = true;
+            try {
+                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(id)}`, 'GET');
+                if (!this.panel || this.panel !== panel) return;
+                if (response.ok) panel.data = data;
+                else this.showMessage(this.sentence(data.error || 'Failed to load the page'), 'error');
+            } catch (error) {
+                this.showMessage('Could not load the page: ' + error.message, 'error');
+            } finally {
+                if (panel) panel.loading = false;
+            }
+        },
+        // Links inside the panel stay in the panel; a link to another map opens that map.
+        onPanelClick(event) {
+            const a = event.target.closest('a.wikilink');
+            if (!a) return;
+            if (a.classList.contains('wikilink--missing')) {
+                event.preventDefault();
+                this.openCreatePage('lore', a.dataset.text);
+                return;
+            }
+            const id = (a.getAttribute('href').split('/')[3] || '');
+            const target = this.panel.data.links.map((l) => l.page).find((p) => p && p.id === id);
+            if (!id || (target && target.kind === 'map')) return;
+            event.preventDefault();
+            this.loadPanelPage(decodeURIComponent(id));
+        },
+        startAddPin() {
+            const at = this.pinMenu;
+            this.pinMenu = null;
+            if (!at) return;
+            this.pinDlg = { open: true, x: at.x, y: at.y, query: '', busy: false, error: '' };
+            this.$nextTick(() => this.$refs.pinFocus?.focus());
+        },
+        closePinDlg() {
+            this.pinDlg.open = false;
+        },
+        async choosePin(option) {
+            const d = this.pinDlg;
+            if (!option || d.busy) return;
+            d.busy = true;
+            d.error = '';
+            try {
+                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/pins`, 'POST',
+                    { x: d.x, y: d.y, target_text: option.title, create_page: option.kind === 'new' });
+                if (response.status === 201) {
+                    d.open = false;
+                    await this.reloadMap();
+                    await this.loadTitles();
+                    this.showMessage(option.kind === 'new' ? `Pinned the new page “${option.title}”` : 'Pin added', 'success');
+                    this.openPanel(this.pageData.map.pins.find((p) => p.id === data.pin.id) || data.pin);
+                } else if (data.code === 'name_taken') {
+                    await this.loadTitles();
+                    d.error = `A page named “${option.title}” already exists in this world. Pick it from the list.`;
+                } else {
+                    d.error = response.status === 401 ? 'Your login has expired. Log in again, then try once more.' : this.sentence(data.error || 'Failed to add the pin');
+                }
+            } catch (error) {
+                d.error = 'Error adding the pin: ' + error.message;
+            } finally {
+                d.busy = false;
+            }
+        },
+        // Reload the map page (pins, links) and redraw the pins without losing the zoom.
+        async reloadMap() {
+            const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}`, 'GET');
+            if (!response.ok) return;
+            this.pageData = data;
+            if (codexMapCtl) codexMapCtl.setPins(data.map.pins);
+            if (this.panel) {
+                const pin = data.map.pins.find((p) => p.id === this.panel.pin.id);
+                if (pin) {
+                    this.panel.pin = pin;
+                    if (codexMapCtl) codexMapCtl.setOpen(pin.id);
+                } else {
+                    this.panel = null;
+                }
+            }
+        },
+        startMove() {
+            if (!this.panel || !codexMapCtl) return;
+            this.movingPin = this.panel.pin.id;
+            codexMapCtl.setMovable(this.movingPin);
+        },
+        cancelMove() {
+            this.movingPin = '';
+            if (codexMapCtl) {
+                codexMapCtl.setMovable('');
+                codexMapCtl.setPins(this.pageData.map.pins);
+                if (this.panel) codexMapCtl.setOpen(this.panel.pin.id);
+            }
+        },
+        async onPinMove(id, x, y) {
+            if (this.movingPin !== id) return;
+            this.movingPin = '';
+            if (codexMapCtl) codexMapCtl.setMovable('');
+            try {
+                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/pins/${encodeURIComponent(id)}`, 'PUT', { x, y });
+                if (!response.ok) this.showMessage(this.sentence(data.error || 'Failed to move the pin'), 'error');
+                else this.showMessage('Pin moved', 'success');
+            } catch (error) {
+                this.showMessage('Error moving the pin: ' + error.message, 'error');
+            }
+            await this.reloadMap();
+        },
+        async removePin() {
+            if (!this.panel || this.busy) return;
+            const pin = this.panel.pin;
+            const ok = await this.askConfirm({
+                eyebrow: this.page.title,
+                title: 'Remove this pin?',
+                message: `The pin for “${pin.target ? pin.target.title : pin.target_text}” is removed from the map. The page itself stays. You can undo this from the page history.`,
+                confirmLabel: 'Remove pin',
+                danger: true
+            });
+            if (!ok) return;
+            this.busy = true;
+            try {
+                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/pins/${encodeURIComponent(pin.id)}`, 'DELETE');
+                if (response.ok || response.status === 404) {
+                    this.panel = null;
+                    await this.reloadMap();
+                    this.showMessage('Pin removed', 'success');
+                } else {
+                    this.showMessage(this.sentence(data.error || 'Failed to remove the pin'), 'error');
+                }
+            } catch (error) {
+                this.showMessage('Error removing the pin: ' + error.message, 'error');
+            } finally {
+                this.busy = false;
+            }
+        },
+        // The picture's width over its height, read in the browser before uploading.
+        imageRatio(file) {
+            return new Promise((resolve) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => { URL.revokeObjectURL(url); resolve(img.naturalWidth / img.naturalHeight); };
+                img.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
+                img.src = url;
+            });
+        },
+        async onImageChosen(event) {
+            const input = event.target;
+            const file = input.files && input.files[0];
+            input.value = '';
+            if (!file || this.busy) return;
+            const current = this.pageData.map.image;
+            if (current && this.pageData.map.pins.length) {
+                const ratio = await this.imageRatio(file);
+                const was = current.width / current.height;
+                if (ratio && Math.abs(ratio - was) / was > 0.02) {
+                    const ok = await this.askConfirm({
+                        eyebrow: this.page.title,
+                        title: 'Replace with a different shape?',
+                        message: 'The new image has a different width-to-height ratio than the old one. Pins are placed by position, so they may land in the wrong place. You can restore the old image from the page history.',
+                        confirmLabel: 'Replace image',
+                        danger: true
+                    });
+                    if (!ok) return;
+                }
+            }
+            this.busy = true;
+            try {
+                const response = await fetch(`/api/codex/pages/${encodeURIComponent(this.page.id)}/images`, { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+                if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
+                    this.showMessage('Your login has expired. Log in again, then upload the image.', 'error');
+                    return;
+                }
+                const data = await response.json().catch(() => ({}));
+                if (response.status === 201) {
+                    await this.reloadMap();
+                    this.$nextTick(() => this.mountMap());
+                    this.showMessage('Image uploaded', 'success');
+                } else {
+                    this.showMessage(this.sentence(data.error || 'Failed to upload the image'), 'error');
+                }
+            } catch (error) {
+                this.showMessage('Error uploading the image: ' + error.message, 'error');
+            } finally {
+                this.busy = false;
+            }
+        },
+        async loadMapHistory() {
+            try {
+                const id = encodeURIComponent(this.route.id);
+                const [imgs, events] = await Promise.all([this.send(`/api/codex/pages/${id}/images`, 'GET'), this.send(`/api/codex/pages/${id}/pin-events`, 'GET')]);
+                if (imgs.response.ok) this.images = imgs.data;
+                if (events.response.ok) this.pinEvents = events.data;
+            } catch (error) {
+                this.showMessage('Could not load the map history: ' + error.message, 'error');
+            }
+        },
+        async restoreImage(img) {
+            if (this.busy) return;
+            this.busy = true;
+            try {
+                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/images/${encodeURIComponent(img.id)}/restore`, 'POST');
+                if (response.ok) {
+                    await this.loadMapHistory();
+                    this.showMessage('Image restored', 'success');
+                } else {
+                    this.showMessage(this.sentence(data.error || 'Failed to restore the image'), 'error');
+                }
+            } catch (error) {
+                this.showMessage('Error restoring the image: ' + error.message, 'error');
+            } finally {
+                this.busy = false;
+            }
+        },
+        async undoPinEvent(e) {
+            if (this.busy) return;
+            this.busy = true;
+            try {
+                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/pin-events/${encodeURIComponent(e.id)}/undo`, 'POST');
+                if (response.ok) this.showMessage('Pin change undone', 'success');
+                else if (data.code === 'already_undone') this.showMessage('That change was already undone.', 'info');
+                else this.showMessage(this.sentence(data.error || 'Failed to undo the change'), 'error');
+                await this.loadMapHistory();
+            } catch (error) {
+                this.showMessage('Error undoing the change: ' + error.message, 'error');
+            } finally {
+                this.busy = false;
+            }
         },
 
         // ---- Delete ----

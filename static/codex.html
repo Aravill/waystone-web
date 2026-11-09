@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=7"></script>
     <link rel="stylesheet" href="/static/styles.css?v=74">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=2">
+    <link rel="stylesheet" href="/static/codex.css?v=5">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -189,12 +189,72 @@
                             <button type="button" class="campaign-action-btn" @click="openAliases()">Aliases</button>
                             <button type="button" class="campaign-action-btn" @click="openRename()">Rename</button>
                             <a class="campaign-action-btn" :href="pageUrl(page, '/history')" x-text="'History · ' + page.revision_count"></a>
+                            <button type="button" class="campaign-action-btn" x-show="page.kind === 'map' && pageData.map.image" :disabled="busy" @click="$refs.imageInput.click()">Replace image</button>
                             <a class="submit-btn" :href="pageUrl(page, '/edit')" x-text="page.kind === 'map' ? 'Edit text' : 'Edit'"></a>
+                            <input type="file" class="visually-hidden" x-ref="imageInput" accept="image/png,image/jpeg,image/webp" tabindex="-1" aria-hidden="true" @change="onImageChosen($event)">
                         </div>
+                    </section>
+                    <section class="map-block" x-show="page.kind === 'map'" aria-label="Map">
+                        <template x-if="page.kind === 'map' && !pageData.map.image">
+                            <div class="map-empty">
+                                <p>This map has no image yet.</p>
+                                <button type="button" class="submit-btn" :disabled="busy" @click="$refs.imageInput.click()">Upload an image</button>
+                                <p class="hint">PNG, JPEG or WebP, up to 25 MB.</p>
+                            </div>
+                        </template>
+                        <template x-if="page.kind === 'map' && pageData.map.image">
+                            <div class="map-layout">
+                                <div class="map-stage" @keydown.escape.window="pinMenu = null">
+                                    <div class="codex-map" x-ref="mapEl"></div>
+                                    <div class="map-menu" x-show="pinMenu" :style="pinMenu ? 'left:' + pinMenu.px + 'px;top:' + pinMenu.py + 'px' : ''" role="menu">
+                                        <button type="button" role="menuitem" @click="startAddPin()">+ Add pin here</button>
+                                        <button type="button" role="menuitem" @click="pinMenu = null">Cancel</button>
+                                    </div>
+                                    <p class="map-banner" x-show="movingPin" role="status">Drag the pin to its new spot. <button type="button" class="text-link" @click="cancelMove()">Cancel</button></p>
+                                </div>
+                                <aside class="map-panel" aria-live="polite" aria-label="Pin details">
+                                    <p class="same" x-show="!panel">Click a pin to read about the place.</p>
+                                    <template x-if="panel">
+                                        <div class="map-panel-body">
+                                            <p x-show="panel.loading">Loading...</p>
+                                            <template x-if="!panel.loading && panel.data">
+                                                <div>
+                                                    <p class="modal-eyebrow" x-text="panel.data.page.kind === 'map' ? '◈ Map' : '✦ Lore'"></p>
+                                                    <h3 class="map-panel-title" x-text="panel.data.page.title"></h3>
+                                                    <p class="byline" x-show="panel.data.page.aliases.length" x-text="'Also known as ' + panel.data.page.aliases.join(', ')"></p>
+                                                    <div class="game-text" @click="onPanelClick($event)" x-html="panelHtml"></div>
+                                                    <p class="same" x-show="!panel.data.page.body.trim()">Nothing has been written here yet.</p>
+                                                    <p><a class="text-link" :href="pageUrl(panel.data.page)">Open page →</a></p>
+                                                </div>
+                                            </template>
+                                            <template x-if="!panel.loading && !panel.data">
+                                                <div>
+                                                    <p class="modal-eyebrow">No page yet</p>
+                                                    <h3 class="map-panel-title" x-text="panel.pin.target_text"></h3>
+                                                    <p class="same">This pin has no page. It may have been deleted or renamed.</p>
+                                                    <button type="button" class="submit-btn" @click="openCreatePage('lore', panel.pin.target_text)">Create the page</button>
+                                                </div>
+                                            </template>
+                                            <div class="map-panel-actions">
+                                                <button type="button" class="campaign-action-btn" :disabled="busy || !!movingPin" @click="startMove()">Move pin</button>
+                                                <button type="button" class="btn-danger" :disabled="busy" @click="removePin()">Remove pin</button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </aside>
+                            </div>
+                        </template>
+                        <p class="hint" x-show="page.kind === 'map' && pageData.map.image">Drag to pan · scroll or pinch to zoom · click an empty spot to add a pin</p>
+                        <ul class="pin-key" x-show="page.kind === 'map' && pageData.map.image" aria-label="Pin key">
+                            <li><span class="codex-pin codex-pin--key">✦</span> lore page</li>
+                            <li><span class="codex-pin codex-pin--key codex-pin--map">◈</span> map, opens it</li>
+                            <li><span class="codex-pin codex-pin--key codex-pin--missing">✦</span> no page yet</li>
+                            <li><span class="codex-pin codex-pin--key codex-pin--open">✦</span> open in the panel</li>
+                        </ul>
                     </section>
                     <div class="split">
                         <article>
-                            <!--MAP-->
+                            <h2 class="section-header" x-show="page.kind === 'map'">About this map</h2>
                             <div class="game-text" x-ref="body" @click="onBodyClick($event)" x-html="bodyHtml"></div>
                             <p class="same" x-show="!page.body.trim()">This page is empty. <a :href="pageUrl(page, '/edit')">Write it</a>.</p>
                         </article>
@@ -214,7 +274,7 @@
                                 <h2 class="panel-heading">On maps</h2>
                                 <ul class="page-list">
                                     <template x-for="m in pageData.on_maps" :key="m.pin_id">
-                                        <li><a :href="pageUrl({ id: m.map_id, title: m.map_title }) + '?pin=' + encodeURIComponent(m.pin_id)" x-text="'◈ ' + m.map_title"></a></li>
+                                        <li><a class="map-link" :href="pageUrl({ id: m.map_id, title: m.map_title }) + '?pin=' + encodeURIComponent(m.pin_id)"><img class="map-thumb" :src="m.image_url" alt="" x-show="m.image_url"><span x-text="'◈ ' + m.map_title"></span></a></li>
                                     </template>
                                 </ul>
                             </div>
@@ -335,7 +395,37 @@
                             </div>
                         </section>
                     </div>
-                    <!--HISTORY-MAP-->
+                    <template x-if="page.kind === 'map'">
+                        <div class="map-history">
+                            <section class="codex-section">
+                                <h2 class="section-header">Map images</h2>
+                                <p class="same" x-show="images.length === 0">No image has been uploaded.</p>
+                                <ul class="image-list">
+                                    <template x-for="img in images" :key="img.id">
+                                        <li>
+                                            <img class="map-thumb" :src="img.url" alt="" loading="lazy">
+                                            <span><span x-text="img.uploaded_by_user.display_name + ' · ' + formatStamp(img.created_at) + ' · ' + img.width + '×' + img.height"></span> <span class="tag" x-show="img.current">✓ Current</span></span>
+                                            <button type="button" class="campaign-action-btn" x-show="!img.current" :disabled="busy" @click="restoreImage(img)">Restore</button>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </section>
+                            <section class="codex-section">
+                                <h2 class="section-header">Pin changes</h2>
+                                <p class="hint">Undo restores the pin as it was before this change.</p>
+                                <p class="same" x-show="pinEvents.length === 0">No pins have been added yet.</p>
+                                <ul class="page-list">
+                                    <template x-for="e in pinEvents" :key="e.id">
+                                        <li class="pin-event">
+                                            <span x-text="e.label + ' · ' + e.user.display_name + ' · ' + formatStamp(e.created_at)"></span>
+                                            <span class="muted" x-show="e.undone_by_user" x-text="' · undone by ' + (e.undone_by_user ? e.undone_by_user.display_name : '')"></span>
+                                            <button type="button" class="campaign-action-btn" x-show="!e.undone_by_user" :disabled="busy" @click="undoPinEvent(e)">Undo</button>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </section>
+                        </div>
+                    </template>
                 </div>
             </template>
 
@@ -426,7 +516,34 @@
         </div>
     </div>
 
-    <!--PIN-DIALOGS-->
+    <!-- Add pin -->
+    <div class="modal" :class="{ 'modal-open': pinDlg.open }" @click.self="closePinDlg()" @keydown.escape.window="pinDlg.open && closePinDlg()" role="dialog" aria-modal="true" aria-labelledby="pinDlgTitle">
+        <div class="modal-content confirm-modal-content">
+            <div class="modal-header">
+                <div>
+                    <span class="modal-eyebrow" x-text="page ? page.title : ''"></span>
+                    <h2 id="pinDlgTitle">Add a pin</h2>
+                </div>
+                <button type="button" class="modal-close" @click="closePinDlg()" aria-label="Close">&times;</button>
+            </div>
+            <form class="modal-form" @submit.prevent="choosePin(pinOptions[0])" novalidate>
+                <div class="form-group">
+                    <label for="pinQuery">Which page is here?</label>
+                    <input type="search" id="pinQuery" x-model="pinDlg.query" x-ref="pinFocus" autocomplete="off" placeholder="Search this world's pages, or type a new title" maxlength="120">
+                </div>
+                <ul class="pin-options">
+                    <template x-for="o in pinOptions" :key="o.key">
+                        <li><button type="button" :disabled="pinDlg.busy" @click="choosePin(o)" x-text="o.label"></button></li>
+                    </template>
+                </ul>
+                <p class="same" x-show="pinOptions.length === 0">Type a title to find a page or start a new one.</p>
+                <div class="notice" role="alert" x-show="pinDlg.error"><p x-text="pinDlg.error"></p></div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" @click="closePinDlg()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- Confirm Modal -->
     <div id="confirmModal" class="modal confirm-modal" :class="{ 'modal-open': confirmDialog.open }" @click.self="closeConfirm(false)" @keydown.escape.window="confirmDialog.open && closeConfirm(false)" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
@@ -452,6 +569,7 @@
     <script src="/campaigns.js?v=59"></script>
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=1"></script>
-    <script src="/static/codex.js?v=1"></script>
+    <script src="/static/codex-map.js?v=1"></script>
+    <script src="/static/codex.js?v=2"></script>
 </body>
 </html>
