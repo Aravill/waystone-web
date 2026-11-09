@@ -696,7 +696,7 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 	}
 	// Validate the world before anything is saved ("unsorted" and "" both mean no world).
 	newWorld := campaign.WorldID
-	if req.WorldID != nil {
+	if userID, _ := r.Context().Value("user_id").(string); req.WorldID != nil && codexAllowedFor(userID) {
 		newWorld = codexWorldParam(*req.WorldID)
 		if newWorld != "" {
 			world, err := db.GetWorld(newWorld)

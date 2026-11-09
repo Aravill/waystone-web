@@ -376,6 +376,7 @@ window.campaignsPage = function () {
     return {
         displayName: 'User',
         isAdmin: false,
+        codexAccess: false,
         currentUserId: '',
         campaigns: [],
         worlds: [],
@@ -441,6 +442,7 @@ window.campaignsPage = function () {
                 const user = await userResponse.json();
                 this.displayName = user.display_name || user.username;
                 this.isAdmin = (user.roles || []).includes('admin');
+                this.codexAccess = !!user.codex_access;
                 this.currentUserId = user.user_id || user.id || '';
 
                 if (!this._signupButtonHandler) {
@@ -593,7 +595,7 @@ window.campaignsPage = function () {
             if (!c) {
                 return;
             }
-            await this.loadWorlds();
+            if (this.codexAccess) await this.loadWorlds();
             this.editingCampaignId = c.id;
             this.formData = {
                 title: c.title || '',

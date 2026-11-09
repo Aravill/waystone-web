@@ -34,11 +34,15 @@
     // A background, so the page's x-text on the same element can't remove it. Failures keep the letter.
     window.refreshHeaderAvatar = async function () {
         const avatars = document.querySelectorAll('.user-menu-avatar');
-        if (avatars.length === 0) return;
+        const codexLinks = document.querySelectorAll('[data-codex]');
+        if (avatars.length === 0 && codexLinks.length === 0) return;
         try {
             const response = await fetch('/auth/current-user');
             if (!response.ok || !response.headers.get('Content-Type')?.includes('application/json')) return;
-            const url = (await response.json()).avatar_url || '';
+            const user = await response.json();
+            // Codex links start hidden and show only when the server allows it (CODEX_ADMIN_ONLY).
+            codexLinks.forEach((el) => { el.hidden = !user.codex_access; });
+            const url = user.avatar_url || '';
             avatars.forEach((el) => {
                 el.classList.toggle('has-image', !!url);
                 el.style.backgroundImage = url ? `url("${encodeURI(url)}")` : '';

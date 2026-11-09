@@ -3,6 +3,9 @@
 # never land in the repo and `down` (down -v) removes them with everything else.
 services:
   waystone-web:
+    environment:
+      # Local test deploys open the Codex to everyone; production keeps it admin-only.
+      - CODEX_ADMIN_ONLY=false
     volumes:
       - waystone-backups:/root/backups
 
