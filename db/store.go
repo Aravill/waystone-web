@@ -292,6 +292,13 @@ func seedIfEmpty() error {
 		}
 	}
 
+	// The demo Codex world links to the seeded game, so it is added with the characters.
+	if len(campaigns) == 0 && len(users) == 0 {
+		if err := seedCodex(); err != nil {
+			return err
+		}
+	}
+
 	// Seed demo users if empty
 	if len(users) == 0 {
 		for _, user := range config.InitialUsers {
