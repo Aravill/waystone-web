@@ -6,6 +6,31 @@ import (
 	"waystone-web/models"
 )
 
+// MaxFolderDepth is how many levels folders may nest (a top-level folder is level 1).
+const MaxFolderDepth = 10
+
+// folderDepth counts the folders from the top level down to id, itself included.
+func folderDepth(byID map[string]models.Folder, id string) int {
+	n := 0
+	for cur := id; cur != "" && n <= len(byID); n++ {
+		cur = byID[cur].ParentID
+	}
+	return n
+}
+
+// folderHeight is the number of levels in the subtree under id, itself included.
+func folderHeight(all []models.Folder, id string) int {
+	h := 0
+	for _, f := range all {
+		if f.ParentID == id {
+			if c := folderHeight(all, f.ID); c > h {
+				h = c
+			}
+		}
+	}
+	return h + 1
+}
+
 const folderColumns = `id, world_id, parent_id, name, created_by, created_at, updated_at`
 
 func scanFolder(row rowScanner) (models.Folder, error) {
@@ -121,11 +146,25 @@ func (s *SQLiteStore) CreateFolder(f models.Folder) error {
 	}
 	if f.ParentID != "" {
 		parent, err := folderByID(tx, f.ParentID)
+		if err == ErrFolderNotFound {
+			return ErrParentNotFound
+		}
 		if err != nil {
 			return err
 		}
 		if parent.WorldID != f.WorldID {
-			return ErrFolderNotFound
+			return ErrParentNotFound
+		}
+		all, err := foldersOf(tx, f.WorldID)
+		if err != nil {
+			return err
+		}
+		byID := map[string]models.Folder{}
+		for _, x := range all {
+			byID[x.ID] = x
+		}
+		if folderDepth(byID, f.ParentID)+1 > MaxFolderDepth {
+			return ErrFolderTooDeep
 		}
 	}
 	if free, err := siblingNameFree(tx, f.WorldID, f.ParentID, f.Name, ""); err != nil {
@@ -188,7 +227,7 @@ func (s *SQLiteStore) MoveFolder(id, newParentID string) error {
 	}
 	if newParentID != "" {
 		if _, ok := byID[newParentID]; !ok {
-			return ErrFolderNotFound
+			return ErrParentNotFound
 		}
 		// Walk up from the target: meeting the folder itself means it is a descendant.
 		for cur, hops := newParentID, 0; cur != "" && hops <= len(all); hops++ {
@@ -200,6 +239,9 @@ func (s *SQLiteStore) MoveFolder(id, newParentID string) error {
 	}
 	if f.ParentID == newParentID {
 		return nil
+	}
+	if newParentID != "" && folderDepth(byID, newParentID)+folderHeight(all, id) > MaxFolderDepth {
+		return ErrFolderTooDeep
 	}
 	if free, err := siblingNameFree(tx, f.WorldID, newParentID, f.Name, id); err != nil {
 		return err

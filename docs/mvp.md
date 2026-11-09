@@ -63,6 +63,7 @@ This document describes what must-have features are to be implemented before pre
 - [x] Codex
     - [x] Worlds as folders (plus a shared Unsorted folder), lore pages and map pages with `[[Title]]` links, aliases, revision history and restore
     - [x] Maps with an uploaded image, pins that point at pages, and an undoable pin log; see the Codex section of `STYLE_GUIDE.md`
+    - [x] Folders inside a world (nested, up to 10 levels, collapsible tree), a page layout with a contents rail and summary box, and `CODEX_ADMIN_ONLY` to limit the Codex to admins while it is tried out
 - [x] Technological
     - [x] SQLite
     - [x] Alpine.js

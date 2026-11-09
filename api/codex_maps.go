@@ -143,26 +143,36 @@ func codexAddMapPayload(payload map[string]interface{}, page *models.Page) error
 // codexAddOnMaps lists the maps that pin the page, with each map's current image for a thumbnail.
 func codexAddOnMaps(payload map[string]interface{}, backs []models.PageBacklink) error {
 	onMaps := []map[string]interface{}{}
+	type mapData struct {
+		pins     []models.MapPin
+		imageURL string
+	}
+	cache := map[string]mapData{}
 	for _, b := range backs {
 		if b.PinID == "" {
 			continue
 		}
-		o := map[string]interface{}{"map_id": b.PageID, "map_title": b.Title, "pin_id": b.PinID, "image_url": "", "x": 0.5, "y": 0.5}
-		pins, err := db.GetMapPins(b.PageID)
-		if err != nil {
-			return err
+		d, ok := cache[b.PageID]
+		if !ok {
+			pins, err := db.GetMapPins(b.PageID)
+			if err != nil {
+				return err
+			}
+			images, err := db.GetMapImages(b.PageID)
+			if err != nil {
+				return err
+			}
+			d = mapData{pins: pins}
+			if len(images) > 0 {
+				d.imageURL = codexImageURL(images[0].File)
+			}
+			cache[b.PageID] = d
 		}
-		for _, pin := range pins {
+		o := map[string]interface{}{"map_id": b.PageID, "map_title": b.Title, "pin_id": b.PinID, "image_url": d.imageURL, "x": 0.5, "y": 0.5}
+		for _, pin := range d.pins {
 			if pin.ID == b.PinID {
 				o["x"], o["y"] = pin.X, pin.Y
 			}
-		}
-		images, err := db.GetMapImages(b.PageID)
-		if err != nil {
-			return err
-		}
-		if len(images) > 0 {
-			o["image_url"] = codexImageURL(images[0].File)
 		}
 		onMaps = append(onMaps, o)
 	}

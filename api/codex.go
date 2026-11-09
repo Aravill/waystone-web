@@ -227,8 +227,14 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 			default:
 				handleDeleteWorld(w, r, parts[1])
 			}
-		case len(parts) == 3 && parts[2] == "folders" && method(http.MethodPost):
-			handleCreateFolder(w, r, parts[1])
+		case len(parts) == 3 && parts[2] == "folders":
+			if method(http.MethodGet, http.MethodPost) {
+				if r.Method == http.MethodGet {
+					handleWorldFolders(w, r, parts[1])
+				} else {
+					handleCreateFolder(w, r, parts[1])
+				}
+			}
 		case len(parts) > 2:
 			writeJSONError(w, http.StatusNotFound, "not found")
 		}

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -9,7 +10,20 @@ import (
 
 // codexAdminOnly limits the Codex to admins while it is being tried out in production
 // (CODEX_ADMIN_ONLY; docker-compose turns it on, a plain `go run` leaves it off).
-var codexAdminOnly, _ = strconv.ParseBool(os.Getenv("CODEX_ADMIN_ONLY"))
+// Any non-empty value that isn't a valid boolean counts as on (fail closed) and is logged once.
+var codexAdminOnly = parseCodexAdminOnly(os.Getenv("CODEX_ADMIN_ONLY"))
+
+func parseCodexAdminOnly(v string) bool {
+	if v == "" {
+		return false
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		log.Printf("CODEX_ADMIN_ONLY=%q is not a boolean (true/false/1/0): treating it as on", v)
+		return true
+	}
+	return b
+}
 
 // codexAllowedFor reports whether the user may use the Codex at all.
 func codexAllowedFor(userID string) bool {

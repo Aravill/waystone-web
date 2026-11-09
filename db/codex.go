@@ -22,6 +22,8 @@ var (
 	ErrFolderNameTaken  = errors.New("a folder with that name already exists here")
 	ErrFolderCycle      = errors.New("a folder can't go inside itself")
 	ErrNoFolders        = errors.New("the Unsorted folder has no folders")
+	ErrParentNotFound   = errors.New("parent folder not found")
+	ErrFolderTooDeep    = errors.New("folders can nest up to 10 levels")
 	ErrPageNotFound     = errors.New("page not found")
 	ErrNotAMap          = errors.New("page is not a map")
 	ErrPinNotFound      = errors.New("pin not found")

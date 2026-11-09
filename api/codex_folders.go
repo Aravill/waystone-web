@@ -62,11 +62,42 @@ func codexFolderError(w http.ResponseWriter, err error, what string) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error(), "code": "folder_deleted"})
 	case errors.Is(err, db.ErrFolderNameTaken):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "folder_name_taken"})
-	case errors.Is(err, db.ErrFolderCycle), errors.Is(err, db.ErrNoFolders), errors.Is(err, db.ErrWorldNotFound):
+	case errors.Is(err, db.ErrParentNotFound):
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error(), "code": "parent_not_found"})
+	case errors.Is(err, db.ErrFolderCycle), errors.Is(err, db.ErrFolderTooDeep), errors.Is(err, db.ErrNoFolders), errors.Is(err, db.ErrWorldNotFound):
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 	default:
 		codexStoreError(w, err, what)
 	}
+}
+
+// handleWorldFolders is the light folder list ({id, parent_id, name}) for the folder pickers.
+func handleWorldFolders(w http.ResponseWriter, r *http.Request, apiWorldID string) {
+	if _, ok := codexUserID(w, r); !ok {
+		return
+	}
+	id := codexWorldParam(apiWorldID)
+	out := []map[string]string{}
+	if id != "" {
+		worlds, _, err := codexWorlds()
+		if err != nil {
+			codexServerError(w, "retrieve worlds")
+			return
+		}
+		if _, found := worlds[id]; !found {
+			writeJSONError(w, http.StatusNotFound, db.ErrWorldNotFound.Error())
+			return
+		}
+		folders, err := db.GetFolders(id)
+		if err != nil {
+			codexServerError(w, "retrieve folders")
+			return
+		}
+		for _, f := range folders {
+			out = append(out, map[string]string{"id": f.ID, "parent_id": f.ParentID, "name": f.Name})
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"folders": out})
 }
 
 func handleCreateFolder(w http.ResponseWriter, r *http.Request, apiWorldID string) {
@@ -114,7 +145,7 @@ func handleCodexFolderRoutes(w http.ResponseWriter, r *http.Request, parts []str
 		writeJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "moved_pages": pages, "moved_folders": folders})
 		return
 	}
-	// PUT renames ({name}) and/or moves ({parent_id}, "" = top level); send either or both.
+	// PUT renames ({name}) or moves ({parent_id}, "" = top level); one per request.
 	var req struct {
 		Name     *string `json:"name"`
 		ParentID *string `json:"parent_id"`
@@ -124,6 +155,10 @@ func handleCodexFolderRoutes(w http.ResponseWriter, r *http.Request, parts []str
 	}
 	if req.Name == nil && req.ParentID == nil {
 		writeJSONError(w, http.StatusBadRequest, "name or parent_id is required")
+		return
+	}
+	if req.Name != nil && req.ParentID != nil {
+		writeJSONError(w, http.StatusBadRequest, "send either name or parent_id, not both")
 		return
 	}
 	if req.Name != nil {
