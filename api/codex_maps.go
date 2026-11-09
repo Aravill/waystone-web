@@ -147,7 +147,16 @@ func codexAddOnMaps(payload map[string]interface{}, backs []models.PageBacklink)
 		if b.PinID == "" {
 			continue
 		}
-		o := map[string]interface{}{"map_id": b.PageID, "map_title": b.Title, "pin_id": b.PinID, "image_url": ""}
+		o := map[string]interface{}{"map_id": b.PageID, "map_title": b.Title, "pin_id": b.PinID, "image_url": "", "x": 0.5, "y": 0.5}
+		pins, err := db.GetMapPins(b.PageID)
+		if err != nil {
+			return err
+		}
+		for _, pin := range pins {
+			if pin.ID == b.PinID {
+				o["x"], o["y"] = pin.X, pin.Y
+			}
+		}
 		images, err := db.GetMapImages(b.PageID)
 		if err != nil {
 			return err

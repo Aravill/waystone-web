@@ -60,6 +60,8 @@ window.codexPage = function () {
         home: null,
         world: null,
         pageData: null,
+        toc: [],
+        tocActive: '',
         pageFilter: '',
         titles: [], // pages of the current page's world, for previews and the editor
         worldChoices: [],
@@ -289,6 +291,37 @@ window.codexPage = function () {
         },
         get bodyHtml() {
             return this.page ? codexMarkdown(this.page.body, this.linkLookup) : '';
+        },
+        get scribes() {
+            const p = this.page;
+            return [...new Set([p.author_user, ...(p.amender_users || [])].map((u) => (u && u.display_name) || 'Unknown'))].join(', ');
+        },
+        // Contents rail: ids go on the rendered ## / ### headings (h3 / h4) from their text, so no
+        // user text is ever injected as HTML.
+        buildToc() {
+            const body = this.$refs.body;
+            if (!body || this.screen !== 'page') {
+                this.toc = [];
+                return;
+            }
+            const used = new Set();
+            this.toc = Array.from(body.querySelectorAll('h3, h4')).map((h) => {
+                const base = 'sec-' + codexSlug(h.textContent);
+                let id = base;
+                for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+                used.add(id);
+                h.id = id;
+                return { id, text: h.textContent.trim(), level: h.tagName === 'H3' ? 2 : 3 };
+            });
+            this.updateToc();
+        },
+        updateToc() {
+            let active = this.toc.length ? this.toc[0].id : '';
+            for (const t of this.toc) {
+                const el = document.getElementById(t.id);
+                if (el && el.getBoundingClientRect().top <= 140) active = t.id;
+            }
+            this.tocActive = active;
         },
         get previewHtml() {
             return this.draft ? codexMarkdown(this.draft.body, this.titleLookup) : '';

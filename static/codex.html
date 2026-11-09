@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=74">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=6">
+    <link rel="stylesheet" href="/static/codex.css?v=7">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -177,12 +177,10 @@
                 <div>
                     <section class="title-block">
                         <div>
-                            <span class="modal-eyebrow" x-text="page.kind === 'map' ? '◈ Map' : 'Lore'"></span>
+                            <span class="modal-eyebrow"><span x-text="page.kind === 'map' ? '◈ Map in ' : '✦ Lore page in '"></span><a :href="'/codex/w/' + encodeURIComponent(page.world.id)" x-text="page.world.name"></a></span>
                             <h1 class="page-title" tabindex="-1" x-text="page.title"></h1>
-                            <p class="byline"><a class="world-chip" :href="'/codex/w/' + encodeURIComponent(page.world.id)" x-text="'World: ' + page.world.name"></a>
-                                <button type="button" class="text-link" @click="openMove()">Move to another world…</button></p>
-                            <p class="byline" x-text="journalByline(page)"></p>
                             <p class="byline" x-show="page.aliases.length"><span>Also known as </span><span x-text="page.aliases.join(', ')"></span></p>
+                            <p class="byline"><button type="button" class="text-link" @click="openMove()">Move to another world…</button></p>
                         </div>
                         <div class="actions">
                             <button type="button" class="btn-danger" @click="deletePage()">Delete</button>
@@ -253,33 +251,50 @@
                             <li><span class="codex-pin codex-pin--key codex-pin--open">✦</span> open in the panel</li>
                         </ul>
                     </section>
-                    <div class="split">
-                        <article>
+                    <div class="codex-grid" :class="{ 'codex-grid--rail': toc.length >= 2 }" @scroll.window.passive="updateToc()">
+                        <nav class="codex-rail" x-show="toc.length >= 2" aria-label="Contents">
+                            <h2 class="codex-rail-title">Contents</h2>
+                            <ul>
+                                <template x-for="t in toc" :key="t.id">
+                                    <li><a :href="'#' + t.id" :class="{ on: tocActive === t.id, sub: t.level === 3 }" :aria-current="tocActive === t.id ? 'location' : null" x-text="t.text"></a></li>
+                                </template>
+                            </ul>
+                        </nav>
+                        <article class="codex-article">
                             <h2 class="section-header" x-show="page.kind === 'map'">About this map</h2>
-                            <div class="game-text" x-ref="body" @click="onBodyClick($event)" x-html="bodyHtml"></div>
+                            <div class="game-text codex-text" x-ref="body" @click="onBodyClick($event)" x-html="bodyHtml" x-effect="bodyHtml; $nextTick(() => buildToc())"></div>
                             <p class="same" x-show="!page.body.trim()">This page is empty. <a :href="pageUrl(page, '/edit')">Write it</a>.</p>
+                            <p class="codex-edited" x-text="'Revision ' + page.current_revision + ' · last edited by ' + page.updated_by_user.display_name + ' ' + formatStamp(page.updated_at)"></p>
                         </article>
-                        <aside class="split-side">
-                            <div>
-                                <p class="modal-eyebrow">Pages that point here</p>
-                                <h2 class="panel-heading">Linked from</h2>
+                        <aside class="codex-side">
+                            <section class="codex-sum" aria-label="Summary">
+                                <p class="codex-sum-title" x-text="page.title"></p>
+                                <template x-for="m in pageData.on_maps.slice(0, 1)" :key="m.pin_id">
+                                    <div>
+                                        <a class="codex-sum-map" x-show="m.image_url" :href="pageUrl({ id: m.map_id, title: m.map_title }) + '?pin=' + encodeURIComponent(m.pin_id)" :aria-label="'Open ' + m.map_title">
+                                            <img :src="m.image_url" alt="">
+                                            <span class="codex-sum-pin" aria-hidden="true" :style="'left:' + (m.x * 100) + '%;top:' + (m.y * 100) + '%'">✦</span>
+                                        </a>
+                                        <p class="codex-sum-cap">On the <a :href="pageUrl({ id: m.map_id, title: m.map_title }) + '?pin=' + encodeURIComponent(m.pin_id)" x-text="m.map_title"></a><span x-show="pageData.on_maps.length > 1" x-text="' and ' + (pageData.on_maps.length - 1) + ' more'"></span></p>
+                                    </div>
+                                </template>
+                                <dl>
+                                    <div class="codex-sum-row" x-show="page.aliases.length"><dt>Aliases</dt><dd x-text="page.aliases.join(', ')"></dd></div>
+                                    <div class="codex-sum-row"><dt>World</dt><dd><a :href="'/codex/w/' + encodeURIComponent(page.world.id)" x-text="page.world.name"></a></dd></div>
+                                    <div class="codex-sum-row"><dt>Started</dt><dd x-text="page.author_user.display_name + ', ' + shortDate(page.created_at)"></dd></div>
+                                    <div class="codex-sum-row"><dt>Scribes</dt><dd x-text="scribes"></dd></div>
+                                    <div class="codex-sum-row"><dt>Revisions</dt><dd><a :href="pageUrl(page, '/history')" x-text="page.revision_count"></a></dd></div>
+                                </dl>
+                            </section>
+                            <section class="codex-linked">
+                                <h2 class="codex-linked-head"><span><span class="codex-linked-mark">§</span> Linked from</span><span class="muted" x-text="pageData.backlinks.length"></span></h2>
                                 <p class="same" x-show="pageData.backlinks.length === 0">No other page links here yet.</p>
-                                <ul class="page-list">
+                                <ul>
                                     <template x-for="b in pageData.backlinks" :key="b.id">
-                                        <li><a :href="pageUrl(b)" x-text="(b.kind === 'map' ? '◈ ' : '') + b.title"></a><span class="muted" x-show="b.via.includes('pin')"> · pin</span><span class="muted" x-show="b.aliases.length" x-text="' · via the alias ' + b.aliases.map((a) => '“' + a + '”').join(', ')"></span></li>
+                                        <li><span class="codex-glyph" aria-hidden="true" x-text="b.kind === 'map' ? '◈' : '✦'"></span><span><a :href="pageUrl(b)" x-text="b.title"></a><span class="muted" x-show="b.aliases.length" x-text="' · as ' + b.aliases.map((a) => '“' + a + '”').join(', ')"></span><span class="muted" x-show="b.via.includes('pin')"> · pin</span></span></li>
                                     </template>
                                 </ul>
-                            </div>
-                            <div x-show="pageData.on_maps.length > 0">
-                                <p class="modal-eyebrow">Pinned on</p>
-                                <h2 class="panel-heading">On maps</h2>
-                                <ul class="page-list">
-                                    <template x-for="m in pageData.on_maps" :key="m.pin_id">
-                                        <li><a class="map-link" :href="pageUrl({ id: m.map_id, title: m.map_title }) + '?pin=' + encodeURIComponent(m.pin_id)"><img class="map-thumb" :src="m.image_url" alt="" x-show="m.image_url"><span x-text="'◈ ' + m.map_title"></span></a></li>
-                                    </template>
-                                </ul>
-                            </div>
-                            <p class="panel-foot">Last changed <span x-text="shortDate(page.updated_at)"></span> by <span x-text="page.updated_by_user.display_name"></span>.</p>
+                            </section>
                         </aside>
                     </div>
                 </div>
@@ -321,7 +336,7 @@
                                 <div class="pane pane--preview">
                                     <span class="label">Preview</span>
                                     <div class="preview">
-                                        <div class="game-text" @click="onBodyClick($event)" x-html="previewHtml"></div>
+                                        <div class="game-text codex-text" @click="onBodyClick($event)" x-html="previewHtml"></div>
                                     </div>
                                 </div>
                             </div>
@@ -572,6 +587,6 @@
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=2"></script>
     <script src="/static/codex-map.js?v=2"></script>
-    <script src="/static/codex.js?v=3"></script>
+    <script src="/static/codex.js?v=4"></script>
 </body>
 </html>
