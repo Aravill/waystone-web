@@ -3,11 +3,13 @@ package db
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -72,6 +74,7 @@ func runBackup(dir string, keep int) {
 		return
 	}
 	log.Printf("Backup written: %s", final)
+	mirrorUploads(filepath.Join(dir, "uploads"))
 
 	files, err := filepath.Glob(filepath.Join(dir, "waystone-*.db"))
 	if err != nil {
@@ -85,4 +88,65 @@ func runBackup(dir string, keep int) {
 		}
 		files = files[1:]
 	}
+}
+
+// mirrorUploads copies Codex map images that are not yet in the mirror directory. Uploaded files
+// never change (their names are random), so a name that exists there is already backed up. It
+// never deletes from the mirror: images of deleted pages stay until you clear them by hand.
+func mirrorUploads(mirror string) {
+	src, err := UploadDir()
+	if err != nil {
+		log.Printf("Upload backup failed: %v", err)
+		return
+	}
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		log.Printf("Upload backup failed: %v", err)
+		return
+	}
+	if err := os.MkdirAll(mirror, 0o755); err != nil {
+		log.Printf("Upload backup failed: %v", err)
+		return
+	}
+	copied := 0
+	for _, e := range entries {
+		if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		dst := filepath.Join(mirror, e.Name())
+		if _, err := os.Stat(dst); err == nil {
+			continue
+		}
+		if err := copyFile(filepath.Join(src, e.Name()), dst); err != nil {
+			log.Printf("Upload backup failed for %s: %v", e.Name(), err)
+			continue
+		}
+		copied++
+	}
+	if copied > 0 {
+		log.Printf("Upload backup: copied %d new file(s) to %s", copied, mirror)
+	}
+}
+
+// copyFile copies via a temp name so a half-written file is never taken for a finished one.
+func copyFile(from, to string) error {
+	in, err := os.Open(from)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	tmp := filepath.Join(filepath.Dir(to), ".tmp-"+filepath.Base(to))
+	out, err := os.Create(tmp)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(out, in)
+	if cerr := out.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return os.Rename(tmp, to)
 }
