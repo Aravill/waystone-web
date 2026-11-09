@@ -26,10 +26,32 @@ func seedCodex() error {
 	if err := store.SetCampaignWorld(config.InitialWorldCampaignID, w.ID); err != nil {
 		return fmt.Errorf("failed to set the seed game's world: %w", err)
 	}
+	folders := map[string]string{} // "parent/name" -> folder id
+	seedFolder := func(worldID, parent, name, userID string) (string, error) {
+		key := parent + "/" + name
+		if id, ok := folders[key]; ok {
+			return id, nil
+		}
+		f := models.Folder{ID: GenerateUUID(), WorldID: worldID, ParentID: parent, Name: name, CreatedBy: userID}
+		if err := store.CreateFolder(f); err != nil {
+			return "", fmt.Errorf("failed to seed folder %q: %w", name, err)
+		}
+		folders[key] = f.ID
+		return f.ID, nil
+	}
 	create := func(sp config.CodexSeedPage) (string, error) {
 		p := models.Page{ID: GenerateUUID(), Kind: sp.Kind, Title: sp.Title, Aliases: sp.Aliases, AuthorID: sp.AuthorID}
 		if sp.InWorld {
 			p.WorldID = w.ID
+			parent := ""
+			for _, name := range sp.Folder {
+				id, err := seedFolder(w.ID, parent, name, sp.AuthorID)
+				if err != nil {
+					return "", err
+				}
+				parent = id
+			}
+			p.FolderID = parent
 		}
 		if err := store.CreatePage(p, sp.Body); err != nil {
 			return "", fmt.Errorf("failed to seed page %q: %w", sp.Title, err)

@@ -168,6 +168,9 @@ func (s *SQLiteStore) AddMapPinWithNewPage(page models.Page, pin models.MapPin) 
 		return pin, err
 	}
 	page.Kind, page.WorldID, page.Aliases = models.PageLore, world, nil
+	if err := tx.QueryRow(`SELECT folder_id FROM pages WHERE id = ?`, pin.MapPageID).Scan(&page.FolderID); err != nil {
+		return pin, err
+	}
 	if err := createPageTx(tx, page, ""); err != nil {
 		return pin, err
 	}

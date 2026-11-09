@@ -18,6 +18,18 @@ type World struct {
 	UpdatedAt   string `json:"updated_at"`
 }
 
+// Folder organises the pages of one world into a nested tree. It is for sorting only: links,
+// titles and aliases ignore it. The Unsorted folder (world "") has none.
+type Folder struct {
+	ID        string `json:"id"`
+	WorldID   string `json:"-"`
+	ParentID  string `json:"parent_id"`
+	Name      string `json:"name"`
+	CreatedBy string `json:"-"`
+	CreatedAt string `json:"-"`
+	UpdatedAt string `json:"-"`
+}
+
 // PageContributor is one person's credit on a page. It outlives pruning of old revisions.
 type PageContributor struct {
 	UserID        string
@@ -30,6 +42,7 @@ type Page struct {
 	ID              string
 	Kind            string
 	WorldID         string
+	FolderID        string // "" = the world's top level
 	Title           string
 	AuthorID        string
 	CreatedAt       string
@@ -44,11 +57,12 @@ type Page struct {
 
 // PageListItem is a page without its body, for lists and link resolution in the client.
 type PageListItem struct {
-	ID      string
-	Kind    string
-	WorldID string
-	Title   string
-	Aliases []string
+	ID       string
+	Kind     string
+	WorldID  string
+	FolderID string
+	Title    string
+	Aliases  []string
 }
 
 type PageRevision struct {

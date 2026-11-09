@@ -227,11 +227,15 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 			default:
 				handleDeleteWorld(w, r, parts[1])
 			}
+		case len(parts) == 3 && parts[2] == "folders" && method(http.MethodPost):
+			handleCreateFolder(w, r, parts[1])
 		case len(parts) > 2:
 			writeJSONError(w, http.StatusNotFound, "not found")
 		}
 	case "pages":
 		handleCodexPageRoutes(w, r, parts[1:], method)
+	case "folders":
+		handleCodexFolderRoutes(w, r, parts[1:], method)
 	case "files":
 		if len(parts) == 2 && method(http.MethodGet) {
 			handleCodexFile(w, r, parts[1])
@@ -421,8 +425,13 @@ func handleGetWorld(w http.ResponseWriter, r *http.Request, apiID string) {
 	list := []map[string]interface{}{}
 	for _, p := range pages {
 		if p.WorldID == id {
-			list = append(list, map[string]interface{}{"id": p.ID, "title": p.Title, "kind": p.Kind, "aliases": p.Aliases})
+			list = append(list, map[string]interface{}{"id": p.ID, "title": p.Title, "kind": p.Kind, "aliases": p.Aliases, "folder_id": p.FolderID})
 		}
+	}
+	folders, err := db.GetFolders(id)
+	if err != nil {
+		codexServerError(w, "retrieve folders")
+		return
 	}
 	games := []map[string]interface{}{}
 	if id != "" {
@@ -456,6 +465,7 @@ func handleGetWorld(w http.ResponseWriter, r *http.Request, apiID string) {
 		"world":      map[string]interface{}{"id": codexWorldID(id), "name": world.Name, "description": world.Description, "unsorted": id == ""},
 		"games":      games,
 		"pages":      list,
+		"folders":    folders,
 		"wanted":     wanted,
 		"recent":     recent,
 		"can_delete": id != "" && admin,
@@ -463,10 +473,11 @@ func handleGetWorld(w http.ResponseWriter, r *http.Request, apiID string) {
 }
 
 type pageCreateRequest struct {
-	Kind    string `json:"kind"`
-	Title   string `json:"title"`
-	Body    string `json:"body"`
-	WorldID string `json:"world_id"`
+	Kind     string `json:"kind"`
+	Title    string `json:"title"`
+	Body     string `json:"body"`
+	WorldID  string `json:"world_id"`
+	FolderID string `json:"folder_id"`
 }
 
 func handleCreatePage(w http.ResponseWriter, r *http.Request) {
@@ -491,7 +502,7 @@ func handleCreatePage(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "body is too long")
 		return
 	}
-	page := models.Page{ID: db.GenerateUUID(), Kind: req.Kind, WorldID: codexWorldParam(req.WorldID), Title: title, AuthorID: userID}
+	page := models.Page{ID: db.GenerateUUID(), Kind: req.Kind, WorldID: codexWorldParam(req.WorldID), FolderID: req.FolderID, Title: title, AuthorID: userID}
 	if err := db.CreatePage(page, req.Body); err != nil {
 		codexStoreError(w, err, "create page")
 		return
@@ -508,7 +519,7 @@ func codexStoreError(w http.ResponseWriter, err error, what string) {
 		codexNameTaken(w, taken)
 	case errors.Is(err, db.ErrPageNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error(), "code": "page_deleted"})
-	case errors.Is(err, db.ErrWorldNotFound):
+	case errors.Is(err, db.ErrWorldNotFound), errors.Is(err, db.ErrFolderNotFound), errors.Is(err, db.ErrNoFolders):
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, db.ErrRevisionNotFound):
 		writeJSONError(w, http.StatusNotFound, err.Error())
@@ -569,6 +580,10 @@ func handleCodexPageRoutes(w http.ResponseWriter, r *http.Request, parts []strin
 	case rest[0] == "aliases" && len(rest) == 1:
 		if method(http.MethodPut) {
 			handleSetAliases(w, r, id)
+		}
+	case rest[0] == "folder" && len(rest) == 1:
+		if method(http.MethodPut) {
+			handleSetPageFolder(w, r, id)
 		}
 	case rest[0] == "world" && len(rest) == 1:
 		if method(http.MethodPut) {
@@ -660,6 +675,10 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 			o["aliases"] = append(o["aliases"].([]string), b.TargetText)
 		}
 	}
+	folderPath, err := codexFolderPath(page.WorldID, page.FolderID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, "failed to retrieve folders"
+	}
 	amenders := []string{}
 	for _, c := range page.Contributors {
 		if c.UserID != page.AuthorID {
@@ -669,7 +688,7 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 	payload := map[string]interface{}{
 		"page": map[string]interface{}{
 			"id": page.ID, "kind": page.Kind, "title": page.Title,
-			"world": codexWorldRef(worlds, page.WorldID), "aliases": page.Aliases, "body": page.Body,
+			"world": codexWorldRef(worlds, page.WorldID), "folder_id": page.FolderID, "folder_path": folderPath, "aliases": page.Aliases, "body": page.Body,
 			"current_revision": page.CurrentRevision, "revision_count": page.RevisionCount,
 			"created_at": page.CreatedAt, "updated_at": page.UpdatedAt,
 			"author_user": journalUser(users, page.AuthorID), "amender_users": journalUserList(users, amenders),

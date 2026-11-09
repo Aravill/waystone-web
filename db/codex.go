@@ -18,6 +18,10 @@ var (
 	ErrWorldNotFound    = errors.New("world not found")
 	ErrWorldNameTaken   = errors.New("a world with that name already exists")
 	ErrWorldInUse       = errors.New("world still has games or pages")
+	ErrFolderNotFound   = errors.New("folder not found")
+	ErrFolderNameTaken  = errors.New("a folder with that name already exists here")
+	ErrFolderCycle      = errors.New("a folder can't go inside itself")
+	ErrNoFolders        = errors.New("the Unsorted folder has no folders")
 	ErrPageNotFound     = errors.New("page not found")
 	ErrNotAMap          = errors.New("page is not a map")
 	ErrPinNotFound      = errors.New("pin not found")
@@ -83,6 +87,16 @@ func RenamePage(id, newTitle, userID string) (int, error) {
 }
 func SetPageAliases(id string, aliases []string) error { return GetStore().SetPageAliases(id, aliases) }
 func MovePage(id, worldID string) error                { return GetStore().MovePage(id, worldID) }
+
+func GetFolders(worldID string) ([]models.Folder, error) { return GetStore().GetFolders(worldID) }
+func GetFolder(id string) (*models.Folder, error)        { return GetStore().GetFolder(id) }
+func CreateFolder(f models.Folder) error                 { return GetStore().CreateFolder(f) }
+func RenameFolder(id, name string) error                 { return GetStore().RenameFolder(id, name) }
+func MoveFolder(id, newParentID string) error            { return GetStore().MoveFolder(id, newParentID) }
+
+// DeleteFolder re-parents the folder's sub-folders and pages one level up and returns how many moved.
+func DeleteFolder(id string) (pages, folders int, err error) { return GetStore().DeleteFolder(id) }
+func SetPageFolder(pageID, folderID string) error            { return GetStore().SetPageFolder(pageID, folderID) }
 
 // DeletePage returns the map image files the caller should remove from disk.
 func DeletePage(id string) ([]string, error) { return GetStore().DeletePage(id) }

@@ -265,6 +265,16 @@ func (s *SQLiteStore) initSchema() error {
 		created_at TEXT NOT NULL,
 		updated_at TEXT NOT NULL
 	);
+	-- Folders nest inside one world and only sort its pages (pages.folder_id '' = top level).
+	CREATE TABLE IF NOT EXISTS codex_folders (
+		id TEXT PRIMARY KEY,
+		world_id TEXT NOT NULL,
+		parent_id TEXT NOT NULL DEFAULT '',
+		name TEXT NOT NULL,
+		created_by TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	);
 	CREATE TABLE IF NOT EXISTS page_revisions (
 		page_id TEXT NOT NULL,
 		number INTEGER NOT NULL,
@@ -326,6 +336,7 @@ func (s *SQLiteStore) initSchema() error {
 		created_at TEXT NOT NULL
 	);
 	CREATE INDEX IF NOT EXISTS idx_pages_world ON pages(world_id);
+	CREATE INDEX IF NOT EXISTS idx_codex_folders_parent ON codex_folders(world_id, parent_id);
 	CREATE INDEX IF NOT EXISTS idx_page_links_to ON page_links(to_page_id);
 	CREATE INDEX IF NOT EXISTS idx_map_pins_map ON map_pins(map_page_id);
 	CREATE INDEX IF NOT EXISTS idx_map_pins_to ON map_pins(to_page_id);
@@ -368,6 +379,31 @@ func (s *SQLiteStore) initSchema() error {
 	if !cols["world_id"] {
 		if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN world_id TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("failed to add campaigns.world_id column: %w", err)
+		}
+	}
+
+	// pages.folder_id was added after the Codex first shipped.
+	rows, err = s.db.Query(`PRAGMA table_info(pages)`)
+	if err != nil {
+		return fmt.Errorf("failed to inspect pages table: %w", err)
+	}
+	pageHasFolder := false
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, ctype string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			rows.Close()
+			return fmt.Errorf("failed to inspect pages table: %w", err)
+		}
+		if name == "folder_id" {
+			pageHasFolder = true
+		}
+	}
+	rows.Close()
+	if !pageHasFolder {
+		if _, err := s.db.Exec(`ALTER TABLE pages ADD COLUMN folder_id TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("failed to add pages.folder_id column: %w", err)
 		}
 	}
 

@@ -111,9 +111,12 @@ func createPageTx(tx *sql.Tx, p models.Page, body string) error {
 	} else if len(conflicts) > 0 {
 		return &NameTakenError{conflicts}
 	}
+	if err := folderInWorld(tx, p.FolderID, p.WorldID); err != nil {
+		return err
+	}
 	now := nowUTC()
-	if _, err := tx.Exec(`INSERT INTO pages (id, kind, world_id, title, author_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		p.ID, p.Kind, p.WorldID, p.Title, p.AuthorID, now, now); err != nil {
+	if _, err := tx.Exec(`INSERT INTO pages (id, kind, world_id, folder_id, title, author_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.Kind, p.WorldID, p.FolderID, p.Title, p.AuthorID, now, now); err != nil {
 		return err
 	}
 	for _, a := range aliases {
@@ -139,8 +142,8 @@ func (s *SQLiteStore) GetPage(id string) (*models.Page, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	var p models.Page
-	err := s.db.QueryRow(`SELECT id, kind, world_id, title, author_id, created_at, updated_at FROM pages WHERE id = ?`, id).
-		Scan(&p.ID, &p.Kind, &p.WorldID, &p.Title, &p.AuthorID, &p.CreatedAt, &p.UpdatedAt)
+	err := s.db.QueryRow(`SELECT id, kind, world_id, folder_id, title, author_id, created_at, updated_at FROM pages WHERE id = ?`, id).
+		Scan(&p.ID, &p.Kind, &p.WorldID, &p.FolderID, &p.Title, &p.AuthorID, &p.CreatedAt, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -176,7 +179,7 @@ func (s *SQLiteStore) GetPage(id string) (*models.Page, error) {
 func (s *SQLiteStore) GetCodexPages() ([]models.PageListItem, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	rows, err := s.db.Query(`SELECT id, kind, world_id, title FROM pages ORDER BY title COLLATE NOCASE, id`)
+	rows, err := s.db.Query(`SELECT id, kind, world_id, folder_id, title FROM pages ORDER BY title COLLATE NOCASE, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +187,7 @@ func (s *SQLiteStore) GetCodexPages() ([]models.PageListItem, error) {
 	at := map[string]int{}
 	for rows.Next() {
 		var p models.PageListItem
-		if err := rows.Scan(&p.ID, &p.Kind, &p.WorldID, &p.Title); err != nil {
+		if err := rows.Scan(&p.ID, &p.Kind, &p.WorldID, &p.FolderID, &p.Title); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -617,7 +620,7 @@ func (s *SQLiteStore) MovePage(id, worldID string) error {
 	} else if len(conflicts) > 0 {
 		return &NameTakenError{conflicts}
 	}
-	if _, err := tx.Exec(`UPDATE pages SET world_id = ?, updated_at = ? WHERE id = ?`, worldID, nowUTC(), id); err != nil {
+	if _, err := tx.Exec(`UPDATE pages SET world_id = ?, folder_id = '', updated_at = ? WHERE id = ?`, worldID, nowUTC(), id); err != nil {
 		return err
 	}
 	if err := resolveWorldLinks(tx, world, worldID); err != nil {

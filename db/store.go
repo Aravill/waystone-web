@@ -113,6 +113,13 @@ type Store interface {
 	RenamePage(id, newTitle, userID string, keep int) (int, error)
 	SetPageAliases(id string, aliases []string) error
 	MovePage(id, worldID string) error
+	GetFolders(worldID string) ([]models.Folder, error)
+	GetFolder(id string) (*models.Folder, error)
+	CreateFolder(f models.Folder) error
+	RenameFolder(id, name string) error
+	MoveFolder(id, newParentID string) error
+	DeleteFolder(id string) (pages, folders int, err error)
+	SetPageFolder(pageID, folderID string) error
 	DeletePage(id string) ([]string, error)
 	GetMapImages(pageID string) ([]models.MapImage, error)
 	AddMapImage(img models.MapImage) error

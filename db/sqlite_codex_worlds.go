@@ -98,6 +98,9 @@ func (s *SQLiteStore) DeleteWorld(id string) error {
 	if inUse > 0 {
 		return ErrWorldInUse
 	}
+	if _, err := tx.Exec(`DELETE FROM codex_folders WHERE world_id = ?`, id); err != nil {
+		return err
+	}
 	res, err := tx.Exec(`DELETE FROM worlds WHERE id = ?`, id)
 	if err != nil {
 		return err
