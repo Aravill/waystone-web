@@ -691,12 +691,13 @@ button.wikilink {
     width: 22px;
     height: 22px;
     transform: translate(-50%, -50%);
-    background: var(--ink);
-    outline: 2px solid var(--ink);
-    outline-offset: 2px;
-    color: var(--bg);
+    box-sizing: border-box;
+    /* Same as the map's own pins (bg square, ink border): ink fill vanished on light map images in dark mode. */
+    background: var(--bg);
+    border: 2px solid var(--ink);
+    color: var(--ink);
     font-size: 12px;
-    line-height: 22px;
+    line-height: 18px;
     text-align: center;
 }
 
