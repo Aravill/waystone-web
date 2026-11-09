@@ -94,6 +94,12 @@ type Store interface {
 	AssignCharacter(campaignID, userID, characterID, systemID, at string) (bool, error)
 	EndCharacterAssignment(campaignID, userID, at string) (*models.CharacterAssignment, error)
 	CountCharactersBySystem(systemID string) (int, error)
+	GetWorlds() ([]models.World, error)
+	GetWorld(id string) (*models.World, error)
+	CreateWorld(w models.World) error
+	UpdateWorld(id, name, description string) error
+	DeleteWorld(id string) error
+	SetCampaignWorld(campaignID, worldID string) error
 	Backup(path string) error
 	Close() error
 }

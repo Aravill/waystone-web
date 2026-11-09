@@ -245,6 +245,92 @@ func (s *SQLiteStore) initSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_campaign_sessions_date ON campaign_sessions(date);
 	CREATE INDEX IF NOT EXISTS idx_session_responses_session_id ON session_responses(session_id);
 	CREATE INDEX IF NOT EXISTS idx_session_responses_user_id ON session_responses(user_id);
+
+	-- Codex. Foreign keys are off: cascades are done by hand (DeletePage, DeleteWorld).
+	-- pages.world_id '' is the shared "Unsorted" folder; it behaves like one more world.
+	CREATE TABLE IF NOT EXISTS worlds (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+		description TEXT NOT NULL DEFAULT '',
+		created_by TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS pages (
+		id TEXT PRIMARY KEY,
+		kind TEXT NOT NULL,
+		world_id TEXT NOT NULL DEFAULT '',
+		title TEXT NOT NULL,
+		author_id TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS page_revisions (
+		page_id TEXT NOT NULL,
+		number INTEGER NOT NULL,
+		author_id TEXT NOT NULL,
+		title TEXT NOT NULL,
+		body TEXT NOT NULL,
+		note TEXT NOT NULL DEFAULT '',
+		restored_from INTEGER NOT NULL DEFAULT 0,
+		created_at TEXT NOT NULL,
+		PRIMARY KEY (page_id, number)
+	);
+	CREATE TABLE IF NOT EXISTS page_contributors (
+		page_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		revisions INTEGER NOT NULL,
+		first_revision INTEGER NOT NULL,
+		PRIMARY KEY (page_id, user_id)
+	);
+	CREATE TABLE IF NOT EXISTS page_aliases (
+		page_id TEXT NOT NULL,
+		alias TEXT NOT NULL,
+		PRIMARY KEY (page_id, alias)
+	);
+	CREATE TABLE IF NOT EXISTS page_links (
+		from_page_id TEXT NOT NULL,
+		target_text TEXT NOT NULL,
+		to_page_id TEXT NOT NULL DEFAULT '',
+		PRIMARY KEY (from_page_id, target_text)
+	);
+	CREATE TABLE IF NOT EXISTS map_images (
+		id TEXT PRIMARY KEY,
+		page_id TEXT NOT NULL,
+		file TEXT NOT NULL,
+		width INTEGER NOT NULL,
+		height INTEGER NOT NULL,
+		uploaded_by TEXT NOT NULL,
+		created_at TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS map_pins (
+		id TEXT PRIMARY KEY,
+		map_page_id TEXT NOT NULL,
+		x REAL NOT NULL,
+		y REAL NOT NULL,
+		target_text TEXT NOT NULL,
+		to_page_id TEXT NOT NULL DEFAULT '',
+		created_by TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS map_pin_events (
+		id TEXT PRIMARY KEY,
+		map_page_id TEXT NOT NULL,
+		pin_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		action TEXT NOT NULL,
+		before TEXT NOT NULL DEFAULT '',
+		after TEXT NOT NULL DEFAULT '',
+		undone_by TEXT NOT NULL DEFAULT '',
+		created_at TEXT NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_pages_world ON pages(world_id);
+	CREATE INDEX IF NOT EXISTS idx_page_links_to ON page_links(to_page_id);
+	CREATE INDEX IF NOT EXISTS idx_map_pins_map ON map_pins(map_page_id);
+	CREATE INDEX IF NOT EXISTS idx_map_pins_to ON map_pins(to_page_id);
+	CREATE INDEX IF NOT EXISTS idx_map_images_page ON map_images(page_id);
+	CREATE INDEX IF NOT EXISTS idx_map_pin_events_map ON map_pin_events(map_page_id, created_at);
 	`
 
 	if _, err := s.db.Exec(schema); err != nil {
@@ -276,6 +362,12 @@ func (s *SQLiteStore) initSchema() error {
 	if !cols["system"] {
 		if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN system TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("failed to add campaigns.system column: %w", err)
+		}
+	}
+
+	if !cols["world_id"] {
+		if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN world_id TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("failed to add campaigns.world_id column: %w", err)
 		}
 	}
 
@@ -363,7 +455,7 @@ func (s *SQLiteStore) GetAllCampaigns() ([]models.Campaign, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	rows, err := s.db.Query("SELECT id, title, status, type, system, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns ORDER BY id")
+	rows, err := s.db.Query("SELECT id, title, status, type, system, world_id, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -381,6 +473,7 @@ func (s *SQLiteStore) GetAllCampaigns() ([]models.Campaign, error) {
 			&campaign.Status,
 			&campaign.Type,
 			&campaign.System,
+			&campaign.WorldID,
 			&campaign.Summary,
 			&campaign.Description,
 			&playersJSON,
@@ -423,6 +516,8 @@ func (s *SQLiteStore) SaveCampaign(campaign models.Campaign) error {
 		signUpsOpen = 1
 	}
 
+	// world_id is deliberately not written here: only SetCampaignWorld changes it, so the
+	// many callers that save a campaign read-modify-write can't clobber it.
 	query := `
 	INSERT INTO campaigns (id, title, status, type, system, summary, description, players, dm, desired_player_count, sign_ups_open)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -469,13 +564,14 @@ func (s *SQLiteStore) GetCampaignByID(id string) (*models.Campaign, error) {
 	var playersJSON string
 	var signUpsOpen int
 
-	query := `SELECT id, title, status, type, system, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns WHERE id = ?`
+	query := `SELECT id, title, status, type, system, world_id, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns WHERE id = ?`
 	err := s.db.QueryRow(query, id).Scan(
 		&campaign.ID,
 		&campaign.Title,
 		&campaign.Status,
 		&campaign.Type,
 		&campaign.System,
+		&campaign.WorldID,
 		&campaign.Summary,
 		&campaign.Description,
 		&playersJSON,

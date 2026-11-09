@@ -39,6 +39,7 @@ type Campaign struct {
 	DesiredPlayerCount string         `json:"desired_player_count"`
 	SignUpsOpen        bool           `json:"sign_ups_open"`
 	System             string         `json:"system"`
+	WorldID            string         `json:"world_id"` // Codex world label; only SetCampaignWorld writes it
 }
 
 // CampaignStatusTransitions maps each status to the statuses reachable from it.
