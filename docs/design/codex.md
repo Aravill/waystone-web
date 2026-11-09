@@ -48,7 +48,7 @@ Names are provisional.
 - `campaigns.world_id` (empty = no world). A game has at most one world, and a world
   can have many games.
 
-**`pages`**: `id`, `title`, `kind` (`lore` | `session` | `character`), `session_id`
+**`pages`**: `id`, `title`, `kind` (`lore` | `session` | `character` | `map`), `session_id`
 (session pages only, unique), `character_id` (character pages only, unique),
 `author_id`, `created_at`, `updated_at`.
 - The body lives in revisions, reusing the journal's design: saves are refused when
@@ -62,6 +62,17 @@ belongs to zero or more worlds and zero or more games.
 
 **`page_links`**: `from_page_id`, `to_page_id` (empty for a red link), `target_text`.
 Rebuilt from the body on every save. It drives backlinks, red links and the graph.
+
+**`map_images`**: `id`, `page_id`, `file` (name under `UPLOAD_DIR`), `width`, `height`,
+`uploaded_by`, `created_at`. The newest row is the current image; older rows are its
+history.
+
+**`map_pins`**: `id`, `map_page_id`, `x`, `y` (fractions 0–1 of the image's width and
+height), `target_page_id` (empty for a red pin), `target_text`, `created_by`,
+`created_at`, `updated_at`.
+
+**`map_pin_events`**: who added, moved or removed which pin, with the old position or
+target, so a change can be undone. Lighter than full revisions.
 
 **FTS5 index** over titles, aliases and bodies.
 
@@ -120,12 +131,50 @@ Foreign keys are off, as everywhere in this app, so cascades are written by hand
   the person who renamed it. Session pages they couldn't edit are rewritten anyway, as
   a system edit.
 
+### Maps
+- A map is a page of kind `map`: an uploaded image on top of an ordinary page. It has
+  everything other pages have (title, aliases, body, worlds and games, links,
+  backlinks, a graph node, search).
+- Shown with Leaflet (vendored), using its plain-image mode (`CRS.Simple`): pan and
+  zoom over one image, no tiles.
+- **Upload:** PNG, JPEG or WebP, up to 25 MB, stored as files under `UPLOAD_DIR` on
+  the data volume (not in SQLite) and served with caching. New env var:
+  `UPLOAD_DIR` goes in `.env.example` and `docker-compose.yml`. Backups
+  (`db/backup.go`) must copy the folder too.
+- **Who:** anyone logged in uploads maps, replaces images and adds, moves or removes
+  pins. Each pin change is logged on the map's history and can be undone.
+- **Replacing the image:** pins keep their fractional positions, so a higher-resolution
+  version of the same map keeps them in place. If the aspect ratio changes, a warning
+  ("pins may land in the wrong place") comes before saving. Old images stay in the
+  history and can be restored.
+- **Pins:** a pin points to an existing page (picked with autocomplete) or to a new
+  title, which makes a red pin. Clicking a red pin creates the page, starting with the
+  map's worlds and games. Pinning an existing page never changes its scope. One page
+  can be pinned on several maps, and several times on one map. Pins count as links:
+  they appear in backlinks and as map → page edges in the graph. Deleting the target
+  page turns its pin red.
+- **Drill-down:** a pin pointing to another map page opens that map (world → region →
+  city).
+- **Look:** each page kind has its own glyph in the Scriptorium style. The viewer's
+  own characters get the rubric-red accent. Labels show on hover or tap. No custom pin
+  categories in v1.
+- **Side panel:** clicking a pin opens the page read-only in a side panel, beside the
+  map. `[[Links]]` in it open in the same panel, and an "Open page" link goes to the
+  editor. In reverse, a pinned page lists "On maps: Barovia", and clicking that opens
+  the map centred on the pin.
+
+*Later:* tiling very large maps, pin categories, areas (polygons), a marker for the
+party's position, DM-only pins (blocked by the "no secrets in v1" decision).
+
 ## v1 scope
 
 - Pages, `[[links]]` with autocomplete, red links, backlinks, aliases, revisions.
 - Graph view, filtered by world or game. The viewer's own characters are highlighted
   in rubric red, the accent that means "you".
 - Full-text search (FTS5), filtered by world.
+
+Maps are designed, but whether they ship in v1 or right after it is still open
+(question 8).
 
 *Later:* exporting a world as an Obsidian vault (a .zip of `.md` files with links
 intact). Character sheets. DM-only pages or secret blocks.
@@ -149,3 +198,6 @@ intact). Character sheets. DM-only pages or secret blocks.
    page in a game you play in or follow.
 7. **Migration:** turning journal entries and characters into pages while keeping
    revisions, credit and character assignments.
+8. **Maps in v1?** They depend on pages and links, so they're a natural second PR.
+9. **Red links:** should a page created from a red link take the scope of the page it
+   was clicked on, as red pins do? Probably yes, for consistency (see question 4).
