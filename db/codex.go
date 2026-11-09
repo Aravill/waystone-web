@@ -66,6 +66,9 @@ func GetWantedPages(worldID string) ([]models.WantedPage, error) {
 func GetPageRevisions(id string) ([]models.PageRevision, error) {
 	return GetStore().GetPageRevisions(id)
 }
+func GetPageRevision(id string, number int) (models.PageRevision, error) {
+	return GetStore().GetPageRevision(id, number)
+}
 
 // GetRecentRevisions lists recent changes; worldID nil means every world.
 func GetRecentRevisions(worldID *string, limit int) ([]models.RecentRevision, error) {
@@ -91,6 +94,11 @@ func RestoreMapImage(pageID, imageID, userID string) (models.MapImage, error) {
 }
 func GetMapPins(pageID string) ([]models.MapPin, error)  { return GetStore().GetMapPins(pageID) }
 func AddMapPin(pin models.MapPin) (models.MapPin, error) { return GetStore().AddMapPin(pin) }
+
+// AddMapPinWithNewPage creates the page (in the map's world) and pins it, in one transaction.
+func AddMapPinWithNewPage(page models.Page, pin models.MapPin) (models.MapPin, error) {
+	return GetStore().AddMapPinWithNewPage(page, pin)
+}
 func MoveMapPin(mapID, pinID string, x, y float64, userID string) error {
 	return GetStore().MoveMapPin(mapID, pinID, x, y, userID)
 }

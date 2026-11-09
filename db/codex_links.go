@@ -48,7 +48,20 @@ type codexIndex struct {
 	byWorld map[string]map[string]string
 }
 
-func loadCodexIndex(q querier) (*codexIndex, error) {
+// worldFilter returns " WHERE col IN (?, ?)" and its args for the given worlds, or "" for all.
+func worldFilter(col string, worlds []string) (string, []interface{}) {
+	if len(worlds) == 0 {
+		return "", nil
+	}
+	args := make([]interface{}, len(worlds))
+	for i, w := range worlds {
+		args[i] = w
+	}
+	return " WHERE " + col + " IN (?" + strings.Repeat(", ?", len(worlds)-1) + ")", args
+}
+
+// loadCodexIndex indexes the pages of the given worlds (every world when none is given).
+func loadCodexIndex(q querier, worlds ...string) (*codexIndex, error) {
 	idx := &codexIndex{byWorld: map[string]map[string]string{}}
 	add := func(world, name, id string) {
 		m := idx.byWorld[world]
@@ -60,12 +73,13 @@ func loadCodexIndex(q querier) (*codexIndex, error) {
 			m[NormName(name)] = id
 		}
 	}
+	where, args := worldFilter("p.world_id", worlds)
 	// Titles first so a title wins over an alias if legacy data ever collides.
 	for _, query := range []string{
-		`SELECT id, world_id, title FROM pages ORDER BY created_at, id`,
-		`SELECT p.id, p.world_id, a.alias FROM page_aliases a JOIN pages p ON p.id = a.page_id ORDER BY p.created_at, p.id, a.alias`,
+		`SELECT p.id, p.world_id, p.title FROM pages p` + where + ` ORDER BY p.created_at, p.id`,
+		`SELECT p.id, p.world_id, a.alias FROM page_aliases a JOIN pages p ON p.id = a.page_id` + where + ` ORDER BY p.created_at, p.id, a.alias`,
 	} {
-		rows, err := q.Query(query)
+		rows, err := q.Query(query, args...)
 		if err != nil {
 			return nil, err
 		}
@@ -86,7 +100,7 @@ func loadCodexIndex(q querier) (*codexIndex, error) {
 	return idx, nil
 }
 
-// resolve returns the page a [[text]] in the given world points at, or ” when there is none.
+// resolve returns the page a [[text]] in the given world points at, or "" when there is none.
 func (idx *codexIndex) resolve(world, text string) string {
 	return idx.byWorld[world][NormName(text)]
 }
@@ -110,7 +124,11 @@ func nameConflicts(q querier, world, pageID string, names []string) ([]NameConfl
 			}
 			taken[NormName(name)] = NameConflict{PageID: id, Title: title}
 		}
+		err = rows.Err()
 		rows.Close()
+		if err != nil {
+			return nil, err
+		}
 	}
 	var out []NameConflict
 	seen := map[string]bool{}
@@ -145,24 +163,30 @@ func rebuildPageLinks(tx *sql.Tx, idx *codexIndex, pageID, world, body string) e
 	return nil
 }
 
-// resolveAllLinks re-resolves every stored link and pin against the current titles, aliases and
-// worlds. Call it at the end of every transaction that changes what a name can point at:
-// CreatePage, RenamePage, SetPageAliases, MovePage and DeletePage. (Body saves only rebuild
-// that page's rows; world deletes need none because a world with pages can't be deleted;
-// game-to-world labels never affect links.)
-func resolveAllLinks(tx *sql.Tx) error {
-	idx, err := loadCodexIndex(tx)
+// resolveWorldLinks re-resolves the stored links and pins of the given worlds (pages and maps
+// that live there) against the current titles and aliases. Call it at the end of every
+// transaction that changes what a name in a world can point at: CreatePage, RenamePage,
+// SetPageAliases, DeletePage (that page's world) and MovePage (the old and the new world).
+// Body saves only rebuild that page's rows; world deletes need none because a world with pages
+// can't be deleted; game-to-world labels never affect links.
+func resolveWorldLinks(tx *sql.Tx, worlds ...string) error {
+	idx, err := loadCodexIndex(tx, worlds...)
 	if err != nil {
 		return err
 	}
+	return resolveLinksWith(tx, idx, worlds...)
+}
+
+func resolveLinksWith(tx *sql.Tx, idx *codexIndex, worlds ...string) error {
+	where, args := worldFilter("p.world_id", worlds)
 	type row struct{ a, b, to, world string }
 	for _, t := range []struct{ sel, upd string }{
-		{`SELECT l.from_page_id, l.target_text, l.to_page_id, p.world_id FROM page_links l JOIN pages p ON p.id = l.from_page_id`,
+		{`SELECT l.from_page_id, l.target_text, l.to_page_id, p.world_id FROM page_links l JOIN pages p ON p.id = l.from_page_id` + where,
 			`UPDATE page_links SET to_page_id = ? WHERE from_page_id = ? AND target_text = ?`},
-		{`SELECT m.id, m.target_text, m.to_page_id, p.world_id FROM map_pins m JOIN pages p ON p.id = m.map_page_id`,
+		{`SELECT m.id, m.target_text, m.to_page_id, p.world_id FROM map_pins m JOIN pages p ON p.id = m.map_page_id` + where,
 			`UPDATE map_pins SET to_page_id = ? WHERE id = ? AND target_text = ?`},
 	} {
-		rows, err := tx.Query(t.sel)
+		rows, err := tx.Query(t.sel, args...)
 		if err != nil {
 			return err
 		}

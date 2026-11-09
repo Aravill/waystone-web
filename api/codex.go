@@ -3,11 +3,11 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 	"unicode/utf8"
 	"waystone-web/db"
 	"waystone-web/models"
@@ -22,7 +22,7 @@ const (
 	maxAliases        = 20
 )
 
-// codexWorldParam maps the API's "unsorted" (or empty) world id to the stored ”.
+// codexWorldParam maps the API's "unsorted" (or empty) world id to the stored "".
 func codexWorldParam(id string) string {
 	if id == models.UnsortedWorldID {
 		return ""
@@ -36,26 +36,6 @@ func codexWorldID(id string) string {
 		return models.UnsortedWorldID
 	}
 	return id
-}
-
-// codexSlug makes a URL-friendly, cosmetic suffix from a title; the id decides the page.
-func codexSlug(title string) string {
-	var b strings.Builder
-	dash := false
-	for _, r := range strings.ToLower(title) {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			b.WriteRune(r)
-			dash = false
-		} else if !dash && b.Len() > 0 {
-			b.WriteByte('-')
-			dash = true
-		}
-	}
-	s := strings.Trim(b.String(), "-")
-	if len(s) > 60 {
-		s = strings.Trim(s[:60], "-")
-	}
-	return s
 }
 
 // codexName validates a page title or alias: 1-120 characters, no [ ] | or line breaks.
@@ -77,9 +57,9 @@ func codexUserID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return userID, true
 }
 
-func codexIsAdmin(userID string) bool {
+func codexIsAdmin(userID string) (bool, error) {
 	u, err := db.GetUserByID(userID)
-	return err == nil && u != nil && u.IsAdmin()
+	return err == nil && u != nil && u.IsAdmin(), err
 }
 
 func codexNameTaken(w http.ResponseWriter, e *db.NameTakenError) {
@@ -117,12 +97,18 @@ func codexWorldRef(worlds map[string]models.World, storedID string) map[string]i
 }
 
 func codexRevisionObject(users map[string]*models.User, rev models.PageRevision) map[string]interface{} {
+	o := codexRevisionSummary(users, rev)
+	o["body"] = rev.Body
+	return o
+}
+
+// codexRevisionSummary is a revision without its body, for the history list.
+func codexRevisionSummary(users map[string]*models.User, rev models.PageRevision) map[string]interface{} {
 	return map[string]interface{}{
 		"number":        rev.Number,
 		"author_id":     rev.AuthorID,
 		"author_user":   journalUser(users, rev.AuthorID),
 		"title":         rev.Title,
-		"body":          rev.Body,
 		"note":          rev.Note,
 		"restored_from": rev.RestoredFrom,
 		"created_at":    rev.CreatedAt,
@@ -201,7 +187,7 @@ func codexRecent(worldID *string, worlds map[string]models.World) ([]map[string]
 	out := make([]map[string]interface{}, 0, len(revs))
 	for _, rv := range revs {
 		out = append(out, map[string]interface{}{
-			"page_id": rv.PageID, "title": rv.Title, "slug": codexSlug(rv.Title), "kind": rv.Kind,
+			"page_id": rv.PageID, "title": rv.Title, "kind": rv.Kind,
 			"world": codexWorldRef(worlds, rv.WorldID), "number": rv.Number, "note": rv.Note,
 			"author_user": journalUser(users, rv.AuthorID), "created_at": rv.CreatedAt,
 		})
@@ -275,8 +261,7 @@ func handleCodexTitles(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		out = append(out, map[string]interface{}{
-			"id": p.ID, "title": p.Title, "slug": codexSlug(p.Title), "kind": p.Kind,
-			"aliases": p.Aliases, "world_id": codexWorldID(p.WorldID),
+			"id": p.ID, "title": p.Title, "kind": p.Kind, "aliases": p.Aliases,
 		})
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -291,6 +276,9 @@ func (req *worldRequest) normalize() string {
 	req.Name = strings.Join(strings.Fields(req.Name), " ")
 	if n := utf8.RuneCountInString(req.Name); n < 1 || n > maxWorldNameRunes {
 		return "name must be 1 to 80 characters"
+	}
+	if db.NormName(req.Name) == models.UnsortedWorldID {
+		return "\"unsorted\" is reserved for the Unsorted folder"
 	}
 	if utf8.RuneCountInString(req.Description) > maxWorldDescRunes {
 		return "description is too long"
@@ -311,7 +299,7 @@ func handleCreateWorld(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, msg)
 		return
 	}
-	now := nowRFC3339()
+	now := time.Now().UTC().Format(time.RFC3339)
 	world := models.World{ID: db.GenerateUUID(), Name: req.Name, Description: req.Description, CreatedBy: userID, CreatedAt: now, UpdatedAt: now}
 	if err := db.CreateWorld(world); err != nil {
 		if errors.Is(err, db.ErrWorldNameTaken) {
@@ -355,7 +343,12 @@ func handleDeleteWorld(w http.ResponseWriter, r *http.Request, id string) {
 	if !ok {
 		return
 	}
-	if !codexIsAdmin(userID) {
+	admin, err := codexIsAdmin(userID)
+	if err != nil {
+		codexServerError(w, "retrieve user")
+		return
+	}
+	if !admin {
 		writeJSONError(w, http.StatusForbidden, "only an admin can delete a world")
 		return
 	}
@@ -428,7 +421,7 @@ func handleGetWorld(w http.ResponseWriter, r *http.Request, apiID string) {
 	list := []map[string]interface{}{}
 	for _, p := range pages {
 		if p.WorldID == id {
-			list = append(list, map[string]interface{}{"id": p.ID, "title": p.Title, "slug": codexSlug(p.Title), "kind": p.Kind, "aliases": p.Aliases})
+			list = append(list, map[string]interface{}{"id": p.ID, "title": p.Title, "kind": p.Kind, "aliases": p.Aliases})
 		}
 	}
 	games := []map[string]interface{}{}
@@ -443,6 +436,11 @@ func handleGetWorld(w http.ResponseWriter, r *http.Request, apiID string) {
 				games = append(games, map[string]interface{}{"id": c.ID, "title": c.Title, "status": c.Status})
 			}
 		}
+	}
+	admin, err := codexIsAdmin(userID)
+	if err != nil {
+		codexServerError(w, "retrieve user")
+		return
 	}
 	wanted, err := db.GetWantedPages(id)
 	if err != nil {
@@ -460,7 +458,7 @@ func handleGetWorld(w http.ResponseWriter, r *http.Request, apiID string) {
 		"pages":      list,
 		"wanted":     wanted,
 		"recent":     recent,
-		"can_delete": id != "" && codexIsAdmin(userID),
+		"can_delete": id != "" && admin,
 	})
 }
 
@@ -499,7 +497,7 @@ func handleCreatePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"page": map[string]interface{}{
-		"id": page.ID, "slug": codexSlug(title), "world_id": codexWorldID(page.WorldID)}})
+		"id": page.ID, "world_id": codexWorldID(page.WorldID)}})
 }
 
 // codexStoreError writes the response for the errors the page store returns.
@@ -512,18 +510,25 @@ func codexStoreError(w http.ResponseWriter, err error, what string) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error(), "code": "page_deleted"})
 	case errors.Is(err, db.ErrWorldNotFound):
 		writeJSONError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, db.ErrRevisionNotFound):
+		writeJSONError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, db.ErrNotAMap):
 		writeJSONError(w, http.StatusConflict, err.Error())
 	default:
+		log.Printf("codex %s: %v", what, err)
 		codexServerError(w, what)
 	}
 }
 
 func handleCodexPageRoutes(w http.ResponseWriter, r *http.Request, parts []string, method func(...string) bool) {
-	if len(parts) == 0 || parts[0] == "" {
+	if len(parts) == 0 || (len(parts) == 1 && parts[0] == "") {
 		if method(http.MethodPost) {
 			handleCreatePage(w, r)
 		}
+		return
+	}
+	if parts[0] == "" {
+		writeJSONError(w, http.StatusNotFound, "not found")
 		return
 	}
 	id, rest := parts[0], parts[1:]
@@ -544,13 +549,17 @@ func handleCodexPageRoutes(w http.ResponseWriter, r *http.Request, parts []strin
 		if method(http.MethodGet) {
 			handlePageRevisions(w, r, id)
 		}
-	case rest[0] == "revisions" && len(rest) == 3 && rest[2] == "restore":
+	case rest[0] == "revisions" && (len(rest) == 2 || len(rest) == 3 && rest[2] == "restore"):
 		n, err := strconv.Atoi(rest[1])
 		if err != nil || n < 1 {
 			writeJSONError(w, http.StatusNotFound, "revision not found")
 			return
 		}
-		if method(http.MethodPost) {
+		if len(rest) == 2 {
+			if method(http.MethodGet) {
+				handleGetRevision(w, r, id, n)
+			}
+		} else if method(http.MethodPost) {
 			handleRestorePage(w, r, id, n)
 		}
 	case rest[0] == "title" && len(rest) == 1:
@@ -618,7 +627,7 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 		o := map[string]interface{}{"text": l.TargetText, "status": "missing", "page": nil}
 		if t, ok := byID[l.ToPageID]; ok {
 			o["status"] = "ok"
-			o["page"] = map[string]interface{}{"id": t.ID, "title": t.Title, "slug": codexSlug(t.Title), "kind": t.Kind}
+			o["page"] = map[string]interface{}{"id": t.ID, "title": t.Title, "kind": t.Kind}
 		}
 		linkList = append(linkList, o)
 	}
@@ -635,7 +644,7 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 			i = len(backList)
 			at[b.PageID] = i
 			backList = append(backList, map[string]interface{}{
-				"id": b.PageID, "title": b.Title, "slug": codexSlug(b.Title), "kind": b.Kind,
+				"id": b.PageID, "title": b.Title, "kind": b.Kind,
 				"via": []string{}, "aliases": []string{},
 			})
 		}
@@ -659,7 +668,7 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 	}
 	payload := map[string]interface{}{
 		"page": map[string]interface{}{
-			"id": page.ID, "kind": page.Kind, "title": page.Title, "slug": codexSlug(page.Title),
+			"id": page.ID, "kind": page.Kind, "title": page.Title,
 			"world": codexWorldRef(worlds, page.WorldID), "aliases": page.Aliases, "body": page.Body,
 			"current_revision": page.CurrentRevision, "revision_count": page.RevisionCount,
 			"created_at": page.CreatedAt, "updated_at": page.UpdatedAt,
@@ -675,7 +684,8 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 		if err := codexAddMapPayload(payload, page); err != nil {
 			return nil, http.StatusInternalServerError, "failed to retrieve map"
 		}
-	} else if err := codexAddOnMaps(payload, backs); err != nil {
+	}
+	if err := codexAddOnMaps(payload, backs); err != nil {
 		return nil, http.StatusInternalServerError, "failed to retrieve maps"
 	}
 	return payload, http.StatusOK, ""
@@ -747,7 +757,7 @@ func handlePageRevisions(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	list := make([]map[string]interface{}, 0, len(revs))
 	for _, rv := range revs {
-		list = append(list, codexRevisionObject(users, rv))
+		list = append(list, codexRevisionSummary(users, rv))
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"current_revision": revs[0].Number,
@@ -765,24 +775,37 @@ func handleRestorePage(w http.ResponseWriter, r *http.Request, id string, number
 	var req struct {
 		BaseRevision int `json:"base_revision"`
 	}
-	if !codexDecode(w, r, 4<<10, &req) || req.BaseRevision < 1 {
-		if req.BaseRevision < 1 {
-			writeJSONError(w, http.StatusBadRequest, "invalid request body")
-		}
+	if !codexDecode(w, r, 4<<10, &req) {
 		return
 	}
-	revs, err := db.GetPageRevisions(id)
+	if req.BaseRevision < 1 {
+		writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	rv, err := db.GetPageRevision(id, number)
 	if err != nil {
-		codexServerError(w, "retrieve revisions")
+		codexStoreError(w, err, "retrieve revision")
 		return
 	}
-	for _, rv := range revs {
-		if rv.Number == number {
-			saveCodexRevision(w, id, req.BaseRevision, models.PageRevision{AuthorID: userID, Body: rv.Body, RestoredFrom: number})
-			return
-		}
+	saveCodexRevision(w, id, req.BaseRevision, models.PageRevision{AuthorID: userID, Body: rv.Body, RestoredFrom: number})
+}
+
+// handleGetRevision returns one kept revision with its body.
+func handleGetRevision(w http.ResponseWriter, r *http.Request, id string, number int) {
+	if _, ok := codexUserID(w, r); !ok {
+		return
 	}
-	writeJSONError(w, http.StatusNotFound, "revision not found")
+	rv, err := db.GetPageRevision(id, number)
+	if err != nil {
+		codexStoreError(w, err, "retrieve revision")
+		return
+	}
+	users, err := journalUsers()
+	if err != nil {
+		codexServerError(w, "retrieve users")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"revision": codexRevisionObject(users, rv)})
 }
 
 func handleRenamePage(w http.ResponseWriter, r *http.Request, id string) {
@@ -806,7 +829,7 @@ func handleRenamePage(w http.ResponseWriter, r *http.Request, id string) {
 		codexStoreError(w, err, "rename page")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"rewritten": n, "title": title, "slug": codexSlug(title)})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"rewritten": n, "title": title})
 }
 
 func handleSetAliases(w http.ResponseWriter, r *http.Request, id string) {
@@ -880,5 +903,3 @@ func handleDeletePage(w http.ResponseWriter, r *http.Request, id string) {
 	removeCodexFiles(files)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
-
-func nowRFC3339() string { return time.Now().UTC().Format(time.RFC3339) }

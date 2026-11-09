@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -41,8 +40,8 @@ func StartBackups(ctx context.Context) {
 		return
 	}
 
-	runBackup(dir, keep)
 	go func() {
+		runBackup(dir, keep)
 		ticker := time.NewTicker(backupInterval)
 		defer ticker.Stop()
 		for {
@@ -63,17 +62,13 @@ func runBackup(dir string, keep int) {
 	tmp := filepath.Join(dir, ".tmp-"+name)
 	_ = os.Remove(tmp)
 
-	if err := Backup(tmp); err != nil {
+	if err := snapshotDB(tmp, final); err != nil {
 		log.Printf("Backup failed: %v", err)
 		_ = os.Remove(tmp)
-		return
+	} else {
+		log.Printf("Backup written: %s", final)
 	}
-	if err := os.Rename(tmp, final); err != nil {
-		log.Printf("Backup failed: %v", err)
-		_ = os.Remove(tmp)
-		return
-	}
-	log.Printf("Backup written: %s", final)
+	// The images are mirrored even when the snapshot failed.
 	mirrorUploads(filepath.Join(dir, "uploads"))
 
 	files, err := filepath.Glob(filepath.Join(dir, "waystone-*.db"))
@@ -90,9 +85,16 @@ func runBackup(dir string, keep int) {
 	}
 }
 
-// mirrorUploads copies Codex map images that are not yet in the mirror directory. Uploaded files
-// never change (their names are random), so a name that exists there is already backed up. It
-// never deletes from the mirror: images of deleted pages stay until you clear them by hand.
+func snapshotDB(tmp, final string) error {
+	if err := Backup(tmp); err != nil {
+		return err
+	}
+	return os.Rename(tmp, final)
+}
+
+// mirrorUploads copies Codex map images that are not yet in the mirror directory, or whose size
+// differs (a broken earlier copy). Uploaded files never change (their names are random), so a
+// same-sized copy is already backed up. Only files named like uploads are mirrored. It never deletes from the mirror: images of deleted pages stay until you clear them by hand.
 func mirrorUploads(mirror string) {
 	src, err := UploadDir()
 	if err != nil {
@@ -110,11 +112,13 @@ func mirrorUploads(mirror string) {
 	}
 	copied := 0
 	for _, e := range entries {
-		if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+		if !e.Type().IsRegular() || !UploadFileRe.MatchString(e.Name()) {
 			continue
 		}
 		dst := filepath.Join(mirror, e.Name())
-		if _, err := os.Stat(dst); err == nil {
+		if si, err := e.Info(); err != nil {
+			continue
+		} else if di, err := os.Stat(dst); err == nil && di.Size() == si.Size() {
 			continue
 		}
 		if err := copyFile(filepath.Join(src, e.Name()), dst); err != nil {
@@ -141,6 +145,9 @@ func copyFile(from, to string) error {
 		return err
 	}
 	_, err = io.Copy(out, in)
+	if err == nil {
+		err = out.Sync()
+	}
 	if cerr := out.Close(); err == nil {
 		err = cerr
 	}

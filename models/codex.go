@@ -1,6 +1,6 @@
 package models
 
-// UnsortedWorldID is how the API names the shared "Unsorted" folder; the database stores ”.
+// UnsortedWorldID is how the API names the shared "Unsorted" folder; the database stores "".
 const UnsortedWorldID = "unsorted"
 
 const (
@@ -25,7 +25,7 @@ type PageContributor struct {
 	FirstRevision int
 }
 
-// Page is a Codex page with its newest revision. WorldID ” is the Unsorted folder.
+// Page is a Codex page with its newest revision. WorldID "" is the Unsorted folder.
 type Page struct {
 	ID              string
 	Kind            string
@@ -87,7 +87,7 @@ type PageSaveResult struct {
 	Latest   *PageRevision // set when stale
 }
 
-// PageLink is one distinct [[target]] in a page's body. ToPageID ” means no page yet.
+// PageLink is one distinct [[target]] in a page's body. ToPageID "" means no page yet.
 type PageLink struct {
 	FromPageID string
 	TargetText string
@@ -132,7 +132,7 @@ type MapPin struct {
 	UpdatedAt  string  `json:"updated_at"`
 }
 
-// MapPinEvent logs a pin change. Before and After are JSON MapPin snapshots (” when absent).
+// MapPinEvent logs a pin change. Before and After are JSON MapPin snapshots ("" when absent).
 type MapPinEvent struct {
 	ID        string
 	MapPageID string

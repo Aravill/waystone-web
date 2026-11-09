@@ -62,7 +62,7 @@ var InitialCodexPages = []CodexSeedPage{
 	{Kind: models.PageLore, Title: "Cloveswick", AuthorID: simonID, InWorld: true,
 		Body: "A village that burned a few weeks ago. The ash smelled of cloves.\n\nOne survivor, a boy who only says *up, up, up*, was taken in at [[Karrow Ford]]."},
 	{Kind: models.PageLore, Title: "Saltmarsh Reach", AuthorID: simonID, InWorld: true,
-		Body: "Brackish flats to the east of [[Karrow Ford]]. The [[The Marsh Wardens]] patrol it."},
+		Body: "Brackish flats to the east of [[Karrow Ford]]. [[The Marsh Wardens]] patrol it."},
 	{Kind: models.PageLore, Title: "The Marsh Wardens", AuthorID: simonID, InWorld: true,
 		Body: "Lantern-bearers who keep the causeways of [[Saltmarsh Reach]] open. They owe [[Old Hesk]] a favour."},
 	{Kind: models.PageLore, Title: "Lamplighters' Guild", AuthorID: testyID, InWorld: true,

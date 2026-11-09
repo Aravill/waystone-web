@@ -14,7 +14,12 @@ fs.mkdirSync(tmp, { recursive: true });
 const child = spawn('go', ['run', 'main.go'], {
   cwd: root,
   stdio: 'inherit',
-  env: { ...process.env, DB_PATH: path.join(tmp, 'waystone.db') },
+  env: {
+    ...process.env,
+    DB_PATH: path.join(tmp, 'waystone.db'),
+    UPLOAD_DIR: path.join(tmp, 'uploads'),
+    BACKUP_DIR: '',
+  },
 });
 
 for (const sig of ['SIGINT', 'SIGTERM']) {

@@ -694,6 +694,22 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve systems")
 		return
 	}
+	// Validate the world before anything is saved ("unsorted" and "" both mean no world).
+	newWorld := campaign.WorldID
+	if req.WorldID != nil {
+		newWorld = codexWorldParam(*req.WorldID)
+		if newWorld != "" {
+			world, err := db.GetWorld(newWorld)
+			if err != nil {
+				writeJSONError(w, http.StatusInternalServerError, "failed to retrieve world")
+				return
+			}
+			if world == nil {
+				writeJSONError(w, http.StatusBadRequest, db.ErrWorldNotFound.Error())
+				return
+			}
+		}
+	}
 	probe := *campaign
 	probe.System = system
 	idChanges := campaignSystemID(byName, campaign) != campaignSystemID(byName, &probe)
@@ -710,8 +726,8 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 		writeJSONError(w, http.StatusInternalServerError, "failed to update game")
 		return
 	}
-	if req.WorldID != nil && *req.WorldID != campaign.WorldID {
-		if err := db.SetCampaignWorld(campaignID, *req.WorldID); err != nil {
+	if newWorld != campaign.WorldID {
+		if err := db.SetCampaignWorld(campaignID, newWorld); err != nil {
 			if errors.Is(err, db.ErrWorldNotFound) {
 				writeJSONError(w, http.StatusBadRequest, err.Error())
 				return

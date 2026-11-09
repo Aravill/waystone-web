@@ -127,7 +127,7 @@ func logPinEvent(tx *sql.Tx, mapID, pinID, userID, action, before, after string)
 
 // insertPin resolves the pin's target in the map's world and stores it.
 func insertPin(tx *sql.Tx, world string, pin models.MapPin) (models.MapPin, error) {
-	idx, err := loadCodexIndex(tx)
+	idx, err := loadCodexIndex(tx, world)
 	if err != nil {
 		return pin, err
 	}
@@ -146,6 +146,38 @@ func (s *SQLiteStore) AddMapPin(pin models.MapPin) (models.MapPin, error) {
 		return pin, err
 	}
 	defer tx.Rollback()
+	if pin, err = addMapPinTx(tx, pin); err != nil {
+		return pin, err
+	}
+	return pin, tx.Commit()
+}
+
+// AddMapPinWithNewPage creates an empty lore page titled pin.TargetText in the map's world and
+// pins it, in one transaction: a name clash leaves neither behind. page.ID, Title and AuthorID
+// are used; the kind and world are set here.
+func (s *SQLiteStore) AddMapPinWithNewPage(page models.Page, pin models.MapPin) (models.MapPin, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	tx, err := s.db.Begin()
+	if err != nil {
+		return pin, err
+	}
+	defer tx.Rollback()
+	world, err := mapWorld(tx, pin.MapPageID)
+	if err != nil {
+		return pin, err
+	}
+	page.Kind, page.WorldID, page.Aliases = models.PageLore, world, nil
+	if err := createPageTx(tx, page, ""); err != nil {
+		return pin, err
+	}
+	if pin, err = addMapPinTx(tx, pin); err != nil {
+		return pin, err
+	}
+	return pin, tx.Commit()
+}
+
+func addMapPinTx(tx *sql.Tx, pin models.MapPin) (models.MapPin, error) {
 	world, err := mapWorld(tx, pin.MapPageID)
 	if err != nil {
 		return pin, err
@@ -155,10 +187,8 @@ func (s *SQLiteStore) AddMapPin(pin models.MapPin) (models.MapPin, error) {
 	if pin, err = insertPin(tx, world, pin); err != nil {
 		return pin, err
 	}
-	if err := logPinEvent(tx, pin.MapPageID, pin.ID, pin.CreatedBy, "add", "", pinJSON(pin)); err != nil {
-		return pin, err
-	}
-	return pin, tx.Commit()
+	err = logPinEvent(tx, pin.MapPageID, pin.ID, pin.CreatedBy, "add", "", pinJSON(pin))
+	return pin, err
 }
 
 func (s *SQLiteStore) MoveMapPin(mapID, pinID string, x, y float64, userID string) error {
@@ -232,7 +262,9 @@ func (s *SQLiteStore) GetMapPinEvents(mapID string, limit int) ([]models.MapPinE
 }
 
 // UndoMapPinEvent reverses one pin change: an added pin is removed, a moved pin goes back, a
-// removed pin is restored as it was. The event stays in the log, marked undone.
+// removed pin is restored as it was (named after its target page's current title, if that page
+// is still in the map's world). The event stays in the log, marked undone, and the undo is logged
+// as an event of its own, which can be undone in turn.
 func (s *SQLiteStore) UndoMapPinEvent(mapID, eventID, userID string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -257,40 +289,70 @@ func (s *SQLiteStore) UndoMapPinEvent(mapID, eventID, userID string) error {
 	if e.UndoneBy != "" {
 		return ErrPinEventUndone
 	}
+	current := func() (models.MapPin, error) {
+		p, err := scanMapPin(tx.QueryRow(`SELECT `+mapPinColumns+` FROM map_pins WHERE id = ? AND map_page_id = ?`, e.PinID, mapID))
+		if err == sql.ErrNoRows {
+			err = ErrPinNotFound
+		}
+		return p, err
+	}
 	switch e.Action {
 	case "add":
-		_, err = tx.Exec(`DELETE FROM map_pins WHERE id = ? AND map_page_id = ?`, e.PinID, mapID)
+		cur, err := current()
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM map_pins WHERE id = ?`, e.PinID); err != nil {
+			return err
+		}
+		err = logPinEvent(tx, mapID, e.PinID, userID, "remove", pinJSON(cur), "")
+		if err != nil {
+			return err
+		}
 	case "move":
 		var before models.MapPin
-		if err = json.Unmarshal([]byte(e.Before), &before); err != nil {
+		if err := json.Unmarshal([]byte(e.Before), &before); err != nil {
 			return err
 		}
-		var res sql.Result
-		if res, err = tx.Exec(`UPDATE map_pins SET x = ?, y = ?, updated_at = ? WHERE id = ? AND map_page_id = ?`, before.X, before.Y, nowUTC(), e.PinID, mapID); err != nil {
+		cur, err := current()
+		if err != nil {
 			return err
 		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			return ErrPinNotFound
+		restored := cur
+		restored.X, restored.Y, restored.UpdatedAt = before.X, before.Y, nowUTC()
+		if _, err := tx.Exec(`UPDATE map_pins SET x = ?, y = ?, updated_at = ? WHERE id = ?`, restored.X, restored.Y, restored.UpdatedAt, e.PinID); err != nil {
+			return err
+		}
+		if err := logPinEvent(tx, mapID, e.PinID, userID, "move", pinJSON(cur), pinJSON(restored)); err != nil {
+			return err
 		}
 	case "remove":
 		var before models.MapPin
-		if err = json.Unmarshal([]byte(e.Before), &before); err != nil {
+		if err := json.Unmarshal([]byte(e.Before), &before); err != nil {
 			return err
 		}
-		var one int
-		if err = tx.QueryRow(`SELECT 1 FROM map_pins WHERE id = ?`, e.PinID).Scan(&one); err != sql.ErrNoRows {
-			if err == nil {
-				return ErrPinEventUndone // already back
-			}
+		if _, err := current(); err == nil {
+			return ErrPinEventUndone // already back
+		} else if err != ErrPinNotFound {
 			return err
+		}
+		if before.ToPageID != "" { // the page may have been renamed since
+			var title string
+			err := tx.QueryRow(`SELECT title FROM pages WHERE id = ? AND world_id = ?`, before.ToPageID, world).Scan(&title)
+			if err == nil {
+				before.TargetText = title
+			} else if err != sql.ErrNoRows {
+				return err
+			}
 		}
 		before.UpdatedAt = nowUTC()
-		if _, err = insertPin(tx, world, before); err != nil {
+		restored, err := insertPin(tx, world, before)
+		if err != nil {
 			return err
 		}
-	}
-	if err != nil {
-		return err
+		if err := logPinEvent(tx, mapID, e.PinID, userID, "add", "", pinJSON(restored)); err != nil {
+			return err
+		}
 	}
 	if _, err := tx.Exec(`UPDATE map_pin_events SET undone_by = ? WHERE id = ?`, userID, eventID); err != nil {
 		return err

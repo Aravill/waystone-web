@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"image"
@@ -12,8 +11,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 	"waystone-web/db"
 	"waystone-web/models"
@@ -25,9 +24,6 @@ const (
 	maxMapImageBytes = 25 << 20
 	maxMapImageSide  = 16384
 )
-
-// codexFileRe is the only shape of file name the file endpoint serves or removes.
-var codexFileRe = regexp.MustCompile(`^[0-9a-f-]{36}\.(png|jpg|webp)$`)
 
 var codexImageTypes = map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
 
@@ -82,7 +78,7 @@ func codexMapError(w http.ResponseWriter, err error, what string) {
 	case errors.Is(err, db.ErrPinEventUndone):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "already_undone"})
 	default:
-		codexStoreError(w, err, what)
+		codexStoreError(w, err, what) // logs anything unexpected
 	}
 }
 
@@ -97,7 +93,7 @@ func codexPinObject(pin models.MapPin, pages map[string]models.PageListItem) map
 	o := map[string]interface{}{"id": pin.ID, "x": pin.X, "y": pin.Y, "target_text": pin.TargetText, "status": "missing", "target": nil}
 	if t, ok := pages[pin.ToPageID]; ok {
 		o["status"] = "ok"
-		o["target"] = map[string]interface{}{"id": t.ID, "title": t.Title, "slug": codexSlug(t.Title), "kind": t.Kind}
+		o["target"] = map[string]interface{}{"id": t.ID, "title": t.Title, "kind": t.Kind}
 	}
 	return o
 }
@@ -140,7 +136,7 @@ func codexAddMapPayload(payload map[string]interface{}, page *models.Page) error
 	for _, p := range pins {
 		pinList = append(pinList, codexPinObject(p, pages))
 	}
-	payload["map"] = map[string]interface{}{"image": image, "images_count": len(images), "pins": pinList}
+	payload["map"] = map[string]interface{}{"image": image, "pins": pinList}
 	return nil
 }
 
@@ -186,34 +182,20 @@ func handleListMapImages(w http.ResponseWriter, r *http.Request, id string) {
 	writeJSON(w, http.StatusOK, list)
 }
 
+// uploadTimeout is how long the slowest accepted upload (25 MB) may take to arrive and be answered.
+const uploadTimeout = 150 * time.Second
+
 // handleUploadMapImage takes the raw image as the request body (PNG, JPEG or WebP, 25 MB at most).
 func handleUploadMapImage(w http.ResponseWriter, r *http.Request, id string) {
 	userID, ok := codexUserID(w, r)
 	if !ok {
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxMapImageBytes)
-	data, err := io.ReadAll(r.Body)
-	if err != nil {
-		var tooBig *http.MaxBytesError
-		if errors.As(err, &tooBig) {
-			writeJSONError(w, http.StatusRequestEntityTooLarge, "the image must be 25 MB or smaller")
-			return
-		}
-		writeJSONError(w, http.StatusBadRequest, "failed to read the image")
-		return
-	}
-	ext, known := codexImageTypes[http.DetectContentType(data)]
-	if !known {
-		writeJSONError(w, http.StatusBadRequest, "the image must be a PNG, JPEG or WebP file")
-		return
-	}
-	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
-	if err != nil || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > maxMapImageSide || cfg.Height > maxMapImageSide {
-		writeJSONError(w, http.StatusBadRequest, "the image could not be read, or is larger than 16384 pixels on a side")
-		return
-	}
-	// Check the page before writing the file.
+	// The server-wide timeouts suit small bodies; give this one room (unsupported writers ignore it).
+	rc := http.NewResponseController(w)
+	_ = rc.SetReadDeadline(time.Now().Add(uploadTimeout))
+	_ = rc.SetWriteDeadline(time.Now().Add(uploadTimeout))
+	// Check the page before reading the body.
 	page, err := db.GetPage(id)
 	if err != nil {
 		codexServerError(w, "retrieve page")
@@ -227,16 +209,47 @@ func handleUploadMapImage(w http.ResponseWriter, r *http.Request, id string) {
 		codexStoreError(w, db.ErrNotAMap, "")
 		return
 	}
-	file := db.GenerateUUID() + ext
-	if err := writeCodexFile(file, data); err != nil {
+	tmp, err := db.CreateUploadTemp()
+	if err != nil {
 		log.Printf("failed to store map image: %v", err)
 		codexServerError(w, "store the image")
 		return
 	}
-	img := models.MapImage{ID: db.GenerateUUID(), PageID: id, File: file, Width: cfg.Width, Height: cfg.Height, UploadedBy: userID, CreatedAt: nowRFC3339()}
+	size, err := io.Copy(tmp, http.MaxBytesReader(w, r.Body, maxMapImageBytes))
+	if err != nil {
+		db.DiscardUpload(tmp)
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeJSONError(w, http.StatusRequestEntityTooLarge, "the image must be 25 MB or smaller")
+			return
+		}
+		writeJSONError(w, http.StatusBadRequest, "failed to read the image")
+		return
+	}
+	head := make([]byte, 512)
+	n, _ := tmp.ReadAt(head, 0)
+	ext, known := codexImageTypes[http.DetectContentType(head[:n])]
+	if !known {
+		db.DiscardUpload(tmp)
+		writeJSONError(w, http.StatusBadRequest, "the image must be a PNG, JPEG or WebP file")
+		return
+	}
+	cfg, _, err := image.DecodeConfig(io.NewSectionReader(tmp, 0, size))
+	if err != nil || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > maxMapImageSide || cfg.Height > maxMapImageSide {
+		db.DiscardUpload(tmp)
+		writeJSONError(w, http.StatusBadRequest, "the image could not be read, or is larger than 16384 pixels on a side")
+		return
+	}
+	file := db.GenerateUUID() + ext
+	if err := db.CommitUpload(tmp, file); err != nil {
+		log.Printf("failed to store map image: %v", err)
+		codexServerError(w, "store the image")
+		return
+	}
+	img := models.MapImage{ID: db.GenerateUUID(), PageID: id, File: file, Width: cfg.Width, Height: cfg.Height, UploadedBy: userID, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
 	if err := db.AddMapImage(img); err != nil {
 		removeCodexFiles([]string{file})
-		codexStoreError(w, err, "save the image")
+		codexMapError(w, err, "save the image")
 		return
 	}
 	users, err := journalUsers()
@@ -247,35 +260,6 @@ func handleUploadMapImage(w http.ResponseWriter, r *http.Request, id string) {
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"image": codexImageObject(users, img, true)})
 }
 
-// writeCodexFile stores data under the upload directory via a temp file and a rename.
-func writeCodexFile(name string, data []byte) error {
-	dir, err := db.UploadDir()
-	if err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(dir, ".upload-*")
-	if err != nil {
-		return err
-	}
-	_, werr := tmp.Write(data)
-	if cerr := tmp.Close(); werr == nil {
-		werr = cerr
-	}
-	if werr != nil {
-		os.Remove(tmp.Name())
-		return werr
-	}
-	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
-		os.Remove(tmp.Name())
-		return err
-	}
-	if err := os.Rename(tmp.Name(), filepath.Join(dir, name)); err != nil {
-		os.Remove(tmp.Name())
-		return err
-	}
-	return nil
-}
-
 // removeCodexFiles deletes stored map images after their page is gone; failures are only logged.
 func removeCodexFiles(files []string) {
 	dir, err := db.UploadDir()
@@ -284,7 +268,7 @@ func removeCodexFiles(files []string) {
 		return
 	}
 	for _, f := range files {
-		if !codexFileRe.MatchString(f) {
+		if !db.UploadFileRe.MatchString(f) {
 			continue
 		}
 		if err := os.Remove(filepath.Join(dir, f)); err != nil && !os.IsNotExist(err) {
@@ -297,7 +281,7 @@ func handleCodexFile(w http.ResponseWriter, r *http.Request, name string) {
 	if _, ok := codexUserID(w, r); !ok {
 		return
 	}
-	if !codexFileRe.MatchString(name) {
+	if !db.UploadFileRe.MatchString(name) {
 		writeJSONError(w, http.StatusNotFound, "not found")
 		return
 	}
@@ -340,13 +324,16 @@ func handleRestoreMapImage(w http.ResponseWriter, r *http.Request, id, imageID s
 }
 
 type pinRequest struct {
-	X          float64 `json:"x"`
-	Y          float64 `json:"y"`
-	TargetText string  `json:"target_text"`
-	CreatePage bool    `json:"create_page"` // add: create the lore page first (empty, in the map's world)
+	X          *float64 `json:"x"`
+	Y          *float64 `json:"y"`
+	TargetText string   `json:"target_text"`
+	CreatePage bool     `json:"create_page"` // add: create the lore page first (empty, in the map's world)
 }
 
-func validFraction(f float64) bool { return f >= 0 && f <= 1 }
+// validPosition reports whether both coordinates are present and fractions of the image.
+func (req pinRequest) validPosition() bool {
+	return req.X != nil && req.Y != nil && *req.X >= 0 && *req.X <= 1 && *req.Y >= 0 && *req.Y <= 1
+}
 
 func handleAddPin(w http.ResponseWriter, r *http.Request, id string) {
 	userID, ok := codexUserID(w, r)
@@ -358,7 +345,7 @@ func handleAddPin(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	text, valid := codexName(req.TargetText)
-	if !valid || !validFraction(req.X) || !validFraction(req.Y) {
+	if !valid || !req.validPosition() {
 		writeJSONError(w, http.StatusBadRequest, "a pin needs a position on the map and a page title")
 		return
 	}
@@ -375,14 +362,13 @@ func handleAddPin(w http.ResponseWriter, r *http.Request, id string) {
 		codexStoreError(w, db.ErrNotAMap, "")
 		return
 	}
+	pin := models.MapPin{MapPageID: id, X: *req.X, Y: *req.Y, TargetText: text, CreatedBy: userID}
 	if req.CreatePage {
-		page := models.Page{ID: db.GenerateUUID(), Kind: models.PageLore, WorldID: mapPage.WorldID, Title: text, AuthorID: userID}
-		if err := db.CreatePage(page, ""); err != nil {
-			codexStoreError(w, err, "create page")
-			return
-		}
+		// The page and the pin are saved together; the store sets the page's world to the map's.
+		pin, err = db.AddMapPinWithNewPage(models.Page{ID: db.GenerateUUID(), Title: text, AuthorID: userID}, pin)
+	} else {
+		pin, err = db.AddMapPin(pin)
 	}
-	pin, err := db.AddMapPin(models.MapPin{MapPageID: id, X: req.X, Y: req.Y, TargetText: text, CreatedBy: userID})
 	if err != nil {
 		codexMapError(w, err, "add the pin")
 		return
@@ -404,11 +390,11 @@ func handleMovePin(w http.ResponseWriter, r *http.Request, id, pinID string) {
 	if !codexDecode(w, r, 4<<10, &req) {
 		return
 	}
-	if !validFraction(req.X) || !validFraction(req.Y) {
+	if !req.validPosition() {
 		writeJSONError(w, http.StatusBadRequest, "a pin needs a position on the map")
 		return
 	}
-	if err := db.MoveMapPin(id, pinID, req.X, req.Y, userID); err != nil {
+	if err := db.MoveMapPin(id, pinID, *req.X, *req.Y, userID); err != nil {
 		codexMapError(w, err, "move the pin")
 		return
 	}

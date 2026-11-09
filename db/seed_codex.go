@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -50,26 +51,17 @@ func seedCodex() error {
 		return err
 	}
 
-	dir, err := UploadDir()
-	if err != nil {
-		return fmt.Errorf("failed to seed map image: %w", err)
-	}
 	file := GenerateUUID() + ".png"
 	img := demoMapPNG()
-	f, err := os.Create(filepath.Join(dir, file))
-	if err != nil {
-		return fmt.Errorf("failed to seed map image: %w", err)
-	}
-	if err := png.Encode(f, img); err != nil {
-		f.Close()
-		return fmt.Errorf("failed to seed map image: %w", err)
-	}
-	if err := f.Close(); err != nil {
+	if err := WriteUpload(file, func(w io.Writer) error { return png.Encode(w, img) }); err != nil {
 		return fmt.Errorf("failed to seed map image: %w", err)
 	}
 	b := img.Bounds()
 	if err := store.AddMapImage(models.MapImage{ID: GenerateUUID(), PageID: mapID, File: file, Width: b.Dx(), Height: b.Dy(),
 		UploadedBy: config.InitialMapPage.AuthorID, CreatedAt: now}); err != nil {
+		if dir, derr := UploadDir(); derr == nil {
+			os.Remove(filepath.Join(dir, file))
+		}
 		return fmt.Errorf("failed to seed map image: %w", err)
 	}
 	for _, sp := range config.InitialMapPins {

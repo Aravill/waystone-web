@@ -106,6 +106,7 @@ type Store interface {
 	GetBacklinks(id string) ([]models.PageBacklink, error)
 	GetWantedPages(worldID string) ([]models.WantedPage, error)
 	GetPageRevisions(id string) ([]models.PageRevision, error)
+	GetPageRevision(id string, number int) (models.PageRevision, error)
 	GetRecentRevisions(worldID *string, limit int) ([]models.RecentRevision, error)
 	CreatePage(p models.Page, body string) error
 	SavePageRevision(id string, base int, rev models.PageRevision, keep int) (models.PageSaveResult, error)
@@ -118,6 +119,7 @@ type Store interface {
 	RestoreMapImage(pageID, imageID, userID string) (models.MapImage, error)
 	GetMapPins(pageID string) ([]models.MapPin, error)
 	AddMapPin(pin models.MapPin) (models.MapPin, error)
+	AddMapPinWithNewPage(page models.Page, pin models.MapPin) (models.MapPin, error)
 	MoveMapPin(mapID, pinID string, x, y float64, userID string) error
 	DeleteMapPin(mapID, pinID, userID string) error
 	GetMapPinEvents(mapID string, limit int) ([]models.MapPinEvent, error)

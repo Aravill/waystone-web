@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	"strings"
-	"time"
 	"waystone-web/models"
 )
 
@@ -67,7 +66,7 @@ func (s *SQLiteStore) UpdateWorld(id, name, description string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	res, err := s.db.Exec(`UPDATE worlds SET name = ?, description = ?, updated_at = ? WHERE id = ?`,
-		name, description, time.Now().UTC().Format(time.RFC3339), id)
+		name, description, nowUTC(), id)
 	if isUniqueViolation(err) {
 		return ErrWorldNameTaken
 	}
@@ -111,7 +110,7 @@ func (s *SQLiteStore) DeleteWorld(id string) error {
 	return tx.Commit()
 }
 
-// SetCampaignWorld points a game at a world (” clears it). It is only a label: links don't change.
+// SetCampaignWorld points a game at a world ("" clears it). It is only a label: links don't change.
 func (s *SQLiteStore) SetCampaignWorld(campaignID, worldID string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
