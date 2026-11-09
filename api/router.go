@@ -45,6 +45,8 @@ func RegisterRoutes() {
 	// Protected API endpoints (wrapped with auth middleware)
 	http.Handle("/api/campaigns", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaigns)))
 	http.Handle("/api/campaigns/", middleware.AuthMiddleware(http.HandlerFunc(HandleCampaignRoutes)))
+	http.Handle("/api/codex", middleware.AuthMiddleware(http.HandlerFunc(HandleCodexHome)))
+	http.Handle("/api/codex/", middleware.AuthMiddleware(http.HandlerFunc(HandleCodexRoutes)))
 	http.Handle("/api/characters", middleware.AuthMiddleware(http.HandlerFunc(HandleCharacters)))
 	http.Handle("/api/characters/", middleware.AuthMiddleware(http.HandlerFunc(HandleCharacterRoutes)))
 	http.Handle("/api/version", middleware.AuthMiddleware(http.HandlerFunc(HandleVersion)))
@@ -125,6 +127,9 @@ func RegisterRoutes() {
 		}
 		characterPage(w, r)
 	})))
+	codexPage := ServePageWithFallback("codex.html")
+	http.Handle("/codex", middleware.AuthMiddleware(codexPage))
+	http.Handle("/codex/", middleware.AuthMiddleware(codexPage))
 	http.Handle("/games", http.RedirectHandler("/campaigns", http.StatusSeeOther))
 	http.Handle("/profile", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("profile.html"))))
 	http.Handle("/change-password", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("change-password.html"))))
