@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=7"></script>
     <link rel="stylesheet" href="/static/styles.css?v=74">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=5">
+    <link rel="stylesheet" href="/static/codex.css?v=6">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -207,7 +207,7 @@
                                 <div class="map-stage" @keydown.escape.window="pinMenu = null">
                                     <div class="codex-map" x-ref="mapEl"></div>
                                     <div class="map-menu" x-show="pinMenu" :style="pinMenu ? 'left:' + pinMenu.px + 'px;top:' + pinMenu.py + 'px' : ''" role="menu">
-                                        <button type="button" role="menuitem" @click="startAddPin()">+ Add pin here</button>
+                                        <button type="button" role="menuitem" x-ref="menuFirst" @click="startAddPin()">+ Add pin here</button>
                                         <button type="button" role="menuitem" @click="pinMenu = null">Cancel</button>
                                     </div>
                                     <p class="map-banner" x-show="movingPin" role="status">Drag the pin to its new spot. <button type="button" class="text-link" @click="cancelMove()">Cancel</button></p>
@@ -244,6 +244,7 @@
                                 </aside>
                             </div>
                         </template>
+                        <p x-show="page.kind === 'map' && pageData.map.image"><button type="button" class="campaign-action-btn" @click="startAddPinAtCentre()">+ Add pin</button></p>
                         <p class="hint" x-show="page.kind === 'map' && pageData.map.image">Drag to pan · scroll or pinch to zoom · click an empty spot to add a pin</p>
                         <ul class="pin-key" x-show="page.kind === 'map' && pageData.map.image" aria-label="Pin key">
                             <li><span class="codex-pin codex-pin--key">✦</span> lore page</li>
@@ -295,7 +296,7 @@
                         </div>
                     </section>
                     <div class="notice conflict" role="alert" x-show="conflict">
-                        <h2 class="conflict-title" x-text="'§ ' + conflictWho + ' saved revision ' + (conflict ? conflict.latest.number : '') + ' while you were editing'"></h2>
+                        <h2 class="conflict-title"><span class="conflict-mark">§</span> <span x-text="conflictWho + ' saved revision ' + (conflict ? conflict.latest.number : '') + ' while you were editing'"></span></h2>
                         <p>Nothing is lost: your text is still in the editor below. This is what they changed:</p>
                         <div class="diff" x-show="conflict && conflict.html" x-html="conflict ? conflict.html : ''"></div>
                         <p class="same" x-show="conflict && !conflict.html">Their revision didn't change the text.</p>
@@ -320,7 +321,7 @@
                                 <div class="pane pane--preview">
                                     <span class="label">Preview</span>
                                     <div class="preview">
-                                        <div class="game-text" x-html="previewHtml"></div>
+                                        <div class="game-text" @click="onBodyClick($event)" x-html="previewHtml"></div>
                                     </div>
                                 </div>
                             </div>
@@ -380,12 +381,13 @@
                                 </div>
                                 <span class="legend" x-show="historyMode === 'changes' && previousRevision">Against revision <span x-text="previousRevision ? previousRevision.number : ''"></span>: <ins>added</ins> · <del>removed</del></span>
                             </div>
+                            <p class="same" x-show="bodyLoading">Loading this revision...</p>
                             <div x-show="historyMode === 'full'">
-                                <div class="game-text" x-html="selectedRevision ? codexMarkdown(selectedRevision.body, null) : ''"></div>
+                                <div class="game-text" x-html="codexMarkdown(selectedBody, null)"></div>
                             </div>
                             <div x-show="historyMode === 'changes'">
                                 <p class="same" x-show="!previousRevision" x-text="pruned && selected > 1 ? 'This is the oldest revision still kept, so there is nothing to compare it with.' : 'This is the first version of the page, so there is nothing to compare it with.'"></p>
-                                <div class="game-text" x-show="!previousRevision" x-html="selectedRevision ? codexMarkdown(selectedRevision.body, null) : ''"></div>
+                                <div class="game-text" x-show="!previousRevision" x-html="codexMarkdown(selectedBody, null)"></div>
                                 <template x-if="previousRevision && selectedDiff">
                                     <div class="detail-changes">
                                         <div class="diff" x-show="selectedDiff.added || selectedDiff.removed" x-html="selectedDiff.html"></div>
@@ -450,7 +452,7 @@
                             <label for="dTitle">Title</label>
                             <input type="text" id="dTitle" maxlength="120" x-model="dlg.title" x-ref="dlgFocus">
                         </div>
-                        <div class="form-group" x-show="!dlg.kindLocked">
+                        <div class="form-group">
                             <label for="dKind">Kind</label>
                             <select id="dKind" x-model="dlg.kind">
                                 <option value="lore">Lore page</option>
@@ -526,7 +528,7 @@
                 </div>
                 <button type="button" class="modal-close" @click="closePinDlg()" aria-label="Close">&times;</button>
             </div>
-            <form class="modal-form" @submit.prevent="choosePin(pinOptions[0])" novalidate>
+            <form class="modal-form" @submit.prevent="pinDlg.query.trim() && choosePin(pinOptions[0])" novalidate>
                 <div class="form-group">
                     <label for="pinQuery">Which page is here?</label>
                     <input type="search" id="pinQuery" x-model="pinDlg.query" x-ref="pinFocus" autocomplete="off" placeholder="Search this world's pages, or type a new title" maxlength="120">
@@ -566,10 +568,10 @@
     </div>
 
     <script src="/static/notifications.js?v=11"></script>
-    <script src="/campaigns.js?v=59"></script>
+    <script src="/campaigns.js?v=60"></script>
     <script src="/static/journal.js?v=1"></script>
-    <script src="/static/codex-editor.js?v=1"></script>
-    <script src="/static/codex-map.js?v=1"></script>
-    <script src="/static/codex.js?v=2"></script>
+    <script src="/static/codex-editor.js?v=2"></script>
+    <script src="/static/codex-map.js?v=2"></script>
+    <script src="/static/codex.js?v=3"></script>
 </body>
 </html>

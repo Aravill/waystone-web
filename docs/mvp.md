@@ -60,6 +60,9 @@ This document describes what must-have features are to be implemented before pre
     - [x] Visually distinct campaign statuses
 - [x] Initial log-in
     - [x] Profile creation process (set nickname and avatar)
+- [x] Codex
+    - [x] Worlds as folders (plus a shared Unsorted folder), lore pages and map pages with `[[Title]]` links, aliases, revision history and restore
+    - [x] Maps with an uploaded image, pins that point at pages, and an undoable pin log; see the Codex section of `STYLE_GUIDE.md`
 - [x] Technological
     - [x] SQLite
     - [x] Alpine.js

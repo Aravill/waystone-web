@@ -9,7 +9,7 @@ const CODEX_LINK_RE = /\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{1,200}))?\]\]/g;
 const codexNorm = (s) => String(s || '').trim().split(/\s+/).join(' ').toLowerCase();
 
 function codexSlug(title) {
-    const s = String(title || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60).replace(/-+$/, '');
+    const s = Array.from(String(title || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '')).slice(0, 60).join('').replace(/-+$/, '');
     return s || 'page';
 }
 
@@ -19,15 +19,17 @@ function codexPageUrl(p, tail = '') {
 
 // Markdown with [[wikilinks]]. lookup(text) returns the target page ({id, title}) or null for a
 // missing page; with no lookup (old revisions) links are shown plain. The links are swapped for
-// placeholders before rendering so the Markdown renderer never sees them.
+// placeholders before rendering so the Markdown renderer never sees them. A placeholder holds
+// spaces, which a Markdown link URL can't, so one inside "(...)" is never swallowed into an href.
 function codexMarkdown(body, lookup) {
     const found = [];
-    const text = String(body || '').replace(CODEX_LINK_RE, (m, t, label) => {
+    const text = String(body || '').replace(/\u0001/g, '').replace(CODEX_LINK_RE, (m, t, label) => {
         found.push({ text: t.trim(), label });
-        return `\u0001${found.length - 1}\u0001`;
+        return `\u0001 ${found.length - 1} \u0001`;
     });
-    return renderMarkdown(text).replace(/\u0001(\d+)\u0001/g, (m, i) => {
+    return renderMarkdown(text).replace(/\u0001 (\d+) \u0001/g, (m, i) => {
         const l = found[Number(i)];
+        if (!l) return '';
         const shown = escapeHtml(l.label || l.text);
         if (!lookup) return `<span class="wikilink wikilink--plain">${shown}</span>`;
         const target = lookup(l.text);
@@ -82,8 +84,11 @@ window.codexPage = function () {
         historyMode: 'changes',
         selected: 0,
         selectedDiff: null,
+        selectedBody: '',
+        bodyLoading: false,
+        bodies: {}, // revision number -> text, fetched on demand
+        diffSeq: 0,
         deltas: {},
-        deltaSeq: 0,
 
         async init() {
             try {
@@ -102,6 +107,12 @@ window.codexPage = function () {
                 return;
             }
             this.route = this.parseRoute();
+            if (!this.route) {
+                this.route = { screen: 'home', id: '' };
+                this.notFound = true;
+                this.loading = false;
+                return;
+            }
             window.addEventListener('beforeunload', (event) => {
                 if (this.isDirty) {
                     event.preventDefault();
@@ -113,11 +124,17 @@ window.codexPage = function () {
         },
 
         // /codex, /codex/w/{id}[/slug], /codex/p/{id}/{slug}[/edit|/history]
+        // Returns null for a malformed URL.
         parseRoute() {
-            const parts = location.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+            let parts;
+            try {
+                parts = location.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+            } catch (error) {
+                return null;
+            }
             if (parts[1] === 'w' && parts[2]) return { screen: 'world', id: parts[2] };
             if (parts[1] === 'p' && parts[2]) {
-                const tail = parts[4] || (parts.length === 4 ? parts[3] : '');
+                const tail = parts[4] || '';
                 return { screen: tail === 'edit' || tail === 'history' ? tail : 'page', id: parts[2] };
             }
             return { screen: 'home', id: '' };
@@ -215,7 +232,7 @@ window.codexPage = function () {
         recentHtml(r, withWorld) {
             const note = r.note ? ` · ${escapeHtml(r.note)}` : '';
             const where = withWorld ? ` · ${escapeHtml(r.world.name)}` : '';
-            return `<a href="${codexPageUrl(r)}">${r.kind === 'map' ? '◈ ' : ''}${escapeHtml(r.title)}</a><span class="muted"> · revision ${r.number} by ${escapeHtml(r.author_user.display_name)}${where}${note} · ${escapeHtml(this.shortDate(r.created_at))}</span>`;
+            return `<a href="${codexPageUrl({ id: r.page_id, title: r.title })}">${r.kind === 'map' ? '◈ ' : ''}${escapeHtml(r.title)}</a><span class="muted"> · revision ${r.number} by ${escapeHtml(r.author_user.display_name)}${where}${note} · ${escapeHtml(this.shortDate(r.created_at))}</span>`;
         },
         get worldMaps() {
             return this.world ? this.world.pages.filter((p) => p.kind === 'map') : [];
@@ -227,12 +244,16 @@ window.codexPage = function () {
 
         // fetch with JSON in and out. An expired login comes back as a redirect to the login page,
         // which is reported as status 401 so the editor can keep the draft instead of leaving.
+        // Any other reply that isn't JSON is reported as a generic failure.
         async send(url, method, body) {
             const response = await fetch(url, body === undefined
                 ? { method }
                 : { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-            if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
+            if (response.status === 401 || (response.redirected && new URL(response.url).pathname.includes('login'))) {
                 return { response: { ok: false, status: 401 }, data: {} };
+            }
+            if (!response.headers.get('Content-Type')?.includes('application/json')) {
+                return { response: { ok: false, status: response.ok ? 500 : response.status }, data: { error: 'unexpected reply from the server' } };
             }
             return { response, data: await response.json().catch(() => ({})) };
         },
@@ -489,15 +510,17 @@ window.codexPage = function () {
                 }
                 if (codexMapCtl) {
                     codexMapCtl.setPins(m.pins);
+                    if (this.panel) codexMapCtl.setOpen(this.panel.pin.id);
                     return;
                 }
                 codexMapCtl = await window.mountCodexMap(el, {
                     image: m.image,
                     pins: m.pins,
                     onPinClick: (pin) => this.onPinClick(pin),
-                    onMapClick: (info) => { this.pinMenu = info; },
+                    onMapClick: (info) => this.showPinMenu(info),
                     onPinMove: (id, x, y) => this.onPinMove(id, x, y)
                 });
+                if (this.panel) codexMapCtl.setOpen(this.panel.pin.id);
                 const pinId = new URLSearchParams(location.search).get('pin');
                 const pin = pinId && m.pins.find((p) => p.id === pinId);
                 if (pin) {
@@ -507,6 +530,21 @@ window.codexPage = function () {
             } catch (error) {
                 this.showMessage('Could not show the map: ' + error.message, 'error');
             }
+        },
+        // Opens the "add pin here" menu at the click, kept inside the map, with focus on its first item.
+        showPinMenu(info) {
+            const stage = this.$refs.mapEl;
+            if (info && stage) {
+                info = { ...info, px: Math.max(0, Math.min(info.px, stage.clientWidth - 200)), py: Math.max(0, Math.min(info.py, stage.clientHeight - 90)) };
+            }
+            this.pinMenu = info;
+            if (info) this.$nextTick(() => this.$refs.menuFirst?.focus());
+        },
+        // Keyboard route to a pin: the picker opens for the middle of what the map is showing.
+        startAddPinAtCentre() {
+            if (!codexMapCtl) return;
+            this.pinMenu = codexMapCtl.center();
+            this.startAddPin();
         },
         onPinClick(pin) {
             this.pinMenu = null;
@@ -590,7 +628,10 @@ window.codexPage = function () {
         // Reload the map page (pins, links) and redraw the pins without losing the zoom.
         async reloadMap() {
             const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}`, 'GET');
-            if (!response.ok) return;
+            if (!response.ok) {
+                this.showMessage(this.sentence(data.error || 'Failed to reload the map'), 'error');
+                return;
+            }
             this.pageData = data;
             if (codexMapCtl) codexMapCtl.setPins(data.map.pins);
             if (this.panel) {
@@ -624,10 +665,12 @@ window.codexPage = function () {
                 const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/pins/${encodeURIComponent(id)}`, 'PUT', { x, y });
                 if (!response.ok) this.showMessage(this.sentence(data.error || 'Failed to move the pin'), 'error');
                 else this.showMessage('Pin moved', 'success');
+                await this.reloadMap();
             } catch (error) {
                 this.showMessage('Error moving the pin: ' + error.message, 'error');
+                // The marker was dragged but the move didn't go through: put the pins back.
+                if (codexMapCtl) codexMapCtl.setPins(this.pageData.map.pins);
             }
-            await this.reloadMap();
         },
         async removePin() {
             if (!this.panel || this.busy) return;
@@ -823,7 +866,7 @@ window.codexPage = function () {
             await this.$nextTick();
             try {
                 this.editor = await window.createCodexEditor(this.$refs.editorHost, {
-                    doc: this.draft.body,
+                    doc: () => this.draft.body,
                     titles: () => this.titles,
                     onChange: (value) => { this.draft.body = value; }
                 });
@@ -892,35 +935,43 @@ window.codexPage = function () {
                 this.currentRevision = data.current_revision;
                 this.selected = select && this.revisions.some((r) => r.number === select) ? select : this.currentRevision;
                 this.updateDiff();
-                this.computeDeltas();
             } catch (error) {
                 this.loadError = 'Could not load the history: ' + error.message;
             } finally {
                 this.historyLoading = false;
             }
         },
-        updateDiff() {
-            const r = this.selectedRevision, prev = this.previousRevision;
-            if (!r || !prev) {
-                this.selectedDiff = null;
-                return;
+        // The list has no bodies; a revision's text (kept revisions never change) is fetched when needed.
+        async revisionBody(n) {
+            if (this.bodies[n] === undefined) {
+                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.route.id)}/revisions/${n}`, 'GET');
+                if (!response.ok) throw new Error(data.error || 'request failed');
+                this.bodies[n] = data.revision.body;
             }
-            const d = diffWords(prev.body, r.body);
-            this.selectedDiff = { added: d.added, removed: d.removed, html: diffHtml(d.segs) };
+            return this.bodies[n];
         },
-        // The +/- counts for the list, a few at a time so a long history doesn't freeze the page.
-        async computeDeltas() {
-            const seq = ++this.deltaSeq;
-            this.deltas = {};
-            for (let i = 0; i < this.revisions.length; i++) {
-                const r = this.revisions[i];
-                const prev = this.revisions.find((x) => x.number === r.number - 1);
-                if (prev) {
-                    const d = diffWords(prev.body, r.body);
-                    if (seq !== this.deltaSeq) return;
+        // Loads the selected revision and the one before it, then diffs them. The +/- count of a
+        // revision shows in the list once it has been opened.
+        async updateDiff() {
+            const seq = ++this.diffSeq;
+            const r = this.selectedRevision, prev = this.previousRevision;
+            this.selectedBody = '';
+            this.selectedDiff = null;
+            if (!r) return;
+            this.bodyLoading = true;
+            try {
+                const [body, before] = await Promise.all([this.revisionBody(r.number), prev ? this.revisionBody(prev.number) : null]);
+                if (seq !== this.diffSeq) return;
+                this.selectedBody = body;
+                if (before !== null) {
+                    const d = diffWords(before, body);
+                    this.selectedDiff = { added: d.added, removed: d.removed, html: diffHtml(d.segs) };
                     this.deltas = { ...this.deltas, [r.number]: { added: d.added, removed: d.removed } };
                 }
-                if (i % 4 === 3) await new Promise((resolve) => setTimeout(resolve));
+            } catch (error) {
+                if (seq === this.diffSeq) this.showMessage('Could not load the revision: ' + error.message, 'error');
+            } finally {
+                if (seq === this.diffSeq) this.bodyLoading = false;
             }
         },
         deltaHtml(r) {

@@ -17,7 +17,7 @@
     }
 
     // mountCodexMap(el, { image, pins, onPinClick(pin), onMapClick(info | null), onPinMove(id, x, y) })
-    // resolves to { el, imageUrl, setPins, setOpen, setMovable, focusPin, destroy }.
+    // resolves to { el, imageUrl, setPins, setOpen, setMovable, center, focusPin, destroy }.
     // image is { url, width, height }; a pin is { id, x, y, target_text, status, target }.
     window.mountCodexMap = async function (el, { image, pins, onPinClick, onMapClick, onPinMove }) {
         await Promise.all([loadOnce('/static/vendor/leaflet/leaflet.css?v=1', true), loadOnce('/static/vendor/leaflet/leaflet.js?v=1')]);
@@ -26,6 +26,7 @@
         const map = L.map(el, { crs: L.CRS.Simple, minZoom: -4, maxZoom: 3, zoomSnap: 0.25, attributionControl: false });
         L.imageOverlay(image.url, bounds).addTo(map);
         map.fitBounds(bounds);
+        map.setMinZoom(Math.min(-4, map.getBoundsZoom(bounds) - 0.5));
         map.setMaxBounds(L.latLngBounds(bounds).pad(0.5));
 
         const Fit = L.Control.extend({
@@ -93,6 +94,11 @@
             setMovable(id) {
                 movableId = id || '';
                 markers.forEach((m, pid) => (pid === movableId ? m.dragging.enable() : m.dragging.disable()));
+            },
+            // The middle of the current view as image fractions.
+            center() {
+                const c = map.getCenter();
+                return { x: Math.min(1, Math.max(0, c.lng / w)), y: Math.min(1, Math.max(0, 1 - c.lat / h)) };
             },
             focusPin(id) {
                 const m = markers.get(id);

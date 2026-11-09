@@ -580,18 +580,20 @@ window.campaignsPage = function () {
             if (this.worlds.length) return;
             try {
                 const response = await fetch('/api/codex');
-                if (response.ok) this.worlds = (await response.json()).worlds;
+                if (response.ok) this.worlds = (await response.json()).worlds ?? [];
+                else this.showMessage('Could not load worlds', 'error');
             } catch (error) {
                 console.error('Failed to load worlds:', error);
+                this.showMessage('Could not load worlds', 'error');
             }
         },
 
-        openEditModal(campaignId) {
+        async openEditModal(campaignId) {
             const c = this.campaigns.find((x) => x.id === campaignId);
             if (!c) {
                 return;
             }
-            this.loadWorlds();
+            await this.loadWorlds();
             this.editingCampaignId = c.id;
             this.formData = {
                 title: c.title || '',
