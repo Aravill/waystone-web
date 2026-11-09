@@ -124,6 +124,7 @@ type Store interface {
 	GetMapImages(pageID string) ([]models.MapImage, error)
 	AddMapImage(img models.MapImage) error
 	RestoreMapImage(pageID, imageID, userID string) (models.MapImage, error)
+	RemoveMap(pageID, userID string) (int, error)
 	GetMapPins(pageID string) ([]models.MapPin, error)
 	AddMapPin(pin models.MapPin) (models.MapPin, error)
 	AddMapPinWithNewPage(page models.Page, pin models.MapPin) (models.MapPin, error)

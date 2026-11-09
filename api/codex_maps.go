@@ -29,7 +29,25 @@ var codexImageTypes = map[string]string{"image/png": ".png", "image/jpeg": ".jpg
 
 func codexImageURL(file string) string { return "/api/codex/files/" + file }
 
-// handleCodexMapRoutes serves the map-only endpoints under /api/codex/pages/{id}/.
+// currentMapImage splits a page's image rows (newest first) into its history and its current
+// image. A newest row with no file is the "map removed" marker: no current image, and markers
+// are not part of the history.
+func currentMapImage(rows []models.MapImage) (current *models.MapImage, history []models.MapImage) {
+	history = []models.MapImage{}
+	for i, img := range rows {
+		if img.File == "" {
+			continue
+		}
+		if i == 0 {
+			c := img
+			current = &c
+		}
+		history = append(history, img)
+	}
+	return current, history
+}
+
+// handleCodexMapRoutes serves the map endpoints under /api/codex/pages/{id}/.
 // It reports false when rest is not one of them.
 func handleCodexMapRoutes(w http.ResponseWriter, r *http.Request, id string, rest []string, method func(...string) bool) bool {
 	switch {
@@ -40,6 +58,10 @@ func handleCodexMapRoutes(w http.ResponseWriter, r *http.Request, id string, res
 			} else {
 				handleUploadMapImage(w, r, id)
 			}
+		}
+	case rest[0] == "map" && len(rest) == 1:
+		if method(http.MethodDelete) {
+			handleRemoveMap(w, r, id)
 		}
 	case rest[0] == "images" && len(rest) == 3 && rest[2] == "restore":
 		if method(http.MethodPost) {
@@ -93,7 +115,7 @@ func codexPinObject(pin models.MapPin, pages map[string]models.PageListItem) map
 	o := map[string]interface{}{"id": pin.ID, "x": pin.X, "y": pin.Y, "target_text": pin.TargetText, "status": "missing", "target": nil}
 	if t, ok := pages[pin.ToPageID]; ok {
 		o["status"] = "ok"
-		o["target"] = map[string]interface{}{"id": t.ID, "title": t.Title, "kind": t.Kind}
+		o["target"] = map[string]interface{}{"id": t.ID, "title": t.Title, "has_map": t.HasMap}
 	}
 	return o
 }
@@ -129,8 +151,8 @@ func codexAddMapPayload(payload map[string]interface{}, page *models.Page) error
 		return err
 	}
 	var image interface{}
-	if len(images) > 0 {
-		image = codexImageObject(users, images[0], true)
+	if cur, _ := currentMapImage(images); cur != nil {
+		image = codexImageObject(users, *cur, true)
 	}
 	pinList := make([]map[string]interface{}, 0, len(pins))
 	for _, p := range pins {
@@ -163,8 +185,8 @@ func codexAddOnMaps(payload map[string]interface{}, backs []models.PageBacklink)
 				return err
 			}
 			d = mapData{pins: pins}
-			if len(images) > 0 {
-				d.imageURL = codexImageURL(images[0].File)
+			if cur, _ := currentMapImage(images); cur != nil {
+				d.imageURL = codexImageURL(cur.File)
 			}
 			cache[b.PageID] = d
 		}
@@ -194,9 +216,10 @@ func handleListMapImages(w http.ResponseWriter, r *http.Request, id string) {
 		codexServerError(w, "retrieve users")
 		return
 	}
-	list := make([]map[string]interface{}, 0, len(images))
-	for i, img := range images {
-		list = append(list, codexImageObject(users, img, i == 0))
+	cur, history := currentMapImage(images)
+	list := make([]map[string]interface{}, 0, len(history))
+	for _, img := range history {
+		list = append(list, codexImageObject(users, img, cur != nil && img.ID == cur.ID))
 	}
 	writeJSON(w, http.StatusOK, list)
 }
@@ -222,10 +245,6 @@ func handleUploadMapImage(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	if page == nil {
 		codexStoreError(w, db.ErrPageNotFound, "")
-		return
-	}
-	if page.Kind != models.PageMap {
-		codexStoreError(w, db.ErrNotAMap, "")
 		return
 	}
 	tmp, err := db.CreateUploadTemp()
@@ -324,6 +343,20 @@ func handleCodexFile(w http.ResponseWriter, r *http.Request, name string) {
 	http.ServeFile(w, r, path)
 }
 
+// handleRemoveMap clears the page's map and answers with how many pins went with it.
+func handleRemoveMap(w http.ResponseWriter, r *http.Request, id string) {
+	userID, ok := codexUserID(w, r)
+	if !ok {
+		return
+	}
+	n, err := db.RemoveMap(id, userID)
+	if err != nil {
+		codexMapError(w, err, "remove the map")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "pins_removed": n})
+}
+
 func handleRestoreMapImage(w http.ResponseWriter, r *http.Request, id, imageID string) {
 	userID, ok := codexUserID(w, r)
 	if !ok {
@@ -375,10 +408,6 @@ func handleAddPin(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	if mapPage == nil {
 		codexStoreError(w, db.ErrPageNotFound, "")
-		return
-	}
-	if mapPage.Kind != models.PageMap {
-		codexStoreError(w, db.ErrNotAMap, "")
 		return
 	}
 	pin := models.MapPin{MapPageID: id, X: *req.X, Y: *req.Y, TargetText: text, CreatedBy: userID}

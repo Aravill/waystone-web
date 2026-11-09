@@ -40,7 +40,7 @@ func seedCodex() error {
 		return f.ID, nil
 	}
 	create := func(sp config.CodexSeedPage) (string, error) {
-		p := models.Page{ID: GenerateUUID(), Kind: sp.Kind, Title: sp.Title, Aliases: sp.Aliases, AuthorID: sp.AuthorID}
+		p := models.Page{ID: GenerateUUID(), Kind: models.PageLore, Title: sp.Title, Aliases: sp.Aliases, AuthorID: sp.AuthorID}
 		if sp.InWorld {
 			p.WorldID = w.ID
 			parent := ""
@@ -63,35 +63,56 @@ func seedCodex() error {
 		}
 		return p.ID, nil
 	}
+	// A page with a map and pins. Pin targets are pages of the world, so these run after all pages exist.
+	seedMap := func(pageID, authorID string, pins []config.CodexSeedPin) error {
+		file := GenerateUUID() + ".png"
+		img := demoMapPNG()
+		if err := WriteUpload(file, func(w io.Writer) error { return png.Encode(w, img) }); err != nil {
+			return fmt.Errorf("failed to seed map image: %w", err)
+		}
+		b := img.Bounds()
+		if err := store.AddMapImage(models.MapImage{ID: GenerateUUID(), PageID: pageID, File: file, Width: b.Dx(), Height: b.Dy(),
+			UploadedBy: authorID, CreatedAt: now}); err != nil {
+			if dir, derr := UploadDir(); derr == nil {
+				os.Remove(filepath.Join(dir, file))
+			}
+			return fmt.Errorf("failed to seed map image: %w", err)
+		}
+		for _, sp := range pins {
+			if _, err := store.AddMapPin(models.MapPin{MapPageID: pageID, X: sp.X, Y: sp.Y, TargetText: sp.Target, CreatedBy: authorID}); err != nil {
+				return fmt.Errorf("failed to seed map pin: %w", err)
+			}
+		}
+		return nil
+	}
+	ids := map[string]string{}
 	for _, sp := range config.InitialCodexPages {
-		if _, err := create(sp); err != nil {
+		id, err := create(sp)
+		if err != nil {
 			return err
 		}
+		ids[sp.Title] = id
 	}
 	mapID, err := create(config.InitialMapPage)
 	if err != nil {
 		return err
 	}
-
-	file := GenerateUUID() + ".png"
-	img := demoMapPNG()
-	if err := WriteUpload(file, func(w io.Writer) error { return png.Encode(w, img) }); err != nil {
-		return fmt.Errorf("failed to seed map image: %w", err)
+	if err := seedMap(mapID, config.InitialMapPage.AuthorID, config.InitialMapPins); err != nil {
+		return err
 	}
-	b := img.Bounds()
-	if err := store.AddMapImage(models.MapImage{ID: GenerateUUID(), PageID: mapID, File: file, Width: b.Dx(), Height: b.Dy(),
-		UploadedBy: config.InitialMapPage.AuthorID, CreatedAt: now}); err != nil {
-		if dir, derr := UploadDir(); derr == nil {
-			os.Remove(filepath.Join(dir, file))
-		}
-		return fmt.Errorf("failed to seed map image: %w", err)
-	}
-	for _, sp := range config.InitialMapPins {
-		if _, err := store.AddMapPin(models.MapPin{MapPageID: mapID, X: sp.X, Y: sp.Y, TargetText: sp.Target, CreatedBy: config.InitialMapPage.AuthorID}); err != nil {
-			return fmt.Errorf("failed to seed map pin: %w", err)
-		}
+	if id, ok := ids[config.InitialSettlementMapPage]; ok {
+		return seedMap(id, seedAuthor(config.InitialCodexPages, config.InitialSettlementMapPage), config.InitialSettlementMapPins)
 	}
 	return nil
+}
+
+func seedAuthor(pages []config.CodexSeedPage, title string) string {
+	for _, p := range pages {
+		if p.Title == title {
+			return p.AuthorID
+		}
+	}
+	return ""
 }
 
 // demoMapPNG draws a small vellum map with a road, a river and a few landmarks. Nothing is

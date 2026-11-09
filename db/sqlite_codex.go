@@ -179,7 +179,7 @@ func (s *SQLiteStore) GetPage(id string) (*models.Page, error) {
 func (s *SQLiteStore) GetCodexPages() ([]models.PageListItem, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	rows, err := s.db.Query(`SELECT id, kind, world_id, folder_id, title FROM pages ORDER BY title COLLATE NOCASE, id`)
+	rows, err := s.db.Query(`SELECT id, COALESCE((SELECT file != '' FROM map_images i WHERE i.page_id = pages.id ORDER BY created_at DESC, rowid DESC LIMIT 1), 0), world_id, folder_id, title FROM pages ORDER BY title COLLATE NOCASE, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func (s *SQLiteStore) GetCodexPages() ([]models.PageListItem, error) {
 	at := map[string]int{}
 	for rows.Next() {
 		var p models.PageListItem
-		if err := rows.Scan(&p.ID, &p.Kind, &p.WorldID, &p.FolderID, &p.Title); err != nil {
+		if err := rows.Scan(&p.ID, &p.HasMap, &p.WorldID, &p.FolderID, &p.Title); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -644,7 +644,7 @@ func (s *SQLiteStore) DeletePage(id string) ([]string, error) {
 		return nil, err
 	}
 	var files []string
-	rows, err := tx.Query(`SELECT DISTINCT file FROM map_images WHERE page_id = ?`, id)
+	rows, err := tx.Query(`SELECT DISTINCT file FROM map_images WHERE page_id = ? AND file != ''`, id)
 	if err != nil {
 		return nil, err
 	}

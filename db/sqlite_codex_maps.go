@@ -22,20 +22,86 @@ func scanMapPin(row rowScanner) (models.MapPin, error) {
 	return p, err
 }
 
-// mapWorld returns the map page's world, or ErrPageNotFound / ErrNotAMap.
+// mapWorld returns the page's world, or ErrPageNotFound. Any page can hold a map.
 func mapWorld(q querier, id string) (string, error) {
-	var kind, world string
-	err := q.QueryRow(`SELECT kind, world_id FROM pages WHERE id = ?`, id).Scan(&kind, &world)
+	var world string
+	err := q.QueryRow(`SELECT world_id FROM pages WHERE id = ?`, id).Scan(&world)
 	if err == sql.ErrNoRows {
 		return "", ErrPageNotFound
 	}
+	return world, err
+}
+
+// hasMap reports whether the page's newest image row is a real image. "Remove map" adds a marker
+// row with file ” (see RemoveMap), so the newest row decides.
+func hasMap(q querier, pageID string) (bool, error) {
+	var file string
+	err := q.QueryRow(`SELECT file FROM map_images WHERE page_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1`, pageID).Scan(&file)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return file != "", err
+}
+
+// mapWorldWithMap is mapWorld that also requires the page to have a map (pins need an image).
+func mapWorldWithMap(q querier, id string) (string, error) {
+	world, err := mapWorld(q, id)
 	if err != nil {
 		return "", err
 	}
-	if kind != models.PageMap {
-		return "", ErrNotAMap
+	if ok, err := hasMap(q, id); err != nil {
+		return "", err
+	} else if !ok {
+		return "", ErrNoMap
 	}
 	return world, nil
+}
+
+// RemoveMap clears the page's map: its pins are removed (each logged, so History shows them) and a
+// marker image row (file ”) makes the page map-less. Images stay in the history and the files stay
+// on disk; restoring an image brings the map back, and removed pins can be undone from History.
+// It returns how many pins were removed.
+func (s *SQLiteStore) RemoveMap(pageID, userID string) (int, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	if _, err := mapWorldWithMap(tx, pageID); err != nil {
+		return 0, err
+	}
+	rows, err := tx.Query(`SELECT `+mapPinColumns+` FROM map_pins WHERE map_page_id = ? ORDER BY created_at, id`, pageID)
+	if err != nil {
+		return 0, err
+	}
+	var pins []models.MapPin
+	for rows.Next() {
+		p, err := scanMapPin(rows)
+		if err != nil {
+			rows.Close()
+			return 0, err
+		}
+		pins = append(pins, p)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	for _, p := range pins {
+		if _, err := tx.Exec(`DELETE FROM map_pins WHERE id = ?`, p.ID); err != nil {
+			return 0, err
+		}
+		if err := logPinEvent(tx, pageID, p.ID, userID, "remove", pinJSON(p), ""); err != nil {
+			return 0, err
+		}
+	}
+	if _, err := tx.Exec(`INSERT INTO map_images (`+mapImageColumns+`) VALUES (?, ?, '', 0, 0, ?, ?)`,
+		GenerateUUID(), pageID, userID, nowUTC()); err != nil {
+		return 0, err
+	}
+	return len(pins), tx.Commit()
 }
 
 // GetMapImages lists a map's images, newest (the current one) first.
@@ -77,7 +143,7 @@ func (s *SQLiteStore) RestoreMapImage(pageID, imageID, userID string) (models.Ma
 	if _, err := mapWorld(s.db, pageID); err != nil {
 		return models.MapImage{}, err
 	}
-	old, err := scanMapImage(s.db.QueryRow(`SELECT `+mapImageColumns+` FROM map_images WHERE id = ? AND page_id = ?`, imageID, pageID))
+	old, err := scanMapImage(s.db.QueryRow(`SELECT `+mapImageColumns+` FROM map_images WHERE id = ? AND page_id = ? AND file != ''`, imageID, pageID))
 	if err == sql.ErrNoRows {
 		return models.MapImage{}, ErrImageNotFound
 	}
@@ -154,7 +220,7 @@ func (s *SQLiteStore) AddMapPin(pin models.MapPin) (models.MapPin, error) {
 
 // AddMapPinWithNewPage creates an empty lore page titled pin.TargetText in the map's world and
 // pins it, in one transaction: a name clash leaves neither behind. page.ID, Title and AuthorID
-// are used; the kind and world are set here.
+// are used; the kind and world are set here, and the page lands in the map page's folder.
 func (s *SQLiteStore) AddMapPinWithNewPage(page models.Page, pin models.MapPin) (models.MapPin, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -163,7 +229,7 @@ func (s *SQLiteStore) AddMapPinWithNewPage(page models.Page, pin models.MapPin) 
 		return pin, err
 	}
 	defer tx.Rollback()
-	world, err := mapWorld(tx, pin.MapPageID)
+	world, err := mapWorldWithMap(tx, pin.MapPageID)
 	if err != nil {
 		return pin, err
 	}
@@ -181,7 +247,7 @@ func (s *SQLiteStore) AddMapPinWithNewPage(page models.Page, pin models.MapPin) 
 }
 
 func addMapPinTx(tx *sql.Tx, pin models.MapPin) (models.MapPin, error) {
-	world, err := mapWorld(tx, pin.MapPageID)
+	world, err := mapWorldWithMap(tx, pin.MapPageID)
 	if err != nil {
 		return pin, err
 	}
@@ -333,6 +399,11 @@ func (s *SQLiteStore) UndoMapPinEvent(mapID, eventID, userID string) error {
 		var before models.MapPin
 		if err := json.Unmarshal([]byte(e.Before), &before); err != nil {
 			return err
+		}
+		if ok, err := hasMap(tx, mapID); err != nil {
+			return err
+		} else if !ok {
+			return ErrNoMap
 		}
 		if _, err := current(); err == nil {
 			return ErrPinEventUndone // already back

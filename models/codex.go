@@ -3,10 +3,9 @@ package models
 // UnsortedWorldID is how the API names the shared "Unsorted" folder; the database stores "".
 const UnsortedWorldID = "unsorted"
 
-const (
-	PageLore = "lore"
-	PageMap  = "map"
-)
+// PageLore is the kind of every page; the kind column is kept but nothing branches on it. A map
+// is an optional part of any page (map_images, map_pins).
+const PageLore = "lore"
 
 // World is a folder of Codex pages. Games point at a world with campaigns.world_id (a label only).
 type World struct {
@@ -58,7 +57,7 @@ type Page struct {
 // PageListItem is a page without its body, for lists and link resolution in the client.
 type PageListItem struct {
 	ID       string
-	Kind     string
+	HasMap   bool
 	WorldID  string
 	FolderID string
 	Title    string

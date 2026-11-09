@@ -25,7 +25,7 @@ var (
 	ErrParentNotFound   = errors.New("parent folder not found")
 	ErrFolderTooDeep    = errors.New("folders can nest up to 10 levels")
 	ErrPageNotFound     = errors.New("page not found")
-	ErrNotAMap          = errors.New("page is not a map")
+	ErrNoMap            = errors.New("the page has no map")
 	ErrPinNotFound      = errors.New("pin not found")
 	ErrPinEventNotFound = errors.New("pin event not found")
 	ErrPinEventUndone   = errors.New("pin change already undone")
@@ -108,6 +108,7 @@ func AddMapImage(img models.MapImage) error                 { return GetStore().
 func RestoreMapImage(pageID, imageID, userID string) (models.MapImage, error) {
 	return GetStore().RestoreMapImage(pageID, imageID, userID)
 }
+func RemoveMap(pageID, userID string) (int, error)       { return GetStore().RemoveMap(pageID, userID) }
 func GetMapPins(pageID string) ([]models.MapPin, error)  { return GetStore().GetMapPins(pageID) }
 func AddMapPin(pin models.MapPin) (models.MapPin, error) { return GetStore().AddMapPin(pin) }
 

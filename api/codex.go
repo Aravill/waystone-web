@@ -187,7 +187,7 @@ func codexRecent(worldID *string, worlds map[string]models.World) ([]map[string]
 	out := make([]map[string]interface{}, 0, len(revs))
 	for _, rv := range revs {
 		out = append(out, map[string]interface{}{
-			"page_id": rv.PageID, "title": rv.Title, "kind": rv.Kind,
+			"page_id": rv.PageID, "title": rv.Title,
 			"world": codexWorldRef(worlds, rv.WorldID), "number": rv.Number, "note": rv.Note,
 			"author_user": journalUser(users, rv.AuthorID), "created_at": rv.CreatedAt,
 		})
@@ -271,7 +271,7 @@ func handleCodexTitles(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		out = append(out, map[string]interface{}{
-			"id": p.ID, "title": p.Title, "kind": p.Kind, "aliases": p.Aliases,
+			"id": p.ID, "title": p.Title, "has_map": p.HasMap, "aliases": p.Aliases,
 		})
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -431,7 +431,7 @@ func handleGetWorld(w http.ResponseWriter, r *http.Request, apiID string) {
 	list := []map[string]interface{}{}
 	for _, p := range pages {
 		if p.WorldID == id {
-			list = append(list, map[string]interface{}{"id": p.ID, "title": p.Title, "kind": p.Kind, "aliases": p.Aliases, "folder_id": p.FolderID})
+			list = append(list, map[string]interface{}{"id": p.ID, "title": p.Title, "has_map": p.HasMap, "aliases": p.Aliases, "folder_id": p.FolderID})
 		}
 	}
 	folders, err := db.GetFolders(id)
@@ -479,7 +479,6 @@ func handleGetWorld(w http.ResponseWriter, r *http.Request, apiID string) {
 }
 
 type pageCreateRequest struct {
-	Kind     string `json:"kind"`
 	Title    string `json:"title"`
 	Body     string `json:"body"`
 	WorldID  string `json:"world_id"`
@@ -500,15 +499,11 @@ func handleCreatePage(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "title must be 1 to 120 characters and can't contain [ ] or |")
 		return
 	}
-	if req.Kind != models.PageLore && req.Kind != models.PageMap {
-		writeJSONError(w, http.StatusBadRequest, "kind must be lore or map")
-		return
-	}
 	if utf8.RuneCountInString(req.Body) > maxPageBodyRunes {
 		writeJSONError(w, http.StatusBadRequest, "body is too long")
 		return
 	}
-	page := models.Page{ID: db.GenerateUUID(), Kind: req.Kind, WorldID: codexWorldParam(req.WorldID), FolderID: req.FolderID, Title: title, AuthorID: userID}
+	page := models.Page{ID: db.GenerateUUID(), Kind: models.PageLore, WorldID: codexWorldParam(req.WorldID), FolderID: req.FolderID, Title: title, AuthorID: userID}
 	if err := db.CreatePage(page, req.Body); err != nil {
 		codexStoreError(w, err, "create page")
 		return
@@ -529,7 +524,7 @@ func codexStoreError(w http.ResponseWriter, err error, what string) {
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, db.ErrRevisionNotFound):
 		writeJSONError(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, db.ErrNotAMap):
+	case errors.Is(err, db.ErrNoMap):
 		writeJSONError(w, http.StatusConflict, err.Error())
 	default:
 		log.Printf("codex %s: %v", what, err)
@@ -648,7 +643,7 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 		o := map[string]interface{}{"text": l.TargetText, "status": "missing", "page": nil}
 		if t, ok := byID[l.ToPageID]; ok {
 			o["status"] = "ok"
-			o["page"] = map[string]interface{}{"id": t.ID, "title": t.Title, "kind": t.Kind}
+			o["page"] = map[string]interface{}{"id": t.ID, "title": t.Title, "has_map": t.HasMap}
 		}
 		linkList = append(linkList, o)
 	}
@@ -665,7 +660,7 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 			i = len(backList)
 			at[b.PageID] = i
 			backList = append(backList, map[string]interface{}{
-				"id": b.PageID, "title": b.Title, "kind": b.Kind,
+				"id": b.PageID, "title": b.Title,
 				"via": []string{}, "aliases": []string{},
 			})
 		}
@@ -693,7 +688,7 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 	}
 	payload := map[string]interface{}{
 		"page": map[string]interface{}{
-			"id": page.ID, "kind": page.Kind, "title": page.Title,
+			"id": page.ID, "title": page.Title,
 			"world": codexWorldRef(worlds, page.WorldID), "folder_id": page.FolderID, "folder_path": folderPath, "aliases": page.Aliases, "body": page.Body,
 			"current_revision": page.CurrentRevision, "revision_count": page.RevisionCount,
 			"created_at": page.CreatedAt, "updated_at": page.UpdatedAt,
@@ -705,10 +700,8 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 		"incoming_count": len(backs),
 		"on_maps":        []interface{}{},
 	}
-	if page.Kind == models.PageMap {
-		if err := codexAddMapPayload(payload, page); err != nil {
-			return nil, http.StatusInternalServerError, "failed to retrieve map"
-		}
+	if err := codexAddMapPayload(payload, page); err != nil {
+		return nil, http.StatusInternalServerError, "failed to retrieve map"
 	}
 	if err := codexAddOnMaps(payload, backs); err != nil {
 		return nil, http.StatusInternalServerError, "failed to retrieve maps"

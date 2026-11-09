@@ -406,6 +406,10 @@ func (s *SQLiteStore) initSchema() error {
 			return fmt.Errorf("failed to add pages.folder_id column: %w", err)
 		}
 	}
+	// Maps are no longer a page kind: every page is 'lore' and may have a map (idempotent).
+	if _, err := s.db.Exec(`UPDATE pages SET kind = 'lore' WHERE kind = 'map'`); err != nil {
+		return fmt.Errorf("failed to fold map pages into lore pages: %w", err)
+	}
 
 	// Add users columns introduced after the table was first created.
 	rows, err = s.db.Query(`PRAGMA table_info(users)`)
