@@ -55,3 +55,31 @@ func DeleteWorld(id string) error { return GetStore().DeleteWorld(id) }
 func SetCampaignWorld(campaignID, worldID string) error {
 	return GetStore().SetCampaignWorld(campaignID, worldID)
 }
+
+func GetCodexPages() ([]models.PageListItem, error)         { return GetStore().GetCodexPages() }
+func GetPage(id string) (*models.Page, error)               { return GetStore().GetPage(id) }
+func GetPageLinks(fromID string) ([]models.PageLink, error) { return GetStore().GetPageLinks(fromID) }
+func GetBacklinks(id string) ([]models.PageBacklink, error) { return GetStore().GetBacklinks(id) }
+func GetWantedPages(worldID string) ([]models.WantedPage, error) {
+	return GetStore().GetWantedPages(worldID)
+}
+func GetPageRevisions(id string) ([]models.PageRevision, error) {
+	return GetStore().GetPageRevisions(id)
+}
+
+// GetRecentRevisions lists recent changes; worldID nil means every world.
+func GetRecentRevisions(worldID *string, limit int) ([]models.RecentRevision, error) {
+	return GetStore().GetRecentRevisions(worldID, limit)
+}
+func CreatePage(p models.Page, body string) error { return GetStore().CreatePage(p, body) }
+func SavePageRevision(id string, base int, rev models.PageRevision) (models.PageSaveResult, error) {
+	return GetStore().SavePageRevision(id, base, rev, PageKeepRevisions)
+}
+func RenamePage(id, newTitle, userID string) (int, error) {
+	return GetStore().RenamePage(id, newTitle, userID, PageKeepRevisions)
+}
+func SetPageAliases(id string, aliases []string) error { return GetStore().SetPageAliases(id, aliases) }
+func MovePage(id, worldID string) error                { return GetStore().MovePage(id, worldID) }
+
+// DeletePage returns the map image files the caller should remove from disk.
+func DeletePage(id string) ([]string, error) { return GetStore().DeletePage(id) }

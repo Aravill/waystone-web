@@ -100,6 +100,19 @@ type Store interface {
 	UpdateWorld(id, name, description string) error
 	DeleteWorld(id string) error
 	SetCampaignWorld(campaignID, worldID string) error
+	GetCodexPages() ([]models.PageListItem, error)
+	GetPage(id string) (*models.Page, error)
+	GetPageLinks(fromID string) ([]models.PageLink, error)
+	GetBacklinks(id string) ([]models.PageBacklink, error)
+	GetWantedPages(worldID string) ([]models.WantedPage, error)
+	GetPageRevisions(id string) ([]models.PageRevision, error)
+	GetRecentRevisions(worldID *string, limit int) ([]models.RecentRevision, error)
+	CreatePage(p models.Page, body string) error
+	SavePageRevision(id string, base int, rev models.PageRevision, keep int) (models.PageSaveResult, error)
+	RenamePage(id, newTitle, userID string, keep int) (int, error)
+	SetPageAliases(id string, aliases []string) error
+	MovePage(id, worldID string) error
+	DeletePage(id string) ([]string, error)
 	Backup(path string) error
 	Close() error
 }
