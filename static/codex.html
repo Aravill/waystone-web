@@ -3,9 +3,455 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Codex - Waystone</title>
+    <title>Waystone - Codex</title>
+    <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+    <script src="/static/theme.js?v=7"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=74">
+    <link rel="stylesheet" href="/static/notifications.css?v=10">
+    <link rel="stylesheet" href="/static/codex.css?v=1">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
-<body>
-    <p>The Codex is being written.</p>
+<body class="journal-page codex-page" x-data="codexPage()">
+    <div class="header">
+        <div class="header-left">
+            <a href="/" class="logo">Waystone</a>
+        </div>
+        <nav class="nav-bar" aria-label="Main">
+            <a href="/" class="nav-item" data-page="dashboard">Home</a>
+            <a href="/campaigns" class="nav-item" data-page="campaigns">Games</a>
+            <a href="/characters" class="nav-item" data-page="characters">Characters</a>
+            <a href="/codex" class="nav-item active" aria-current="page" data-page="codex">Codex</a>
+            <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
+        </nav>
+        <div class="header-right">
+            <details class="user-menu">
+                <summary><span class="user-menu-avatar" aria-hidden="true" x-text="(displayName || '?').charAt(0).toUpperCase()"></span><span class="user-menu-name" x-text="displayName"></span><span class="user-menu-caret" aria-hidden="true">&#9662;</span></summary>
+                <div class="user-menu-panel">
+                    <a href="/profile">Profile</a>
+                    <button type="button" @click="handleLogout()">Log out</button>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <div class="container">
+        <main>
+            <nav class="game-crumb" aria-label="Breadcrumb">
+                <a href="/codex">Codex</a>
+                <template x-for="(c, i) in crumbs" :key="i">
+                    <span><span aria-hidden="true"> › </span><a x-show="c.href" :href="c.href" x-text="c.label"></a><span x-show="!c.href" aria-current="page" x-text="c.label"></span></span>
+                </template>
+            </nav>
+
+            <p x-show="loading">Loading...</p>
+            <div class="game-error" role="alert" x-show="loadError">
+                <p x-text="loadError"></p>
+                <button type="button" class="campaign-action-btn" @click="load()">Try again</button>
+            </div>
+            <template x-if="notFound">
+                <p>That page or world could not be found. It may have been deleted. <a href="/codex">Back to the Codex</a></p>
+            </template>
+
+            <div class="message journal-message" :class="messageType" x-show="messageVisible" role="status" x-text="messageText"></div>
+
+            <!-- Home -->
+            <template x-if="screen === 'home' && home">
+                <div>
+                    <section class="title-block">
+                        <div>
+                            <span class="modal-eyebrow">World database</span>
+                            <h1 class="page-title" tabindex="-1">Codex</h1>
+                            <p class="byline">Worlds hold pages. A page links to others in its world with [[double brackets]].</p>
+                        </div>
+                        <div class="actions">
+                            <button type="button" class="submit-btn" @click="openCreateWorld()">+ New world</button>
+                        </div>
+                    </section>
+                    <section class="codex-section">
+                        <h2 class="section-header">Worlds</h2>
+                        <div class="world-grid">
+                            <template x-for="w in home.worlds" :key="w.id">
+                                <a class="world-card" :href="'/codex/w/' + encodeURIComponent(w.id)">
+                                    <span class="world-card-name" x-text="w.name"></span>
+                                    <span class="world-card-excerpt" x-text="w.excerpt || 'No description yet.'"></span>
+                                    <span class="world-card-meta" x-text="countLabel(w.page_count, 'page') + ' · ' + countLabel(w.game_count, 'game')"></span>
+                                </a>
+                            </template>
+                            <a class="world-card world-card--unsorted" href="/codex/w/unsorted">
+                                <span class="world-card-name">Unsorted</span>
+                                <span class="world-card-excerpt">Pages that don't belong to a world yet.</span>
+                                <span class="world-card-meta" x-text="countLabel(home.unsorted.page_count, 'page')"></span>
+                            </a>
+                        </div>
+                    </section>
+                    <section class="codex-section">
+                        <h2 class="section-header">Recent changes</h2>
+                        <p class="same" x-show="home.recent.length === 0">Nothing has been written yet.</p>
+                        <ul class="recent">
+                            <template x-for="r in home.recent" :key="r.page_id + '-' + r.number">
+                                <li x-html="recentHtml(r, true)"></li>
+                            </template>
+                        </ul>
+                    </section>
+                </div>
+            </template>
+
+            <!-- World -->
+            <template x-if="screen === 'world' && world">
+                <div>
+                    <section class="title-block">
+                        <div>
+                            <span class="modal-eyebrow" x-text="world.world.unsorted ? 'Shared folder' : 'World'"></span>
+                            <h1 class="page-title" tabindex="-1" x-text="world.world.name"></h1>
+                        </div>
+                        <div class="actions">
+                            <button type="button" class="btn-danger" x-show="world.can_delete" @click="deleteWorld()">Delete world</button>
+                            <button type="button" class="campaign-action-btn" x-show="!world.world.unsorted" @click="openEditWorld()">Edit world</button>
+                            <button type="button" class="campaign-action-btn" @click="openCreatePage('map')">+ New map</button>
+                            <button type="button" class="submit-btn" @click="openCreatePage('lore')">+ New page</button>
+                        </div>
+                    </section>
+                    <div class="split">
+                        <article>
+                            <div class="game-text" x-show="world.world.description" x-html="renderMarkdown(world.world.description)"></div>
+                            <section class="codex-section" x-show="worldMaps.length > 0">
+                                <h2 class="section-header">Maps</h2>
+                                <ul class="page-list">
+                                    <template x-for="p in worldMaps" :key="p.id">
+                                        <li><a :href="pageUrl(p)" x-text="'◈ ' + p.title"></a></li>
+                                    </template>
+                                </ul>
+                            </section>
+                            <section class="codex-section">
+                                <h2 class="section-header">Pages</h2>
+                                <div class="field" x-show="world.pages.length > 8">
+                                    <label for="pageFilter" class="label">Find a page</label>
+                                    <input type="search" id="pageFilter" x-model="pageFilter" placeholder="Title or alias">
+                                </div>
+                                <p class="same" x-show="world.pages.length === 0">No pages yet. Start with "+ New page".</p>
+                                <ul class="page-list">
+                                    <template x-for="p in filteredPages" :key="p.id">
+                                        <li><a :href="pageUrl(p)" x-text="(p.kind === 'map' ? '◈ ' : '') + p.title"></a><span class="muted" x-show="p.aliases.length" x-text="' · also ' + p.aliases.join(', ')"></span></li>
+                                    </template>
+                                </ul>
+                            </section>
+                        </article>
+                        <aside class="split-side">
+                            <div x-show="!world.world.unsorted">
+                                <p class="modal-eyebrow">Games set here</p>
+                                <h2 class="panel-heading">Games</h2>
+                                <p class="same" x-show="world.games.length === 0">No game is set in this world. A game's DM picks the world when editing the game.</p>
+                                <ul class="page-list">
+                                    <template x-for="g in world.games" :key="g.id">
+                                        <li><a :href="'/games/' + encodeURIComponent(g.id)" x-text="g.title"></a></li>
+                                    </template>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="modal-eyebrow">Linked but not written</p>
+                                <h2 class="panel-heading">Wanted pages</h2>
+                                <p class="same" x-show="world.wanted.length === 0">Every link in this world leads somewhere.</p>
+                                <ul class="page-list">
+                                    <template x-for="w in world.wanted" :key="w.text">
+                                        <li><button type="button" class="wikilink wikilink--missing" title="No page yet. Click to create." @click="openCreatePage('lore', w.text)" x-text="w.text"></button><span class="muted" x-text="' · wanted ' + w.count + (w.count === 1 ? ' time' : ' times')"></span></li>
+                                    </template>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="modal-eyebrow">Latest edits</p>
+                                <h2 class="panel-heading">Recent changes</h2>
+                                <p class="same" x-show="world.recent.length === 0">Nothing yet.</p>
+                                <ul class="recent">
+                                    <template x-for="r in world.recent" :key="r.page_id + '-' + r.number">
+                                        <li x-html="recentHtml(r, false)"></li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </aside>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Page -->
+            <template x-if="screen === 'page' && pageData">
+                <div>
+                    <section class="title-block">
+                        <div>
+                            <span class="modal-eyebrow" x-text="page.kind === 'map' ? '◈ Map' : 'Lore'"></span>
+                            <h1 class="page-title" tabindex="-1" x-text="page.title"></h1>
+                            <p class="byline"><a class="world-chip" :href="'/codex/w/' + encodeURIComponent(page.world.id)" x-text="'World: ' + page.world.name"></a>
+                                <button type="button" class="text-link" @click="openMove()">Move to another world…</button></p>
+                            <p class="byline" x-text="journalByline(page)"></p>
+                            <p class="byline" x-show="page.aliases.length"><span>Also known as </span><span x-text="page.aliases.join(', ')"></span></p>
+                        </div>
+                        <div class="actions">
+                            <button type="button" class="btn-danger" @click="deletePage()">Delete</button>
+                            <button type="button" class="campaign-action-btn" @click="openAliases()">Aliases</button>
+                            <button type="button" class="campaign-action-btn" @click="openRename()">Rename</button>
+                            <a class="campaign-action-btn" :href="pageUrl(page, '/history')" x-text="'History · ' + page.revision_count"></a>
+                            <a class="submit-btn" :href="pageUrl(page, '/edit')" x-text="page.kind === 'map' ? 'Edit text' : 'Edit'"></a>
+                        </div>
+                    </section>
+                    <div class="split">
+                        <article>
+                            <!--MAP-->
+                            <div class="game-text" x-ref="body" @click="onBodyClick($event)" x-html="bodyHtml"></div>
+                            <p class="same" x-show="!page.body.trim()">This page is empty. <a :href="pageUrl(page, '/edit')">Write it</a>.</p>
+                        </article>
+                        <aside class="split-side">
+                            <div>
+                                <p class="modal-eyebrow">Pages that point here</p>
+                                <h2 class="panel-heading">Linked from</h2>
+                                <p class="same" x-show="pageData.backlinks.length === 0">No other page links here yet.</p>
+                                <ul class="page-list">
+                                    <template x-for="b in pageData.backlinks" :key="b.id">
+                                        <li><a :href="pageUrl(b)" x-text="(b.kind === 'map' ? '◈ ' : '') + b.title"></a><span class="muted" x-show="b.via.includes('pin')"> · pin</span><span class="muted" x-show="b.aliases.length" x-text="' · via the alias ' + b.aliases.map((a) => '“' + a + '”').join(', ')"></span></li>
+                                    </template>
+                                </ul>
+                            </div>
+                            <div x-show="pageData.on_maps.length > 0">
+                                <p class="modal-eyebrow">Pinned on</p>
+                                <h2 class="panel-heading">On maps</h2>
+                                <ul class="page-list">
+                                    <template x-for="m in pageData.on_maps" :key="m.pin_id">
+                                        <li><a :href="pageUrl({ id: m.map_id, title: m.map_title }) + '?pin=' + encodeURIComponent(m.pin_id)" x-text="'◈ ' + m.map_title"></a></li>
+                                    </template>
+                                </ul>
+                            </div>
+                            <p class="panel-foot">Last changed <span x-text="shortDate(page.updated_at)"></span> by <span x-text="page.updated_by_user.display_name"></span>.</p>
+                        </aside>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Edit -->
+            <template x-if="screen === 'edit' && pageData && draft">
+                <div>
+                    <section class="title-block title-block--single">
+                        <div>
+                            <span class="modal-eyebrow" x-text="'Edit · ' + page.world.name"></span>
+                            <h1 class="page-title" tabindex="-1" x-text="page.title"></h1>
+                            <p class="byline" x-text="'Saving adds revision ' + (draft.base + 1) + '. To change the title, use Rename.'"></p>
+                        </div>
+                    </section>
+                    <div class="notice conflict" role="alert" x-show="conflict">
+                        <h2 class="conflict-title" x-text="'§ ' + conflictWho + ' saved revision ' + (conflict ? conflict.latest.number : '') + ' while you were editing'"></h2>
+                        <p>Nothing is lost: your text is still in the editor below. This is what they changed:</p>
+                        <div class="diff" x-show="conflict && conflict.html" x-html="conflict ? conflict.html : ''"></div>
+                        <p class="same" x-show="conflict && !conflict.html">Their revision didn't change the text.</p>
+                        <div class="form-foot">
+                            <button type="button" class="submit-btn" :disabled="busy" @click="saveOnTop()">Save mine on top</button>
+                            <button type="button" class="btn-cancel conflict-discard" @click="discardMine()">Discard mine</button>
+                            <a class="text-link" target="_blank" rel="noopener" :href="pageUrl(page, '/history') + '?r=' + (conflict ? conflict.latest.number : '')" x-text="'Open revision ' + (conflict ? conflict.latest.number : '') + ' in a new tab'"></a>
+                        </div>
+                    </div>
+                    <form class="edit-form" @submit.prevent="save()" novalidate>
+                        <div class="field">
+                            <div class="tabs" role="group" aria-label="Editor view">
+                                <button type="button" class="tab" :aria-pressed="draft.tab === 'write'" @click="draft.tab = 'write'">Write</button>
+                                <button type="button" class="tab" :aria-pressed="draft.tab === 'preview'" @click="draft.tab = 'preview'">Preview</button>
+                            </div>
+                            <div class="editor" :data-tab="draft.tab">
+                                <div class="pane pane--write">
+                                    <label for="fBody">The page</label>
+                                    <div class="cm-host" x-ref="editorHost"></div>
+                                    <textarea id="fBody" x-ref="bodyArea" placeholder="Write about it. Link other pages with [[Title]]." x-model="draft.body" x-show="!editorReady"></textarea>
+                                </div>
+                                <div class="pane pane--preview">
+                                    <span class="label">Preview</span>
+                                    <div class="preview">
+                                        <div class="game-text" x-html="previewHtml"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="hint hint--formatting">Formatting: **bold** · *italic* · # heading · - list · 1. list · &gt; quote · [link](https://…) · [[Page title]] or [[Page title|shown text]] to link a page in this world</p>
+                        </div>
+                        <div class="field field--note">
+                            <label for="fNote">What changed (optional)</label>
+                            <input type="text" id="fNote" maxlength="120" placeholder="Added the history of the tower" x-model="draft.note">
+                        </div>
+                        <div class="notice" role="alert" x-show="draft.error"><p x-text="draft.error"></p></div>
+                        <div class="form-foot">
+                            <button type="submit" class="submit-btn" :disabled="busy || draft.locked">Save changes</button>
+                            <a class="campaign-action-btn" :href="pageUrl(page)">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </template>
+
+            <!-- History -->
+            <template x-if="screen === 'history' && pageData">
+                <div>
+                    <section class="title-block title-block--single">
+                        <div>
+                            <span class="modal-eyebrow" x-text="'History · ' + revisions.length + ' revision' + (revisions.length === 1 ? '' : 's')"></span>
+                            <h1 class="page-title" tabindex="-1" x-text="page.title"></h1>
+                            <p class="byline" x-text="journalByline(page)"></p>
+                            <p class="byline" x-show="pruned">Only the latest 200 revisions are kept.</p>
+                        </div>
+                    </section>
+                    <p x-show="historyLoading">Loading history...</p>
+                    <div class="history" x-show="!historyLoading && revisions.length > 0">
+                        <ol class="revs" reversed aria-label="Revisions, newest first">
+                            <template x-for="r in revisions" :key="r.number">
+                                <li class="rev-item">
+                                    <button type="button" class="rev" :aria-current="r.number === selected" @click="selectRevision(r.number)">
+                                        <span x-html="userAvatarHtml(r.author_user, false)"></span>
+                                        <span class="rev-head"><span class="rev-no" x-text="'Revision ' + r.number"></span><span class="tag" x-show="r.number === currentRevision">✓ Current</span></span>
+                                        <span class="rev-meta" x-text="r.author_user.display_name + (r.author_id === currentUserId ? ' (you)' : '') + ' · ' + formatStamp(r.created_at)"></span>
+                                        <span class="rev-note"><span x-text="revNote(r) || 'No note'"></span> <span class="rev-delta" x-html="deltaHtml(r)"></span></span>
+                                    </button>
+                                </li>
+                            </template>
+                        </ol>
+                        <section class="detail" aria-live="polite" x-show="selectedRevision">
+                            <div class="detail-head">
+                                <div>
+                                    <h2 class="detail-title">§ Revision <span class="t-no" x-text="selected"></span></h2>
+                                    <p class="detail-sub" x-text="selectedRevision ? selectedRevision.author_user.display_name + ' · ' + formatStamp(selectedRevision.created_at) + (revNote(selectedRevision) ? ' · ' + revNote(selectedRevision) : '') : ''"></p>
+                                </div>
+                                <span class="legend" x-show="selected === currentRevision">This is the current version.</span>
+                                <button type="button" class="submit-btn" x-show="selected !== currentRevision" :disabled="busy" @click="restore()">Restore this version</button>
+                            </div>
+                            <div class="toolbar">
+                                <div role="group" aria-label="Show">
+                                    <button type="button" class="tab" :aria-pressed="historyMode === 'changes'" @click="historyMode = 'changes'">Changes</button>
+                                    <button type="button" class="tab" :aria-pressed="historyMode === 'full'" @click="historyMode = 'full'">Full text</button>
+                                </div>
+                                <span class="legend" x-show="historyMode === 'changes' && previousRevision">Against revision <span x-text="previousRevision ? previousRevision.number : ''"></span>: <ins>added</ins> · <del>removed</del></span>
+                            </div>
+                            <div x-show="historyMode === 'full'">
+                                <div class="game-text" x-html="selectedRevision ? codexMarkdown(selectedRevision.body, null) : ''"></div>
+                            </div>
+                            <div x-show="historyMode === 'changes'">
+                                <p class="same" x-show="!previousRevision" x-text="pruned && selected > 1 ? 'This is the oldest revision still kept, so there is nothing to compare it with.' : 'This is the first version of the page, so there is nothing to compare it with.'"></p>
+                                <div class="game-text" x-show="!previousRevision" x-html="selectedRevision ? codexMarkdown(selectedRevision.body, null) : ''"></div>
+                                <template x-if="previousRevision && selectedDiff">
+                                    <div class="detail-changes">
+                                        <div class="diff" x-show="selectedDiff.added || selectedDiff.removed" x-html="selectedDiff.html"></div>
+                                        <p class="same" x-show="!selectedDiff.added && !selectedDiff.removed">The text did not change in this revision.</p>
+                                    </div>
+                                </template>
+                            </div>
+                        </section>
+                    </div>
+                    <!--HISTORY-MAP-->
+                </div>
+            </template>
+
+            <p class="ornament" aria-hidden="true">❦ ❦ ❦</p>
+        </main>
+    </div>
+
+    <!-- Form dialogs -->
+    <div class="modal" :class="{ 'modal-open': dlg.type }" @click.self="closeDlg()" @keydown.escape.window="dlg.type && closeDlg()" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+        <div class="modal-content confirm-modal-content">
+            <div class="modal-header">
+                <div>
+                    <span class="modal-eyebrow" x-text="dlgEyebrow"></span>
+                    <h2 id="dlgTitle" x-text="dlgTitle"></h2>
+                </div>
+                <button type="button" class="modal-close" @click="closeDlg()" aria-label="Close">&times;</button>
+            </div>
+            <form class="modal-form" @submit.prevent="submitDlg()" novalidate>
+                <template x-if="dlg.type === 'createPage'">
+                    <div>
+                        <div class="form-group">
+                            <label for="dTitle">Title</label>
+                            <input type="text" id="dTitle" maxlength="120" x-model="dlg.title" x-ref="dlgFocus">
+                        </div>
+                        <div class="form-group" x-show="!dlg.kindLocked">
+                            <label for="dKind">Kind</label>
+                            <select id="dKind" x-model="dlg.kind">
+                                <option value="lore">Lore page</option>
+                                <option value="map">Map</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="dWorld">World</label>
+                            <select id="dWorld" x-model="dlg.worldId">
+                                <template x-for="w in worldChoices" :key="w.id"><option :value="w.id" x-text="w.name"></option></template>
+                            </select>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'world'">
+                    <div>
+                        <div class="form-group">
+                            <label for="dName">Name</label>
+                            <input type="text" id="dName" maxlength="80" x-model="dlg.name" x-ref="dlgFocus">
+                        </div>
+                        <div class="form-group">
+                            <label for="dDesc">Description (optional)</label>
+                            <textarea id="dDesc" rows="6" x-model="dlg.description"></textarea>
+                            <p class="hint">Formatting works as on pages. Shown at the top of the world.</p>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'rename'">
+                    <div>
+                        <div class="form-group">
+                            <label for="dRename">New title</label>
+                            <input type="text" id="dRename" maxlength="120" x-model="dlg.title" x-ref="dlgFocus">
+                            <p class="hint">Links to the old title in this world are rewritten to the new one. Links that use an alias are left alone.</p>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'aliases'">
+                    <div>
+                        <div class="form-group">
+                            <label for="dAliases">Other names, one per line</label>
+                            <textarea id="dAliases" rows="5" x-model="dlg.text" x-ref="dlgFocus"></textarea>
+                            <p class="hint">A link like [[Hesk]] reaches this page if "Hesk" is one of its names. Each name is unique within the world.</p>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'move'">
+                    <div>
+                        <div class="form-group">
+                            <label for="dMove">Move to</label>
+                            <select id="dMove" x-model="dlg.worldId" x-ref="dlgFocus">
+                                <template x-for="w in worldChoices" :key="w.id"><option :value="w.id" x-text="w.name" :disabled="w.id === page.world.id"></option></template>
+                            </select>
+                        </div>
+                        <p class="hint" x-text="moveWarning"></p>
+                    </div>
+                </template>
+                <div class="notice" role="alert" x-show="dlg.error"><p x-text="dlg.error"></p></div>
+                <div class="modal-actions">
+                    <button type="submit" class="submit-btn" :disabled="dlg.busy" x-text="dlgSubmit"></button>
+                    <button type="button" class="btn-cancel" @click="closeDlg()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!--PIN-DIALOGS-->
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal confirm-modal" :class="{ 'modal-open': confirmDialog.open }" @click.self="closeConfirm(false)" @keydown.escape.window="confirmDialog.open && closeConfirm(false)" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+        <div class="modal-content confirm-modal-content">
+            <div class="modal-header">
+                <div>
+                    <span class="modal-eyebrow" x-text="confirmDialog.eyebrow"></span>
+                    <h2 id="confirmModalTitle" x-text="confirmDialog.title"></h2>
+                </div>
+                <button type="button" class="modal-close" @click="closeConfirm(false)" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-form">
+                <p class="confirm-modal-message" x-text="confirmDialog.message"></p>
+                <div class="modal-actions">
+                    <button type="button" :class="confirmDialog.danger ? 'btn-confirm-danger' : 'submit-btn'" @click="closeConfirm(true)" x-text="confirmDialog.confirmLabel"></button>
+                    <button type="button" class="btn-cancel" x-ref="confirmCancelBtn" @click="closeConfirm(false)">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/notifications.js?v=11"></script>
+    <script src="/campaigns.js?v=58"></script>
+    <script src="/static/journal.js?v=1"></script>
+    <script src="/static/codex-editor.js?v=1"></script>
+    <script src="/static/codex.js?v=1"></script>
 </body>
 </html>
