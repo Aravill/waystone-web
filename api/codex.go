@@ -214,7 +214,7 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 					handleCreateFolder(w, r, parts[1])
 				}
 			}
-		case len(parts) > 2:
+		case len(parts) != 2:
 			writeJSONError(w, http.StatusNotFound, "not found")
 		}
 	case "pages":
@@ -642,6 +642,12 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 			amenders = append(amenders, c.UserID)
 		}
 	}
+	incoming := 0 // links only: pins are hidden while maps are
+	for _, b := range backs {
+		if b.PinID == "" {
+			incoming++
+		}
+	}
 	payload := map[string]interface{}{
 		"page": map[string]interface{}{
 			"id": page.ID, "title": page.Title,
@@ -653,7 +659,7 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 		},
 		"links":          linkList,
 		"backlinks":      backList,
-		"incoming_count": len(backs),
+		"incoming_count": incoming,
 		"on_maps":        []interface{}{},
 	}
 	if err := codexAddMapPayload(payload, page); err != nil {
@@ -883,7 +889,9 @@ func handleDeletePage(w http.ResponseWriter, r *http.Request, id string) {
 func redirectOldCodexURL(w http.ResponseWriter, r *http.Request) {
 	target := "/codices"
 	rest := strings.TrimPrefix(r.URL.EscapedPath(), "/codex")
-	if strings.HasPrefix(rest, "/w/") {
+	if strings.HasPrefix(rest, "/w/unsorted") {
+		// The old Unsorted folder has no codex of its own any more.
+	} else if strings.HasPrefix(rest, "/w/") {
 		target = "/codices/c/" + strings.TrimPrefix(rest, "/w/")
 	} else if strings.HasPrefix(rest, "/p/") {
 		target = "/codices/p/" + strings.TrimPrefix(rest, "/p/")

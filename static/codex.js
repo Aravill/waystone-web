@@ -92,7 +92,7 @@ function codexFolderTree(folders, pages) {
 // Folders in tree order with a path label ("Places › Cities"); excludeId's subtree is disabled.
 function codexFolderOptions(folders, excludeId = '') {
     const { roots } = codexFolderTree(folders || [], []);
-    const out = [{ id: '', label: 'Top level', disabled: false }];
+    const out = []; // "Top level" is a static <option value=""> in the selects
     const walk = (n, trail, blocked) => {
         const path = [...trail, n.name];
         const off = blocked || n.id === excludeId;
@@ -717,6 +717,10 @@ window.codexPage = function () {
         },
         async openMove() {
             await this.ensureCodices();
+            if (!this.codexChoices.some((w) => w.id !== this.page.codex.id)) {
+                this.showMessage('Make another codex first.', 'error');
+                return;
+            }
             this.dlg = { type: 'move', codexId: this.codexChoices.find((w) => w.id !== this.page.codex.id)?.id || '', error: '', busy: false };
             this.focusDlg();
         },

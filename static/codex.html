@@ -361,13 +361,14 @@
                         <div class="form-group">
                             <label for="dCodex">Codex</label>
                             <select id="dCodex" x-model="dlg.codexId" @change="onDlgCodexChange()">
-                                <template x-for="w in codexChoices" :key="w.id"><option :value="w.id" x-text="w.name"></option></template>
+                                <template x-for="w in codexChoices" :key="w.id"><option :value="w.id" x-text="w.name" :selected="w.id === dlg.codexId"></option></template>
                             </select>
                         </div>
                         <div class="form-group" x-show="dlg.folders && dlg.folders.length">
                             <label for="dFolder">Folder</label>
                             <select id="dFolder" x-model="dlg.folderId">
-                                <template x-for="o in folderOptions(dlg.folders)" :key="o.id"><option :value="o.id" x-text="o.label"></option></template>
+                                <option value="">Top level</option>
+                                <template x-for="o in folderOptions(dlg.folders)" :key="o.id"><option :value="o.id" x-text="o.label" :selected="o.id === dlg.folderId"></option></template>
                             </select>
                         </div>
                     </div>
@@ -386,7 +387,8 @@
                         <div class="form-group">
                             <label for="dFolderPick" x-text="dlg.type === 'pageFolder' ? 'Folder' : 'Move into'"></label>
                             <select id="dFolderPick" x-model="dlg.folderId" x-ref="dlgFocus">
-                                <template x-for="o in folderOptions(dlg.folders, dlg.excludeId)" :key="o.id"><option :value="o.id" x-text="o.label" :disabled="o.disabled"></option></template>
+                                <option value="">Top level</option>
+                                <template x-for="o in folderOptions(dlg.folders, dlg.excludeId)" :key="o.id"><option :value="o.id" x-text="o.label" :disabled="o.disabled" :selected="o.id === dlg.folderId"></option></template>
                             </select>
                         </div>
                     </div>
@@ -427,7 +429,7 @@
                         <div class="form-group">
                             <label for="dMove">Move to</label>
                             <select id="dMove" x-model="dlg.codexId" x-ref="dlgFocus">
-                                <template x-for="w in codexChoices" :key="w.id"><option :value="w.id" x-text="w.name" :disabled="w.id === page.codex.id"></option></template>
+                                <template x-for="w in codexChoices" :key="w.id"><option :value="w.id" x-text="w.name" :disabled="w.id === page.codex.id" :selected="w.id === dlg.codexId"></option></template>
                             </select>
                         </div>
                         <p class="hint" x-text="moveWarning"></p>
@@ -466,6 +468,6 @@
     <script src="/campaigns.js?v=62"></script>
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=2"></script>
-    <script src="/static/codex.js?v=8"></script>
+    <script src="/static/codex.js?v=9"></script>
 </body>
 </html>
