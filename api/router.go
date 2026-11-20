@@ -138,6 +138,7 @@ func RegisterRoutes() {
 
 	// Admin page
 	http.Handle("/admin/users", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminUsersPage)))
+	http.Handle("/admin/access", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminAccessPage)))
 	http.Handle("/admin", middleware.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 	})))
@@ -145,6 +146,8 @@ func RegisterRoutes() {
 	// Admin API
 	http.Handle("/api/admin/users", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminUsers)))
 	http.Handle("/api/admin/users/", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminUserActions)))
+	http.Handle("/api/admin/access", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminAccess)))
+	http.Handle("/api/admin/access/", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminAccessActions)))
 	http.Handle("/api/admin/campaigns/", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminCampaignActions)))
 	http.Handle("/api/admin/systems", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminSystems)))
 	http.Handle("/api/admin/systems/", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminSystemActions)))
@@ -152,6 +155,9 @@ func RegisterRoutes() {
 	// Admin static
 	http.HandleFunc("/admin-users.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/admin-users.js")
+	})
+	http.HandleFunc("/admin-access.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/admin-access.js")
 	})
 }
 

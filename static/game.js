@@ -11,7 +11,6 @@ window.gamePage = function () {
     return {
         displayName: 'User',
         isAdmin: false,
-        codexAccess: false,
         currentUserId: '',
         gameId: '',
         campaign: null,
@@ -45,7 +44,6 @@ window.gamePage = function () {
                 const user = await userResponse.json();
                 this.displayName = user.display_name || user.username;
                 this.isAdmin = (user.roles || []).includes('admin');
-                this.codexAccess = !!user.codex_access;
                 this.currentUserId = user.user_id || user.id || '';
             } catch (error) {
                 console.error('Auth check failed:', error);

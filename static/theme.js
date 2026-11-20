@@ -40,7 +40,7 @@
             const response = await fetch('/auth/current-user');
             if (!response.ok || !response.headers.get('Content-Type')?.includes('application/json')) return;
             const user = await response.json();
-            // Codex links start hidden and show only when the server allows it (CODEX_ADMIN_ONLY).
+            // Codex links start hidden and show only when the server allows it (the See Codices right, or admin).
             codexLinks.forEach((el) => { el.hidden = !user.codex_access; });
             const url = user.avatar_url || '';
             avatars.forEach((el) => {
