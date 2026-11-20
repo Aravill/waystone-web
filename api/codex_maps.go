@@ -203,7 +203,8 @@ func codexAddOnMaps(payload map[string]interface{}, backs []models.PageBacklink)
 }
 
 func handleListMapImages(w http.ResponseWriter, r *http.Request, id string) {
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, false) {
 		return
 	}
 	images, err := db.GetMapImages(id)
@@ -229,8 +230,8 @@ const uploadTimeout = 150 * time.Second
 
 // handleUploadMapImage takes the raw image as the request body (PNG, JPEG or WebP, 25 MB at most).
 func handleUploadMapImage(w http.ResponseWriter, r *http.Request, id string) {
-	userID, ok := codexUserID(w, r)
-	if !ok {
+	userID, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	// The server-wide timeouts suit small bodies; give this one room (unsupported writers ignore it).
@@ -316,12 +317,25 @@ func removeCodexFiles(files []string) {
 }
 
 func handleCodexFile(w http.ResponseWriter, r *http.Request, name string) {
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok {
 		return
 	}
 	if !db.UploadFileRe.MatchString(name) {
 		writeJSONError(w, http.StatusNotFound, "not found")
 		return
+	}
+	if !rt.admin {
+		// An image is visible to whoever can see the codex of the page it belongs to.
+		codexID, err := db.GetImageCodexID(name)
+		if err != nil {
+			codexServerError(w, "read the image")
+			return
+		}
+		if codexID == "" || !rt.canSee(codexID) {
+			writeJSONError(w, http.StatusNotFound, "not found")
+			return
+		}
 	}
 	dir, err := db.UploadDir()
 	if err != nil {
@@ -345,8 +359,8 @@ func handleCodexFile(w http.ResponseWriter, r *http.Request, name string) {
 
 // handleRemoveMap clears the page's map and answers with how many pins went with it.
 func handleRemoveMap(w http.ResponseWriter, r *http.Request, id string) {
-	userID, ok := codexUserID(w, r)
-	if !ok {
+	userID, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	n, err := db.RemoveMap(id, userID)
@@ -358,8 +372,8 @@ func handleRemoveMap(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 func handleRestoreMapImage(w http.ResponseWriter, r *http.Request, id, imageID string) {
-	userID, ok := codexUserID(w, r)
-	if !ok {
+	userID, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	img, err := db.RestoreMapImage(id, imageID, userID)
@@ -388,8 +402,8 @@ func (req pinRequest) validPosition() bool {
 }
 
 func handleAddPin(w http.ResponseWriter, r *http.Request, id string) {
-	userID, ok := codexUserID(w, r)
-	if !ok {
+	userID, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	var req pinRequest
@@ -430,8 +444,8 @@ func handleAddPin(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 func handleMovePin(w http.ResponseWriter, r *http.Request, id, pinID string) {
-	userID, ok := codexUserID(w, r)
-	if !ok {
+	userID, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	var req pinRequest
@@ -450,8 +464,8 @@ func handleMovePin(w http.ResponseWriter, r *http.Request, id, pinID string) {
 }
 
 func handleDeletePin(w http.ResponseWriter, r *http.Request, id, pinID string) {
-	userID, ok := codexUserID(w, r)
-	if !ok {
+	userID, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	if err := db.DeleteMapPin(id, pinID, userID); err != nil {
@@ -462,7 +476,8 @@ func handleDeletePin(w http.ResponseWriter, r *http.Request, id, pinID string) {
 }
 
 func handlePinEvents(w http.ResponseWriter, r *http.Request, id string) {
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, false) {
 		return
 	}
 	events, err := db.GetMapPinEvents(id, db.PinEventsKeep)
@@ -505,8 +520,8 @@ func pinEventLabel(e models.MapPinEvent) string {
 }
 
 func handleUndoPinEvent(w http.ResponseWriter, r *http.Request, id, eventID string) {
-	userID, ok := codexUserID(w, r)
-	if !ok {
+	userID, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	if err := db.UndoMapPinEvent(id, eventID, userID); err != nil {

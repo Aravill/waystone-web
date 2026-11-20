@@ -380,6 +380,7 @@ window.campaignsPage = function () {
         currentUserId: '',
         campaigns: [],
         codices: [],
+        codexHidden: null, // the edited game's codex when the DM can't see it, so the select still shows it
         loading: true,
         modalOpen: false,
         messageVisible: false,
@@ -596,6 +597,7 @@ window.campaignsPage = function () {
                 return;
             }
             if (this.codexAccess) await this.loadCodices();
+            this.codexHidden = c.codex && !this.codices.some((x) => x.id === c.codex.id) ? c.codex : null;
             this.editingCampaignId = c.id;
             this.formData = {
                 title: c.title || '',

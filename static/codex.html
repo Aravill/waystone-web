@@ -64,12 +64,12 @@
                             <p class="byline">Codices hold pages. A page links to others in its codex with [[double brackets]].</p>
                         </div>
                         <div class="actions">
-                            <button type="button" class="submit-btn" @click="openCreateCodex()">+ New codex</button>
+                            <button type="button" class="submit-btn" x-show="home.can_create" @click="openCreateCodex()">+ New codex</button>
                         </div>
                     </section>
                     <section class="codex-section">
                         <h2 class="section-header">Codices</h2>
-                        <p class="same" x-show="home.codices.length === 0">No codices yet. Make a codex first.</p>
+                        <p class="same" x-show="home.codices.length === 0" x-text="home.can_create ? 'No codices yet. Make a codex first.' : 'No codices to show yet.'"></p>
                         <div class="codex-cards">
                             <template x-for="w in home.codices" :key="w.id">
                                 <a class="codex-card" :href="'/codices/c/' + encodeURIComponent(w.id)">
@@ -101,9 +101,9 @@
                             <h1 class="page-title" tabindex="-1" x-text="codex.codex.name"></h1>
                         </div>
                         <div class="actions">
-                            <button type="button" class="btn-danger" x-show="codex.can_delete" @click="deleteCodex()">Delete codex</button>
-                            <button type="button" class="campaign-action-btn" @click="openEditCodex()">Edit codex</button>
-                            <button type="button" class="submit-btn" @click="openCreatePage()">+ New page</button>
+                            <button type="button" class="btn-danger" x-show="codex.can_manage" @click="deleteCodex()">Delete codex</button>
+                            <button type="button" class="campaign-action-btn" x-show="codex.can_manage" @click="openEditCodex()">Edit codex</button>
+                            <button type="button" class="submit-btn" x-show="codex.can_edit" @click="openCreatePage()">+ New page</button>
                         </div>
                     </section>
                     <div class="split">
@@ -115,8 +115,8 @@
                                     <label for="pageFilter" class="label">Find a page</label>
                                     <input type="search" id="pageFilter" x-model="pageFilter" placeholder="Title or alias">
                                 </div>
-                                <p class="same" x-show="codex.pages.length === 0 && codex.folders.length === 0">No pages yet. Start with "+ New page".</p>
-                                <p class="codex-tree-bar" x-show="!pageFilter.trim()">
+                                <p class="same" x-show="codex.pages.length === 0 && codex.folders.length === 0" x-text="codex.can_edit ? 'No pages yet. Start with &quot;+ New page&quot;.' : 'No pages yet.'"></p>
+                                <p class="codex-tree-bar" x-show="codex.can_edit && !pageFilter.trim()">
                                     <button type="button" class="text-link" id="new-folder-btn" @click="openNewFolder('')">+ New folder</button>
                                 </p>
                                 <div class="codex-tree-wrap" @click.window="folderMenu.id && !$event.target.closest('.codex-menu, .codex-menu-btn') && closeFolderMenu()">
@@ -137,7 +137,7 @@
                                 <p class="same" x-show="codex.wanted.length === 0">Every link in this codex leads somewhere.</p>
                                 <ul class="page-list">
                                     <template x-for="w in codex.wanted" :key="w.text">
-                                        <li><button type="button" class="wikilink wikilink--missing" title="No page yet. Click to create." @click="openCreatePage(w.text)" x-text="w.text"></button><span class="muted" x-text="' · wanted ' + w.count + (w.count === 1 ? ' time' : ' times')"></span></li>
+                                        <li><button type="button" class="wikilink wikilink--missing" :title="codex.can_edit ? 'No page yet. Click to create.' : 'No page yet.'" @click="openCreatePage(w.text)" x-text="w.text"></button><span class="muted" x-text="' · wanted ' + w.count + (w.count === 1 ? ' time' : ' times')"></span></li>
                                     </template>
                                 </ul>
                             </div>
@@ -164,14 +164,14 @@
                             <span class="modal-eyebrow"><span>Page in </span><a :href="'/codices/c/' + encodeURIComponent(page.codex.id)" x-text="page.codex.name"></a></span>
                             <h1 class="page-title" tabindex="-1" x-text="page.title"></h1>
                             <p class="byline" x-show="page.aliases.length"><span>Also known as </span><span x-text="page.aliases.join(', ')"></span></p>
-                            <p class="byline"><button type="button" class="text-link" @click="openMove()">Move to another codex…</button></p>
+                            <p class="byline" x-show="canEdit"><button type="button" class="text-link" @click="openMove()">Move to another codex…</button></p>
                         </div>
                         <div class="actions">
-                            <button type="button" class="btn-danger" @click="deletePage()">Delete</button>
-                            <button type="button" class="campaign-action-btn" @click="openAliases()">Aliases</button>
-                            <button type="button" class="campaign-action-btn" @click="openRename()">Rename</button>
+                            <button type="button" class="btn-danger" x-show="canEdit" @click="deletePage()">Delete</button>
+                            <button type="button" class="campaign-action-btn" x-show="canEdit" @click="openAliases()">Aliases</button>
+                            <button type="button" class="campaign-action-btn" x-show="canEdit" @click="openRename()">Rename</button>
                             <a class="campaign-action-btn" :href="pageUrl(page, '/history')" x-text="'History · ' + page.revision_count"></a>
-                            <a class="submit-btn" :href="pageUrl(page, '/edit')">Edit</a>
+                            <a class="submit-btn" x-show="canEdit" :href="pageUrl(page, '/edit')">Edit</a>
                         </div>
                     </section>
                     <div class="codex-grid" :class="{ 'codex-grid--rail': toc.length >= 2 }" @scroll.window.passive="updateToc()">
@@ -193,7 +193,7 @@
                                 </ul>
                             </details>
                             <div class="game-text codex-text" x-ref="body" @click="onBodyClick($event)" x-html="bodyHtml" x-effect="bodyHtml; $nextTick(() => buildToc())"></div>
-                            <p class="same" x-show="!page.body.trim()">This page is empty. <a :href="pageUrl(page, '/edit')">Write it</a>.</p>
+                            <p class="same" x-show="!page.body.trim()">This page is empty.<span x-show="canEdit"> <a :href="pageUrl(page, '/edit')">Write it</a>.</span></p>
                             <p class="codex-edited" x-text="'Revision ' + page.current_revision + ' · last edited by ' + page.updated_by_user.display_name + ' ' + formatStamp(page.updated_at)"></p>
                         </article>
                         <aside class="codex-side">
@@ -202,7 +202,7 @@
                                 <dl>
                                     <div class="codex-sum-row" x-show="page.aliases.length"><dt>Aliases</dt><dd x-text="page.aliases.join(', ')"></dd></div>
                                     <div class="codex-sum-row"><dt>Codex</dt><dd><a :href="'/codices/c/' + encodeURIComponent(page.codex.id)" x-text="page.codex.name"></a></dd></div>
-                                    <div class="codex-sum-row"><dt>Folder</dt><dd><span x-text="page.folder_path.length ? page.folder_path.map((f) => f.name).join(' › ') : 'Top level'"></span> <button type="button" class="text-link" @click="openPageFolder()">Change</button></dd></div>
+                                    <div class="codex-sum-row"><dt>Folder</dt><dd><span x-text="page.folder_path.length ? page.folder_path.map((f) => f.name).join(' › ') : 'Top level'"></span> <button type="button" class="text-link" x-show="canEdit" @click="openPageFolder()">Change</button></dd></div>
                                     <div class="codex-sum-row"><dt>Started</dt><dd x-text="page.author_user.display_name + ', ' + shortDate(page.created_at)"></dd></div>
                                     <div class="codex-sum-row"><dt>Scribes</dt><dd x-text="scribes"></dd></div>
                                     <div class="codex-sum-row"><dt>Revisions</dt><dd><a :href="pageUrl(page, '/history')" x-text="page.revision_count"></a></dd></div>
@@ -309,7 +309,7 @@
                                     <p class="detail-sub" x-text="selectedRevision ? selectedRevision.author_user.display_name + ' · ' + formatStamp(selectedRevision.created_at) + (revNote(selectedRevision) ? ' · ' + revNote(selectedRevision) : '') : ''"></p>
                                 </div>
                                 <span class="legend" x-show="selected === currentRevision">This is the current version.</span>
-                                <button type="button" class="submit-btn" x-show="selected !== currentRevision" :disabled="busy" @click="restore()">Restore this version</button>
+                                <button type="button" class="submit-btn" x-show="canEdit && selected !== currentRevision" :disabled="busy" @click="restore()">Restore this version</button>
                             </div>
                             <div class="toolbar">
                                 <div role="group" aria-label="Show">
@@ -465,9 +465,9 @@
     </div>
 
     <script src="/static/notifications.js?v=11"></script>
-    <script src="/campaigns.js?v=62"></script>
+    <script src="/campaigns.js?v=63"></script>
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=2"></script>
-    <script src="/static/codex.js?v=9"></script>
+    <script src="/static/codex.js?v=11"></script>
 </body>
 </html>

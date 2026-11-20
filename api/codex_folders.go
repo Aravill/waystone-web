@@ -73,7 +73,8 @@ func codexFolderError(w http.ResponseWriter, err error, what string) {
 
 // handleCodexFolders is the light folder list ({id, parent_id, name}) for the folder pickers.
 func handleCodexFolders(w http.ResponseWriter, r *http.Request, id string) {
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkCodex(w, id, false) {
 		return
 	}
 	out := []map[string]string{}
@@ -98,8 +99,8 @@ func handleCodexFolders(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 func handleCreateFolder(w http.ResponseWriter, r *http.Request, codexID string) {
-	userID, ok := codexUserID(w, r)
-	if !ok {
+	userID, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkCodex(w, codexID, true) {
 		return
 	}
 	var req struct {
@@ -130,7 +131,8 @@ func handleCodexFolderRoutes(w http.ResponseWriter, r *http.Request, parts []str
 	if !method(http.MethodPut, http.MethodDelete) {
 		return
 	}
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkFolder(w, parts[0], true) {
 		return
 	}
 	if r.Method == http.MethodDelete {
@@ -184,7 +186,8 @@ func handleCodexFolderRoutes(w http.ResponseWriter, r *http.Request, parts []str
 }
 
 func handleSetPageFolder(w http.ResponseWriter, r *http.Request, id string) {
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	var req struct {

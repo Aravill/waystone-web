@@ -154,3 +154,25 @@ type MapPinEvent struct {
 	UndoneBy  string
 	CreatedAt string
 }
+
+// Per-user rights (user_rights.action). Admins always have every right.
+const (
+	RightCodicesSee  = "codices.see"
+	RightCodicesEdit = "codices.edit"
+)
+
+// UserRights lists the known per-user rights.
+var UserRights = []string{RightCodicesSee, RightCodicesEdit}
+
+// Per-codex access levels (codex_access.level).
+const (
+	CodexLevelSee  = "see"
+	CodexLevelEdit = "edit"
+)
+
+// CodexAccess is one user's level on one codex.
+type CodexAccess struct {
+	CodexID string `json:"codex_id"`
+	UserID  string `json:"user_id"`
+	Level   string `json:"level"`
+}

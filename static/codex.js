@@ -21,7 +21,7 @@ function codexPageUrl(p, tail = '') {
 // missing page; with no lookup (old revisions) links are shown plain. The links are swapped for
 // placeholders before rendering so the Markdown renderer never sees them. A placeholder holds
 // spaces, which a Markdown link URL can't, so one inside "(...)" is never swallowed into an href.
-function codexMarkdown(body, lookup) {
+function codexMarkdown(body, lookup, canCreate = true) {
     const found = [];
     const text = String(body || '').replace(/\u0001/g, '').replace(CODEX_LINK_RE, (m, t, label) => {
         found.push({ text: t.trim(), label });
@@ -34,7 +34,7 @@ function codexMarkdown(body, lookup) {
         if (!lookup) return `<span class="wikilink wikilink--plain">${shown}</span>`;
         const target = lookup(l.text);
         if (target) return `<a class="wikilink" href="${codexPageUrl(target)}">${shown}</a>`;
-        return `<a class="wikilink wikilink--missing" href="#" data-text="${escapeHtml(l.text)}" title="No page yet. Click to create.">${shown}</a>`;
+        return `<a class="wikilink wikilink--missing" href="#" data-text="${escapeHtml(l.text)}" title="No page yet.${canCreate ? ' Click to create.' : ''}">${shown}</a>`;
     });
 }
 
@@ -108,15 +108,15 @@ function codexPageItemHtml(p) {
     return `<li><a href="${codexPageUrl(p)}">${escapeHtml(p.title)}</a>${also}</li>`;
 }
 
-function codexFolderHtml(n, depth) {
+function codexFolderHtml(n, depth, canEdit) {
     const open = codexOpenState[n.id] === undefined ? depth === 0 : codexOpenState[n.id];
     const id = escapeHtml(n.id);
     const pages = n.pages.length ? `<ul class="page-list">${n.pages.map(codexPageItemHtml).join('')}</ul>` : '';
     return `<details class="codex-folder${depth >= 4 ? ' codex-folder--deep' : ''}" id="folder-${id}" data-id="${id}"${open ? ' open' : ''}>` +
         `<summary><span class="codex-folder-name">${escapeHtml(n.name)}</span><span class="muted"> · ${n.count} ${n.count === 1 ? 'page' : 'pages'}</span>` +
-        `<button type="button" class="codex-menu-btn" data-menu="${id}" aria-label="Actions for folder ${escapeHtml(n.name)}" aria-haspopup="menu" aria-expanded="false">⋯</button></summary>` +
+        (canEdit ? `<button type="button" class="codex-menu-btn" data-menu="${id}" aria-label="Actions for folder ${escapeHtml(n.name)}" aria-haspopup="menu" aria-expanded="false">⋯</button>` : '') + '</summary>' +
         `<div class="codex-folder-body">` +
-        n.children.map((c) => codexFolderHtml(c, depth + 1)).join('') + pages + '</div></details>';
+        n.children.map((c) => codexFolderHtml(c, depth + 1, canEdit)).join('') + pages + '</div></details>';
 }
 
 // The ⋯ menu's items; every label names the folder for screen readers.
@@ -234,6 +234,11 @@ window.codexPage = function () {
         get page() {
             return this.pageData ? this.pageData.page : null;
         },
+        // Whether the viewer may change what is on screen: the codex's pages and folders, or this page.
+        get canEdit() {
+            if (this.screen === 'codex') return !!(this.codex && this.codex.can_edit);
+            return !!(this.pageData && this.pageData.can_edit);
+        },
         get crumbs() {
             const s = this.screen;
             if (s === 'codex' && this.codex) return [{ label: this.codex.codex.name, href: '' }];
@@ -293,6 +298,10 @@ window.codexPage = function () {
                     if (location.pathname !== this.pageUrl(data.page) + (r.screen === 'page' ? '' : '/' + r.screen)) {
                         history.replaceState(null, '', this.pageUrl(data.page) + (r.screen === 'page' ? '' : '/' + r.screen) + location.search);
                     }
+                    if (r.screen === 'edit' && !data.can_edit) {
+                        window.location.replace(this.pageUrl(data.page));
+                        return;
+                    }
                     if (r.screen === 'edit' && !this.draft) await this.initDraft();
                     if (r.screen === 'history') {
                         await this.loadHistory(Number(new URLSearchParams(location.search).get('r')) || 0);
@@ -340,7 +349,7 @@ window.codexPage = function () {
             const pages = tree.pages.length
                 ? `<p class="codex-tree-label muted">Not in a folder</p><ul class="page-list">${tree.pages.map(codexPageItemHtml).join('')}</ul>`
                 : '';
-            return tree.roots.map((r) => codexFolderHtml(r, 0)).join('') + pages;
+            return tree.roots.map((r) => codexFolderHtml(r, 0, this.codex.can_edit)).join('') + pages;
         },
         // Marks a folder and the ones above it open.
         openFolderChain(id, folders) {
@@ -503,7 +512,7 @@ window.codexPage = function () {
             return (text) => map.get(codexNorm(text)) || null;
         },
         get bodyHtml() {
-            return this.page ? codexMarkdown(this.page.body, this.linkLookup) : '';
+            return this.page ? codexMarkdown(this.page.body, this.linkLookup, this.canEdit) : '';
         },
         // Pages that link here by [[link]]; map pins are not shown.
         get linkedFrom() {
@@ -595,7 +604,7 @@ window.codexPage = function () {
             if (this.codexChoices.length) return;
             try {
                 const { response, data } = await this.send('/api/codices', 'GET');
-                if (response.ok) this.codexChoices = data.codices.map((w) => ({ id: w.id, name: w.name }));
+                if (response.ok) this.codexChoices = data.codices.filter((w) => w.can_edit).map((w) => ({ id: w.id, name: w.name }));
             } catch (error) {
                 this.showMessage('Could not load the codices: ' + error.message, 'error');
             }
@@ -608,6 +617,10 @@ window.codexPage = function () {
         },
         // folderId: the folder to prefill; a page's missing links start in its own folder.
         async openCreatePage(title = '', folderId = null) {
+            if (!this.canEdit) {
+                this.showMessage("You can't add pages to this codex.", 'error');
+                return;
+            }
             await this.ensureCodices();
             if (!this.codexChoices.length) {
                 this.showMessage('Make a codex first.', 'error');
@@ -718,7 +731,7 @@ window.codexPage = function () {
         async openMove() {
             await this.ensureCodices();
             if (!this.codexChoices.some((w) => w.id !== this.page.codex.id)) {
-                this.showMessage('Make another codex first.', 'error');
+                this.showMessage("There's no other codex you can move it to.", 'error');
                 return;
             }
             this.dlg = { type: 'move', codexId: this.codexChoices.find((w) => w.id !== this.page.codex.id)?.id || '', error: '', busy: false };

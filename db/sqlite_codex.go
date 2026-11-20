@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"sort"
+	"strings"
 	"time"
 	"waystone-web/models"
 )
@@ -332,16 +333,21 @@ func (s *SQLiteStore) GetPageRevision(id string, number int) (models.PageRevisio
 	return r, err
 }
 
-// GetRecentRevisions lists the newest revisions, optionally only for pages in one codex.
-func (s *SQLiteStore) GetRecentRevisions(codexID *string, limit int) ([]models.RecentRevision, error) {
+// GetRecentRevisions lists the newest revisions, only for pages in the given codices (nil: all).
+func (s *SQLiteStore) GetRecentRevisions(codexIDs []string, limit int) ([]models.RecentRevision, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	q := `SELECT p.id, p.title, p.kind, p.codex_id, r.number, r.note, r.author_id, r.created_at
 		FROM page_revisions r JOIN pages p ON p.id = r.page_id`
 	args := []interface{}{}
-	if codexID != nil {
-		q += ` WHERE p.codex_id = ?`
-		args = append(args, *codexID)
+	if codexIDs != nil {
+		if len(codexIDs) == 0 {
+			return []models.RecentRevision{}, nil
+		}
+		q += ` WHERE p.codex_id IN (?` + strings.Repeat(", ?", len(codexIDs)-1) + `)`
+		for _, id := range codexIDs {
+			args = append(args, id)
+		}
 	}
 	q += ` ORDER BY r.created_at DESC, r.number DESC LIMIT ?`
 	args = append(args, limit)

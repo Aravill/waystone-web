@@ -258,6 +258,19 @@ func (s *SQLiteStore) initSchema() error {
 		created_at TEXT NOT NULL,
 		updated_at TEXT NOT NULL
 	);
+	-- Access rights: per-user actions (codices.see, codices.edit) and per-codex levels (see, edit). Admins need no rows.
+	CREATE TABLE IF NOT EXISTS user_rights (
+		user_id TEXT NOT NULL,
+		action TEXT NOT NULL,
+		PRIMARY KEY (user_id, action)
+	);
+	CREATE TABLE IF NOT EXISTS codex_access (
+		codex_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		level TEXT NOT NULL,
+		PRIMARY KEY (codex_id, user_id)
+	);
+	CREATE INDEX IF NOT EXISTS idx_codex_access_user ON codex_access(user_id);
 	CREATE TABLE IF NOT EXISTS pages (
 		id TEXT PRIMARY KEY,
 		kind TEXT NOT NULL,
@@ -1023,7 +1036,7 @@ func (s *SQLiteStore) AnonymizeUser(id string) error {
 		return ErrUserNotFound
 	}
 
-	for _, table := range []string{"campaign_signups", "campaign_follows", "calendar_tokens", "password_invites", "notifications"} {
+	for _, table := range []string{"campaign_signups", "campaign_follows", "calendar_tokens", "password_invites", "notifications", "user_rights", "codex_access"} {
 		if _, err := tx.Exec(`DELETE FROM `+table+` WHERE user_id = ?`, id); err != nil {
 			return err
 		}

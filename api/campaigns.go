@@ -116,6 +116,7 @@ type campaignViewer struct {
 	systems        map[string]models.System
 	characters     map[string]models.CharacterAssignment // the viewer's active character per campaign
 	codices        map[string]string                     // codex id -> name, for the game label
+	codexRights    *codexRights                          // the viewer's Codices rights, for the label's link
 }
 
 // loadCampaignViewer fetches the per-viewer data for campaigns. It returns an
@@ -155,6 +156,9 @@ func loadCampaignViewer(r *http.Request, campaigns []models.Campaign) (*campaign
 	for _, c := range codices {
 		v.codices[c.ID] = c.Name
 	}
+	if v.codexRights, err = loadCodexRights(v.userID); err != nil {
+		return nil, "failed to retrieve rights"
+	}
 	if v.characters, err = db.GetActiveAssignmentsByUser(v.userID); err != nil {
 		return nil, "failed to retrieve characters"
 	}
@@ -172,7 +176,7 @@ func loadCampaignViewer(r *http.Request, campaigns []models.Campaign) (*campaign
 // codexRef is the game's codex label ({id, name}), or nil when it has none.
 func (v *campaignViewer) codexRef(id string) interface{} {
 	if name, ok := v.codices[id]; ok && id != "" {
-		return map[string]string{"id": id, "name": name}
+		return map[string]interface{}{"id": id, "name": name, "can_open": v.codexRights.canSee(id)}
 	}
 	return nil
 }
@@ -714,17 +718,25 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 	}
 	// Validate the codex before anything is saved ("" means no codex).
 	newCodex := campaign.CodexID
-	if userID, _ := r.Context().Value("user_id").(string); req.CodexID != nil && codexAllowedFor(userID) {
-		newCodex = *req.CodexID
-		if newCodex != "" {
-			codex, err := db.GetCodex(newCodex)
-			if err != nil {
-				writeJSONError(w, http.StatusInternalServerError, "failed to retrieve codex")
-				return
-			}
-			if codex == nil {
-				writeJSONError(w, http.StatusBadRequest, db.ErrCodexNotFound.Error())
-				return
+	// Only someone with See Codices can change it, and only to a codex they can see.
+	if userID, _ := r.Context().Value("user_id").(string); req.CodexID != nil && *req.CodexID != campaign.CodexID {
+		rt, err := loadCodexRights(userID)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "failed to retrieve rights")
+			return
+		}
+		if rt.canUse() {
+			newCodex = *req.CodexID
+			if newCodex != "" {
+				codex, err := db.GetCodex(newCodex)
+				if err != nil {
+					writeJSONError(w, http.StatusInternalServerError, "failed to retrieve codex")
+					return
+				}
+				if codex == nil || !rt.canSee(newCodex) {
+					writeJSONError(w, http.StatusBadRequest, db.ErrCodexNotFound.Error())
+					return
+				}
 			}
 		}
 	}

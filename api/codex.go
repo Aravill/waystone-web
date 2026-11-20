@@ -41,11 +41,6 @@ func codexUserID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return userID, true
 }
 
-func codexIsAdmin(userID string) (bool, error) {
-	u, err := db.GetUserByID(userID)
-	return err == nil && u != nil && u.IsAdmin(), err
-}
-
 func codexNameTaken(w http.ResponseWriter, e *db.NameTakenError) {
 	writeJSON(w, http.StatusConflict, map[string]interface{}{"error": e.Error(), "code": "name_taken", "conflicts": e.Conflicts})
 }
@@ -113,7 +108,8 @@ func HandleCodexHome(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok {
 		return
 	}
 	codices, list, err := codexCodices()
@@ -132,24 +128,37 @@ func HandleCodexHome(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]interface{}, 0, len(list))
 	for _, wd := range list {
+		if !rt.canSee(wd.ID) {
+			continue
+		}
 		out = append(out, map[string]interface{}{
 			"id": wd.ID, "name": wd.Name, "excerpt": codexExcerpt(wd.Description),
-			"page_count": pageCount[wd.ID],
+			"page_count": pageCount[wd.ID], "can_edit": rt.canEdit(wd.ID),
 		})
 	}
-	recent, err := codexRecent(nil, codices)
+	var visible []string // nil = every codex (admins)
+	if !rt.admin {
+		visible = []string{}
+		for _, wd := range list {
+			if rt.canSee(wd.ID) {
+				visible = append(visible, wd.ID)
+			}
+		}
+	}
+	recent, err := codexRecent(visible, codices)
 	if err != nil {
 		codexServerError(w, "retrieve recent changes")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"codices": out,
-		"recent":  recent,
+		"codices":    out,
+		"recent":     recent,
+		"can_create": rt.canManage(),
 	})
 }
 
-func codexRecent(codexID *string, codices map[string]models.Codex) ([]map[string]interface{}, error) {
-	revs, err := db.GetRecentRevisions(codexID, 15)
+func codexRecent(codexIDs []string, codices map[string]models.Codex) ([]map[string]interface{}, error) {
+	revs, err := db.GetRecentRevisions(codexIDs, 15)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +244,8 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 // handleCodexTitles lists page titles and aliases (optionally one codex: ?codex=id), for the
 // editor's autocomplete, the pin picker and link status in previews.
 func handleCodexTitles(w http.ResponseWriter, r *http.Request) {
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok {
 		return
 	}
 	pages, err := db.GetCodexPages()
@@ -246,7 +256,7 @@ func handleCodexTitles(w http.ResponseWriter, r *http.Request) {
 	filter, only := r.URL.Query().Get("codex"), r.URL.Query().Has("codex")
 	out := []map[string]interface{}{}
 	for _, p := range pages {
-		if only && p.CodexID != filter {
+		if (only && p.CodexID != filter) || !rt.canSee(p.CodexID) {
 			continue
 		}
 		out = append(out, map[string]interface{}{
@@ -273,8 +283,8 @@ func (req *codexRequest) normalize() string {
 }
 
 func handleCreateCodex(w http.ResponseWriter, r *http.Request) {
-	userID, ok := codexUserID(w, r)
-	if !ok {
+	userID, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkManage(w) {
 		return
 	}
 	var req codexRequest
@@ -287,7 +297,8 @@ func handleCreateCodex(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	codex := models.Codex{ID: db.GenerateUUID(), Name: req.Name, Description: req.Description, CreatedBy: userID, CreatedAt: now, UpdatedAt: now}
-	if err := db.CreateCodex(codex); err != nil {
+	// Admins have every right anyway; a stored row would outlive a demotion unseen.
+	if err := db.CreateCodex(codex, !rt.admin); err != nil {
 		if errors.Is(err, db.ErrCodexNameTaken) {
 			writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "codex_name_taken"})
 			return
@@ -299,7 +310,8 @@ func handleCreateCodex(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleUpdateCodex(w http.ResponseWriter, r *http.Request, id string) {
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkCodex(w, id, false) || !rt.checkManage(w) {
 		return
 	}
 	var req codexRequest
@@ -325,17 +337,8 @@ func handleUpdateCodex(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 func handleDeleteCodex(w http.ResponseWriter, r *http.Request, id string) {
-	userID, ok := codexUserID(w, r)
-	if !ok {
-		return
-	}
-	admin, err := codexIsAdmin(userID)
-	if err != nil {
-		codexServerError(w, "retrieve user")
-		return
-	}
-	if !admin {
-		writeJSONError(w, http.StatusForbidden, "only an admin can delete a codex")
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkCodex(w, id, false) || !rt.checkManage(w) {
 		return
 	}
 	codex, err := db.GetCodex(id)
@@ -375,8 +378,8 @@ func codexPageCount(id string) int {
 }
 
 func handleGetCodex(w http.ResponseWriter, r *http.Request, id string) {
-	userID, ok := codexUserID(w, r)
-	if !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkCodex(w, id, false) {
 		return
 	}
 	codices, _, err := codexCodices()
@@ -405,17 +408,12 @@ func handleGetCodex(w http.ResponseWriter, r *http.Request, id string) {
 		codexServerError(w, "retrieve folders")
 		return
 	}
-	admin, err := codexIsAdmin(userID)
-	if err != nil {
-		codexServerError(w, "retrieve user")
-		return
-	}
 	wanted, err := db.GetWantedPages(id)
 	if err != nil {
 		codexServerError(w, "retrieve wanted pages")
 		return
 	}
-	recent, err := codexRecent(&id, codices)
+	recent, err := codexRecent([]string{id}, codices)
 	if err != nil {
 		codexServerError(w, "retrieve recent changes")
 		return
@@ -426,7 +424,8 @@ func handleGetCodex(w http.ResponseWriter, r *http.Request, id string) {
 		"folders":    folders,
 		"wanted":     wanted,
 		"recent":     recent,
-		"can_delete": admin,
+		"can_edit":   rt.canEdit(id),
+		"can_manage": rt.canManage(),
 	})
 }
 
@@ -438,7 +437,7 @@ type pageCreateRequest struct {
 }
 
 func handleCreatePage(w http.ResponseWriter, r *http.Request) {
-	userID, ok := codexUserID(w, r)
+	userID, rt, ok := codexRightsFor(w, r)
 	if !ok {
 		return
 	}
@@ -455,8 +454,12 @@ func handleCreatePage(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "body is too long")
 		return
 	}
-	if req.CodexID == "" {
+	if req.CodexID == "" || !rt.canSee(req.CodexID) {
 		writeJSONError(w, http.StatusBadRequest, db.ErrCodexNotFound.Error())
+		return
+	}
+	if !rt.canEdit(req.CodexID) {
+		writeJSONError(w, http.StatusForbidden, "you can't edit this codex")
 		return
 	}
 	page := models.Page{ID: db.GenerateUUID(), Kind: models.PageLore, CodexID: req.CodexID, FolderID: req.FolderID, Title: title, AuthorID: userID}
@@ -554,7 +557,8 @@ func handleCodexPageRoutes(w http.ResponseWriter, r *http.Request, parts []strin
 }
 
 func handleGetPage(w http.ResponseWriter, r *http.Request, id string) {
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, false) {
 		return
 	}
 	payload, status, msg := codexPagePayload(id)
@@ -562,6 +566,8 @@ func handleGetPage(w http.ResponseWriter, r *http.Request, id string) {
 		writeJSONError(w, status, msg)
 		return
 	}
+	codexID := payload["page"].(map[string]interface{})["codex"].(map[string]interface{})["id"].(string)
+	payload["can_edit"] = rt.canEdit(codexID)
 	writeJSON(w, http.StatusOK, payload)
 }
 
@@ -678,8 +684,8 @@ type pageSaveRequest struct {
 }
 
 func handleSavePage(w http.ResponseWriter, r *http.Request, id string) {
-	userID, ok := codexUserID(w, r)
-	if !ok {
+	userID, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	var req pageSaveRequest
@@ -718,7 +724,8 @@ func saveCodexRevision(w http.ResponseWriter, id string, base int, rev models.Pa
 }
 
 func handlePageRevisions(w http.ResponseWriter, r *http.Request, id string) {
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, false) {
 		return
 	}
 	revs, err := db.GetPageRevisions(id)
@@ -748,8 +755,8 @@ func handlePageRevisions(w http.ResponseWriter, r *http.Request, id string) {
 
 // handleRestorePage saves an old revision's body as a new revision. The title is never restored.
 func handleRestorePage(w http.ResponseWriter, r *http.Request, id string, number int) {
-	userID, ok := codexUserID(w, r)
-	if !ok {
+	userID, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	var req struct {
@@ -772,7 +779,8 @@ func handleRestorePage(w http.ResponseWriter, r *http.Request, id string, number
 
 // handleGetRevision returns one kept revision with its body.
 func handleGetRevision(w http.ResponseWriter, r *http.Request, id string, number int) {
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, false) {
 		return
 	}
 	rv, err := db.GetPageRevision(id, number)
@@ -789,8 +797,8 @@ func handleGetRevision(w http.ResponseWriter, r *http.Request, id string, number
 }
 
 func handleRenamePage(w http.ResponseWriter, r *http.Request, id string) {
-	userID, ok := codexUserID(w, r)
-	if !ok {
+	userID, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	var req struct {
@@ -813,7 +821,8 @@ func handleRenamePage(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 func handleSetAliases(w http.ResponseWriter, r *http.Request, id string) {
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	var req struct {
@@ -855,13 +864,23 @@ func handleSetAliases(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 func handleMovePage(w http.ResponseWriter, r *http.Request, id string) {
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	var req struct {
 		CodexID string `json:"codex_id"`
 	}
 	if !codexDecode(w, r, 4<<10, &req) {
+		return
+	}
+	// The target needs Edit too; one that doesn't exist or can't be seen is "codex not found".
+	if !rt.canSee(req.CodexID) {
+		writeJSONError(w, http.StatusBadRequest, db.ErrCodexNotFound.Error())
+		return
+	}
+	if !rt.canEdit(req.CodexID) {
+		writeJSONError(w, http.StatusForbidden, "you can't edit the target codex")
 		return
 	}
 	if err := db.MovePage(id, req.CodexID); err != nil {
@@ -872,7 +891,8 @@ func handleMovePage(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 func handleDeletePage(w http.ResponseWriter, r *http.Request, id string) {
-	if _, ok := codexUserID(w, r); !ok {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	files, err := db.DeletePage(id)
