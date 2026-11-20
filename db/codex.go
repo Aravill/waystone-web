@@ -52,7 +52,9 @@ func (e *NameTakenError) Error() string {
 
 func GetCodices() ([]models.Codex, error)       { return GetStore().GetCodices() }
 func GetCodex(id string) (*models.Codex, error) { return GetStore().GetCodex(id) }
-func CreateCodex(w models.Codex, creatorGetsEdit bool) error          { return GetStore().CreateCodex(w, creatorGetsEdit) }
+func CreateCodex(w models.Codex, creatorGetsEdit bool) error {
+	return GetStore().CreateCodex(w, creatorGetsEdit)
+}
 func UpdateCodex(id, name, description string) error {
 	return GetStore().UpdateCodex(id, name, description)
 }
