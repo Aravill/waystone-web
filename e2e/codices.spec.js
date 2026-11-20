@@ -87,7 +87,9 @@ test.describe('Codices access rights', () => {
     await expect(moduleRow).toBeVisible();
     await gridRow.locator('select').first().selectOption('edit');
     await expect(page.getByRole('status')).toHaveText('Saved');
+    const saved = page.waitForResponse((r) => r.url().includes('/api/admin/access/users/') && r.request().method() === 'PUT');
     await moduleRow.getByRole('checkbox').first().check();
+    expect((await saved).ok()).toBeTruthy();
 
     await page.reload();
     await expect(gridRow.locator('select').first()).toHaveValue('edit');

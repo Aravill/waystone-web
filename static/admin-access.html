@@ -20,9 +20,10 @@
         tbody tr { border-bottom: 1px solid var(--line); }
         tbody tr:hover { background: var(--folio); }
         .access-user { white-space: nowrap; }
+        @media (max-width: 480px) { .access-user { white-space: normal; } }
         .access-note { color: var(--muted); font-size: 0.8125rem; }
-        .access-check { text-align: center; width: 7rem; }
-        .access-check input { margin: 0; width: 1.125rem; height: 1.125rem; }
+        .access-check { text-align: center; width: 5rem; }
+        .access-check input { margin: 0; width: 1.125rem; height: 1.125rem; accent-color: var(--ink); }
         .access-grid td select { width: auto; min-width: 5.5rem; }
         .admin-empty { padding: 1.25rem 0.5rem; color: var(--muted); text-align: center; }
     </style>

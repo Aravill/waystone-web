@@ -137,7 +137,7 @@
                                 <p class="same" x-show="codex.wanted.length === 0">Every link in this codex leads somewhere.</p>
                                 <ul class="page-list">
                                     <template x-for="w in codex.wanted" :key="w.text">
-                                        <li><button type="button" class="wikilink wikilink--missing" :title="codex.can_edit ? 'No page yet. Click to create.' : 'No page yet.'" @click="codex.can_edit && openCreatePage(w.text)" x-text="w.text"></button><span class="muted" x-text="' · wanted ' + w.count + (w.count === 1 ? ' time' : ' times')"></span></li>
+                                        <li><button type="button" class="wikilink wikilink--missing" :title="codex.can_edit ? 'No page yet. Click to create.' : 'No page yet.'" @click="openCreatePage(w.text)" x-text="w.text"></button><span class="muted" x-text="' · wanted ' + w.count + (w.count === 1 ? ' time' : ' times')"></span></li>
                                     </template>
                                 </ul>
                             </div>
@@ -465,9 +465,9 @@
     </div>
 
     <script src="/static/notifications.js?v=11"></script>
-    <script src="/campaigns.js?v=62"></script>
+    <script src="/campaigns.js?v=63"></script>
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=2"></script>
-    <script src="/static/codex.js?v=10"></script>
+    <script src="/static/codex.js?v=11"></script>
 </body>
 </html>

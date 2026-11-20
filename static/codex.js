@@ -21,7 +21,7 @@ function codexPageUrl(p, tail = '') {
 // missing page; with no lookup (old revisions) links are shown plain. The links are swapped for
 // placeholders before rendering so the Markdown renderer never sees them. A placeholder holds
 // spaces, which a Markdown link URL can't, so one inside "(...)" is never swallowed into an href.
-function codexMarkdown(body, lookup) {
+function codexMarkdown(body, lookup, canCreate = true) {
     const found = [];
     const text = String(body || '').replace(/\u0001/g, '').replace(CODEX_LINK_RE, (m, t, label) => {
         found.push({ text: t.trim(), label });
@@ -34,7 +34,7 @@ function codexMarkdown(body, lookup) {
         if (!lookup) return `<span class="wikilink wikilink--plain">${shown}</span>`;
         const target = lookup(l.text);
         if (target) return `<a class="wikilink" href="${codexPageUrl(target)}">${shown}</a>`;
-        return `<a class="wikilink wikilink--missing" href="#" data-text="${escapeHtml(l.text)}" title="No page yet. Click to create.">${shown}</a>`;
+        return `<a class="wikilink wikilink--missing" href="#" data-text="${escapeHtml(l.text)}" title="No page yet.${canCreate ? ' Click to create.' : ''}">${shown}</a>`;
     });
 }
 
@@ -512,7 +512,7 @@ window.codexPage = function () {
             return (text) => map.get(codexNorm(text)) || null;
         },
         get bodyHtml() {
-            return this.page ? codexMarkdown(this.page.body, this.linkLookup) : '';
+            return this.page ? codexMarkdown(this.page.body, this.linkLookup, this.canEdit) : '';
         },
         // Pages that link here by [[link]]; map pins are not shown.
         get linkedFrom() {
@@ -731,7 +731,7 @@ window.codexPage = function () {
         async openMove() {
             await this.ensureCodices();
             if (!this.codexChoices.some((w) => w.id !== this.page.codex.id)) {
-                this.showMessage('Make another codex first.', 'error');
+                this.showMessage("There's no other codex you can move it to.", 'error');
                 return;
             }
             this.dlg = { type: 'move', codexId: this.codexChoices.find((w) => w.id !== this.page.codex.id)?.id || '', error: '', busy: false };
