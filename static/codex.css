@@ -1,5 +1,5 @@
-/* Codex. The page also carries .journal-page, which supplies the title block, split layout,
-   editor panes, history and diff styles (see styles.css). Tokens only, square corners. */
+/* Codices. The page also carries .journal-page, which supplies the editor panes, history and diff styles
+   (see styles.css). Tokens only, square corners. The layout (.cx-*) is at the end. */
 
 .codex-page .muted {
     color: var(--muted);
@@ -105,24 +105,6 @@ button.wikilink {
     font-size: 0.8125rem;
 }
 
-/* Page header */
-.codex-chip {
-    display: inline-block;
-    margin-right: 0.75rem;
-    padding: 0.125rem 0.625rem;
-    border: 1px solid var(--ctl);
-    color: var(--ink);
-    text-decoration: none;
-}
-
-.codex-chip:hover {
-    background: var(--folio);
-}
-
-.codex-page .byline .text-link {
-    min-height: 0;
-}
-
 /* Editor */
 .cm-host {
     min-width: 0;
@@ -222,19 +204,6 @@ button.wikilink {
 .codex-page .conflict .form-foot {
     align-items: center;
     flex-wrap: wrap;
-}
-
-@media (max-width: 900px) {
-    .codex-page .split {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .codex-page .split-side {
-        padding-left: 0;
-        border-left: none;
-        padding-top: 1.5rem;
-        border-top: 1px solid var(--ink);
-    }
 }
 
 /* Maps */
@@ -519,71 +488,849 @@ button.wikilink {
     }
 }
 
-/* Page view: contents rail, plain article text, summary box. */
-.codex-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 18.75rem;
-    gap: 1.75rem;
-    padding-top: 1.75rem;
-    align-items: start;
+/* Breadcrumb: middle folders collapse to an ellipsis on narrow screens. */
+.crumb-ellipsis {
+    display: none;
 }
 
-.codex-grid--rail {
-    grid-template-columns: 12.5rem minmax(0, 1fr) 18.75rem;
+@media (max-width: 600px) {
+    .crumb-mid {
+        display: none;
+    }
+
+    .crumb-ellipsis {
+        display: inline;
+    }
 }
 
-.codex-grid > * {
+.map-layout + p {
+    margin-top: 1.25rem;
+}
+
+/* ---------- Codices layout ("vault"): top bar, folder tree, page tabs, article, side panel ---------- */
+[x-cloak] {
+    display: none !important;
+}
+
+/* The top bar is the one dark band on the page, in both themes (the guide's ink on parchment, a deeper brown on candlelight). */
+.codex-page {
+    --cx-bar: #2B241C;
+    --cx-bar-text: #F2EAD8;
+    --cx-bar-accent: #D9735C;
+    --cx-bar-line: rgba(242, 234, 216, 0.22);
+    --cx-bar-fill: #3A3128;
+    --cx-soft: color-mix(in srgb, var(--ink) 16%, transparent);
+    --cx-hover: color-mix(in srgb, var(--ink) 9%, transparent);
+    --cx-top-h: 3.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .codex-page {
+        --cx-bar: #0C0A07;
+        --cx-bar-text: #E8DCC4;
+        --cx-bar-line: rgba(232, 220, 196, 0.2);
+        --cx-bar-fill: #2A231B;
+    }
+}
+
+:root[data-theme="dark"] .codex-page {
+    --cx-bar: #0C0A07;
+    --cx-bar-text: #E8DCC4;
+    --cx-bar-line: rgba(232, 220, 196, 0.2);
+    --cx-bar-fill: #2A231B;
+}
+
+/* Top bar */
+.cx-top {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: var(--cx-top-h);
+    margin-top: 1rem;
+    padding: 0.5rem 1rem;
+    background: var(--cx-bar);
+    color: var(--cx-bar-text);
+    border-bottom: 2px solid var(--cx-bar-accent);
+}
+
+.cx-top :focus-visible {
+    outline-color: var(--cx-bar-accent);
+}
+
+.cx-brand {
+    color: var(--cx-bar-text);
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    letter-spacing: 0.06em;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.cx-icon {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    background: none;
+    border: 1px solid transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.cx-icon:hover {
+    background: var(--cx-bar-fill);
+}
+
+.cx-icon svg,
+.cx-search svg,
+.cx-act svg {
+    width: 1.125rem;
+    height: 1.125rem;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.cx-menu-btn {
+    display: none;
+}
+
+.cx-pick {
+    position: relative;
     min-width: 0;
 }
 
-.codex-rail {
-    position: sticky;
-    top: 1rem;
-    max-height: calc(100vh - 2rem);
+.cx-pick-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 18rem;
+    min-height: 2.5rem;
+    padding: 0 0.75rem;
+    background: none;
+    border: 1px solid var(--cx-bar-line);
+    color: inherit;
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.cx-pick-btn span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cx-pick-btn::after {
+    content: '▾';
+    flex: none;
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+.cx-pick-btn:hover {
+    background: var(--cx-bar-fill);
+}
+
+.cx-pick-menu,
+.cx-results {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 0.25rem);
+    max-height: 60vh;
     overflow-y: auto;
-    font-size: 0.9rem;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--ink);
+    outline: 1px solid var(--ink);
+    outline-offset: 2px;
+    font-size: 0.875rem;
 }
 
-.codex-rail-title {
-    margin: 0 0 0.375rem;
-    padding-bottom: 0.375rem;
-    border-bottom: 1px solid var(--ink);
-    font-family: var(--font-display);
-    font-size: 1.1875rem;
-    font-weight: 400;
-    line-height: 1.2;
+.cx-pick-menu {
+    left: 0;
+    min-width: 15rem;
+    max-width: calc(100vw - 2rem);
 }
 
-.codex-rail ul,
-.codex-linked ul {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
-.codex-rail a {
+.cx-pick-menu a,
+.cx-results a {
     display: block;
-    padding: 0.3125rem 0 0.3125rem 0.625rem;
-    border-left: 2px solid transparent;
+    padding: 0.625rem 0.875rem;
+    border-bottom: 1px solid var(--cx-soft);
     color: var(--ink);
     text-decoration: none;
     overflow-wrap: anywhere;
 }
 
-.codex-rail a.sub {
-    padding-left: 1.5rem;
+.cx-pick-menu a:last-of-type,
+.cx-results a:last-of-type {
+    border-bottom: none;
 }
 
-.codex-rail a:hover {
+.cx-pick-menu a:hover,
+.cx-pick-menu a:focus-visible,
+.cx-results a:hover,
+.cx-results a.on {
     background: var(--folio);
 }
 
-.codex-rail a.on {
-    border-left-color: var(--ink);
+.cx-pick-menu a[aria-current] {
+    font-weight: 600;
+    box-shadow: inset 3px 0 0 var(--rubric);
+}
+
+.cx-pick-note {
+    margin: 0;
+    padding: 0.625rem 0.875rem;
+    color: var(--muted);
+}
+
+.cx-search {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 30rem;
+    margin-left: auto;
+}
+
+.cx-search svg {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    width: 1rem;
+    height: 1rem;
+    transform: translateY(-50%);
+    stroke-width: 2;
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.cx-search input[type="search"] {
+    width: 100%;
+    max-width: none;
+    height: 2.5rem;
+    padding: 0 2.5rem 0 2.5rem;
+    background: var(--cx-bar-fill);
+    color: var(--cx-bar-text);
+    border: 1px solid var(--cx-bar-line);
+    font: inherit;
+    font-size: 0.875rem;
+}
+
+.cx-search input::-webkit-search-cancel-button {
+    display: none;
+}
+
+.cx-search input::placeholder {
+    color: var(--cx-bar-text);
+    opacity: 0.6;
+}
+
+.cx-search kbd {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0 0.375rem;
+    border: 1px solid var(--cx-bar-line);
+    font: inherit;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.cx-results {
+    left: 0;
+    right: 0;
+}
+
+.cx-results a {
+    display: grid;
+    gap: 0.125rem;
+}
+
+.cx-results-meta {
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+/* Shell: left nav, main column, right rail */
+.cx-shell {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 17rem minmax(0, 1fr) 17.5rem;
+    grid-template-areas: "nav main rail";
+    width: 100%;
+    min-width: 0;
+}
+
+.cx-shell--home {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "main";
+}
+
+.cx-shell--edit,
+.cx-shell--history {
+    grid-template-columns: 17rem minmax(0, 1fr);
+    grid-template-areas: "nav main";
+}
+
+.cx-scrim {
+    display: none;
+}
+
+.cx-nav {
+    grid-area: nav;
+    min-width: 0;
+    background: var(--folio);
+    border-right: 1px solid var(--line);
+}
+
+.cx-nav-in,
+.cx-rail-in {
+    position: sticky;
+    top: var(--cx-top-h);
+    max-height: calc(100vh - var(--cx-top-h));
+    overflow-y: auto;
+    font-size: 0.875rem;
+}
+
+.cx-nav-in {
+    padding: 1rem 0.75rem 2.5rem 1rem;
+}
+
+.cx-drawer-head {
+    display: none;
+}
+
+.cx-new {
+    display: block;
+    width: 100%;
+    min-height: 2.5rem;
+    margin: 0 0 1rem;
+    padding: 0 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--ctl);
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cx-new:hover {
+    background: var(--cx-hover);
+}
+
+.cx-nav-title {
+    margin: 0 0 0.25rem;
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.cx-nav-empty {
+    margin: 0;
+    color: var(--muted);
+}
+
+.cx-nav-foot {
+    margin: 0.5rem 0 0;
+}
+
+.cx-nav-foot .text-link {
+    min-height: 2rem;
+    font-size: 0.875rem;
+}
+
+.cx-nav-group {
+    margin-top: 1.5rem;
+}
+
+.cx-nav-group a {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.3125rem 0.5rem;
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.cx-nav-group a:hover {
+    background: var(--cx-hover);
+}
+
+.cx-nav-group a[aria-current] {
+    background: var(--bg);
+    box-shadow: inset 3px 0 0 var(--rubric);
+}
+
+.cx-count {
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+/* Folder tree (native <details>; open state is kept per codex in localStorage). Each level indents
+   a little, and the indent stops after four levels so a deep tree stays readable. */
+.cx-nav .codex-tree {
+    margin: 0;
+}
+
+.codex-folder {
+    scroll-margin-top: 5rem;
+}
+
+.cx-nav .codex-folder > summary {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    box-sizing: border-box;
+    min-height: 2rem;
+    padding: 0.25rem 2.25rem 0.25rem 0.375rem;
+    list-style: none;
+    font-weight: 600;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+
+.cx-nav .codex-folder > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cx-nav .codex-folder > summary::before {
+    content: '▸';
+    flex: none;
+    width: 0.75rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.cx-nav .codex-folder[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.cx-nav .codex-folder > summary:hover {
+    background: var(--cx-hover);
+}
+
+.codex-folder-name {
+    min-width: 0;
+}
+
+.codex-folder-count {
+    margin-left: auto;
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.cx-nav .codex-folder-body {
+    margin-left: 0.5rem;
+    padding-left: 0.5rem;
+    border-left: 1px solid var(--cx-soft);
+}
+
+.cx-nav .codex-folder--deep > .codex-folder-body {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
+}
+
+.cx-nav .page-list {
+    gap: 0;
+    margin: 0;
+}
+
+.cx-nav .page-list a {
+    display: block;
+    padding: 0.25rem 0.5rem 0.25rem 1.375rem;
+    color: var(--ink);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+.cx-nav .page-list a:hover {
+    background: var(--cx-hover);
+}
+
+.cx-nav .page-list a[aria-current] {
+    background: var(--bg);
+    box-shadow: inset 3px 0 0 var(--rubric);
     font-weight: 600;
 }
 
-/* Article text, shared by the page view, the map's About text and the editor preview */
+.cx-nav .page-list .muted {
+    display: none;
+}
+
+.codex-folder--target > summary,
+.cx-group-name.codex-folder--target {
+    background: var(--folio);
+    outline: 2px solid var(--ink);
+    outline-offset: -2px;
+    padding-left: 0.5rem;
+}
+
+.codex-menu-btn {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    width: 2rem;
+    height: 2rem;
+    transform: translateY(-50%);
+    background: none;
+    border: 1px solid transparent;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 1.125rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.codex-menu-btn:hover,
+.codex-menu-btn[aria-expanded="true"] {
+    background: var(--bg);
+    border-color: var(--ctl);
+}
+
+.codex-tree-wrap {
+    position: relative;
+}
+
+.codex-menu {
+    position: absolute;
+    z-index: 5;
+    display: grid;
+    min-width: 11rem;
+    max-width: calc(100vw - 2rem);
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    outline: 1px solid var(--ink);
+    outline-offset: 2px;
+}
+
+.codex-menu-item {
+    min-height: 2.5rem;
+    padding: 0 0.875rem;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.codex-menu-item:last-child {
+    border-bottom: none;
+}
+
+.codex-menu-item:hover,
+.codex-menu-item:focus-visible {
+    background: var(--folio);
+}
+
+.codex-menu-item--danger {
+    color: var(--rubric);
+}
+
+/* Main column */
+.cx-main {
+    grid-area: main;
+    min-width: 0;
+}
+
+.cx-tabs {
+    display: flex;
+    align-items: flex-end;
+    min-height: 2.5rem;
+    padding: 0 0.5rem;
+    background: var(--folio);
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+    font-size: 0.8125rem;
+}
+
+.cx-tab {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    max-width: 15rem;
+    height: 2.125rem;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.cx-tab a {
+    min-width: 0;
+    padding: 0 0.25rem 0 0.875rem;
+    overflow: hidden;
+    color: inherit;
+    text-overflow: ellipsis;
+    text-decoration: none;
+}
+
+.cx-tab a:hover {
+    color: var(--ink);
+}
+
+.cx-tab-x {
+    flex: none;
+    width: 1.75rem;
+    height: 100%;
+    background: none;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    font-size: 1rem;
+    opacity: 0.6;
+    cursor: pointer;
+}
+
+.cx-tab-x:hover {
+    color: var(--rubric);
+    opacity: 1;
+}
+
+.cx-tab.on {
+    margin-bottom: -1px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-bottom-color: var(--bg);
+    box-shadow: inset 0 2px 0 var(--rubric);
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.cx-inner {
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 1.25rem 2rem 4rem;
+}
+
+.cx-shell--home .cx-inner {
+    max-width: 64rem;
+}
+
+.cx-shell--edit .cx-inner,
+.cx-shell--history .cx-inner {
+    max-width: 68rem;
+}
+
+.cx-crumb {
+    margin: 0 0 0.5rem;
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+.cx-crumb a {
+    color: var(--muted);
+}
+
+.cx-crumb a:hover {
+    color: var(--rubric);
+}
+
+.cx-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--rubric);
+}
+
+.cx-head-text {
+    flex: 1 1 14rem;
+    min-width: 0;
+}
+
+.cx-title {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: clamp(1.9rem, 1.4rem + 2vw, 2.75rem);
+    font-weight: 400;
+    line-height: 1.1;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+}
+
+.cx-title:focus {
+    outline: none;
+}
+
+.cx-sub {
+    margin: 0.5rem 0 1.25rem;
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.cx-actions {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.cx-spacer {
+    flex: 0 0 0.5rem;
+}
+
+.cx-act {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.25rem;
+    padding: 0 0.75rem;
+    background: var(--folio);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.875rem;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.cx-act:hover {
+    background: var(--cx-hover);
+}
+
+.cx-act[aria-current="page"] {
+    border-color: var(--ink);
+}
+
+.cx-act--primary {
+    background: var(--rubric);
+    border-color: var(--rubric);
+    color: var(--bg);
+    font-weight: 600;
+}
+
+.cx-act--primary:hover {
+    background: var(--rubric);
+    filter: brightness(1.1);
+}
+
+.cx-act--primary[aria-current="page"] {
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--ink);
+}
+
+.cx-act--danger {
+    color: var(--rubric);
+}
+
+.cx-more {
+    position: relative;
+}
+
+.cx-more-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.25rem);
+    z-index: 20;
+    min-width: 13.5rem;
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    outline: 1px solid var(--ink);
+    outline-offset: 2px;
+}
+
+.cx-more-menu button {
+    display: block;
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0 0.875rem;
+    background: none;
+    border: 0;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cx-more-menu button:hover,
+.cx-more-menu button:focus-visible {
+    background: var(--folio);
+}
+
+.cx-more-menu hr {
+    margin: 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+}
+
+.cx-more-menu .cx-danger {
+    color: var(--rubric);
+}
+
+/* Properties */
+.cx-props {
+    margin: 0 0 1.5rem;
+    padding-bottom: 0.625rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.cx-props-label {
+    margin: 0 0 0.25rem;
+    color: var(--muted);
+    font-family: var(--font-display);
+    font-size: 0.9375rem;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.cx-props dl {
+    margin: 0;
+}
+
+.cx-prop {
+    display: grid;
+    grid-template-columns: 9rem minmax(0, 1fr);
+    gap: 0.5rem 1rem;
+    padding: 0.1875rem 0;
+    font-size: 0.875rem;
+}
+
+.cx-prop dt {
+    color: var(--muted);
+}
+
+.cx-prop dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.cx-prop .text-link {
+    min-height: 0;
+    font-size: inherit;
+}
+
+.cx-chip {
+    display: inline-block;
+    margin: 0 0.25rem 0.125rem 0;
+    padding: 0 0.5rem;
+    border: 1px solid var(--line);
+    background: var(--folio);
+}
+
+/* Article text: the page, the codex description and the editor preview */
 .codex-page .codex-text {
     max-width: none;
 }
@@ -605,19 +1352,20 @@ button.wikilink {
     font-family: var(--font-display);
     font-weight: 400;
     line-height: 1.2;
-    scroll-margin-top: 1rem;
+    scroll-margin-top: 5rem;
 }
 
 .codex-page .codex-text h3 {
     margin: 2rem 0 0.75rem;
-    padding-bottom: 0.25rem;
-    border-bottom: 1px solid var(--line);
-    font-size: 1.8rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--folio);
+    border-left: 4px solid var(--rubric);
+    font-size: 1.5rem;
 }
 
 .codex-page .codex-text h4 {
     margin: 1.25rem 0 0.5rem;
-    font-size: 1.3rem;
+    font-size: 1.25rem;
 }
 
 .codex-page .codex-text > :first-child {
@@ -627,199 +1375,23 @@ button.wikilink {
 .codex-page .codex-text blockquote {
     max-width: 62ch;
     margin: 0.25rem 0 1rem;
-    padding: 0.25rem 0 0.25rem 1.125rem;
-    border-left: 3px double var(--ink);
+    padding: 0.5rem 1rem;
+    background: var(--folio);
+    border-left: 4px solid var(--rubric);
     color: var(--ink);
     font-style: italic;
 }
 
-.codex-edited {
-    margin: 1.5rem 0 0;
-    color: var(--muted);
-    font-size: 0.875rem;
+.cx-article--desc {
+    margin-top: 1.25rem;
 }
 
-/* Side boxes */
-.codex-side {
-    display: grid;
-    gap: 1.25rem;
-}
-
-.codex-sum {
-    border: 1px solid var(--ink);
-    outline: 1px solid var(--ink);
-    outline-offset: 3px;
-    font-size: 0.9rem;
-}
-
-.codex-sum-title {
-    margin: 0;
-    padding: 0.625rem 0.875rem;
-    border-bottom: 3px double var(--ink);
-    font-family: var(--font-display);
-    font-size: 1.375rem;
-    line-height: 1.2;
-    text-align: center;
-    overflow-wrap: anywhere;
-}
-
-.codex-sum-map {
-    display: block;
-    border-bottom: 1px solid var(--line);
-    background: var(--folio);
-    line-height: 0;
-    text-align: center;
-}
-
-/* Shrink-wraps the whole image so the pin's percentages stay relative to what is visible. */
-.codex-sum-frame {
-    position: relative;
-    display: inline-block;
-    max-width: 100%;
-    vertical-align: top;
-}
-
-.codex-sum-map img {
-    display: block;
-    width: auto;
-    height: auto;
-    max-width: 100%;
-    max-height: 14rem;
-}
-
-.codex-sum-maps {
-    margin: 0;
-    padding: 0.375rem 0.875rem;
-    border-bottom: 1px solid var(--line);
-    list-style: none;
-    color: var(--muted);
-    font-size: 0.84rem;
-    text-align: center;
-}
-
-.codex-sum-pin {
-    position: absolute;
-    width: 22px;
-    height: 22px;
-    transform: translate(-50%, -50%);
-    box-sizing: border-box;
-    /* Same as the map's own pins (bg square, ink border): ink fill vanished on light map images in dark mode. */
-    background: var(--bg);
-    border: 2px solid var(--ink);
-    color: var(--ink);
-    font-size: 12px;
-    line-height: 18px;
-    text-align: center;
-}
-
-.codex-sum-cap {
-    margin: 0;
-    padding: 0.375rem 0.875rem;
-    border-bottom: 1px solid var(--line);
-    color: var(--muted);
-    font-size: 0.84rem;
-    text-align: center;
-}
-
-.codex-sum dl {
-    margin: 0;
-}
-
-.codex-sum-row {
-    display: grid;
-    grid-template-columns: 6rem minmax(0, 1fr);
-    gap: 0.625rem;
-    padding: 0.4375rem 0.875rem;
-    border-bottom: 1px solid var(--line);
-}
-
-.codex-sum-row:last-child {
-    border-bottom: none;
-}
-
-.codex-sum-row dt {
-    font-weight: 600;
-}
-
-.codex-sum-row dd {
-    margin: 0;
-    overflow-wrap: anywhere;
-}
-
-.codex-linked {
-    border: 1px solid var(--line);
-    background: var(--bg);
-}
-
-.codex-linked-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin: 0;
-    padding: 0.5rem 1rem;
-    border-bottom: 1px solid var(--line);
-    background: var(--folio);
-    font-family: var(--font-display);
-    font-size: 1.5rem;
-    font-weight: 400;
-    line-height: 1.25;
-}
-
-.codex-linked-head .muted {
-    font-family: var(--font-text);
-    font-size: 0.875rem;
-}
-
-.codex-linked-mark {
-    color: var(--rubric);
-}
-
-.codex-linked .same {
-    margin: 0;
-    padding: 0.5rem 1rem;
-}
-
-.codex-linked li {
-    display: grid;
-    grid-template-columns: 1.25rem minmax(0, 1fr);
-    gap: 0.375rem;
-    padding: 0.4375rem 1rem;
-    border-bottom: 1px solid var(--line);
-    font-size: 0.9rem;
-    overflow-wrap: anywhere;
-}
-
-.codex-linked li:last-child {
-    border-bottom: none;
-}
-
-.codex-glyph {
-    color: var(--muted);
-    text-align: center;
-}
-
-/* Contents box: the rail's stand-in where the rail is hidden. */
+/* The in-article Contents box stands in for the side panel's Outline where the panel is stacked below. */
 .codex-contents {
     display: none;
     margin-bottom: 1rem;
     border: 1px solid var(--ctl);
-    font-size: 0.9rem;
-}
-
-@media (max-width: 1100px) {
-    .codex-grid,
-    .codex-grid--rail {
-        grid-template-columns: minmax(0, 1fr) 17.5rem;
-    }
-
-    .codex-rail {
-        display: none;
-    }
-
-    .codex-contents {
-        display: block;
-    }
+    font-size: 0.875rem;
 }
 
 .codex-contents > summary {
@@ -854,7 +1426,361 @@ button.wikilink {
     background: var(--folio);
 }
 
-@media (max-width: 820px) {
+/* Codex screen: pages grouped by folder */
+.cx-group {
+    margin-top: 1.25rem;
+}
+
+.cx-group-name {
+    margin: 0;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 400;
+    scroll-margin-top: 5rem;
+}
+
+/* Right rail */
+.cx-rail {
+    grid-area: rail;
+    min-width: 0;
+    background: var(--bg);
+    border-left: 1px solid var(--line);
+}
+
+.cx-rail-in {
+    padding: 1rem;
+}
+
+.cx-box {
+    margin: 0 0 1.25rem;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    scroll-margin-top: 4.5rem;
+}
+
+.cx-box > h2 {
+    margin: 0;
+    padding: 0.375rem 0.75rem;
+    background: var(--cx-bar);
+    color: var(--cx-bar-text);
+    border-bottom: 2px solid var(--cx-bar-accent);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    line-height: 1.4;
+}
+
+.cx-box ul {
+    margin: 0;
+    padding: 0.375rem 0.75rem 0.625rem;
+    list-style: none;
+}
+
+.cx-box li {
+    padding: 0.3125rem 0;
+    overflow-wrap: anywhere;
+}
+
+.cx-box li + li {
+    border-top: 1px solid var(--cx-soft);
+}
+
+.cx-box small {
+    display: block;
+    font-size: 0.8125rem;
+}
+
+.cx-box ul.recent {
+    display: block;
+    margin: 0;
+}
+
+.cx-box-empty {
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    color: var(--muted);
+}
+
+.cx-outline li + li {
+    border-top: 0;
+}
+
+.cx-outline li {
+    padding: 0;
+}
+
+.cx-outline a {
+    display: block;
+    padding: 0.1875rem 0 0.1875rem 0.625rem;
+    border-left: 2px solid var(--cx-soft);
+    color: var(--muted);
+    text-decoration: none;
+}
+
+.cx-outline a.sub {
+    padding-left: 1.375rem;
+}
+
+.cx-outline a:hover {
+    color: var(--ink);
+}
+
+.cx-outline a.on {
+    border-left-color: var(--rubric);
+    color: var(--rubric);
+}
+
+/* Link preview card */
+.cx-peek {
+    position: fixed;
+    z-index: 50;
+    width: min(18.75rem, calc(100vw - 1rem));
+    padding: 0.75rem 0.875rem;
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    box-shadow: 0 10px 30px var(--shadow);
+    color: var(--ink);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    pointer-events: none;
+}
+
+.cx-peek strong {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 400;
+    line-height: 1.2;
+}
+
+.cx-peek p {
+    margin: 0;
+}
+
+.cx-peek .cx-peek-where {
+    margin-bottom: 0.375rem;
+    color: var(--muted);
+    font-size: 0.75rem;
+}
+
+/* Medium widths: the side panel stacks under the article */
+@media (max-width: 1180px) {
+    .cx-shell--page,
+    .cx-shell--codex {
+        grid-template-columns: 15.5rem minmax(0, 1fr);
+        grid-template-areas: "nav main" "nav rail";
+    }
+
+    .cx-shell--edit,
+    .cx-shell--history {
+        grid-template-columns: 15.5rem minmax(0, 1fr);
+    }
+
+    .cx-rail {
+        border-left: 0;
+        border-top: 1px solid var(--line);
+    }
+
+    .cx-rail-in {
+        position: static;
+        max-height: none;
+        max-width: 52rem;
+        margin: 0 auto;
+        padding: 1.25rem 2rem 3rem;
+    }
+
+    .cx-box--outline {
+        display: none !important;
+    }
+
+    .codex-contents {
+        display: block;
+    }
+
+    .cx-shell .history {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cx-shell .detail {
+        padding: 1.5rem 0 0;
+        border-left: 0;
+        border-top: 1px solid var(--ink);
+    }
+}
+
+/* Phones: one column; the folder tree is a drawer opened from the top bar */
+@media (max-width: 900px) {
+    .cx-top {
+        gap: 0.5rem;
+        padding: 0.5rem;
+    }
+
+    .cx-menu-btn {
+        display: inline-grid;
+    }
+
+    .cx-brand,
+    .cx-search kbd {
+        display: none;
+    }
+
+    .cx-pick-btn {
+        max-width: 42vw;
+    }
+
+    .cx-shell,
+    .cx-shell--home,
+    .cx-shell--page,
+    .cx-shell--codex,
+    .cx-shell--edit,
+    .cx-shell--history {
+        display: block;
+    }
+
+    .cx-nav {
+        position: fixed;
+        z-index: 40;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: min(86vw, 20rem);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        background: var(--bg);
+        transform: translateX(-102%);
+        visibility: hidden;
+    }
+
+    .cx-shell.nav-anim .cx-nav {
+        transition: transform 0.2s ease, visibility 0s linear 0.2s;
+    }
+
+    .cx-shell.nav-open .cx-nav {
+        transform: none;
+        visibility: visible;
+        box-shadow: 8px 0 30px var(--shadow);
+        transition: transform 0.2s ease, visibility 0s;
+    }
+
+    .cx-shell.nav-open .cx-scrim {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 35;
+        background: var(--backdrop);
+    }
+
+    .cx-nav-in {
+        position: static;
+        max-height: none;
+        padding-top: 0.5rem;
+    }
+
+    .cx-drawer-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin: 0 -0.25rem 0.75rem 0;
+        color: var(--ink);
+    }
+
+    .cx-drawer-head .cx-icon:hover {
+        background: var(--cx-hover);
+    }
+
+    .cx-drawer-name {
+        min-width: 0;
+        font-family: var(--font-display);
+        font-size: 1.25rem;
+        overflow-wrap: anywhere;
+    }
+
+    .cx-new,
+    .cx-nav-group a,
+    .cx-nav .page-list a {
+        min-height: 2.75rem;
+        padding-top: 0.625rem;
+        padding-bottom: 0.625rem;
+    }
+
+    .cx-nav .page-list a {
+        display: flex;
+        align-items: center;
+    }
+
+    .cx-nav .codex-folder > summary {
+        min-height: 2.75rem;
+    }
+
+    .codex-menu-btn {
+        width: 2.75rem;
+        height: 2.75rem;
+    }
+
+    .codex-menu-item {
+        min-height: 2.75rem;
+    }
+
+    .cx-nav-foot .text-link {
+        min-height: 2.75rem;
+    }
+
+    .cx-tab {
+        height: 2.375rem;
+    }
+
+    .cx-tabs {
+        min-height: 2.75rem;
+    }
+
+    .cx-tab-x {
+        width: 2.25rem;
+    }
+
+    .cx-inner {
+        padding: 1rem 1rem 3rem;
+    }
+
+    .cx-actions {
+        width: 100%;
+    }
+
+    .cx-act {
+        min-height: 2.75rem;
+    }
+
+    .cx-act-long {
+        display: none;
+    }
+
+    .cx-prop {
+        grid-template-columns: 6.5rem minmax(0, 1fr);
+        gap: 0.5rem;
+    }
+
+    .cx-prop .text-link {
+        min-height: 2.75rem;
+    }
+
+    .cx-rail-in {
+        padding: 1rem 1rem 3rem;
+    }
+
+    .cx-more-menu button {
+        min-height: 2.75rem;
+    }
+
+    .cx-pick-menu a,
+    .cx-results a {
+        padding-block: 0.75rem;
+    }
+
     .codex-contents > summary {
         min-height: 2.75rem;
     }
@@ -864,172 +1790,8 @@ button.wikilink {
     }
 }
 
-@media (max-width: 820px) {
-    .codex-grid,
-    .codex-grid--rail {
-        grid-template-columns: minmax(0, 1fr);
+@media (prefers-reduced-motion: reduce) {
+    .cx-shell.nav-anim .cx-nav {
+        transition: none;
     }
-}
-
-/* Folder tree on the codex page. Native <details>; each level indents 1rem, but the indent stops
-   after four levels so a deep tree stays readable on a phone. */
-.codex-tree-bar {
-    margin: 0.5rem 0 0;
-}
-
-.codex-tree {
-    margin-top: 0.5rem;
-}
-
-.codex-folder {
-    margin-top: 0.375rem;
-    scroll-margin-top: 1rem;
-}
-
-.codex-folder > summary {
-    position: relative;
-    box-sizing: border-box;
-    min-height: 2.5rem;
-    padding: 0.5rem 2.75rem 0.5rem 0;
-    cursor: pointer;
-    overflow-wrap: anywhere;
-}
-
-.codex-folder > summary:hover .codex-folder-name {
-    text-decoration: underline;
-    text-underline-offset: 0.2rem;
-}
-
-.codex-folder-name {
-    font-weight: 600;
-}
-
-.codex-folder--target > summary {
-    background: var(--folio);
-    outline: 2px solid var(--ink);
-    outline-offset: -2px;
-    padding-left: 0.5rem;
-}
-
-.codex-folder-body {
-    margin-left: 0.25rem;
-    padding-left: 0.75rem;
-    border-left: 1px solid var(--line);
-}
-
-.codex-folder--deep > .codex-folder-body {
-    margin-left: 0;
-    padding-left: 0;
-    border-left: none;
-}
-
-.codex-menu-btn {
-    position: absolute;
-    top: 50%;
-    right: 0;
-    width: 2.5rem;
-    height: 2.5rem;
-    transform: translateY(-50%);
-    background: none;
-    border: 1px solid transparent;
-    color: var(--ink);
-    font-family: inherit;
-    font-size: 1.25rem;
-    line-height: 1;
-    cursor: pointer;
-}
-
-.codex-menu-btn:hover,
-.codex-menu-btn[aria-expanded="true"] {
-    background: var(--folio);
-    border-color: var(--ctl);
-}
-
-.codex-tree-wrap {
-    position: relative;
-}
-
-.codex-menu {
-    position: absolute;
-    z-index: 5;
-    display: grid;
-    min-width: 11rem;
-    max-width: calc(100vw - 2rem);
-    background: var(--bg);
-    border: 1px solid var(--ink);
-    outline: 1px solid var(--ink);
-    outline-offset: 2px;
-}
-
-.codex-menu-item {
-    min-height: 2.5rem;
-    padding: 0 0.875rem;
-    background: none;
-    border: none;
-    border-bottom: 1px solid var(--line);
-    color: var(--ink);
-    font-family: inherit;
-    font-size: 0.9rem;
-    text-align: left;
-    cursor: pointer;
-}
-
-.codex-menu-item:last-child {
-    border-bottom: none;
-}
-
-.codex-menu-item:hover,
-.codex-menu-item:focus-visible {
-    background: var(--folio);
-}
-
-.codex-menu-item--danger {
-    color: var(--rubric);
-}
-
-@media (max-width: 820px) {
-    .codex-folder > summary {
-        min-height: 2.75rem;
-    }
-
-    .codex-menu-btn {
-        width: 2.75rem;
-        height: 2.75rem;
-    }
-
-    .codex-menu-item,
-    .codex-sum-row .text-link,
-    .codex-tree-bar .text-link {
-        min-height: 2.75rem;
-    }
-}
-
-.codex-tree-label {
-    margin: 1rem 0 0;
-    font-size: 0.84rem;
-}
-
-.codex-tree > .page-list,
-.codex-folder-body > .page-list {
-    margin-top: 0.25rem;
-    margin-bottom: 0.25rem;
-}
-
-/* Breadcrumb: middle folders collapse to an ellipsis on narrow screens. */
-.crumb-ellipsis {
-    display: none;
-}
-
-@media (max-width: 600px) {
-    .crumb-mid {
-        display: none;
-    }
-
-    .crumb-ellipsis {
-        display: inline;
-    }
-}
-
-.map-layout + p {
-    margin-top: 1.25rem;
 }

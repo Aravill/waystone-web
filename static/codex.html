@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=74">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=13">
+    <link rel="stylesheet" href="/static/codex.css?v=14">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -34,156 +34,233 @@
         </div>
     </div>
 
-    <div class="container">
-        <main>
-            <nav class="game-crumb" aria-label="Breadcrumb">
-                <a href="/codices">Codices</a>
-                <template x-for="(c, i) in crumbs" :key="i">
-                    <span :class="{ 'crumb-mid': c.mid, 'crumb-ellipsis': c.ellipsis }"><span aria-hidden="true"> › </span><a x-show="c.href" :href="c.href" x-text="c.label"></a><span x-show="!c.href && c.ellipsis" aria-hidden="true" x-text="c.label"></span><span x-show="!c.href && !c.ellipsis" :aria-current="i === crumbs.length - 1 ? 'page' : null" x-text="c.label"></span></span>
+    <!-- Codices top bar: codex picker and search (the site header above stays as on every page) -->
+    <div class="cx-top">
+        <button type="button" class="cx-icon cx-menu-btn" x-show="screen !== 'home'" x-cloak aria-label="Open the page list" aria-controls="cxNav" :aria-expanded="navOpen ? 'true' : 'false'" @click="toggleNav()">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <a class="cx-brand" href="/codices">Codices</a>
+        <div class="cx-pick" @click.outside="pickOpen = false" @keydown.escape="pickOpen = false">
+            <button type="button" class="cx-pick-btn" title="Switch codex" aria-haspopup="true" :aria-expanded="pickOpen ? 'true' : 'false'" @click="togglePick()"><span x-text="pickLabel"></span></button>
+            <div class="cx-pick-menu" x-show="pickOpen" x-cloak>
+                <a href="/codices" :aria-current="screen === 'home' ? 'page' : null">All codices</a>
+                <template x-for="c in (allCodices || [])" :key="c.id">
+                    <a :href="'/codices/c/' + encodeURIComponent(c.id)" :aria-current="c.id === currentCodexId ? 'page' : null" x-text="c.name"></a>
+                </template>
+                <p class="cx-pick-note" x-show="allCodices === null">Loading...</p>
+            </div>
+        </div>
+        <div class="cx-search" role="search" @click.outside="searchOpen = false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <label class="visually-hidden" for="cxSearch" x-text="screen === 'home' ? 'Search all codices' : 'Search this codex'"></label>
+            <input type="search" id="cxSearch" x-ref="search" :placeholder="searchPlaceholder" autocomplete="off" x-model="searchQ" @focus="onSearchFocus()" @input="onSearchInput()" @keydown="onSearchKey($event)">
+            <kbd aria-hidden="true">/</kbd>
+            <div class="cx-results" x-show="searchOpen && searchQ.trim()" x-cloak>
+                <template x-for="(r, i) in searchResults" :key="r.id">
+                    <a :href="pageUrl(r)" :class="{ on: i === searchIdx }">
+                        <span class="cx-results-title" x-text="r.title"></span>
+                        <span class="cx-results-meta" x-show="r.meta" x-text="r.meta"></span>
+                    </a>
+                </template>
+                <p class="cx-pick-note" x-show="searchResults.length === 0" x-text="searchLoading ? 'Searching...' : 'No page matches.'"></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="cx-shell" :class="{ ['cx-shell--' + screen]: true, 'nav-open': navOpen, 'nav-anim': navAnim }" @keydown.escape.window="navOpen && closeNav()">
+        <div class="cx-scrim" @click="closeNav()"></div>
+
+        <!-- Left nav: the folder tree. A drawer on phones. -->
+        <aside class="cx-nav" id="cxNav" x-show="screen !== 'home'" x-cloak aria-label="Pages in this codex" @click="onNavClick($event)">
+            <div class="cx-nav-in">
+                <div class="cx-drawer-head">
+                    <span class="cx-drawer-name" x-text="codex ? codex.codex.name : ''"></span>
+                    <button type="button" class="cx-icon" aria-label="Close the page list" x-ref="navClose" @click="closeNav()">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+                    </button>
+                </div>
+                <template x-if="codex">
+                    <div>
+                        <button type="button" class="cx-new" x-show="canEdit" @click="closeNav(); openCreatePage()">+ New page</button>
+                        <p class="cx-nav-title">Pages</p>
+                        <p class="cx-nav-empty" x-show="codex.pages.length === 0 && codex.folders.length === 0">No pages yet.</p>
+                        <div class="codex-tree-wrap" @click.window="folderMenu.id && !$event.target.closest('.codex-menu, .codex-menu-btn') && closeFolderMenu()">
+                            <div class="codex-tree" x-html="treeHtml" @click="onTreeClick($event)" @toggle.capture="onFolderToggle($event)"></div>
+                            <div class="codex-menu" role="menu" x-ref="folderMenu" x-show="folderMenu.id" x-html="folderMenu.html" :style="'top:' + folderMenu.top + 'px;right:' + folderMenu.right + 'px'" @click="onMenuClick($event)" @keydown="onMenuKey($event)"></div>
+                        </div>
+                        <p class="cx-nav-foot" x-show="canEdit"><button type="button" class="text-link" id="new-folder-btn" @click="closeNav(); openNewFolder('')">+ New folder</button></p>
+                        <div class="cx-nav-group">
+                            <p class="cx-nav-title">This codex</p>
+                            <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id)" :aria-current="screen === 'codex' ? 'page' : null">Codex home</a>
+                            <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#wanted'">Wanted pages <span class="cx-count" x-text="codex.wanted.length"></span></a>
+                            <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#recent'">Recent changes</a>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </aside>
+
+        <main class="cx-main">
+            <!-- Recently opened pages of this codex -->
+            <nav class="cx-tabs" x-show="screen !== 'home' && tabs.length" x-cloak aria-label="Recently opened pages">
+                <template x-for="t in tabs" :key="t.id">
+                    <span class="cx-tab" :class="{ on: t.id === currentPageId }">
+                        <a :href="pageUrl(t)" :aria-current="t.id === currentPageId ? 'page' : null" x-text="t.title"></a>
+                        <button type="button" class="cx-tab-x" :aria-label="'Close the tab ' + t.title" @click="closeTab(t)">&times;</button>
+                    </span>
                 </template>
             </nav>
 
-            <p x-show="loading">Loading...</p>
-            <div class="game-error" role="alert" x-show="loadError">
-                <p x-text="loadError"></p>
-                <button type="button" class="campaign-action-btn" @click="load()">Try again</button>
-            </div>
-            <template x-if="notFound">
-                <p>That page or codex could not be found. It may have been deleted. <a href="/codices">Back to the codices</a></p>
-            </template>
+            <div class="cx-inner">
+                <nav class="cx-crumb" x-show="screen !== 'home'" x-cloak aria-label="Breadcrumb">
+                    <a href="/codices">Codices</a>
+                    <template x-for="(c, i) in crumbs" :key="i">
+                        <span :class="{ 'crumb-mid': c.mid, 'crumb-ellipsis': c.ellipsis }"><span aria-hidden="true"> › </span><a x-show="c.href" :href="c.href" x-text="c.label"></a><span x-show="!c.href && c.ellipsis" aria-hidden="true" x-text="c.label"></span><span x-show="!c.href && !c.ellipsis" :aria-current="i === crumbs.length - 1 ? 'page' : null" x-text="c.label"></span></span>
+                    </template>
+                </nav>
 
-            <div class="message journal-message" :class="messageType" x-show="messageVisible" role="status" x-text="messageText"></div>
-
-            <!-- Home -->
-            <template x-if="screen === 'home' && home">
-                <div>
-                    <section class="title-block">
-                        <div>
-                            <span class="modal-eyebrow">Lore wiki</span>
-                            <h1 class="page-title" tabindex="-1">Codices</h1>
-                            <p class="byline">Codices hold pages. A page links to others in its codex with [[double brackets]].</p>
-                        </div>
-                        <div class="actions">
-                            <button type="button" class="submit-btn" x-show="home.can_create" @click="openCreateCodex()">+ New codex</button>
-                        </div>
-                    </section>
-                    <section class="codex-section">
-                        <h2 class="section-header">Codices</h2>
-                        <p class="same" x-show="home.codices.length === 0" x-text="home.can_create ? 'No codices yet. Make a codex first.' : 'No codices to show yet.'"></p>
-                        <div class="codex-cards">
-                            <template x-for="w in home.codices" :key="w.id">
-                                <a class="codex-card" :href="'/codices/c/' + encodeURIComponent(w.id)">
-                                    <span class="codex-card-name" x-text="w.name"></span>
-                                    <span class="codex-card-excerpt" x-text="w.excerpt || 'No description yet.'"></span>
-                                    <span class="codex-card-meta" x-text="countLabel(w.page_count, 'page')"></span>
-                                </a>
-                            </template>
-                        </div>
-                    </section>
-                    <section class="codex-section">
-                        <h2 class="section-header">Recent changes</h2>
-                        <p class="same" x-show="home.recent.length === 0">Nothing has been written yet.</p>
-                        <ul class="recent">
-                            <template x-for="r in home.recent" :key="r.page_id + '-' + r.number">
-                                <li x-html="recentHtml(r, true)"></li>
-                            </template>
-                        </ul>
-                    </section>
+                <p x-show="loading">Loading...</p>
+                <div class="game-error" role="alert" x-show="loadError">
+                    <p x-text="loadError"></p>
+                    <button type="button" class="campaign-action-btn" @click="load()">Try again</button>
                 </div>
-            </template>
+                <template x-if="notFound">
+                    <p>That page or codex could not be found. It may have been deleted. <a href="/codices">Back to the codices</a></p>
+                </template>
 
-            <!-- Codex -->
-            <template x-if="screen === 'codex' && codex">
-                <div>
-                    <section class="title-block">
-                        <div>
-                            <span class="modal-eyebrow" x-text="'Codex'"></span>
-                            <h1 class="page-title" tabindex="-1" x-text="codex.codex.name"></h1>
-                        </div>
-                        <div class="actions">
-                            <button type="button" class="btn-danger" x-show="codex.can_manage" @click="deleteCodex()">Delete codex</button>
-                            <button type="button" class="campaign-action-btn" x-show="codex.can_manage" @click="openEditCodex()">Edit codex</button>
-                            <button type="button" class="submit-btn" x-show="codex.can_edit" @click="openCreatePage()">+ New page</button>
-                        </div>
-                    </section>
-                    <div class="split">
-                        <article>
-                            <div class="game-text" x-show="codex.codex.description" x-html="renderMarkdown(codex.codex.description)"></div>
-                            <section class="codex-section">
-                                <h2 class="section-header">Pages</h2>
-                                <div class="field" x-show="codex.pages.length > 8">
-                                    <label for="pageFilter" class="label">Find a page</label>
-                                    <input type="search" id="pageFilter" x-model="pageFilter" placeholder="Title or alias">
-                                </div>
-                                <p class="same" x-show="codex.pages.length === 0 && codex.folders.length === 0" x-text="codex.can_edit ? 'No pages yet. Start with &quot;+ New page&quot;.' : 'No pages yet.'"></p>
-                                <p class="codex-tree-bar" x-show="codex.can_edit && !pageFilter.trim()">
-                                    <button type="button" class="text-link" id="new-folder-btn" @click="openNewFolder('')">+ New folder</button>
-                                </p>
-                                <div class="codex-tree-wrap" @click.window="folderMenu.id && !$event.target.closest('.codex-menu, .codex-menu-btn') && closeFolderMenu()">
-                                    <div class="codex-tree" x-show="!pageFilter.trim()" x-html="treeHtml" @click="onTreeClick($event)" @toggle.capture="onFolderToggle($event)"></div>
-                                    <div class="codex-menu" role="menu" x-ref="folderMenu" x-show="folderMenu.id" x-html="folderMenu.html" :style="'top:' + folderMenu.top + 'px;right:' + folderMenu.right + 'px'" @click="onMenuClick($event)" @keydown="onMenuKey($event)"></div>
-                                </div>
-                                <ul class="page-list" x-show="pageFilter.trim()">
-                                    <template x-for="p in filteredPages" :key="p.id">
-                                        <li><a :href="pageUrl(p)" x-text="p.title"></a><span class="muted" x-show="p.aliases.length" x-text="' · also ' + p.aliases.join(', ')"></span></li>
-                                    </template>
-                                </ul>
-                            </section>
-                        </article>
-                        <aside class="split-side">
-                            <div>
-                                <p class="modal-eyebrow">Linked but not written</p>
-                                <h2 class="panel-heading">Wanted pages</h2>
-                                <p class="same" x-show="codex.wanted.length === 0">Every link in this codex leads somewhere.</p>
-                                <ul class="page-list">
-                                    <template x-for="w in codex.wanted" :key="w.text">
-                                        <li><button type="button" class="wikilink wikilink--missing" :title="codex.can_edit ? 'No page yet. Click to create.' : 'No page yet.'" @click="openCreatePage(w.text)" x-text="w.text"></button><span class="muted" x-text="' · wanted ' + w.count + (w.count === 1 ? ' time' : ' times')"></span></li>
-                                    </template>
-                                </ul>
-                            </div>
-                            <div>
-                                <p class="modal-eyebrow">Latest edits</p>
-                                <h2 class="panel-heading">Recent changes</h2>
-                                <p class="same" x-show="codex.recent.length === 0">Nothing yet.</p>
-                                <ul class="recent">
-                                    <template x-for="r in codex.recent" :key="r.page_id + '-' + r.number">
-                                        <li x-html="recentHtml(r, false)"></li>
-                                    </template>
-                                </ul>
-                            </div>
-                        </aside>
-                    </div>
-                </div>
-            </template>
+                <div class="message journal-message" :class="messageType" x-show="messageVisible" role="status" x-text="messageText"></div>
 
-            <!-- Page -->
-            <template x-if="screen === 'page' && pageData">
-                <div>
-                    <section class="title-block">
-                        <div>
-                            <span class="modal-eyebrow"><span>Page in </span><a :href="'/codices/c/' + encodeURIComponent(page.codex.id)" x-text="page.codex.name"></a></span>
-                            <h1 class="page-title" tabindex="-1" x-text="page.title"></h1>
-                            <p class="byline" x-show="page.aliases.length"><span>Also known as </span><span x-text="page.aliases.join(', ')"></span></p>
-                            <p class="byline" x-show="canEdit"><button type="button" class="text-link" @click="openMove()">Move to another codex…</button></p>
-                        </div>
-                        <div class="actions">
-                            <button type="button" class="btn-danger" x-show="canEdit" @click="deletePage()">Delete</button>
-                            <button type="button" class="campaign-action-btn" x-show="canEdit" @click="openAliases()">Aliases</button>
-                            <button type="button" class="campaign-action-btn" x-show="canEdit" @click="openRename()">Rename</button>
-                            <a class="campaign-action-btn" :href="pageUrl(page, '/history')" x-text="'History · ' + page.revision_count"></a>
-                            <a class="submit-btn" x-show="canEdit" :href="pageUrl(page, '/edit')">Edit</a>
-                        </div>
-                    </section>
-                    <div class="codex-grid" :class="{ 'codex-grid--rail': toc.length >= 2 }" @scroll.window.passive="updateToc()">
-                        <nav class="codex-rail" x-show="toc.length >= 2" aria-label="Contents">
-                            <h2 class="codex-rail-title">Contents</h2>
-                            <ul>
-                                <template x-for="t in toc" :key="t.id">
-                                    <li><a :href="'#' + t.id" :class="{ on: tocActive === t.id, sub: t.level === 3 }" :aria-current="tocActive === t.id ? 'location' : null" x-text="t.text"></a></li>
+                <!-- Home -->
+                <template x-if="screen === 'home' && home">
+                    <div>
+                        <header class="cx-head">
+                            <div class="cx-head-text">
+                                <h1 class="cx-title" tabindex="-1">Codices</h1>
+                            </div>
+                            <div class="cx-actions">
+                                <button type="button" class="cx-act cx-act--primary" x-show="home.can_create" @click="openCreateCodex()">+ New codex</button>
+                            </div>
+                        </header>
+                        <p class="cx-sub">Codices hold pages. A page links to others in its codex with [[double brackets]].</p>
+                        <section class="codex-section">
+                            <h2 class="section-header">Codices</h2>
+                            <p class="same" x-show="home.codices.length === 0" x-text="home.can_create ? 'No codices yet. Make a codex first.' : 'No codices to show yet.'"></p>
+                            <div class="codex-cards">
+                                <template x-for="w in home.codices" :key="w.id">
+                                    <a class="codex-card" :href="'/codices/c/' + encodeURIComponent(w.id)">
+                                        <span class="codex-card-name" x-text="w.name"></span>
+                                        <span class="codex-card-excerpt" x-text="w.excerpt || 'No description yet.'"></span>
+                                        <span class="codex-card-meta" x-text="countLabel(w.page_count, 'page')"></span>
+                                    </a>
+                                </template>
+                            </div>
+                        </section>
+                        <section class="codex-section">
+                            <h2 class="section-header">Recent changes</h2>
+                            <p class="same" x-show="home.recent.length === 0">Nothing has been written yet.</p>
+                            <ul class="recent">
+                                <template x-for="r in home.recent" :key="r.page_id + '-' + r.number">
+                                    <li x-html="recentHtml(r, true)"></li>
                                 </template>
                             </ul>
-                        </nav>
-                        <article class="codex-article">
+                        </section>
+                    </div>
+                </template>
+
+                <!-- Codex -->
+                <template x-if="screen === 'codex' && codex">
+                    <div>
+                        <header class="cx-head">
+                            <div class="cx-head-text">
+                                <h1 class="cx-title" tabindex="-1" x-text="codex.codex.name"></h1>
+                            </div>
+                            <div class="cx-actions">
+                                <button type="button" class="cx-act" x-show="codex.can_manage" @click="openEditCodex()">Edit codex</button>
+                                <button type="button" class="cx-act cx-act--danger" x-show="codex.can_manage" @click="deleteCodex()">Delete codex</button>
+                            </div>
+                        </header>
+                        <div class="game-text codex-text cx-article cx-article--desc" x-show="codex.codex.description" x-html="renderMarkdown(codex.codex.description)"></div>
+                        <section class="codex-section">
+                            <h2 class="section-header">Pages</h2>
+                            <div class="field" x-show="codex.pages.length > 8">
+                                <label for="pageFilter" class="label">Find a page</label>
+                                <input type="search" id="pageFilter" x-model="pageFilter" placeholder="Title or alias">
+                            </div>
+                            <p class="same" x-show="codex.pages.length === 0" x-text="codex.can_edit ? 'No pages yet. Use + New page in the page list.' : 'No pages yet.'"></p>
+                            <div x-show="!pageFilter.trim()">
+                                <template x-for="g in pageGroups" :key="g.id">
+                                    <section class="cx-group">
+                                        <h3 class="cx-group-name" :id="'group-' + g.id" x-text="g.label"></h3>
+                                        <ul class="page-list">
+                                            <template x-for="p in g.pages" :key="p.id">
+                                                <li><a :href="pageUrl(p)" x-text="p.title"></a><span class="muted" x-show="p.aliases.length" x-text="' · also ' + p.aliases.join(', ')"></span></li>
+                                            </template>
+                                        </ul>
+                                    </section>
+                                </template>
+                            </div>
+                            <ul class="page-list" x-show="pageFilter.trim()">
+                                <template x-for="p in filteredPages" :key="p.id">
+                                    <li><a :href="pageUrl(p)" x-text="p.title"></a><span class="muted" x-show="p.aliases.length" x-text="' · also ' + p.aliases.join(', ')"></span></li>
+                                </template>
+                            </ul>
+                        </section>
+                    </div>
+                </template>
+
+                <!-- Page, Edit and History share this header -->
+                <template x-if="pageData && (screen === 'page' || screen === 'edit' || screen === 'history')">
+                    <div>
+                        <header class="cx-head">
+                            <div class="cx-head-text">
+                                <h1 class="cx-title" tabindex="-1" x-text="page.title"></h1>
+                            </div>
+                            <div class="cx-actions">
+                                <a class="cx-act" :href="pageUrl(page)" :aria-current="screen === 'page' ? 'page' : null">Read</a>
+                                <a class="cx-act cx-act--primary" x-show="canEdit" :href="pageUrl(page, '/edit')" :aria-current="screen === 'edit' ? 'page' : null">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Edit
+                                </a>
+                                <a class="cx-act" :href="pageUrl(page, '/history')" :aria-current="screen === 'history' ? 'page' : null" :title="countLabel(page.revision_count, 'revision')">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>History <span class="cx-count" x-text="page.revision_count"></span>
+                                </a>
+                                <span class="cx-spacer"></span>
+                                <div class="cx-more" x-show="canEdit" @click.outside="moreOpen = false" @keydown="onMoreKey($event)">
+                                    <button type="button" class="cx-act" id="cxMoreBtn" aria-haspopup="menu" :aria-expanded="moreOpen ? 'true' : 'false'" aria-controls="cxMoreMenu" @click="toggleMore()">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span class="cx-act-long">More</span><span class="visually-hidden"> page actions</span>
+                                    </button>
+                                    <div class="cx-more-menu" id="cxMoreMenu" role="menu" x-ref="moreMenu" x-show="moreOpen" x-cloak>
+                                        <button type="button" role="menuitem" @click="moreDo('openRename')">Rename</button>
+                                        <button type="button" role="menuitem" @click="moreDo('openAliases')">Aliases</button>
+                                        <button type="button" role="menuitem" @click="moreDo('openPageFolder')">Change folder</button>
+                                        <button type="button" role="menuitem" @click="moreDo('openMove')">Move to another codex…</button>
+                                        <hr>
+                                        <button type="button" role="menuitem" class="cx-danger" @click="moreDo('deletePage')">Delete page</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </header>
+                        <p class="cx-sub" x-show="screen === 'page'" x-text="'Revision ' + page.current_revision + ' · last edited by ' + page.updated_by_user.display_name + ' ' + formatStamp(page.updated_at)"></p>
+                        <p class="cx-sub" x-show="screen === 'edit' && draft" x-text="draft ? 'Saving adds revision ' + (draft.base + 1) + '. To change the title, use Rename.' : ''"></p>
+                        <p class="cx-sub" x-show="screen === 'history'" x-text="journalByline(page)"></p>
+                        <p class="cx-sub" x-show="screen === 'history' && pruned">Only the latest 200 revisions are kept.</p>
+                    </div>
+                </template>
+
+                <!-- Page -->
+                <template x-if="screen === 'page' && pageData">
+                    <div @scroll.window.passive="updateToc()">
+                        <section class="cx-props" aria-label="Properties">
+                            <h2 class="cx-props-label">Properties</h2>
+                            <dl>
+                                <div class="cx-prop"><dt>Codex</dt><dd><a :href="'/codices/c/' + encodeURIComponent(page.codex.id)" x-text="page.codex.name"></a></dd></div>
+                                <div class="cx-prop"><dt>Folder</dt><dd><span x-text="page.folder_path.length ? page.folder_path.map((f) => f.name).join(' › ') : 'Top level'"></span> <button type="button" class="text-link" x-show="canEdit" @click="openPageFolder()">Change</button></dd></div>
+                                <div class="cx-prop" x-show="page.aliases.length"><dt>Also known as</dt><dd><template x-for="a in page.aliases" :key="a"><span class="cx-chip" x-text="a"></span></template></dd></div>
+                                <div class="cx-prop"><dt>Started</dt><dd x-text="page.author_user.display_name + ', ' + shortDate(page.created_at)"></dd></div>
+                                <div class="cx-prop"><dt>Scribes</dt><dd x-text="scribes"></dd></div>
+                                <div class="cx-prop"><dt>Revisions</dt><dd><a :href="pageUrl(page, '/history')" x-text="page.revision_count"></a></dd></div>
+                            </dl>
+                        </section>
+                        <article class="cx-article">
                             <details class="codex-contents" x-show="toc.length >= 2">
                                 <summary>Contents</summary>
                                 <ul>
@@ -192,153 +269,170 @@
                                     </template>
                                 </ul>
                             </details>
-                            <div class="game-text codex-text" x-ref="body" @click="onBodyClick($event)" x-html="bodyHtml" x-effect="bodyHtml; $nextTick(() => buildToc())"></div>
+                            <div class="game-text codex-text" x-ref="body" @click="onBodyClick($event)" @pointerover="onBodyOver($event)" @pointerout="onBodyOut($event)" x-html="bodyHtml" x-effect="bodyHtml; $nextTick(() => buildToc())"></div>
                             <p class="same" x-show="!page.body.trim()">This page is empty.<span x-show="canEdit"> <a :href="pageUrl(page, '/edit')">Write it</a>.</span></p>
-                            <p class="codex-edited" x-text="'Revision ' + page.current_revision + ' · last edited by ' + page.updated_by_user.display_name + ' ' + formatStamp(page.updated_at)"></p>
                         </article>
-                        <aside class="codex-side">
-                            <section class="codex-sum" aria-label="Summary">
-                                <p class="codex-sum-title" x-text="page.title"></p>
-                                <dl>
-                                    <div class="codex-sum-row" x-show="page.aliases.length"><dt>Aliases</dt><dd x-text="page.aliases.join(', ')"></dd></div>
-                                    <div class="codex-sum-row"><dt>Codex</dt><dd><a :href="'/codices/c/' + encodeURIComponent(page.codex.id)" x-text="page.codex.name"></a></dd></div>
-                                    <div class="codex-sum-row"><dt>Folder</dt><dd><span x-text="page.folder_path.length ? page.folder_path.map((f) => f.name).join(' › ') : 'Top level'"></span> <button type="button" class="text-link" x-show="canEdit" @click="openPageFolder()">Change</button></dd></div>
-                                    <div class="codex-sum-row"><dt>Started</dt><dd x-text="page.author_user.display_name + ', ' + shortDate(page.created_at)"></dd></div>
-                                    <div class="codex-sum-row"><dt>Scribes</dt><dd x-text="scribes"></dd></div>
-                                    <div class="codex-sum-row"><dt>Revisions</dt><dd><a :href="pageUrl(page, '/history')" x-text="page.revision_count"></a></dd></div>
-                                </dl>
-                            </section>
-                            <section class="codex-linked">
-                                <h2 class="codex-linked-head"><span><span class="codex-linked-mark">§</span> Linked from</span><span class="muted" x-text="linkedFrom.length"></span></h2>
-                                <p class="same" x-show="linkedFrom.length === 0">No other page links here yet.</p>
-                                <ul>
-                                    <template x-for="b in linkedFrom" :key="b.id">
-                                        <li><span class="codex-glyph" aria-hidden="true" x-text="'✦'"></span><span><a :href="pageUrl(b)" x-text="b.title"></a><span class="muted" x-show="b.aliases.length" x-text="' · as ' + b.aliases.map((a) => '“' + a + '”').join(', ')"></span></span></li>
-                                    </template>
-                                </ul>
-                            </section>
-                        </aside>
                     </div>
-                </div>
-            </template>
+                </template>
 
-            <!-- Edit -->
-            <template x-if="screen === 'edit' && pageData && draft">
-                <div>
-                    <section class="title-block title-block--single">
-                        <div>
-                            <span class="modal-eyebrow" x-text="'Edit · ' + page.codex.name"></span>
-                            <h1 class="page-title" tabindex="-1" x-text="page.title"></h1>
-                            <p class="byline" x-text="'Saving adds revision ' + (draft.base + 1) + '. To change the title, use Rename.'"></p>
-                        </div>
-                    </section>
-                    <div class="notice conflict" role="alert" x-show="conflict">
-                        <h2 class="conflict-title"><span class="conflict-mark">§</span> <span x-text="conflictWho + ' saved revision ' + (conflict ? conflict.latest.number : '') + ' while you were editing'"></span></h2>
-                        <p>Nothing is lost: your text is still in the editor below. This is what they changed:</p>
-                        <div class="diff" x-show="conflict && conflict.html" x-html="conflict ? conflict.html : ''"></div>
-                        <p class="same" x-show="conflict && !conflict.html">Their revision didn't change the text.</p>
-                        <div class="form-foot">
-                            <button type="button" class="submit-btn" :disabled="busy" @click="saveOnTop()">Save mine on top</button>
-                            <button type="button" class="btn-cancel conflict-discard" @click="discardMine()">Discard mine</button>
-                            <a class="text-link" target="_blank" rel="noopener" :href="pageUrl(page, '/history') + '?r=' + (conflict ? conflict.latest.number : '')" x-text="'Open revision ' + (conflict ? conflict.latest.number : '') + ' in a new tab'"></a>
-                        </div>
-                    </div>
-                    <form class="edit-form" @submit.prevent="save()" novalidate>
-                        <div class="field">
-                            <div class="tabs" role="group" aria-label="Editor view">
-                                <button type="button" class="tab" :aria-pressed="draft.tab === 'write'" @click="draft.tab = 'write'">Write</button>
-                                <button type="button" class="tab" :aria-pressed="draft.tab === 'preview'" @click="draft.tab = 'preview'">Preview</button>
+                <!-- Edit -->
+                <template x-if="screen === 'edit' && pageData && draft">
+                    <div>
+                        <div class="notice conflict" role="alert" x-show="conflict">
+                            <h2 class="conflict-title"><span class="conflict-mark">§</span> <span x-text="conflictWho + ' saved revision ' + (conflict ? conflict.latest.number : '') + ' while you were editing'"></span></h2>
+                            <p>Nothing is lost: your text is still in the editor below. This is what they changed:</p>
+                            <div class="diff" x-show="conflict && conflict.html" x-html="conflict ? conflict.html : ''"></div>
+                            <p class="same" x-show="conflict && !conflict.html">Their revision didn't change the text.</p>
+                            <div class="form-foot">
+                                <button type="button" class="submit-btn" :disabled="busy" @click="saveOnTop()">Save mine on top</button>
+                                <button type="button" class="btn-cancel conflict-discard" @click="discardMine()">Discard mine</button>
+                                <a class="text-link" target="_blank" rel="noopener" :href="pageUrl(page, '/history') + '?r=' + (conflict ? conflict.latest.number : '')" x-text="'Open revision ' + (conflict ? conflict.latest.number : '') + ' in a new tab'"></a>
                             </div>
-                            <div class="editor" :data-tab="draft.tab">
-                                <div class="pane pane--write">
-                                    <label for="fBody">The page</label>
-                                    <div class="cm-host" x-ref="editorHost"></div>
-                                    <textarea id="fBody" x-ref="bodyArea" placeholder="Write about it. Link other pages with [[Title]]." x-model="draft.body" x-show="!editorReady"></textarea>
+                        </div>
+                        <form class="edit-form" @submit.prevent="save()" novalidate>
+                            <div class="field">
+                                <div class="tabs" role="group" aria-label="Editor view">
+                                    <button type="button" class="tab" :aria-pressed="draft.tab === 'write'" @click="draft.tab = 'write'">Write</button>
+                                    <button type="button" class="tab" :aria-pressed="draft.tab === 'preview'" @click="draft.tab = 'preview'">Preview</button>
                                 </div>
-                                <div class="pane pane--preview">
-                                    <span class="label">Preview</span>
-                                    <div class="preview">
-                                        <div class="game-text codex-text" @click="onBodyClick($event)" x-html="previewHtml"></div>
+                                <div class="editor" :data-tab="draft.tab">
+                                    <div class="pane pane--write">
+                                        <label for="fBody">The page</label>
+                                        <div class="cm-host" x-ref="editorHost"></div>
+                                        <textarea id="fBody" x-ref="bodyArea" placeholder="Write about it. Link other pages with [[Title]]." x-model="draft.body" x-show="!editorReady"></textarea>
+                                    </div>
+                                    <div class="pane pane--preview">
+                                        <span class="label">Preview</span>
+                                        <div class="preview">
+                                            <div class="game-text codex-text" @click="onBodyClick($event)" x-html="previewHtml"></div>
+                                        </div>
                                     </div>
                                 </div>
+                                <p class="hint hint--formatting">Formatting: **bold** · *italic* · # heading · - list · 1. list · &gt; quote · [link](https://…) · [[Page title]] or [[Page title|shown text]] to link a page in this codex</p>
                             </div>
-                            <p class="hint hint--formatting">Formatting: **bold** · *italic* · # heading · - list · 1. list · &gt; quote · [link](https://…) · [[Page title]] or [[Page title|shown text]] to link a page in this codex</p>
-                        </div>
-                        <div class="field field--note">
-                            <label for="fNote">What changed (optional)</label>
-                            <input type="text" id="fNote" maxlength="120" placeholder="Added the history of the tower" x-model="draft.note">
-                        </div>
-                        <div class="notice" role="alert" x-show="draft.error"><p x-text="draft.error"></p></div>
-                        <div class="form-foot">
-                            <button type="submit" class="submit-btn" :disabled="busy || draft.locked">Save changes</button>
-                            <a class="campaign-action-btn" :href="pageUrl(page)">Cancel</a>
-                        </div>
-                    </form>
-                </div>
-            </template>
+                            <div class="field field--note">
+                                <label for="fNote">What changed (optional)</label>
+                                <input type="text" id="fNote" maxlength="120" placeholder="Added the history of the tower" x-model="draft.note">
+                            </div>
+                            <div class="notice" role="alert" x-show="draft.error"><p x-text="draft.error"></p></div>
+                            <div class="form-foot">
+                                <button type="submit" class="submit-btn" :disabled="busy || draft.locked">Save changes</button>
+                                <a class="campaign-action-btn" :href="pageUrl(page)">Cancel</a>
+                            </div>
+                        </form>
+                    </div>
+                </template>
 
-            <!-- History -->
-            <template x-if="screen === 'history' && pageData">
-                <div>
-                    <section class="title-block title-block--single">
-                        <div>
-                            <span class="modal-eyebrow" x-text="'History · ' + revisions.length + ' revision' + (revisions.length === 1 ? '' : 's')"></span>
-                            <h1 class="page-title" tabindex="-1" x-text="page.title"></h1>
-                            <p class="byline" x-text="journalByline(page)"></p>
-                            <p class="byline" x-show="pruned">Only the latest 200 revisions are kept.</p>
-                        </div>
-                    </section>
-                    <p x-show="historyLoading">Loading history...</p>
-                    <div class="history" x-show="!historyLoading && revisions.length > 0">
-                        <ol class="revs" reversed aria-label="Revisions, newest first">
-                            <template x-for="r in revisions" :key="r.number">
-                                <li class="rev-item">
-                                    <button type="button" class="rev" :aria-current="r.number === selected" @click="selectRevision(r.number)">
-                                        <span x-html="userAvatarHtml(r.author_user, false)"></span>
-                                        <span class="rev-head"><span class="rev-no" x-text="'Revision ' + r.number"></span><span class="tag" x-show="r.number === currentRevision">✓ Current</span></span>
-                                        <span class="rev-meta" x-text="r.author_user.display_name + (r.author_id === currentUserId ? ' (you)' : '') + ' · ' + formatStamp(r.created_at)"></span>
-                                        <span class="rev-note"><span x-text="revNote(r) || 'No note'"></span> <span class="rev-delta" x-html="deltaHtml(r)"></span></span>
-                                    </button>
-                                </li>
-                            </template>
-                        </ol>
-                        <section class="detail" aria-live="polite" x-show="selectedRevision">
-                            <div class="detail-head">
-                                <div>
-                                    <h2 class="detail-title">§ Revision <span class="t-no" x-text="selected"></span></h2>
-                                    <p class="detail-sub" x-text="selectedRevision ? selectedRevision.author_user.display_name + ' · ' + formatStamp(selectedRevision.created_at) + (revNote(selectedRevision) ? ' · ' + revNote(selectedRevision) : '') : ''"></p>
-                                </div>
-                                <span class="legend" x-show="selected === currentRevision">This is the current version.</span>
-                                <button type="button" class="submit-btn" x-show="canEdit && selected !== currentRevision" :disabled="busy" @click="restore()">Restore this version</button>
-                            </div>
-                            <div class="toolbar">
-                                <div role="group" aria-label="Show">
-                                    <button type="button" class="tab" :aria-pressed="historyMode === 'changes'" @click="historyMode = 'changes'">Changes</button>
-                                    <button type="button" class="tab" :aria-pressed="historyMode === 'full'" @click="historyMode = 'full'">Full text</button>
-                                </div>
-                                <span class="legend" x-show="historyMode === 'changes' && previousRevision">Against revision <span x-text="previousRevision ? previousRevision.number : ''"></span>: <ins>added</ins> · <del>removed</del></span>
-                            </div>
-                            <p class="same" x-show="bodyLoading">Loading this revision...</p>
-                            <div x-show="historyMode === 'full'">
-                                <div class="game-text" x-html="codexMarkdown(selectedBody, null)"></div>
-                            </div>
-                            <div x-show="historyMode === 'changes'">
-                                <p class="same" x-show="!previousRevision" x-text="pruned && selected > 1 ? 'This is the oldest revision still kept, so there is nothing to compare it with.' : 'This is the first version of the page, so there is nothing to compare it with.'"></p>
-                                <div class="game-text" x-show="!previousRevision" x-html="codexMarkdown(selectedBody, null)"></div>
-                                <template x-if="previousRevision && selectedDiff">
-                                    <div class="detail-changes">
-                                        <div class="diff" x-show="selectedDiff.added || selectedDiff.removed" x-html="selectedDiff.html"></div>
-                                        <p class="same" x-show="!selectedDiff.added && !selectedDiff.removed">The text did not change in this revision.</p>
-                                    </div>
+                <!-- History -->
+                <template x-if="screen === 'history' && pageData">
+                    <div>
+                        <p x-show="historyLoading">Loading history...</p>
+                        <div class="history" x-show="!historyLoading && revisions.length > 0">
+                            <ol class="revs" reversed aria-label="Revisions, newest first">
+                                <template x-for="r in revisions" :key="r.number">
+                                    <li class="rev-item">
+                                        <button type="button" class="rev" :aria-current="r.number === selected" @click="selectRevision(r.number)">
+                                            <span x-html="userAvatarHtml(r.author_user, false)"></span>
+                                            <span class="rev-head"><span class="rev-no" x-text="'Revision ' + r.number"></span><span class="tag" x-show="r.number === currentRevision">✓ Current</span></span>
+                                            <span class="rev-meta" x-text="r.author_user.display_name + (r.author_id === currentUserId ? ' (you)' : '') + ' · ' + formatStamp(r.created_at)"></span>
+                                            <span class="rev-note"><span x-text="revNote(r) || 'No note'"></span> <span class="rev-delta" x-html="deltaHtml(r)"></span></span>
+                                        </button>
+                                    </li>
                                 </template>
-                            </div>
+                            </ol>
+                            <section class="detail" aria-live="polite" x-show="selectedRevision">
+                                <div class="detail-head">
+                                    <div>
+                                        <h2 class="detail-title">§ Revision <span class="t-no" x-text="selected"></span></h2>
+                                        <p class="detail-sub" x-text="selectedRevision ? selectedRevision.author_user.display_name + ' · ' + formatStamp(selectedRevision.created_at) + (revNote(selectedRevision) ? ' · ' + revNote(selectedRevision) : '') : ''"></p>
+                                    </div>
+                                    <span class="legend" x-show="selected === currentRevision">This is the current version.</span>
+                                    <button type="button" class="submit-btn" x-show="canEdit && selected !== currentRevision" :disabled="busy" @click="restore()">Restore this version</button>
+                                </div>
+                                <div class="toolbar">
+                                    <div role="group" aria-label="Show">
+                                        <button type="button" class="tab" :aria-pressed="historyMode === 'changes'" @click="historyMode = 'changes'">Changes</button>
+                                        <button type="button" class="tab" :aria-pressed="historyMode === 'full'" @click="historyMode = 'full'">Full text</button>
+                                    </div>
+                                    <span class="legend" x-show="historyMode === 'changes' && previousRevision">Against revision <span x-text="previousRevision ? previousRevision.number : ''"></span>: <ins>added</ins> · <del>removed</del></span>
+                                </div>
+                                <p class="same" x-show="bodyLoading">Loading this revision...</p>
+                                <div x-show="historyMode === 'full'">
+                                    <div class="game-text" x-html="codexMarkdown(selectedBody, null)"></div>
+                                </div>
+                                <div x-show="historyMode === 'changes'">
+                                    <p class="same" x-show="!previousRevision" x-text="pruned && selected > 1 ? 'This is the oldest revision still kept, so there is nothing to compare it with.' : 'This is the first version of the page, so there is nothing to compare it with.'"></p>
+                                    <div class="game-text" x-show="!previousRevision" x-html="codexMarkdown(selectedBody, null)"></div>
+                                    <template x-if="previousRevision && selectedDiff">
+                                        <div class="detail-changes">
+                                            <div class="diff" x-show="selectedDiff.added || selectedDiff.removed" x-html="selectedDiff.html"></div>
+                                            <p class="same" x-show="!selectedDiff.added && !selectedDiff.removed">The text did not change in this revision.</p>
+                                        </div>
+                                    </template>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </main>
+
+        <!-- Right rail: outline, backlinks, wanted pages -->
+        <aside class="cx-rail" x-show="(screen === 'page' && pageData) || (screen === 'codex' && codex)" x-cloak aria-label="Side panel">
+            <div class="cx-rail-in">
+                <template x-if="screen === 'page' && pageData">
+                    <div>
+                        <section class="cx-box cx-box--outline" aria-label="Outline" x-show="toc.length >= 1">
+                            <h2>Outline</h2>
+                            <ul class="cx-outline">
+                                <template x-for="t in toc" :key="t.id">
+                                    <li><a :href="'#' + t.id" :class="{ on: tocActive === t.id, sub: t.level === 3 }" :aria-current="tocActive === t.id ? 'location' : null" x-text="t.text"></a></li>
+                                </template>
+                            </ul>
+                        </section>
+                        <section class="cx-box" aria-label="Linked from">
+                            <h2>Linked from · <span x-text="linkedFrom.length"></span></h2>
+                            <p class="cx-box-empty" x-show="linkedFrom.length === 0">No other page links here yet.</p>
+                            <ul x-show="linkedFrom.length">
+                                <template x-for="b in linkedFrom" :key="b.id">
+                                    <li><a :href="pageUrl(b)" x-text="b.title"></a><small class="muted" x-show="b.aliases.length" x-text="'as ' + b.aliases.map((a) => '“' + a + '”').join(', ')"></small></li>
+                                </template>
+                            </ul>
                         </section>
                     </div>
-                </div>
-            </template>
+                </template>
+                <template x-if="codex">
+                    <section class="cx-box" id="wanted" aria-label="Wanted pages">
+                        <h2>Wanted pages</h2>
+                        <p class="cx-box-empty" x-show="codex.wanted.length === 0">Every link in this codex leads somewhere.</p>
+                        <ul x-show="codex.wanted.length">
+                            <template x-for="w in codex.wanted.slice(0, screen === 'codex' ? 200 : 10)" :key="w.text">
+                                <li><button type="button" class="wikilink wikilink--missing" :title="codex.can_edit ? 'No page yet. Click to create.' : 'No page yet.'" @click="openCreatePage(w.text)" x-text="w.text"></button><small class="muted" x-text="'wanted ' + w.count + (w.count === 1 ? ' time' : ' times')"></small></li>
+                            </template>
+                        </ul>
+                        <p class="cx-box-empty" x-show="screen === 'page' && codex.wanted.length > 10"><a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#wanted'" x-text="'All ' + codex.wanted.length + ' on the codex home'"></a></p>
+                    </section>
+                </template>
+                <template x-if="screen === 'codex' && codex">
+                    <section class="cx-box" id="recent" aria-label="Recent changes">
+                        <h2>Recent changes</h2>
+                        <p class="cx-box-empty" x-show="codex.recent.length === 0">Nothing yet.</p>
+                        <ul class="recent" x-show="codex.recent.length">
+                            <template x-for="r in codex.recent" :key="r.page_id + '-' + r.number">
+                                <li x-html="recentHtml(r, false)"></li>
+                            </template>
+                        </ul>
+                    </section>
+                </template>
+            </div>
+        </aside>
+    </div>
 
-            <p class="ornament" aria-hidden="true">❦ ❦ ❦</p>
-        </main>
+    <!-- Link preview card (mouse only) -->
+    <div class="cx-peek" role="tooltip" x-show="peek.open" x-cloak :style="'left:' + peek.x + 'px;top:' + peek.y + 'px'">
+        <strong x-text="peek.title"></strong>
+        <p class="cx-peek-where" x-show="peek.where" x-text="peek.where"></p>
+        <p class="cx-peek-text" x-text="peek.text"></p>
     </div>
 
     <!-- Form dialogs -->
@@ -468,6 +562,6 @@
     <script src="/campaigns.js?v=63"></script>
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=2"></script>
-    <script src="/static/codex.js?v=11"></script>
+    <script src="/static/codex.js?v=12"></script>
 </body>
 </html>

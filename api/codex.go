@@ -260,7 +260,7 @@ func handleCodexTitles(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		out = append(out, map[string]interface{}{
-			"id": p.ID, "title": p.Title, "has_map": p.HasMap, "aliases": p.Aliases,
+			"id": p.ID, "title": p.Title, "has_map": p.HasMap, "aliases": p.Aliases, "codex_id": p.CodexID,
 		})
 	}
 	writeJSON(w, http.StatusOK, out)
