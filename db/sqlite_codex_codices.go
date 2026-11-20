@@ -189,10 +189,9 @@ func (s *SQLiteStore) renameWorldsToCodices() error {
 			}
 		}
 	}
-	for _, idx := range []string{"idx_pages_world", "idx_codex_folders_parent"} {
-		if _, err := s.db.Exec(`DROP INDEX IF EXISTS ` + idx); err != nil {
-			return fmt.Errorf("failed to drop %s: %w", idx, err)
-		}
+	// RENAME COLUMN rewrites index definitions; only the old index name has to go.
+	if _, err := s.db.Exec(`DROP INDEX IF EXISTS idx_pages_world`); err != nil {
+		return fmt.Errorf("failed to drop idx_pages_world: %w", err)
 	}
 	return nil
 }
@@ -204,18 +203,23 @@ func (s *SQLiteStore) rescueUnsortedPages() error {
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM pages WHERE codex_id = ''`).Scan(&n); err != nil || n == 0 {
 		return err
 	}
-	const name = "Unsorted pages"
-	var id string
-	err := s.db.QueryRow(`SELECT id FROM codices WHERE name = ?`, name).Scan(&id)
-	if err == sql.ErrNoRows {
-		id = GenerateUUID()
-		now := nowUTC()
-		if _, err := s.db.Exec(`INSERT INTO codices (id, name, description, created_by, created_at, updated_at) VALUES (?, ?, ?, '', ?, ?)`,
-			id, name, "Pages that were in the old Unsorted folder.", now, now); err != nil {
-			return fmt.Errorf("failed to create the rescue codex: %w", err)
+	// Always a fresh codex, so the moved titles can't clash with pages already there.
+	name := "Unsorted pages"
+	for i := 2; ; i++ {
+		var taken int
+		if err := s.db.QueryRow(`SELECT COUNT(*) FROM codices WHERE name = ?`, name).Scan(&taken); err != nil {
+			return err
 		}
-	} else if err != nil {
-		return err
+		if taken == 0 {
+			break
+		}
+		name = fmt.Sprintf("Unsorted pages (%d)", i)
+	}
+	id := GenerateUUID()
+	now := nowUTC()
+	if _, err := s.db.Exec(`INSERT INTO codices (id, name, description, created_by, created_at, updated_at) VALUES (?, ?, ?, '', ?, ?)`,
+		id, name, "Pages that were in the old Unsorted folder.", now, now); err != nil {
+		return fmt.Errorf("failed to create the rescue codex: %w", err)
 	}
 	tx, err := s.db.Begin()
 	if err != nil {
