@@ -63,7 +63,8 @@ This document describes what must-have features are to be implemented before pre
 - [x] Codices
     - [x] Codices as folders of pages (every page belongs to a codex; a game can show its codex as a label) with `[[Title]]` links, aliases, revision history and restore
     - [x] Maps with an uploaded image, pins that point at pages, and an undoable pin log (built, hidden from the UI for now)
-    - [x] Folders inside a codex (nested, up to 10 levels, collapsible tree), a page layout with a contents rail and summary box, and `CODEX_ADMIN_ONLY` to limit the Codices to admins while it is tried out
+    - [x] Folders inside a codex (nested, up to 10 levels, collapsible tree), a page layout with a contents rail and summary box
+    - [x] Access rights (admin page `/admin/access`): per-user See Codices and Edit Codices, and per-codex None / See / Edit for each user; admins always have everything, new users get nothing, and a codex's creator gets Edit on it
 - [x] Technological
     - [x] SQLite
     - [x] Alpine.js
