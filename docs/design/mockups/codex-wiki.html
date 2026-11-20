@@ -98,6 +98,7 @@
 
 /* ---------- base ---------- */
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
     background: var(--bg); color: var(--text);
@@ -574,6 +575,78 @@ h1 {
 [data-skin="ws"] .outline li + li { border-top: 0; }
 [data-skin="ws"] .toc { background: var(--surface); }
 
+/* ---------- dialogs: new page, templates, copy, save as template ---------- */
+.dlg {
+    width: min(94vw, 560px); max-height: 90vh; padding: 0; overflow: hidden;
+    background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.dlg-wide { width: min(94vw, 920px); }
+.dlg::backdrop { background: rgba(10, 8, 6, .55); }
+.dlg-inner { display: flex; flex-direction: column; max-height: 90vh; }
+.dlg-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 18px; border-bottom: 2px solid var(--accent); }
+.dlg-head h2 { margin: 0; font-family: var(--head-font); font-size: 1.25rem; font-weight: 600; }
+[data-skin="ws"] .dlg-head { background: var(--bar); color: var(--bar-text); border-bottom-color: var(--bar-accent); }
+[data-skin="ws"] .dlg-head h2 { text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+[data-skin="ws"] .dlg-head .icon-btn:hover { background: var(--bar-fill); }
+.dlg-body { padding: 16px 18px; overflow: auto; }
+.dlg-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 18px; background: var(--surface); border-top: 1px solid var(--border-soft); }
+.dlg-foot .spacer { flex: 1; }
+.dlg-note { margin: 0 0 12px; font-size: .85rem; color: var(--muted); }
+.field { display: block; margin-bottom: 12px; font-size: .85rem; color: var(--muted); }
+.field input, .field select, .field textarea {
+    display: block; width: 100%; height: 40px; margin-top: 4px; padding: 0 10px;
+    background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: .95rem;
+}
+.field textarea { height: auto; padding: 8px 10px; }
+.field input.invalid { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.te-body { min-height: 260px; font-size: .88rem; border-radius: var(--radius); }
+.field-label { margin: 4px 0 6px; font-size: .85rem; color: var(--muted); }
+.np-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 22px; }
+.tpl-pick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.tpl-group { grid-column: 1 / -1; margin: 8px 0 0; font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.tpl-group:first-child { margin-top: 0; }
+.tpl-card {
+    min-height: 56px; padding: 8px 10px; text-align: left; line-height: 1.35;
+    background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius);
+}
+.tpl-card strong { display: block; font-size: .92rem; }
+.tpl-card span { display: block; color: var(--muted); font-size: .78rem; }
+.tpl-card:hover { border-color: var(--border); }
+.tpl-card[aria-checked="true"] { background: var(--bg); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.tpl-preview {
+    margin: 0; min-height: 300px; max-height: 52vh; overflow: auto; padding: 12px 14px; white-space: pre-wrap;
+    background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius);
+    font: .84rem/1.55 ui-monospace, 'Cascadia Mono', Consolas, monospace; color: var(--text);
+}
+.tpl-preview .ph { color: var(--muted); }
+.np-tags { margin: 8px 0 0; font-size: .85rem; color: var(--muted); }
+.badge { display: inline-block; margin-left: 6px; padding: 0 7px; border: 1px solid var(--border); border-radius: 999px; font-size: .72rem; color: var(--muted); vertical-align: 1px; white-space: nowrap; }
+.tpl-table td small { display: block; color: var(--muted); }
+.tpl-table td:last-child { text-align: right; white-space: nowrap; }
+.tpl-table .text-btn { margin-left: 12px; font-size: .85rem; }
+.tpl-table .text-btn.danger { color: var(--muted); }
+.radio-row { margin: 4px 0 10px; }
+.radio-row label { display: flex; align-items: flex-start; gap: 10px; margin: 8px 0; font-size: .9rem; }
+.radio-row small { color: var(--muted); }
+.radio-row input, .ck-row input { accent-color: var(--accent); margin-top: 3px; }
+.ck-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: .9rem; }
+.toast {
+    position: fixed; left: 50%; bottom: 20px; z-index: 70; transform: translateX(-50%);
+    max-width: calc(100vw - 32px); padding: 10px 16px; border-radius: var(--radius);
+    background: var(--text); color: var(--bg); font-size: .9rem; box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+}
+.toast[hidden] { display: none; }
+@media (max-width: 900px) {
+    .dlg, .dlg-wide { width: calc(100vw - 16px); max-width: none; max-height: calc(100dvh - 16px); }
+    .dlg-inner { max-height: calc(100dvh - 16px); }
+    .np-grid { grid-template-columns: 1fr; gap: 10px; }
+    .tpl-preview { min-height: 140px; max-height: 32vh; }
+    .tpl-tags-col, .tpl-table td:nth-child(2) { display: none; }
+    .tpl-table td:last-child { white-space: normal; }
+    .tpl-table .text-btn { margin: 4px 0 4px 10px; }
+    .dlg-foot .act { height: 44px; }
+}
+
 /* ---------- link preview ---------- */
 .preview {
     position: fixed; z-index: 50; width: 300px; padding: 12px 14px;
@@ -738,7 +811,7 @@ h1 {
             <span class="world">The Karrow Marches</span>
             <button class="icon-btn" type="button" aria-label="Close pages" id="closeNav"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </div>
-        <button class="nav-new" type="button">+ New page</button>
+        <button class="nav-new" type="button" id="newPageBtn">+ New page</button>
         <p class="nav-title">Pages</p>
         <ul class="tree">
             <li><details><summary>Factions <span class="count">3</span></summary><ul>
@@ -772,6 +845,7 @@ h1 {
             <a href="#">Codex home</a>
             <a href="#" data-open-graph>Graph view <span class="count">16 pages</span></a>
             <a href="#">Tags <span class="count">9</span></a>
+            <a href="#" data-open-dlg="tplDlg">Templates <span class="count" id="tplNavCount">11</span></a>
             <a href="#">Wanted pages <span class="count">3</span></a>
             <a href="#">Recent changes</a>
         </div>
@@ -785,7 +859,7 @@ h1 {
                 <a href="#">The Karrow Marches</a><span class="sep">›</span><a href="#">Places</a><span class="sep">›</span><a href="#">Settlements</a>
             </nav>
             <div class="page-head">
-                <h1>Karrow Ford</h1>
+                <h1 id="pageTitle">Karrow Ford</h1>
                 <div class="actions">
                     <a class="act" href="#" aria-current="page" id="readBtn">Read</a>
                     <button class="act primary" type="button" id="editBtn">
@@ -802,7 +876,10 @@ h1 {
                         <button role="menuitem" type="button">Rename</button>
                         <button role="menuitem" type="button">Aliases</button>
                         <button role="menuitem" type="button">Move to folder…</button>
-                        <button role="menuitem" type="button">Move to another world…</button>
+                        <button role="menuitem" type="button">Move to another codex…</button>
+                        <hr>
+                        <button role="menuitem" type="button" data-open-dlg="copyDlg">Copy page…</button>
+                        <button role="menuitem" type="button" data-open-dlg="saveTplDlg">Save as template…</button>
                         <hr>
                         <button role="menuitem" type="button" class="danger">Delete page</button>
                     </div>
@@ -1057,6 +1134,93 @@ Market day is the first of every week. Traders come down from the pass with wool
 
 <div class="preview" id="preview" role="tooltip" hidden></div>
 
+<!-- New page: title, folder and a template; the preview shows what the page will start with -->
+<dialog class="dlg dlg-wide" id="newPageDlg" aria-labelledby="npHead">
+    <div class="dlg-inner">
+        <header class="dlg-head"><h2 id="npHead">New page</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+        <div class="dlg-body np-grid">
+            <div>
+                <label class="field">Title<input type="text" id="npName" maxlength="120" placeholder="Name the page" autocomplete="off"></label>
+                <label class="field">Folder<select id="npFolder"><option>Top level</option><option>Factions</option><option>People</option><option>Places</option><option>Places › Landmarks</option><option selected>Places › Settlements</option></select></label>
+                <p class="field-label">Start from</p>
+                <div class="tpl-pick" id="tplPick" role="radiogroup" aria-label="Template"></div>
+            </div>
+            <div class="np-side">
+                <p class="field-label">Preview · <span id="npTplName"></span></p>
+                <pre class="tpl-preview" id="npPreview"></pre>
+                <p class="np-tags" id="npTags"></p>
+            </div>
+        </div>
+        <footer class="dlg-foot">
+            <button class="text-btn" type="button" data-open-dlg="tplDlg">Manage templates</button>
+            <span class="spacer"></span>
+            <button class="act" type="button" data-close>Cancel</button>
+            <button class="act primary" type="button" id="npCreate">Create page</button>
+        </footer>
+    </div>
+</dialog>
+
+<!-- Templates of this codex: built-in ones (copy to change) and the codex's own -->
+<dialog class="dlg dlg-wide" id="tplDlg" aria-labelledby="tplHead">
+    <div class="dlg-inner">
+        <header class="dlg-head"><h2 id="tplHead">Templates</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+        <div class="dlg-body">
+            <div id="tplList">
+                <p class="dlg-note">Templates of The Karrow Marches. The built-in ones are the same in every codex: copy one to change it. Changing a template never changes pages already made from it.</p>
+                <div class="table-wrap"><table class="data-table tpl-table"><thead><tr><th>Template</th><th class="tpl-tags-col">Adds tags</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="tplRows"></tbody></table></div>
+            </div>
+            <div id="tplEdit" hidden>
+                <label class="field">Name<input type="text" id="teName" maxlength="60"></label>
+                <label class="field">Description<input type="text" id="teDesc" maxlength="120" placeholder="One line, shown in the New page list"></label>
+                <label class="field">Adds tags<input type="text" id="teTags" placeholder="tavern, settlement"></label>
+                <label class="field">Text<textarea class="ed-body te-body" id="teBody" spellcheck="false"></textarea></label>
+                <p class="dlg-note">Write <code>{{title}}</code> where the page's title should go and <code>{{date}}</code> for the day it's made. <code>[[ ]]</code> leaves an empty link to fill in.</p>
+            </div>
+        </div>
+        <footer class="dlg-foot">
+            <button class="act" type="button" id="tplNew">+ New template</button>
+            <button class="act" type="button" id="tplBack" hidden>← All templates</button>
+            <span class="spacer"></span>
+            <button class="act" type="button" data-close id="tplClose">Close</button>
+            <button class="act primary" type="button" id="tplSave" hidden>Save template</button>
+        </footer>
+    </div>
+</dialog>
+
+<dialog class="dlg" id="copyDlg" aria-labelledby="cpHead">
+    <div class="dlg-inner">
+        <header class="dlg-head"><h2 id="cpHead">Copy Karrow Ford</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+        <div class="dlg-body">
+            <label class="field">Title of the copy<input type="text" id="cpName" maxlength="120" value="Karrow Ford (copy)"></label>
+            <label class="field">Codex<select id="cpCodex"><option>The Karrow Marches</option><option>The Sunken Isles</option></select></label>
+            <label class="field">Folder<select id="cpFolder"></select></label>
+            <label class="ck-row"><input type="checkbox" checked> Copy its tags (settlement, river)</label>
+            <label class="ck-row"><input type="checkbox" checked> Copy its 4 images</label>
+            <p class="dlg-note">The copy starts its own history. Aliases aren't copied, because they must be unique. <code>[[Links]]</code> are kept as written and point to pages with those titles in the codex you copy to.</p>
+        </div>
+        <footer class="dlg-foot"><span class="spacer"></span><button class="act" type="button" data-close>Cancel</button><button class="act primary" type="button" id="cpCreate">Copy page</button></footer>
+    </div>
+</dialog>
+
+<dialog class="dlg" id="saveTplDlg" aria-labelledby="stHead">
+    <div class="dlg-inner">
+        <header class="dlg-head"><h2 id="stHead">Save as template</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+        <div class="dlg-body">
+            <label class="field">Template name<input type="text" id="stName" maxlength="60" value="River settlement"></label>
+            <label class="field">Description<input type="text" id="stDesc" maxlength="120" value="A settlement on a crossing, with a market"></label>
+            <div class="radio-row" role="radiogroup" aria-label="What to keep">
+                <label><input type="radio" name="stKeep" value="headings" checked> <span><strong>Headings only</strong><br><small>The sections of Karrow Ford, empty, ready to fill in</small></span></label>
+                <label><input type="radio" name="stKeep" value="all"> <span><strong>All the text</strong><br><small>Everything as written, to edit after</small></span></label>
+            </div>
+            <label class="ck-row"><input type="checkbox" id="stTags" checked> New pages get its tags (settlement, river)</label>
+            <p class="dlg-note">Images aren't kept in templates. The template goes into The Karrow Marches, for everyone who can edit it.</p>
+        </div>
+        <footer class="dlg-foot"><span class="spacer"></span><button class="act" type="button" data-close>Cancel</button><button class="act primary" type="button" id="stSave">Save template</button></footer>
+    </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
 <dialog class="lightbox" id="lightbox" aria-labelledby="lbCap">
     <figure>
         <div class="lb-img" id="lbImg"></div>
@@ -1072,7 +1236,7 @@ document.addEventListener('DOMContentLoaded', function () {
         a: 'Encyclopedia (Wikipedia): white page, serif headings, Read / Edit / History tabs on the title rule, infobox on the right, folder tree on the left.',
         b: 'Vault (Obsidian): three panes, open-page tabs, properties instead of an infobox, outline, backlinks with context and a local graph on the right.',
         c: 'Game wiki (Fextralife): dark header and a section bar instead of a side tree, framed page, banded headings, sidebar boxes for siblings, backlinks, wanted pages and recent changes.',
-        d: 'Chosen direction: B\'s layout with C\'s header bar, condensed headings, banded sections and boxed side panel (now with Wanted pages), in the app\'s Parchment / Candlelight colours. No map: pages hold images instead. Click one to enlarge it, or press Edit to add your own (drop, paste or choose). Graph view: the local graph in the side panel, or Graph view in the left nav.'
+        d: 'Chosen direction: B\'s layout with C\'s header bar, condensed headings, banded sections and boxed side panel (now with Wanted pages), in the app\'s Parchment / Candlelight colours. No map: pages hold images instead. Click one to enlarge it, or press Edit to add your own (drop, paste or choose). Graph view: the local graph in the side panel, or Graph view in the left nav. Templates: + New page (or any missing link), Templates in the left nav, and Copy page / Save as template under More.'
     };
     function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
     function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -1118,7 +1282,8 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('searchBtn').addEventListener('click', function () { top.classList.add('searching'); q.focus(); });
     q.addEventListener('blur', function () { top.classList.remove('searching'); });
     document.addEventListener('keydown', function (e) {
-        if (e.key === '/' && document.activeElement !== q) { e.preventDefault(); top.classList.add('searching'); q.focus(); }
+        var typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) || document.activeElement.isContentEditable;
+        if (e.key === '/' && !typing) { e.preventDefault(); top.classList.add('searching'); q.focus(); }
         if (e.key === 'Escape') {
             if (document.body.classList.contains('nav-open')) setNav(false);
             closeMenu();
@@ -1196,7 +1361,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // edit view
     var page = document.getElementById('main'), editor = document.getElementById('editor');
     var readBtn = document.getElementById('readBtn'), editBtn = document.getElementById('editBtn');
+    var pageTitle = document.getElementById('pageTitle'), origTitle = pageTitle.textContent, origBody = null;
     function setEditing(on) {
+        if (!on && origBody !== null) { pageTitle.textContent = origTitle; document.getElementById('edBody').value = origBody; origBody = null; } // leave a mock "new page"
         page.classList.toggle('editing', on);
         editor.hidden = !on;
         if (on) { readBtn.removeAttribute('aria-current'); editBtn.setAttribute('aria-current', 'page'); }
@@ -1536,9 +1703,190 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     document.querySelectorAll('[data-open-graph]').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); setEditing(false); setGraph(true); }); });
     document.getElementById('gvBack').addEventListener('click', function () { setGraph(false); });
-    document.getElementById('gvCardOpen').addEventListener('click', function () { select(null); setGraph(false); });
+    document.getElementById('gvCardOpen').addEventListener('click', function () {
+        var d = selected && BY[selected]; select(null);
+        if (d && d.missing) openNewPage(d.t); else setGraph(false);
+    });
     pageTab.addEventListener('click', function () { setGraph(false); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !card.hidden) select(null); });
+
+    // ---------- templates ----------
+    var TEMPLATES = [
+        { id: 'blank', name: 'Blank page', desc: 'Start from nothing', tags: [], body: '' },
+        { id: 'session', name: 'Session', desc: 'Notes from one game session', tags: ['session'],
+          body: '**Date:** {{date}}\n**Who was there:** [[ ]], [[ ]]\n\n## Summary\n\n_What happened, in a line or two._\n\n## What happened\n\n1. \n\n## People met\n\n- [[ ]]\n\n## Loot and rewards\n\n- \n\n## Loose ends\n\n- \n\n## Next time\n\n' },
+        { id: 'character', name: 'Character', desc: 'A person, player or not', tags: ['npc'],
+          body: '_Who {{title}} is, in one line._\n\n**Lives in:** [[ ]]\n**Belongs to:** [[ ]]\n\n## Appearance\n\n## Personality\n\n## Background\n\n## Relationships\n\n- [[ ]]: \n\n## Notes\n\n' },
+        { id: 'settlement', name: 'Settlement', desc: 'A village, town or city', tags: ['settlement'],
+          body: '_What {{title}} is, in one line._\n\n**Population:** \n**Ruled by:** [[ ]]\n**Region:** [[ ]]\n\n## Places of note\n\n- [[ ]]\n\n## People of note\n\n- [[ ]]\n\n## History\n\n## Rumours\n\n- \n' },
+        { id: 'landmark', name: 'Landmark', desc: 'A place worth a page of its own', tags: ['landmark'],
+          body: '_What {{title}} is and where it stands, in one line._\n\n**Near:** [[ ]]\n\n## Description\n\n## History\n\n## Dangers\n\n## Rumours\n\n- \n' },
+        { id: 'event', name: 'Event', desc: 'Something that happened: a battle, a fire, a wedding', tags: ['event'],
+          body: '_What happened, in one line._\n\n**When:** \n**Where:** [[ ]]\n**Who:** [[ ]], [[ ]]\n\n## What happened\n\n## Why it matters\n\n## What came of it\n\n- \n' },
+        { id: 'faction', name: 'Faction', desc: 'A guild, cult, family or army', tags: ['faction'],
+          body: '_Who {{title}} are, in one line._\n\n**Led by:** [[ ]]\n**Based in:** [[ ]]\n\n## Goals\n\n## Members\n\n- [[ ]]\n\n## Allies and enemies\n\n- \n\n## Resources\n\n' },
+        { id: 'item', name: 'Item', desc: 'An object, relic or treasure', tags: ['item'],
+          body: '_What {{title}} is, in one line._\n\n**Held by:** [[ ]]\n\n## Appearance\n\n## What it does\n\n## History\n\n## Where it is now\n\n' },
+        { id: 'lore', name: 'Lore', desc: 'History, legends, religion, customs', tags: ['lore'],
+          body: '_What this is about, in one line._\n\n## The story\n\n## What people believe\n\n## Sources\n\n- [[ ]]\n' },
+        { id: 'tavern', name: 'Tavern', desc: 'An inn, its landlord and its regulars', tags: ['tavern', 'settlement'], by: 'Roy',
+          body: '**Landlord:** [[ ]]\n**A room costs:** \n**In:** [[ ]]\n\n## The common room\n\n## Regulars\n\n- [[ ]]\n\n## On the menu\n\n## Rumours heard here\n\n- \n' },
+        { id: 'waystone', name: 'Waystone', desc: 'One of the stones along the road', tags: ['waystone', 'mystery'], by: 'Testy',
+          body: '**Number on the road:** \n**Glow:** warm / cold / dark\n**Between:** [[ ]] and [[ ]]\n\n## Where it stands\n\n## What is carved on it\n\n## Odd happenings\n\n- \n' }
+    ];
+    var TODAY = 'Nov 20, 2026', chosenTpl = 'blank';
+    var toastEl = document.getElementById('toast'), toastTimer;
+    function toast(msg) { toastEl.textContent = msg; toastEl.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(function () { toastEl.hidden = true; }, 3200); }
+    function tplById(id) { return TEMPLATES.filter(function (t) { return t.id === id; })[0]; }
+    function fillTpl(t, title) { return t.body.replace(/\{\{title\}\}/g, title || 'Untitled').replace(/\{\{date\}\}/g, TODAY); }
+    function openDlg(id) {
+        document.querySelectorAll('dialog.dlg[open]').forEach(function (d) { d.close(); });
+        closeMenu();
+        var d = document.getElementById(id); if (d.showModal) d.showModal();
+        if (id === 'tplDlg') showTplList();
+        if (id === 'copyDlg') fillCopyFolders();
+    }
+    document.addEventListener('click', function (e) {
+        var o = e.target.closest('[data-open-dlg]'); if (o) { e.preventDefault(); openDlg(o.dataset.openDlg); return; }
+        var c = e.target.closest('dialog.dlg [data-close]'); if (c) c.closest('dialog').close();
+        var m = e.target.closest('a.wl-missing'); if (m) { e.preventDefault(); openNewPage(m.textContent); }
+    });
+    document.querySelectorAll('dialog.dlg').forEach(function (d) { d.addEventListener('click', function (e) { if (e.target === d) d.close(); }); });
+
+    // new page
+    var npName = document.getElementById('npName');
+    function renderPick() {
+        var box = document.getElementById('tplPick'); box.textContent = '';
+        [['Built-in', function (t) { return !t.by; }], ['This codex', function (t) { return !!t.by; }]].forEach(function (g) {
+            var list = TEMPLATES.filter(g[1]); if (!list.length) return;
+            var h = document.createElement('p'); h.className = 'tpl-group'; h.textContent = g[0]; box.append(h);
+            list.forEach(function (t) {
+                var b = document.createElement('button'); b.type = 'button'; b.className = 'tpl-card'; b.setAttribute('role', 'radio');
+                b.setAttribute('aria-checked', String(t.id === chosenTpl)); b.dataset.tpl = t.id;
+                var s = document.createElement('strong'); s.textContent = t.name;
+                var d = document.createElement('span'); d.textContent = t.by ? t.desc + ' · by ' + t.by : t.desc;
+                b.append(s, d); box.append(b);
+            });
+        });
+    }
+    function renderPreview() {
+        var t = tplById(chosenTpl) || TEMPLATES[0];
+        document.getElementById('npTplName').textContent = t.name;
+        var pre = document.getElementById('npPreview'); pre.textContent = '';
+        if (!t.body) { var ph = document.createElement('span'); ph.className = 'ph'; ph.textContent = 'An empty page.'; pre.append(ph); }
+        else pre.textContent = fillTpl(t, npName.value.trim());
+        document.getElementById('npTags').textContent = t.tags.length ? 'Adds tags: ' + t.tags.join(', ') : '';
+    }
+    document.getElementById('tplPick').addEventListener('click', function (e) {
+        var b = e.target.closest('.tpl-card'); if (!b) return;
+        chosenTpl = b.dataset.tpl;
+        document.querySelectorAll('#tplPick .tpl-card').forEach(function (c) { c.setAttribute('aria-checked', String(c === b)); });
+        renderPreview();
+    });
+    npName.addEventListener('input', function () { npName.classList.remove('invalid'); renderPreview(); });
+    function openNewPage(title) {
+        openDlg('newPageDlg');
+        npName.value = title || ''; npName.classList.remove('invalid');
+        renderPick(); renderPreview(); npName.focus();
+    }
+    document.getElementById('newPageBtn').addEventListener('click', function () { if (document.body.classList.contains('nav-open')) setNav(false); openNewPage(''); });
+    document.getElementById('npCreate').addEventListener('click', function () {
+        var name = npName.value.trim();
+        if (!name) { npName.classList.add('invalid'); npName.focus(); return; }
+        var t = tplById(chosenTpl);
+        document.getElementById('newPageDlg').close();
+        setGraph(false); setEditing(true);
+        var ed = document.getElementById('edBody');
+        if (origBody === null) origBody = ed.value;
+        ed.value = fillTpl(t, name); pageTitle.textContent = name;
+        ed.focus(); ed.setSelectionRange(0, 0);
+        toast('“' + name + '” started from the ' + t.name + ' template. Cancel to go back to Karrow Ford.');
+    });
+    npName.addEventListener('keydown', function (e) { if (e.key === 'Enter') document.getElementById('npCreate').click(); });
+
+    // manage templates
+    var editingTpl = null;
+    function tplMode(edit) {
+        document.getElementById('tplList').hidden = edit; document.getElementById('tplEdit').hidden = !edit;
+        document.getElementById('tplNew').hidden = edit; document.getElementById('tplBack').hidden = !edit;
+        document.getElementById('tplSave').hidden = !edit; document.getElementById('tplClose').hidden = edit;
+    }
+    function showTplList() {
+        tplMode(false);
+        document.getElementById('tplNavCount').textContent = TEMPLATES.length;
+        var rows = document.getElementById('tplRows'); rows.textContent = '';
+        TEMPLATES.forEach(function (t) {
+            var tr = document.createElement('tr');
+            var a = document.createElement('td'), n = document.createElement('strong'); n.textContent = t.name;
+            var badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = t.by ? 'by ' + t.by : 'Built-in';
+            var d = document.createElement('small'); d.textContent = t.desc; a.append(n, badge, d);
+            var tg = document.createElement('td'); t.tags.forEach(function (x) { var c = document.createElement('span'); c.className = 'chip'; c.textContent = x; tg.append(c, ' '); });
+            var act = document.createElement('td');
+            var acts = [['use', 'Use']];
+            if (t.id !== 'blank') acts.push(['copy', 'Copy']);
+            if (t.by) acts.push(['edit', 'Edit'], ['delete', 'Delete']);
+            acts.forEach(function (x) { var b = document.createElement('button'); b.type = 'button'; b.className = 'text-btn' + (x[0] === 'delete' ? ' danger' : ''); b.dataset.act = x[0]; b.dataset.tpl = t.id; b.textContent = x[1]; act.append(b); });
+            tr.append(a, tg, act); rows.append(tr);
+        });
+    }
+    function editTpl(t) {
+        editingTpl = t; tplMode(true);
+        document.getElementById('teName').value = t ? t.name : '';
+        document.getElementById('teDesc').value = t ? t.desc : '';
+        document.getElementById('teTags').value = t ? t.tags.join(', ') : '';
+        document.getElementById('teBody').value = t ? t.body : '## \n\n';
+        document.getElementById('teName').focus();
+    }
+    document.getElementById('tplRows').addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-act]'); if (!b) return;
+        var t = tplById(b.dataset.tpl);
+        if (b.dataset.act === 'use') { chosenTpl = t.id; openNewPage(''); }
+        if (b.dataset.act === 'edit') editTpl(t);
+        if (b.dataset.act === 'copy') { var c = Object.assign({}, t, { id: 'c' + Date.now(), name: t.name + ' (copy)', by: 'Testy', tags: t.tags.slice() }); TEMPLATES.push(c); editTpl(c); }
+        if (b.dataset.act === 'delete' && confirm('Delete the ' + t.name + ' template? Pages already made from it stay as they are.')) {
+            TEMPLATES.splice(TEMPLATES.indexOf(t), 1); showTplList(); toast('Deleted the ' + t.name + ' template.');
+        }
+    });
+    document.getElementById('tplNew').addEventListener('click', function () { editTpl(null); });
+    document.getElementById('tplBack').addEventListener('click', showTplList);
+    document.getElementById('tplSave').addEventListener('click', function () {
+        var nameEl = document.getElementById('teName'), name = nameEl.value.trim();
+        if (!name) { nameEl.classList.add('invalid'); nameEl.focus(); return; }
+        var t = editingTpl || { id: 'c' + Date.now(), by: 'Testy' };
+        t.name = name; t.desc = document.getElementById('teDesc').value.trim() || 'Made in this codex';
+        t.tags = document.getElementById('teTags').value.split(',').map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
+        t.body = document.getElementById('teBody').value;
+        if (!editingTpl) TEMPLATES.push(t);
+        showTplList(); toast('Saved the ' + name + ' template.');
+    });
+
+    // copy page
+    var FOLDERS = { 'The Karrow Marches': ['Top level', 'Factions', 'People', 'Places', 'Places › Landmarks', 'Places › Settlements'], 'The Sunken Isles': ['Top level', 'Islands', 'People', 'Ships'] };
+    var cpCodex = document.getElementById('cpCodex'), cpFolder = document.getElementById('cpFolder');
+    function fillCopyFolders() {
+        cpFolder.textContent = '';
+        FOLDERS[cpCodex.value].forEach(function (f) { var o = document.createElement('option'); o.textContent = f; cpFolder.append(o); });
+        if (cpCodex.value === 'The Karrow Marches') cpFolder.value = 'Places › Settlements';
+    }
+    cpCodex.addEventListener('change', fillCopyFolders);
+    document.getElementById('cpCreate').addEventListener('click', function () {
+        var name = document.getElementById('cpName').value.trim() || 'Karrow Ford (copy)';
+        document.getElementById('copyDlg').close();
+        toast('Copied to ' + cpCodex.value + ' › ' + cpFolder.value + ' as “' + name + '”.');
+    });
+
+    // save as template
+    document.getElementById('stSave').addEventListener('click', function () {
+        var name = document.getElementById('stName').value.trim() || 'Karrow Ford';
+        var all = document.querySelector('input[name="stKeep"]:checked').value === 'all';
+        var text = origBody !== null ? origBody : document.getElementById('edBody').value;
+        var bodyText = all ? text : text.split('\n').filter(function (l) { return /^#{2,3} /.test(l); }).join('\n\n\n') + '\n\n';
+        TEMPLATES.push({ id: 'c' + Date.now(), name: name, desc: document.getElementById('stDesc').value.trim() || 'Made from Karrow Ford', by: 'Testy',
+            tags: document.getElementById('stTags').checked ? ['settlement', 'river'] : [], body: bodyText });
+        document.getElementById('saveTplDlg').close();
+        document.getElementById('tplNavCount').textContent = TEMPLATES.length;
+        toast('Saved “' + name + '” as a template. It is in the New page list now.');
+    });
 
     // outline highlight (Vault)
     var heads = Array.prototype.slice.call(document.querySelectorAll('.article h2[id], .article h3[id]'));
