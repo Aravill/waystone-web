@@ -30,13 +30,13 @@ func codexFolderName(s string) (string, bool) {
 
 const codexFolderNameMsg = "folder name must be 1 to 80 characters and can't contain / or control characters"
 
-// codexFolderPath returns the folders from the world's top level down to folderID.
-func codexFolderPath(worldID, folderID string) ([]map[string]string, error) {
+// codexFolderPath returns the folders from the codex's top level down to folderID.
+func codexFolderPath(codexID, folderID string) ([]map[string]string, error) {
 	path := []map[string]string{}
 	if folderID == "" {
 		return path, nil
 	}
-	all, err := db.GetFolders(worldID)
+	all, err := db.GetFolders(codexID)
 	if err != nil {
 		return nil, err
 	}
@@ -64,43 +64,40 @@ func codexFolderError(w http.ResponseWriter, err error, what string) {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "folder_name_taken"})
 	case errors.Is(err, db.ErrParentNotFound):
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error(), "code": "parent_not_found"})
-	case errors.Is(err, db.ErrFolderCycle), errors.Is(err, db.ErrFolderTooDeep), errors.Is(err, db.ErrNoFolders), errors.Is(err, db.ErrWorldNotFound):
+	case errors.Is(err, db.ErrFolderCycle), errors.Is(err, db.ErrFolderTooDeep), errors.Is(err, db.ErrCodexNotFound):
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 	default:
 		codexStoreError(w, err, what)
 	}
 }
 
-// handleWorldFolders is the light folder list ({id, parent_id, name}) for the folder pickers.
-func handleWorldFolders(w http.ResponseWriter, r *http.Request, apiWorldID string) {
+// handleCodexFolders is the light folder list ({id, parent_id, name}) for the folder pickers.
+func handleCodexFolders(w http.ResponseWriter, r *http.Request, id string) {
 	if _, ok := codexUserID(w, r); !ok {
 		return
 	}
-	id := codexWorldParam(apiWorldID)
 	out := []map[string]string{}
-	if id != "" {
-		worlds, _, err := codexWorlds()
-		if err != nil {
-			codexServerError(w, "retrieve worlds")
-			return
-		}
-		if _, found := worlds[id]; !found {
-			writeJSONError(w, http.StatusNotFound, db.ErrWorldNotFound.Error())
-			return
-		}
-		folders, err := db.GetFolders(id)
-		if err != nil {
-			codexServerError(w, "retrieve folders")
-			return
-		}
-		for _, f := range folders {
-			out = append(out, map[string]string{"id": f.ID, "parent_id": f.ParentID, "name": f.Name})
-		}
+	codices, _, err := codexCodices()
+	if err != nil {
+		codexServerError(w, "retrieve codices")
+		return
+	}
+	if _, found := codices[id]; !found {
+		writeJSONError(w, http.StatusNotFound, db.ErrCodexNotFound.Error())
+		return
+	}
+	folders, err := db.GetFolders(id)
+	if err != nil {
+		codexServerError(w, "retrieve folders")
+		return
+	}
+	for _, f := range folders {
+		out = append(out, map[string]string{"id": f.ID, "parent_id": f.ParentID, "name": f.Name})
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"folders": out})
 }
 
-func handleCreateFolder(w http.ResponseWriter, r *http.Request, apiWorldID string) {
+func handleCreateFolder(w http.ResponseWriter, r *http.Request, codexID string) {
 	userID, ok := codexUserID(w, r)
 	if !ok {
 		return
@@ -117,7 +114,7 @@ func handleCreateFolder(w http.ResponseWriter, r *http.Request, apiWorldID strin
 		writeJSONError(w, http.StatusBadRequest, codexFolderNameMsg)
 		return
 	}
-	f := models.Folder{ID: db.GenerateUUID(), WorldID: codexWorldParam(apiWorldID), ParentID: req.ParentID, Name: name, CreatedBy: userID}
+	f := models.Folder{ID: db.GenerateUUID(), CodexID: codexID, ParentID: req.ParentID, Name: name, CreatedBy: userID}
 	if err := db.CreateFolder(f); err != nil {
 		codexFolderError(w, err, "create folder")
 		return
@@ -205,7 +202,7 @@ func handleSetPageFolder(w http.ResponseWriter, r *http.Request, id string) {
 		codexServerError(w, "retrieve page")
 		return
 	}
-	path, err := codexFolderPath(page.WorldID, page.FolderID)
+	path, err := codexFolderPath(page.CodexID, page.FolderID)
 	if err != nil {
 		codexServerError(w, "retrieve folders")
 		return

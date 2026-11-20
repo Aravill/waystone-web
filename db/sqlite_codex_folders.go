@@ -31,11 +31,11 @@ func folderHeight(all []models.Folder, id string) int {
 	return h + 1
 }
 
-const folderColumns = `id, world_id, parent_id, name, created_by, created_at, updated_at`
+const folderColumns = `id, codex_id, parent_id, name, created_by, created_at, updated_at`
 
 func scanFolder(row rowScanner) (models.Folder, error) {
 	var f models.Folder
-	err := row.Scan(&f.ID, &f.WorldID, &f.ParentID, &f.Name, &f.CreatedBy, &f.CreatedAt, &f.UpdatedAt)
+	err := row.Scan(&f.ID, &f.CodexID, &f.ParentID, &f.Name, &f.CreatedBy, &f.CreatedAt, &f.UpdatedAt)
 	return f, err
 }
 
@@ -47,8 +47,8 @@ func folderByID(q querier, id string) (models.Folder, error) {
 	return f, err
 }
 
-func foldersOf(q querier, worldID string) ([]models.Folder, error) {
-	rows, err := q.Query(`SELECT `+folderColumns+` FROM codex_folders WHERE world_id = ?`, worldID)
+func foldersOf(q querier, codexID string) ([]models.Folder, error) {
+	rows, err := q.Query(`SELECT `+folderColumns+` FROM codex_folders WHERE codex_id = ?`, codexID)
 	if err != nil {
 		return nil, err
 	}
@@ -74,28 +74,25 @@ func foldersOf(q querier, worldID string) ([]models.Folder, error) {
 	return out, nil
 }
 
-// folderInWorld checks that a page's folder ("" = top level) belongs to the page's world.
-func folderInWorld(q querier, folderID, worldID string) error {
+// folderInCodex checks that a page's folder ("" = top level) belongs to the page's codex.
+func folderInCodex(q querier, folderID, codexID string) error {
 	if folderID == "" {
 		return nil
-	}
-	if worldID == "" {
-		return ErrNoFolders
 	}
 	f, err := folderByID(q, folderID)
 	if err != nil {
 		return err
 	}
-	if f.WorldID != worldID {
+	if f.CodexID != codexID {
 		return ErrFolderNotFound
 	}
 	return nil
 }
 
-// siblingNameFree reports whether no folder under parentID in the world (other than exceptID)
+// siblingNameFree reports whether no folder under parentID in the codex (other than exceptID)
 // already has this name by NormName.
-func siblingNameFree(q querier, worldID, parentID, name, exceptID string) (bool, error) {
-	all, err := foldersOf(q, worldID)
+func siblingNameFree(q querier, codexID, parentID, name, exceptID string) (bool, error) {
+	all, err := foldersOf(q, codexID)
 	if err != nil {
 		return false, err
 	}
@@ -107,11 +104,11 @@ func siblingNameFree(q querier, worldID, parentID, name, exceptID string) (bool,
 	return true, nil
 }
 
-// GetFolders lists a world's folders ordered by name.
-func (s *SQLiteStore) GetFolders(worldID string) ([]models.Folder, error) {
+// GetFolders lists a codex's folders ordered by name.
+func (s *SQLiteStore) GetFolders(codexID string) ([]models.Folder, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	return foldersOf(s.db, worldID)
+	return foldersOf(s.db, codexID)
 }
 
 // GetFolder returns nil, nil when the folder does not exist.
@@ -128,8 +125,8 @@ func (s *SQLiteStore) GetFolder(id string) (*models.Folder, error) {
 	return &f, nil
 }
 
-// CreateFolder adds a folder under f.ParentID ("" = the world's top level). Names are unique
-// among siblings; the Unsorted folder (world "") can't have folders.
+// CreateFolder adds a folder under f.ParentID ("" = the codex's top level). Names are unique
+// among siblings.
 func (s *SQLiteStore) CreateFolder(f models.Folder) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -138,10 +135,7 @@ func (s *SQLiteStore) CreateFolder(f models.Folder) error {
 		return err
 	}
 	defer tx.Rollback()
-	if f.WorldID == "" {
-		return ErrNoFolders
-	}
-	if err := worldExists(tx, f.WorldID); err != nil {
+	if err := codexExists(tx, f.CodexID); err != nil {
 		return err
 	}
 	if f.ParentID != "" {
@@ -152,10 +146,10 @@ func (s *SQLiteStore) CreateFolder(f models.Folder) error {
 		if err != nil {
 			return err
 		}
-		if parent.WorldID != f.WorldID {
+		if parent.CodexID != f.CodexID {
 			return ErrParentNotFound
 		}
-		all, err := foldersOf(tx, f.WorldID)
+		all, err := foldersOf(tx, f.CodexID)
 		if err != nil {
 			return err
 		}
@@ -167,14 +161,14 @@ func (s *SQLiteStore) CreateFolder(f models.Folder) error {
 			return ErrFolderTooDeep
 		}
 	}
-	if free, err := siblingNameFree(tx, f.WorldID, f.ParentID, f.Name, ""); err != nil {
+	if free, err := siblingNameFree(tx, f.CodexID, f.ParentID, f.Name, ""); err != nil {
 		return err
 	} else if !free {
 		return ErrFolderNameTaken
 	}
 	now := nowUTC()
 	if _, err := tx.Exec(`INSERT INTO codex_folders (`+folderColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		f.ID, f.WorldID, f.ParentID, f.Name, f.CreatedBy, now, now); err != nil {
+		f.ID, f.CodexID, f.ParentID, f.Name, f.CreatedBy, now, now); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -192,7 +186,7 @@ func (s *SQLiteStore) RenameFolder(id, name string) error {
 	if err != nil {
 		return err
 	}
-	if free, err := siblingNameFree(tx, f.WorldID, f.ParentID, name, id); err != nil {
+	if free, err := siblingNameFree(tx, f.CodexID, f.ParentID, name, id); err != nil {
 		return err
 	} else if !free {
 		return ErrFolderNameTaken
@@ -203,7 +197,7 @@ func (s *SQLiteStore) RenameFolder(id, name string) error {
 	return tx.Commit()
 }
 
-// MoveFolder re-parents a folder inside its world ("" = top level). It can't go inside itself
+// MoveFolder re-parents a folder inside its codex ("" = top level). It can't go inside itself
 // or one of its descendants.
 func (s *SQLiteStore) MoveFolder(id, newParentID string) error {
 	s.mutex.Lock()
@@ -217,7 +211,7 @@ func (s *SQLiteStore) MoveFolder(id, newParentID string) error {
 	if err != nil {
 		return err
 	}
-	all, err := foldersOf(tx, f.WorldID)
+	all, err := foldersOf(tx, f.CodexID)
 	if err != nil {
 		return err
 	}
@@ -243,7 +237,7 @@ func (s *SQLiteStore) MoveFolder(id, newParentID string) error {
 	if newParentID != "" && folderDepth(byID, newParentID)+folderHeight(all, id) > MaxFolderDepth {
 		return ErrFolderTooDeep
 	}
-	if free, err := siblingNameFree(tx, f.WorldID, newParentID, f.Name, id); err != nil {
+	if free, err := siblingNameFree(tx, f.CodexID, newParentID, f.Name, id); err != nil {
 		return err
 	} else if !free {
 		return ErrFolderNameTaken
@@ -255,7 +249,7 @@ func (s *SQLiteStore) MoveFolder(id, newParentID string) error {
 }
 
 // DeleteFolder removes only the folder row: its sub-folders and pages move up one level, into
-// its parent or the world's top level. Foreign keys are off, so this is done by hand. It is
+// its parent or the codex's top level. Foreign keys are off, so this is done by hand. It is
 // refused (ErrFolderNameTaken) when a sub-folder's name is already used in the parent.
 func (s *SQLiteStore) DeleteFolder(id string) (int, int, error) {
 	s.mutex.Lock()
@@ -269,7 +263,7 @@ func (s *SQLiteStore) DeleteFolder(id string) (int, int, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	all, err := foldersOf(tx, f.WorldID)
+	all, err := foldersOf(tx, f.CodexID)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -289,7 +283,7 @@ func (s *SQLiteStore) DeleteFolder(id string) (int, int, error) {
 		}
 	}
 	now := nowUTC()
-	if _, err := tx.Exec(`UPDATE codex_folders SET parent_id = ?, updated_at = ? WHERE parent_id = ? AND world_id = ?`, f.ParentID, now, id, f.WorldID); err != nil {
+	if _, err := tx.Exec(`UPDATE codex_folders SET parent_id = ?, updated_at = ? WHERE parent_id = ? AND codex_id = ?`, f.ParentID, now, id, f.CodexID); err != nil {
 		return 0, 0, err
 	}
 	res, err := tx.Exec(`UPDATE pages SET folder_id = ? WHERE folder_id = ?`, f.ParentID, id)
@@ -306,7 +300,7 @@ func (s *SQLiteStore) DeleteFolder(id string) (int, int, error) {
 	return int(n), children, tx.Commit()
 }
 
-// SetPageFolder files a page in a folder of its own world ("" = top level). Links don't change.
+// SetPageFolder files a page in a folder of its own codex ("" = top level). Links don't change.
 func (s *SQLiteStore) SetPageFolder(pageID, folderID string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -315,11 +309,11 @@ func (s *SQLiteStore) SetPageFolder(pageID, folderID string) error {
 		return err
 	}
 	defer tx.Rollback()
-	world, _, err := pageWorld(tx, pageID)
+	codex, _, err := pageCodex(tx, pageID)
 	if err != nil {
 		return err
 	}
-	if err := folderInWorld(tx, folderID, world); err != nil {
+	if err := folderInCodex(tx, folderID, codex); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`UPDATE pages SET folder_id = ? WHERE id = ?`, folderID, pageID); err != nil {

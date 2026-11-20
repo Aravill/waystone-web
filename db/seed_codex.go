@@ -13,26 +13,26 @@ import (
 	"waystone-web/models"
 )
 
-// seedCodex adds the demo world, its pages, a map with pins and one Unsorted page. Pages are
+// seedCodex adds the demo codex, its pages, and a map with pins (the map isn't shown yet). Pages are
 // created first and linked by title, so the missing link ([[The Ember Choir]]) and the missing
 // pin ("Hollow Tor") stay missing on purpose. Runs only on a fresh demo database.
 func seedCodex() error {
-	w := config.InitialWorld
+	w := config.InitialCodex
 	now := time.Now().UTC().Format(time.RFC3339)
 	w.CreatedAt, w.UpdatedAt = now, now
-	if err := store.CreateWorld(w); err != nil {
-		return fmt.Errorf("failed to seed world: %w", err)
+	if err := store.CreateCodex(w); err != nil {
+		return fmt.Errorf("failed to seed codex: %w", err)
 	}
-	if err := store.SetCampaignWorld(config.InitialWorldCampaignID, w.ID); err != nil {
-		return fmt.Errorf("failed to set the seed game's world: %w", err)
+	if err := store.SetCampaignCodex(config.InitialCodexCampaignID, w.ID); err != nil {
+		return fmt.Errorf("failed to set the seed game's codex: %w", err)
 	}
 	folders := map[string]string{} // "parent/name" -> folder id
-	seedFolder := func(worldID, parent, name, userID string) (string, error) {
+	seedFolder := func(codexID, parent, name, userID string) (string, error) {
 		key := parent + "/" + name
 		if id, ok := folders[key]; ok {
 			return id, nil
 		}
-		f := models.Folder{ID: GenerateUUID(), WorldID: worldID, ParentID: parent, Name: name, CreatedBy: userID}
+		f := models.Folder{ID: GenerateUUID(), CodexID: codexID, ParentID: parent, Name: name, CreatedBy: userID}
 		if err := store.CreateFolder(f); err != nil {
 			return "", fmt.Errorf("failed to seed folder %q: %w", name, err)
 		}
@@ -41,18 +41,16 @@ func seedCodex() error {
 	}
 	create := func(sp config.CodexSeedPage) (string, error) {
 		p := models.Page{ID: GenerateUUID(), Kind: models.PageLore, Title: sp.Title, Aliases: sp.Aliases, AuthorID: sp.AuthorID}
-		if sp.InWorld {
-			p.WorldID = w.ID
-			parent := ""
-			for _, name := range sp.Folder {
-				id, err := seedFolder(w.ID, parent, name, sp.AuthorID)
-				if err != nil {
-					return "", err
-				}
-				parent = id
+		p.CodexID = w.ID
+		parent := ""
+		for _, name := range sp.Folder {
+			id, err := seedFolder(w.ID, parent, name, sp.AuthorID)
+			if err != nil {
+				return "", err
 			}
-			p.FolderID = parent
+			parent = id
 		}
+		p.FolderID = parent
 		if err := store.CreatePage(p, sp.Body); err != nil {
 			return "", fmt.Errorf("failed to seed page %q: %w", sp.Title, err)
 		}
@@ -63,7 +61,7 @@ func seedCodex() error {
 		}
 		return p.ID, nil
 	}
-	// A page with a map and pins. Pin targets are pages of the world, so these run after all pages exist.
+	// A page with a map and pins. Pin targets are pages of the codex, so these run after all pages exist.
 	seedMap := func(pageID, authorID string, pins []config.CodexSeedPin) error {
 		file := GenerateUUID() + ".png"
 		img := demoMapPNG()

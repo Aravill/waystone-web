@@ -1,4 +1,4 @@
-// Codex page: /codex (home), /codex/w/{id} (world), /codex/p/{id}/{slug}[/edit|/history] (page).
+// Codices page: /codices (home), /codices/c/{id} (codex), /codices/p/{id}/{slug}[/edit|/history] (page).
 // Relies on campaigns.js (escapeHtml, renderMarkdown, journalByline, userAvatarHtml), journal.js
 // (diffWords, diffHtml) and codex-editor.js (createCodexEditor). One component picks the screen
 // from the path. Top-level names here must not clash with those scripts' (const clashes throw).
@@ -14,7 +14,7 @@ function codexSlug(title) {
 }
 
 function codexPageUrl(p, tail = '') {
-    return `/codex/p/${encodeURIComponent(p.id)}/${encodeURIComponent(codexSlug(p.title))}${tail}`;
+    return `/codices/p/${encodeURIComponent(p.id)}/${encodeURIComponent(codexSlug(p.title))}${tail}`;
 }
 
 // Markdown with [[wikilinks]]. lookup(text) returns the target page ({id, title}) or null for a
@@ -38,22 +38,22 @@ function codexMarkdown(body, lookup) {
     });
 }
 
-// Folder tree. Folders only sort pages. Open/closed state is kept per world in localStorage and
+// Folder tree. Folders only sort pages. Open/closed state is kept per codex in localStorage and
 // is deliberately not reactive, so toggling a folder never re-renders the tree.
 let codexOpenState = {};
-const codexOpenKey = (worldId) => 'codex-folders-open:' + worldId;
+const codexOpenKey = (codexId) => 'codex-folders-open:' + codexId;
 
-function codexLoadOpenState(worldId) {
+function codexLoadOpenState(codexId) {
     try {
-        codexOpenState = JSON.parse(localStorage.getItem(codexOpenKey(worldId))) || {};
+        codexOpenState = JSON.parse(localStorage.getItem(codexOpenKey(codexId))) || {};
     } catch (error) {
         codexOpenState = {};
     }
 }
 
-function codexSaveOpenState(worldId) {
+function codexSaveOpenState(codexId) {
     try {
-        localStorage.setItem(codexOpenKey(worldId), JSON.stringify(codexOpenState));
+        localStorage.setItem(codexOpenKey(codexId), JSON.stringify(codexOpenState));
     } catch (error) {
         // storage may be blocked; the tree still works
     }
@@ -105,7 +105,7 @@ function codexFolderOptions(folders, excludeId = '') {
 
 function codexPageItemHtml(p) {
     const also = p.aliases.length ? `<span class="muted"> · also ${escapeHtml(p.aliases.join(', '))}</span>` : '';
-    return `<li><a href="${codexPageUrl(p)}">${p.has_map ? '◈ ' : ''}${escapeHtml(p.title)}</a>${also}</li>`;
+    return `<li><a href="${codexPageUrl(p)}">${escapeHtml(p.title)}</a>${also}</li>`;
 }
 
 function codexFolderHtml(n, depth) {
@@ -128,8 +128,6 @@ function codexFolderMenuHtml(f) {
         item('move', 'Move', 'Move') + item('delete', 'Delete', 'Delete', ' codex-menu-item--danger');
 }
 
-let codexMapCtl = null; // the mounted map viewer; kept out of Alpine's reactive state
-
 window.codexPage = function () {
     return {
         displayName: 'User',
@@ -148,7 +146,7 @@ window.codexPage = function () {
         messageType: '',
         confirmDialog: { open: false, eyebrow: '', title: '', message: '', confirmLabel: '', danger: true, resolve: null },
         home: null,
-        world: null,
+        codex: null,
         pageData: null,
         toc: [],
         tocActive: '',
@@ -158,21 +156,14 @@ window.codexPage = function () {
         toggledBy: null, // the folder a user just clicked, so only user toggles are saved
         folderMenu: { id: '', top: 0, right: 0, html: '' },
         tocHashDone: false,
-        titles: [], // pages of the current page's world, for previews and the editor
-        worldChoices: [],
+        titles: [], // pages of the current page's codex, for previews and the editor
+        codexChoices: [],
         dlg: { type: '' },
         // Editor
         draft: null,
         conflict: null,
         editor: null,
         editorReady: false,
-        // Map
-        pinMenu: null, // { x, y, px, py } where an empty spot was clicked
-        panel: null, // { pin, loading, data } for the pin shown in the side panel
-        movingPin: '',
-        pinDlg: { open: false, x: 0, y: 0, query: '', busy: false, error: '' },
-        images: [],
-        pinEvents: [],
         // History
         revisions: [],
         pruned: false,
@@ -220,7 +211,7 @@ window.codexPage = function () {
             this.showArrivalMessage();
         },
 
-        // /codex, /codex/w/{id}[/slug], /codex/p/{id}/{slug}[/edit|/history]
+        // /codices, /codices/c/{id}[/slug], /codices/p/{id}/{slug}[/edit|/history]
         // Returns null for a malformed URL.
         parseRoute() {
             let parts;
@@ -229,7 +220,7 @@ window.codexPage = function () {
             } catch (error) {
                 return null;
             }
-            if (parts[1] === 'w' && parts[2]) return { screen: 'world', id: parts[2] };
+            if (parts[1] === 'c' && parts[2]) return { screen: 'codex', id: parts[2] };
             if (parts[1] === 'p' && parts[2]) {
                 const tail = parts[4] || '';
                 return { screen: tail === 'edit' || tail === 'history' ? tail : 'page', id: parts[2] };
@@ -245,16 +236,16 @@ window.codexPage = function () {
         },
         get crumbs() {
             const s = this.screen;
-            if (s === 'world' && this.world) return [{ label: this.world.world.name, href: '' }];
+            if (s === 'codex' && this.codex) return [{ label: this.codex.codex.name, href: '' }];
             if (!this.page) return [];
-            const worldHref = '/codex/w/' + encodeURIComponent(this.page.world.id) + '/' + encodeURIComponent(codexSlug(this.page.world.name));
-            const list = [{ label: this.page.world.name, href: '/codex/w/' + encodeURIComponent(this.page.world.id) }];
-            // Folder crumbs link to the world page with that folder opened. With more than two
+            const codexHref = '/codices/c/' + encodeURIComponent(this.page.codex.id) + '/' + encodeURIComponent(codexSlug(this.page.codex.name));
+            const list = [{ label: this.page.codex.name, href: '/codices/c/' + encodeURIComponent(this.page.codex.id) }];
+            // Folder crumbs link to the codex page with that folder opened. With more than two
             // folders the middle ones collapse to "…" on narrow screens (CSS).
             const path = this.page.folder_path || [];
             path.forEach((f, i) => {
                 if (path.length > 2 && i === 1) list.push({ label: '…', href: '', ellipsis: true });
-                list.push({ label: f.name, href: `${worldHref}#folder-${encodeURIComponent(f.id)}`, mid: path.length > 2 && i > 0 && i < path.length - 1 });
+                list.push({ label: f.name, href: `${codexHref}#folder-${encodeURIComponent(f.id)}`, mid: path.length > 2 && i > 0 && i < path.length - 1 });
             });
             if (s === 'page') return [...list, { label: this.page.title, href: '' }];
             return [...list, { label: this.page.title, href: this.pageUrl(this.page) }, { label: s === 'edit' ? 'Edit' : 'History', href: '' }];
@@ -264,9 +255,9 @@ window.codexPage = function () {
             const seq = ++this.loadSeq; // an older response must not overwrite a newer one
             try {
                 const r = this.route;
-                const url = r.screen === 'home' ? '/api/codex'
-                    : r.screen === 'world' ? `/api/codex/worlds/${encodeURIComponent(r.id)}`
-                    : `/api/codex/pages/${encodeURIComponent(r.id)}`;
+                const url = r.screen === 'home' ? '/api/codices'
+                    : r.screen === 'codex' ? `/api/codices/c/${encodeURIComponent(r.id)}`
+                    : `/api/codices/pages/${encodeURIComponent(r.id)}`;
                 const { response, data } = await this.send(url, 'GET');
                 if (response.status === 401) {
                     window.location.href = '/login.html';
@@ -279,22 +270,22 @@ window.codexPage = function () {
                     return;
                 }
                 if (!response.ok) {
-                    this.loadError = data.error || 'Failed to load the Codex';
+                    this.loadError = data.error || 'Failed to load the codices';
                     return;
                 }
                 this.notFound = false;
                 this.loadError = '';
                 if (r.screen === 'home') {
                     this.home = data;
-                    document.title = 'Waystone - Codex';
-                } else if (r.screen === 'world') {
-                    codexLoadOpenState(data.world.id);
+                    document.title = 'Waystone - Codices';
+                } else if (r.screen === 'codex') {
+                    codexLoadOpenState(data.codex.id);
                     if (!this.folderRevealed) {
                         this.folderRevealed = true;
                         this.revealFolderFromHash(data.folders);
                     }
-                    this.world = data;
-                    document.title = 'Waystone - ' + data.world.name;
+                    this.codex = data;
+                    document.title = 'Waystone - ' + data.codex.name;
                     this.$nextTick(() => this.scrollToFolder());
                 } else {
                     this.pageData = data;
@@ -305,13 +296,11 @@ window.codexPage = function () {
                     if (r.screen === 'edit' && !this.draft) await this.initDraft();
                     if (r.screen === 'history') {
                         await this.loadHistory(Number(new URLSearchParams(location.search).get('r')) || 0);
-                        await this.loadMapHistory();
                     }
                     if (r.screen === 'page') await this.loadTitles();
-                    if (r.screen === 'page' && data.map.image) this.$nextTick(() => this.mountMap());
                 }
             } catch (error) {
-                if (seq === this.loadSeq) this.loadError = 'Could not load the Codex: ' + error.message;
+                if (seq === this.loadSeq) this.loadError = 'Could not load the codices: ' + error.message;
             } finally {
                 if (seq === this.loadSeq) this.loading = false;
             }
@@ -340,17 +329,14 @@ window.codexPage = function () {
             const t = String(text || '');
             return t.charAt(0).toUpperCase() + t.slice(1) + (t.endsWith('.') ? '' : '.');
         },
-        recentHtml(r, withWorld) {
+        recentHtml(r, withCodex) {
             const note = r.note ? ` · ${escapeHtml(r.note)}` : '';
-            const where = withWorld ? ` · ${escapeHtml(r.world.name)}` : '';
+            const where = withCodex ? ` · ${escapeHtml(r.codex.name)}` : '';
             return `<a href="${codexPageUrl({ id: r.page_id, title: r.title })}">${escapeHtml(r.title)}</a><span class="muted"> · revision ${r.number} by ${escapeHtml(r.author_user.display_name)}${where}${note} · ${escapeHtml(this.shortDate(r.created_at))}</span>`;
         },
-        get worldMaps() {
-            return this.world ? this.world.pages.filter((p) => p.has_map) : [];
-        },
         get treeHtml() {
-            if (!this.world || this.world.world.unsorted) return '';
-            const tree = codexFolderTree(this.world.folders, this.world.pages);
+            if (!this.codex) return '';
+            const tree = codexFolderTree(this.codex.folders, this.codex.pages);
             const pages = tree.pages.length
                 ? `<p class="codex-tree-label muted">Not in a folder</p><ul class="page-list">${tree.pages.map(codexPageItemHtml).join('')}</ul>`
                 : '';
@@ -367,10 +353,10 @@ window.codexPage = function () {
         // Keeps a folder (and its ancestors) open across the reload that follows a change.
         keepFolderOpen(id) {
             if (!id) return;
-            this.openFolderChain(id, this.world.folders);
-            codexSaveOpenState(this.world.world.id);
+            this.openFolderChain(id, this.codex.folders);
+            codexSaveOpenState(this.codex.codex.id);
         },
-        // #folder-{id} on the world page opens that folder and the ones above it.
+        // #folder-{id} on the codex page opens that folder and the ones above it.
         revealFolderFromHash(folders) {
             let hash;
             try {
@@ -401,10 +387,10 @@ window.codexPage = function () {
         // Only toggles the user caused are saved; the ones fired while the tree renders are not.
         onFolderToggle(event) {
             const d = event.target;
-            if (!this.world || !d.matches || !d.matches('details.codex-folder') || d !== this.toggledBy) return;
+            if (!this.codex || !d.matches || !d.matches('details.codex-folder') || d !== this.toggledBy) return;
             this.toggledBy = null;
             codexOpenState[d.dataset.id] = d.open;
-            codexSaveOpenState(this.world.world.id);
+            codexSaveOpenState(this.codex.codex.id);
         },
         onTreeClick(event) {
             const sum = event.target.closest('summary');
@@ -464,11 +450,11 @@ window.codexPage = function () {
             return codexFolderOptions(folders, excludeId);
         },
         folderById(id) {
-            return this.world.folders.find((f) => f.id === id);
+            return this.codex.folders.find((f) => f.id === id);
         },
         get filteredPages() {
             const q = codexNorm(this.pageFilter);
-            return this.world.pages.filter((p) => !q || codexNorm(p.title).includes(q) || p.aliases.some((a) => codexNorm(a).includes(q)));
+            return this.codex.pages.filter((p) => !q || codexNorm(p.title).includes(q) || p.aliases.some((a) => codexNorm(a).includes(q)));
         },
 
         // fetch with JSON in and out. An expired login comes back as a redirect to the login page,
@@ -508,7 +494,7 @@ window.codexPage = function () {
             const map = new Map((this.pageData?.links || []).map((l) => [codexNorm(l.text), l.page]));
             return (text) => map.get(codexNorm(text)) || null;
         },
-        // Lookup by title or alias among the pages of this world.
+        // Lookup by title or alias among the pages of this codex.
         get titleLookup() {
             const map = new Map();
             for (const t of this.titles) {
@@ -519,16 +505,9 @@ window.codexPage = function () {
         get bodyHtml() {
             return this.page ? codexMarkdown(this.page.body, this.linkLookup) : '';
         },
-        // The pages the page is pinned on, one entry per page (its first pin).
-        get hasMap() {
-            return !!(this.pageData && this.pageData.map && this.pageData.map.image);
-        },
-        get sumMaps() {
-            const seen = new Set();
-            return (this.pageData ? this.pageData.on_maps : []).filter((m) => !seen.has(m.map_id) && seen.add(m.map_id));
-        },
-        mapPinUrl(m) {
-            return this.pageUrl({ id: m.map_id, title: m.map_title }) + '?pin=' + encodeURIComponent(m.pin_id);
+        // Pages that link here by [[link]]; map pins are not shown.
+        get linkedFrom() {
+            return this.pageData ? this.pageData.backlinks.filter((b) => b.via.some((v) => v !== 'pin')) : [];
         },
         get scribes() {
             const p = this.page;
@@ -578,7 +557,7 @@ window.codexPage = function () {
         async loadTitles() {
             if (!this.page) return;
             try {
-                const { response, data } = await this.send(`/api/codex/titles?world=${encodeURIComponent(this.page.world.id)}`, 'GET');
+                const { response, data } = await this.send(`/api/codices/titles?codex=${encodeURIComponent(this.page.codex.id)}`, 'GET');
                 if (response.ok) this.titles = data;
             } catch (error) {
                 console.error('Failed to load titles:', error);
@@ -593,32 +572,32 @@ window.codexPage = function () {
 
         // ---- Dialogs ----
         get dlgEyebrow() {
-            return { createPage: 'Codex', world: 'Codex', rename: 'Page', aliases: 'Page', move: 'Page', folder: 'Folder', folderMove: 'Folder', pageFolder: 'Page' }[this.dlg.type] || '';
+            return { createPage: 'Codex', codex: 'Codex', rename: 'Page', aliases: 'Page', move: 'Page', folder: 'Folder', folderMove: 'Folder', pageFolder: 'Page' }[this.dlg.type] || '';
         },
         get dlgTitle() {
             const d = this.dlg;
             if (d.type === 'createPage') return 'New page';
-            return { world: d.world ? 'Edit world' : 'New world', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another world', folder: d.folder ? 'Rename folder' : 'New folder', folderMove: 'Move folder', pageFolder: 'Change folder' }[d.type] || '';
+            return { codex: d.codex ? 'Edit codex' : 'New codex', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another codex', folder: d.folder ? 'Rename folder' : 'New folder', folderMove: 'Move folder', pageFolder: 'Change folder' }[d.type] || '';
         },
         get dlgSubmit() {
             const d = this.dlg;
             if (d.type === 'createPage') return d.busy ? 'Creating...' : 'Create';
-            return d.busy ? 'Saving...' : d.type === 'move' ? 'Move page' : d.type === 'folderMove' ? 'Move folder' : (d.type === 'world' && !d.world) || (d.type === 'folder' && !d.folder) ? 'Create' + (d.type === 'world' ? ' world' : ' folder') : 'Save';
+            return d.busy ? 'Saving...' : d.type === 'move' ? 'Move page' : d.type === 'folderMove' ? 'Move folder' : (d.type === 'codex' && !d.codex) || (d.type === 'folder' && !d.folder) ? 'Create' + (d.type === 'codex' ? ' codex' : ' folder') : 'Save';
         },
         get moveWarning() {
             const n = this.pageData?.incoming_count || 0;
-            const here = this.page?.world.name;
+            const here = this.page?.codex.name;
             return (n > 0
-                ? `${this.countLabel(n, 'link')} from ${here} will turn into missing links, because links only reach pages in their own world. `
-                : '') + "This page's own links are checked again in the new world, and it goes to the top level of its folders.";
+                ? `${this.countLabel(n, 'link')} from ${here} will turn into missing links, because links only reach pages in their own codex. `
+                : '') + "This page's own links are checked again in the new codex, and it goes to the top level of its folders.";
         },
-        async ensureWorlds() {
-            if (this.worldChoices.length) return;
+        async ensureCodices() {
+            if (this.codexChoices.length) return;
             try {
-                const { response, data } = await this.send('/api/codex', 'GET');
-                if (response.ok) this.worldChoices = [{ id: 'unsorted', name: 'Unsorted' }, ...data.worlds.map((w) => ({ id: w.id, name: w.name }))];
+                const { response, data } = await this.send('/api/codices', 'GET');
+                if (response.ok) this.codexChoices = data.codices.map((w) => ({ id: w.id, name: w.name }));
             } catch (error) {
-                this.showMessage('Could not load the worlds: ' + error.message, 'error');
+                this.showMessage('Could not load the codices: ' + error.message, 'error');
             }
         },
         focusDlg() {
@@ -627,21 +606,25 @@ window.codexPage = function () {
         closeDlg() {
             this.dlg = { type: '' };
         },
-        // folderId: the folder to prefill; a page's missing links and pins start in its own folder.
+        // folderId: the folder to prefill; a page's missing links start in its own folder.
         async openCreatePage(title = '', folderId = null) {
-            await this.ensureWorlds();
-            const worldId = this.screen === 'world' ? this.world.world.id : this.page ? this.page.world.id : 'unsorted';
-            const folders = this.screen === 'world' ? this.world.folders || [] : (await this.fetchFolders(worldId)) || [];
+            await this.ensureCodices();
+            if (!this.codexChoices.length) {
+                this.showMessage('Make a codex first.', 'error');
+                return;
+            }
+            const codexId = this.screen === 'codex' ? this.codex.codex.id : this.page ? this.page.codex.id : this.codexChoices[0].id;
+            const folders = this.screen === 'codex' ? this.codex.folders || [] : (await this.fetchFolders(codexId)) || [];
             if (folderId === null) folderId = this.page ? this.page.folder_id || '' : '';
             if (!folders.some((f) => f.id === folderId)) folderId = '';
-            this.dlg = { type: 'createPage', title, worldId, folders, folderId, error: '', busy: false };
+            this.dlg = { type: 'createPage', title, codexId, folders, folderId, error: '', busy: false };
             this.focusDlg();
         },
-        // The world's folders, [] for Unsorted, or null (after an error message) when the load failed.
-        async fetchFolders(worldId) {
-            if (!worldId || worldId === 'unsorted') return [];
+        // The codex's folders, or null (after an error message) when the load failed.
+        async fetchFolders(codexId) {
+            if (!codexId) return [];
             try {
-                const { response, data } = await this.send(`/api/codex/worlds/${encodeURIComponent(worldId)}/folders`, 'GET');
+                const { response, data } = await this.send(`/api/codices/c/${encodeURIComponent(codexId)}/folders`, 'GET');
                 if (response.ok) return data.folders || [];
             } catch (error) {
                 console.error('Failed to load folders:', error);
@@ -649,12 +632,12 @@ window.codexPage = function () {
             this.showMessage('Could not load the folders', 'error');
             return null;
         },
-        async onDlgWorldChange() {
+        async onDlgCodexChange() {
             const d = this.dlg;
-            const worldId = d.worldId;
+            const codexId = d.codexId;
             d.folderId = '';
-            const folders = await this.fetchFolders(worldId);
-            if (this.dlg === d && d.worldId === worldId) d.folders = folders || [];
+            const folders = await this.fetchFolders(codexId);
+            if (this.dlg === d && d.codexId === codexId) d.folders = folders || [];
         },
         openNewFolder(parentId) {
             this.dlg = { type: 'folder', folder: null, parentId, name: '', error: '', busy: false };
@@ -669,11 +652,11 @@ window.codexPage = function () {
         openMoveFolder(id) {
             const f = this.folderById(id);
             if (!f) return;
-            this.dlg = { type: 'folderMove', folder: f, folders: this.world.folders, excludeId: id, folderId: f.parent_id || '', error: '', busy: false };
+            this.dlg = { type: 'folderMove', folder: f, folders: this.codex.folders, excludeId: id, folderId: f.parent_id || '', error: '', busy: false };
             this.focusDlg();
         },
         async openPageFolder() {
-            const folders = await this.fetchFolders(this.page.world.id);
+            const folders = await this.fetchFolders(this.page.codex.id);
             if (!folders) return;
             this.dlg = { type: 'pageFolder', folders, excludeId: '', folderId: this.page.folder_id || '', error: '', busy: false };
             this.focusDlg();
@@ -681,8 +664,8 @@ window.codexPage = function () {
         async deleteFolder(id) {
             const f = this.folderById(id);
             if (!f) return;
-            const pages = this.world.pages.filter((p) => p.folder_id === id).length;
-            const subs = this.world.folders.filter((x) => x.parent_id === id).length;
+            const pages = this.codex.pages.filter((p) => p.folder_id === id).length;
+            const subs = this.codex.folders.filter((x) => x.parent_id === id).length;
             const parent = this.folderById(f.parent_id);
             const moves = pages + subs
                 ? `Its ${this.countLabel(pages, 'page')} and ${this.countLabel(subs, 'folder')} will move up into ${parent ? '“' + parent.name + '”' : 'the top level'}.`
@@ -695,7 +678,7 @@ window.codexPage = function () {
             });
             if (!ok) return;
             try {
-                const { response, data } = await this.send(`/api/codex/folders/${encodeURIComponent(id)}`, 'DELETE');
+                const { response, data } = await this.send(`/api/codices/folders/${encodeURIComponent(id)}`, 'DELETE');
                 if (response.status === 401) {
                     this.showMessage('Your login has expired. Log in again, then try once more.', 'error');
                     return;
@@ -715,13 +698,13 @@ window.codexPage = function () {
                 this.showMessage('Could not delete the folder: ' + error.message, 'error');
             }
         },
-        openCreateWorld() {
-            this.dlg = { type: 'world', world: null, name: '', description: '', error: '', busy: false };
+        openCreateCodex() {
+            this.dlg = { type: 'codex', codex: null, name: '', description: '', error: '', busy: false };
             this.focusDlg();
         },
-        openEditWorld() {
-            const w = this.world.world;
-            this.dlg = { type: 'world', world: w, name: w.name, description: w.description, error: '', busy: false };
+        openEditCodex() {
+            const w = this.codex.codex;
+            this.dlg = { type: 'codex', codex: w, name: w.name, description: w.description, error: '', busy: false };
             this.focusDlg();
         },
         openRename() {
@@ -733,13 +716,13 @@ window.codexPage = function () {
             this.focusDlg();
         },
         async openMove() {
-            await this.ensureWorlds();
-            this.dlg = { type: 'move', worldId: this.worldChoices.find((w) => w.id !== this.page.world.id)?.id || '', error: '', busy: false };
+            await this.ensureCodices();
+            this.dlg = { type: 'move', codexId: this.codexChoices.find((w) => w.id !== this.page.codex.id)?.id || '', error: '', busy: false };
             this.focusDlg();
         },
         conflictText(data) {
             const c = (data.conflicts || [])[0];
-            return c ? `“${c.name}” is already used in this world${c.title && c.title !== c.name ? ' (by ' + c.title + ')' : ''}. Titles and aliases are unique within a world.` : this.sentence(data.error);
+            return c ? `“${c.name}” is already used in this codex${c.title && c.title !== c.name ? ' (by ' + c.title + ')' : ''}. Titles and aliases are unique within a codex.` : this.sentence(data.error);
         },
         async submitDlg() {
             const d = this.dlg;
@@ -748,7 +731,7 @@ window.codexPage = function () {
             d.busy = true;
             try {
                 if (d.type === 'createPage') await this.submitCreatePage(d);
-                else if (d.type === 'world') await this.submitWorld(d);
+                else if (d.type === 'codex') await this.submitCodex(d);
                 else if (d.type === 'rename') await this.submitRename(d);
                 else if (d.type === 'aliases') await this.submitAliases(d);
                 else if (d.type === 'move') await this.submitMove(d);
@@ -775,7 +758,7 @@ window.codexPage = function () {
                 d.error = 'Give the page a title.';
                 return;
             }
-            const { response, data } = await this.send('/api/codex/pages', 'POST', { title, world_id: d.worldId, folder_id: d.folderId || '' });
+            const { response, data } = await this.send('/api/codices/pages', 'POST', { title, codex_id: d.codexId, folder_id: d.folderId || '' });
             if (response.status === 201) {
                 this.saved = true;
                 window.location.href = codexPageUrl({ id: data.page.id, title }, '/edit');
@@ -794,8 +777,8 @@ window.codexPage = function () {
                 return;
             }
             const { response, data } = d.folder
-                ? await this.send(`/api/codex/folders/${encodeURIComponent(d.folder.id)}`, 'PUT', { name })
-                : await this.send(`/api/codex/worlds/${encodeURIComponent(this.world.world.id)}/folders`, 'POST', { name, parent_id: d.parentId });
+                ? await this.send(`/api/codices/folders/${encodeURIComponent(d.folder.id)}`, 'PUT', { name })
+                : await this.send(`/api/codices/c/${encodeURIComponent(this.codex.codex.id)}/folders`, 'POST', { name, parent_id: d.parentId });
             if (!response.ok) {
                 this.failDlg(d, response, data);
                 return;
@@ -811,7 +794,7 @@ window.codexPage = function () {
                 this.closeDlg();
                 return;
             }
-            const { response, data } = await this.send(`/api/codex/folders/${encodeURIComponent(d.folder.id)}`, 'PUT', { parent_id: d.folderId || '' });
+            const { response, data } = await this.send(`/api/codices/folders/${encodeURIComponent(d.folder.id)}`, 'PUT', { parent_id: d.folderId || '' });
             if (!response.ok) {
                 this.failDlg(d, response, data);
                 return;
@@ -823,7 +806,7 @@ window.codexPage = function () {
             this.showMessage('Folder moved', 'success');
         },
         async submitPageFolder(d) {
-            const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/folder`, 'PUT', { folder_id: d.folderId || '' });
+            const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/folder`, 'PUT', { folder_id: d.folderId || '' });
             if (!response.ok) {
                 this.failDlg(d, response, data);
                 return;
@@ -832,25 +815,25 @@ window.codexPage = function () {
             await this.load();
             this.showMessage('Folder changed', 'success');
         },
-        async submitWorld(d) {
+        async submitCodex(d) {
             const name = d.name.trim();
             if (!name) {
-                d.error = 'Give the world a name.';
+                d.error = 'Give the codex a name.';
                 return;
             }
             const body = { name, description: d.description };
-            const { response, data } = d.world
-                ? await this.send(`/api/codex/worlds/${encodeURIComponent(d.world.id)}`, 'PUT', body)
-                : await this.send('/api/codex/worlds', 'POST', body);
-            if (response.ok && !d.world) {
-                window.location.href = '/codex/w/' + encodeURIComponent(data.world.id);
+            const { response, data } = d.codex
+                ? await this.send(`/api/codices/c/${encodeURIComponent(d.codex.id)}`, 'PUT', body)
+                : await this.send('/api/codices', 'POST', body);
+            if (response.ok && !d.codex) {
+                window.location.href = '/codices/c/' + encodeURIComponent(data.codex.id);
             } else if (response.ok) {
                 this.closeDlg();
-                this.worldChoices = [];
+                this.codexChoices = [];
                 await this.load();
-                this.showMessage('World saved', 'success');
-            } else if (data.code === 'world_name_taken') {
-                d.error = 'A world with that name already exists.';
+                this.showMessage('Codex saved', 'success');
+            } else if (data.code === 'codex_name_taken') {
+                d.error = 'A codex with that name already exists.';
             } else {
                 this.failDlg(d, response, data);
             }
@@ -865,7 +848,7 @@ window.codexPage = function () {
                 this.closeDlg();
                 return;
             }
-            const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/title`, 'PUT', { title });
+            const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/title`, 'PUT', { title });
             if (response.ok) {
                 window.location.href = codexPageUrl({ id: this.page.id, title: data.title }) + `?renamed=${data.rewritten}`;
                 return;
@@ -874,7 +857,7 @@ window.codexPage = function () {
         },
         async submitAliases(d) {
             const aliases = d.text.split('\n').map((a) => a.trim()).filter(Boolean);
-            const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/aliases`, 'PUT', { aliases });
+            const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/aliases`, 'PUT', { aliases });
             if (response.ok) {
                 this.closeDlg();
                 await this.load();
@@ -884,358 +867,12 @@ window.codexPage = function () {
             this.failDlg(d, response, data);
         },
         async submitMove(d) {
-            const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/world`, 'PUT', { world_id: d.worldId });
+            const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/codex`, 'PUT', { codex_id: d.codexId });
             if (response.ok) {
                 window.location.href = codexPageUrl(this.page) + '?moved=1';
                 return;
             }
             this.failDlg(d, response, data);
-        },
-
-        // ---- Map ----
-        get panelHtml() {
-            const d = this.panel && this.panel.data;
-            if (!d) return '';
-            const map = new Map(d.links.map((l) => [codexNorm(l.text), l.page]));
-            return codexMarkdown(d.page.body, (text) => map.get(codexNorm(text)) || null);
-        },
-        get pinOptions() {
-            const q = codexNorm(this.pinDlg.query);
-            const options = [];
-            for (const t of this.titles) {
-                if (!this.page || t.id === this.page.id) continue;
-                const alias = t.aliases.find((a) => codexNorm(a).includes(q));
-                if (q && !codexNorm(t.title).includes(q) && !alias) continue;
-                options.push({ key: t.id, kind: 'page', title: t.title, label: (t.has_map ? '◈ ' : '✦ ') + t.title + (alias && !codexNorm(t.title).includes(q) ? ` (also known as ${alias})` : '') });
-            }
-            const typed = this.pinDlg.query.trim().split(/\s+/).join(' ');
-            const exists = this.titles.some((t) => [t.title, ...t.aliases].some((n) => codexNorm(n) === q));
-            const list = options.slice(0, 30);
-            if (typed && !exists && !/[\[\]|]/.test(typed)) {
-                list.push({ key: 'new', kind: 'new', title: typed, label: `New page “${typed}” in ${this.page ? this.page.world.name : ''}` });
-            }
-            return list;
-        },
-        async mountMap() {
-            const m = this.pageData && this.pageData.map;
-            const el = this.$refs.mapEl;
-            if (!m || !m.image || !el) return;
-            try {
-                if (codexMapCtl && (codexMapCtl.el !== el || codexMapCtl.imageUrl !== m.image.url)) {
-                    codexMapCtl.destroy();
-                    codexMapCtl = null;
-                }
-                if (codexMapCtl) {
-                    codexMapCtl.setPins(m.pins);
-                    if (this.panel) codexMapCtl.setOpen(this.panel.pin.id);
-                    return;
-                }
-                codexMapCtl = await window.mountCodexMap(el, {
-                    image: m.image,
-                    pins: m.pins,
-                    onPinClick: (pin) => this.onPinClick(pin),
-                    onMapClick: (info) => this.showPinMenu(info),
-                    onPinMove: (id, x, y) => this.onPinMove(id, x, y)
-                });
-                if (this.panel) codexMapCtl.setOpen(this.panel.pin.id);
-                const pinId = new URLSearchParams(location.search).get('pin');
-                const pin = pinId && m.pins.find((p) => p.id === pinId);
-                if (pin) {
-                    codexMapCtl.focusPin(pin.id);
-                    if (pin.target) this.openPanel(pin);
-                }
-            } catch (error) {
-                this.showMessage('Could not show the map: ' + error.message, 'error');
-            }
-        },
-        // Opens the "add pin here" menu at the click, kept inside the map, with focus on its first item.
-        showPinMenu(info) {
-            const stage = this.$refs.mapEl;
-            if (info && stage) {
-                info = { ...info, px: Math.max(0, Math.min(info.px, stage.clientWidth - 200)), py: Math.max(0, Math.min(info.py, stage.clientHeight - 90)) };
-            }
-            this.pinMenu = info;
-            if (info) this.$nextTick(() => this.$refs.menuFirst?.focus());
-        },
-        // Keyboard route to a pin: the picker opens for the middle of what the map is showing.
-        startAddPinAtCentre() {
-            if (!codexMapCtl) return;
-            this.pinMenu = codexMapCtl.center();
-            this.startAddPin();
-        },
-        onPinClick(pin) {
-            this.pinMenu = null;
-            if (this.movingPin) return;
-            this.openPanel(pin);
-        },
-        async openPanel(pin) {
-            this.panel = { pin, loading: !!pin.target, data: null };
-            if (codexMapCtl) codexMapCtl.setOpen(pin.id);
-            if (pin.target) await this.loadPanelPage(pin.target.id);
-        },
-        async loadPanelPage(id) {
-            const panel = this.panel;
-            if (panel) panel.loading = true;
-            try {
-                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(id)}`, 'GET');
-                if (!this.panel || this.panel !== panel) return;
-                if (response.ok) panel.data = data;
-                else this.showMessage(this.sentence(data.error || 'Failed to load the page'), 'error');
-            } catch (error) {
-                this.showMessage('Could not load the page: ' + error.message, 'error');
-            } finally {
-                if (panel) panel.loading = false;
-            }
-        },
-        // Links inside the panel stay in the panel.
-        onPanelClick(event) {
-            const a = event.target.closest('a.wikilink');
-            if (!a) return;
-            if (a.classList.contains('wikilink--missing')) {
-                event.preventDefault();
-                this.openCreatePage(a.dataset.text);
-                return;
-            }
-            const id = (a.getAttribute('href').split('/')[3] || '');
-            if (!id) return;
-            event.preventDefault();
-            this.loadPanelPage(decodeURIComponent(id));
-        },
-        startAddPin() {
-            const at = this.pinMenu;
-            this.pinMenu = null;
-            if (!at) return;
-            this.pinDlg = { open: true, x: at.x, y: at.y, query: '', busy: false, error: '' };
-            this.$nextTick(() => this.$refs.pinFocus?.focus());
-        },
-        closePinDlg() {
-            this.pinDlg.open = false;
-        },
-        async choosePin(option) {
-            const d = this.pinDlg;
-            if (!option || d.busy) return;
-            d.busy = true;
-            d.error = '';
-            try {
-                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/pins`, 'POST',
-                    { x: d.x, y: d.y, target_text: option.title, create_page: option.kind === 'new' });
-                if (response.status === 201) {
-                    d.open = false;
-                    await this.reloadMap();
-                    await this.loadTitles();
-                    this.showMessage(option.kind === 'new' ? `Pinned the new page “${option.title}”` : 'Pin added', 'success');
-                    this.openPanel(this.pageData.map.pins.find((p) => p.id === data.pin.id) || data.pin);
-                } else if (data.code === 'name_taken') {
-                    await this.loadTitles();
-                    d.error = `A page named “${option.title}” already exists in this world. Pick it from the list.`;
-                } else {
-                    d.error = response.status === 401 ? 'Your login has expired. Log in again, then try once more.' : this.sentence(data.error || 'Failed to add the pin');
-                }
-            } catch (error) {
-                d.error = 'Error adding the pin: ' + error.message;
-            } finally {
-                d.busy = false;
-            }
-        },
-        // Reload the map page (pins, links) and redraw the pins without losing the zoom.
-        async reloadMap() {
-            const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}`, 'GET');
-            if (!response.ok) {
-                this.showMessage(this.sentence(data.error || 'Failed to reload the map'), 'error');
-                return;
-            }
-            this.pageData = data;
-            if (codexMapCtl) codexMapCtl.setPins(data.map.pins);
-            if (this.panel) {
-                const pin = data.map.pins.find((p) => p.id === this.panel.pin.id);
-                if (pin) {
-                    this.panel.pin = pin;
-                    if (codexMapCtl) codexMapCtl.setOpen(pin.id);
-                } else {
-                    this.panel = null;
-                }
-            }
-        },
-        startMove() {
-            if (!this.panel || !codexMapCtl) return;
-            this.movingPin = this.panel.pin.id;
-            codexMapCtl.setMovable(this.movingPin);
-        },
-        cancelMove() {
-            this.movingPin = '';
-            if (codexMapCtl) {
-                codexMapCtl.setMovable('');
-                codexMapCtl.setPins(this.pageData.map.pins);
-                if (this.panel) codexMapCtl.setOpen(this.panel.pin.id);
-            }
-        },
-        async onPinMove(id, x, y) {
-            if (this.movingPin !== id) return;
-            this.movingPin = '';
-            if (codexMapCtl) codexMapCtl.setMovable('');
-            try {
-                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/pins/${encodeURIComponent(id)}`, 'PUT', { x, y });
-                if (!response.ok) this.showMessage(this.sentence(data.error || 'Failed to move the pin'), 'error');
-                else this.showMessage('Pin moved', 'success');
-                await this.reloadMap();
-            } catch (error) {
-                this.showMessage('Error moving the pin: ' + error.message, 'error');
-                // The marker was dragged but the move didn't go through: put the pins back.
-                if (codexMapCtl) codexMapCtl.setPins(this.pageData.map.pins);
-            }
-        },
-        async removePin() {
-            if (!this.panel || this.busy) return;
-            const pin = this.panel.pin;
-            const ok = await this.askConfirm({
-                eyebrow: this.page.title,
-                title: 'Remove this pin?',
-                message: `The pin for “${pin.target ? pin.target.title : pin.target_text}” is removed from the map. The page itself stays. You can undo this from the page history.`,
-                confirmLabel: 'Remove pin',
-                danger: true
-            });
-            if (!ok) return;
-            this.busy = true;
-            try {
-                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/pins/${encodeURIComponent(pin.id)}`, 'DELETE');
-                if (response.ok || response.status === 404) {
-                    this.panel = null;
-                    await this.reloadMap();
-                    this.showMessage('Pin removed', 'success');
-                } else {
-                    this.showMessage(this.sentence(data.error || 'Failed to remove the pin'), 'error');
-                }
-            } catch (error) {
-                this.showMessage('Error removing the pin: ' + error.message, 'error');
-            } finally {
-                this.busy = false;
-            }
-        },
-        // The picture's width over its height, read in the browser before uploading.
-        imageRatio(file) {
-            return new Promise((resolve) => {
-                const url = URL.createObjectURL(file);
-                const img = new Image();
-                img.onload = () => { URL.revokeObjectURL(url); resolve(img.naturalWidth / img.naturalHeight); };
-                img.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
-                img.src = url;
-            });
-        },
-        async onImageChosen(event) {
-            const input = event.target;
-            const file = input.files && input.files[0];
-            input.value = '';
-            if (!file || this.busy) return;
-            const current = this.pageData.map.image;
-            if (current && this.pageData.map.pins.length) {
-                const ratio = await this.imageRatio(file);
-                const was = current.width / current.height;
-                if (ratio && Math.abs(ratio - was) / was > 0.02) {
-                    const ok = await this.askConfirm({
-                        eyebrow: this.page.title,
-                        title: 'Replace with a different shape?',
-                        message: 'The new image has a different width-to-height ratio than the old one. Pins are placed by position, so they may land in the wrong place. You can restore the old image from the page history.',
-                        confirmLabel: 'Replace image',
-                        danger: true
-                    });
-                    if (!ok) return;
-                }
-            }
-            this.busy = true;
-            try {
-                const response = await fetch(`/api/codex/pages/${encodeURIComponent(this.page.id)}/images`, { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
-                if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
-                    this.showMessage('Your login has expired. Log in again, then upload the image.', 'error');
-                    return;
-                }
-                const data = await response.json().catch(() => ({}));
-                if (response.status === 201) {
-                    await this.reloadMap();
-                    this.$nextTick(() => this.mountMap());
-                    this.showMessage(current ? 'Image replaced' : 'Map added', 'success');
-                } else {
-                    this.showMessage(this.sentence(data.error || 'Failed to upload the image'), 'error');
-                }
-            } catch (error) {
-                this.showMessage('Error uploading the image: ' + error.message, 'error');
-            } finally {
-                this.busy = false;
-            }
-        },
-        async removeMap() {
-            if (this.busy || !this.hasMap) return;
-            const n = this.pageData.map.pins.length;
-            const ok = await this.askConfirm({
-                eyebrow: this.page.title,
-                title: 'Remove the map?',
-                message: `The map image and its ${this.countLabel(n, 'pin')} are removed from this page. The page text stays. The image and the pin changes stay in the page history, where you can restore the image or undo pin removals.`,
-                confirmLabel: 'Remove map',
-                danger: true
-            });
-            if (!ok) return;
-            this.busy = true;
-            try {
-                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/map`, 'DELETE');
-                if (response.ok) {
-                    if (codexMapCtl) {
-                        codexMapCtl.destroy();
-                        codexMapCtl = null;
-                    }
-                    this.panel = null;
-                    this.pinMenu = null;
-                    this.movingPin = '';
-                    await this.reloadMap();
-                    this.showMessage('Map removed', 'success');
-                } else {
-                    this.showMessage(this.sentence(data.error || 'Failed to remove the map'), 'error');
-                }
-            } catch (error) {
-                this.showMessage('Error removing the map: ' + error.message, 'error');
-            } finally {
-                this.busy = false;
-            }
-        },
-        async loadMapHistory() {
-            try {
-                const id = encodeURIComponent(this.route.id);
-                const [imgs, events] = await Promise.all([this.send(`/api/codex/pages/${id}/images`, 'GET'), this.send(`/api/codex/pages/${id}/pin-events`, 'GET')]);
-                if (imgs.response.ok) this.images = imgs.data;
-                if (events.response.ok) this.pinEvents = events.data;
-            } catch (error) {
-                this.showMessage('Could not load the map history: ' + error.message, 'error');
-            }
-        },
-        async restoreImage(img) {
-            if (this.busy) return;
-            this.busy = true;
-            try {
-                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/images/${encodeURIComponent(img.id)}/restore`, 'POST');
-                if (response.ok) {
-                    await this.loadMapHistory();
-                    this.showMessage('Image restored', 'success');
-                } else {
-                    this.showMessage(this.sentence(data.error || 'Failed to restore the image'), 'error');
-                }
-            } catch (error) {
-                this.showMessage('Error restoring the image: ' + error.message, 'error');
-            } finally {
-                this.busy = false;
-            }
-        },
-        async undoPinEvent(e) {
-            if (this.busy) return;
-            this.busy = true;
-            try {
-                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/pin-events/${encodeURIComponent(e.id)}/undo`, 'POST');
-                if (response.ok) this.showMessage('Pin change undone', 'success');
-                else if (data.code === 'already_undone') this.showMessage('That change was already undone.', 'info');
-                else this.showMessage(this.sentence(data.error || 'Failed to undo the change'), 'error');
-                await this.loadMapHistory();
-            } catch (error) {
-                this.showMessage('Error undoing the change: ' + error.message, 'error');
-            } finally {
-                this.busy = false;
-            }
         },
 
         // ---- Delete ----
@@ -1245,16 +882,16 @@ window.codexPage = function () {
             const ok = await this.askConfirm({
                 eyebrow: 'Codex',
                 title: `Delete “${p.title}”?`,
-                message: `This deletes the page and all ${p.revision_count} of its revisions${this.hasMap ? ', its map images and pins' : ''}. It cannot be undone. Links to it become missing links.`,
+                message: `This deletes the page and all ${p.revision_count} of its revisions. It cannot be undone. Links to it become missing links.`,
                 confirmLabel: 'Delete page',
                 danger: true
             });
             if (!ok) return;
             this.busy = true;
             try {
-                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(p.id)}`, 'DELETE');
+                const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(p.id)}`, 'DELETE');
                 if (response.ok || response.status === 404) {
-                    window.location.href = '/codex/w/' + encodeURIComponent(p.world.id) + '?page_deleted=1';
+                    window.location.href = '/codices/c/' + encodeURIComponent(p.codex.id) + '?page_deleted=1';
                     return;
                 }
                 this.showMessage(response.status === 401 ? 'Your login has expired. Log in again, then delete the page.' : this.sentence(data.error || 'Failed to delete the page'), 'error');
@@ -1264,32 +901,31 @@ window.codexPage = function () {
                 this.busy = false;
             }
         },
-        async deleteWorld() {
+        async deleteCodex() {
             if (this.busy) return;
-            const w = this.world.world;
+            const w = this.codex.codex;
             const ok = await this.askConfirm({
                 eyebrow: 'Codex',
-                title: `Delete the world “${w.name}”?`,
-                message: 'A world can only be deleted when it has no pages and no game is set in it. This cannot be undone.',
-                confirmLabel: 'Delete world',
+                title: `Delete the codex “${w.name}”?`,
+                message: 'A codex can only be deleted when it has no pages. Games set in it lose their codex label. This cannot be undone.',
+                confirmLabel: 'Delete codex',
                 danger: true
             });
             if (!ok) return;
             this.busy = true;
             try {
-                const { response, data } = await this.send(`/api/codex/worlds/${encodeURIComponent(w.id)}`, 'DELETE');
+                const { response, data } = await this.send(`/api/codices/c/${encodeURIComponent(w.id)}`, 'DELETE');
                 if (response.ok) {
-                    window.location.href = '/codex';
-                } else if (data.code === 'world_in_use') {
+                    window.location.href = '/codices';
+                } else if (data.code === 'codex_in_use') {
                     const parts = [];
                     if (data.page_count) parts.push(`it still has ${this.countLabel(data.page_count, 'page')}. Move or delete them first`);
-                    if (data.games && data.games.length) parts.push(`these games are set in it: ${data.games.join(', ')}. Their DMs can pick another world`);
                     this.showMessage(this.sentence("Can't delete " + w.name + ': ' + parts.join('; ')), 'error');
                 } else {
-                    this.showMessage(this.sentence(data.error || 'Failed to delete the world'), 'error');
+                    this.showMessage(this.sentence(data.error || 'Failed to delete the codex'), 'error');
                 }
             } catch (error) {
-                this.showMessage('Error deleting the world: ' + error.message, 'error');
+                this.showMessage('Error deleting the codex: ' + error.message, 'error');
             } finally {
                 this.busy = false;
             }
@@ -1326,7 +962,7 @@ window.codexPage = function () {
             d.error = '';
             this.busy = true;
             try {
-                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}`, 'PUT', { base_revision: d.base, body: d.body, note: d.note.trim() });
+                const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}`, 'PUT', { base_revision: d.base, body: d.body, note: d.note.trim() });
                 if (response.ok) {
                     this.saved = true;
                     window.location.href = this.pageUrl(this.page) + (response.status === 201 ? `?saved=${data.revision.number}` : '?unchanged=1');
@@ -1370,7 +1006,7 @@ window.codexPage = function () {
         async loadHistory(select) {
             this.historyLoading = true;
             try {
-                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.route.id)}/revisions`, 'GET');
+                const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.route.id)}/revisions`, 'GET');
                 if (!response.ok) {
                     this.loadError = data.error || 'Failed to load the history';
                     return;
@@ -1389,7 +1025,7 @@ window.codexPage = function () {
         // The list has no bodies; a revision's text (kept revisions never change) is fetched when needed.
         async revisionBody(n) {
             if (this.bodies[n] === undefined) {
-                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.route.id)}/revisions/${n}`, 'GET');
+                const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.route.id)}/revisions/${n}`, 'GET');
                 if (!response.ok) throw new Error(data.error || 'request failed');
                 this.bodies[n] = data.revision.body;
             }
@@ -1448,7 +1084,7 @@ window.codexPage = function () {
             if (!ok) return;
             this.busy = true;
             try {
-                const { response, data } = await this.send(`/api/codex/pages/${encodeURIComponent(this.page.id)}/revisions/${r.number}/restore`, 'POST', { base_revision: this.currentRevision });
+                const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/revisions/${r.number}/restore`, 'POST', { base_revision: this.currentRevision });
                 if (response.ok && response.status === 201) {
                     await this.loadHistory(data.revision.number);
                     this.showMessage(`Restored revision ${r.number} as revision ${data.revision.number}`, 'success');

@@ -17,26 +17,10 @@ const (
 	maxPageTitleRunes = 120
 	maxPageBodyRunes  = 100000
 	maxPageNoteRunes  = 120
-	maxWorldNameRunes = 80
-	maxWorldDescRunes = 20000
+	maxCodexNameRunes = 80
+	maxCodexDescRunes = 20000
 	maxAliases        = 20
 )
-
-// codexWorldParam maps the API's "unsorted" (or empty) world id to the stored "".
-func codexWorldParam(id string) string {
-	if id == models.UnsortedWorldID {
-		return ""
-	}
-	return id
-}
-
-// codexWorldID is the API's name for a stored world id.
-func codexWorldID(id string) string {
-	if id == "" {
-		return models.UnsortedWorldID
-	}
-	return id
-}
 
 // codexName validates a page title or alias: 1-120 characters, no [ ] | or line breaks.
 func codexName(s string) (string, bool) {
@@ -79,21 +63,21 @@ func codexServerError(w http.ResponseWriter, what string) {
 	writeJSONError(w, http.StatusInternalServerError, "failed to "+what)
 }
 
-// codexWorlds loads the worlds by id plus the synthetic Unsorted folder.
-func codexWorlds() (map[string]models.World, []models.World, error) {
-	list, err := db.GetWorlds()
+// codexCodices loads the codices by id.
+func codexCodices() (map[string]models.Codex, []models.Codex, error) {
+	list, err := db.GetCodices()
 	if err != nil {
 		return nil, nil, err
 	}
-	byID := map[string]models.World{"": {ID: models.UnsortedWorldID, Name: "Unsorted", Description: "Pages that haven't been put in a world yet."}}
+	byID := map[string]models.Codex{}
 	for _, w := range list {
 		byID[w.ID] = w
 	}
 	return byID, list, nil
 }
 
-func codexWorldRef(worlds map[string]models.World, storedID string) map[string]interface{} {
-	return map[string]interface{}{"id": codexWorldID(storedID), "name": worlds[storedID].Name}
+func codexCodexRef(codices map[string]models.Codex, storedID string) map[string]interface{} {
+	return map[string]interface{}{"id": storedID, "name": codices[storedID].Name}
 }
 
 func codexRevisionObject(users map[string]*models.User, rev models.PageRevision) map[string]interface{} {
@@ -123,7 +107,7 @@ func codexExcerpt(s string) string {
 	return s
 }
 
-// HandleCodexHome serves GET /api/codex: the worlds, the Unsorted folder and recent changes.
+// HandleCodexHome serves GET /api/codices: the codices and recent changes.
 func HandleCodexHome(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -132,9 +116,9 @@ func HandleCodexHome(w http.ResponseWriter, r *http.Request) {
 	if _, ok := codexUserID(w, r); !ok {
 		return
 	}
-	worlds, list, err := codexWorlds()
+	codices, list, err := codexCodices()
 	if err != nil {
-		codexServerError(w, "retrieve worlds")
+		codexServerError(w, "retrieve codices")
 		return
 	}
 	pages, err := db.GetCodexPages()
@@ -142,41 +126,30 @@ func HandleCodexHome(w http.ResponseWriter, r *http.Request) {
 		codexServerError(w, "retrieve pages")
 		return
 	}
-	campaigns, err := db.GetAllCampaigns()
-	if err != nil {
-		codexServerError(w, "retrieve games")
-		return
-	}
-	pageCount, gameCount := map[string]int{}, map[string]int{}
+	pageCount := map[string]int{}
 	for _, p := range pages {
-		pageCount[p.WorldID]++
-	}
-	for _, c := range campaigns {
-		if c.WorldID != "" {
-			gameCount[c.WorldID]++
-		}
+		pageCount[p.CodexID]++
 	}
 	out := make([]map[string]interface{}, 0, len(list))
 	for _, wd := range list {
 		out = append(out, map[string]interface{}{
 			"id": wd.ID, "name": wd.Name, "excerpt": codexExcerpt(wd.Description),
-			"game_count": gameCount[wd.ID], "page_count": pageCount[wd.ID],
+			"page_count": pageCount[wd.ID],
 		})
 	}
-	recent, err := codexRecent(nil, worlds)
+	recent, err := codexRecent(nil, codices)
 	if err != nil {
 		codexServerError(w, "retrieve recent changes")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"worlds":   out,
-		"unsorted": map[string]interface{}{"id": models.UnsortedWorldID, "name": "Unsorted", "page_count": pageCount[""]},
-		"recent":   recent,
+		"codices": out,
+		"recent":  recent,
 	})
 }
 
-func codexRecent(worldID *string, worlds map[string]models.World) ([]map[string]interface{}, error) {
-	revs, err := db.GetRecentRevisions(worldID, 15)
+func codexRecent(codexID *string, codices map[string]models.Codex) ([]map[string]interface{}, error) {
+	revs, err := db.GetRecentRevisions(codexID, 15)
 	if err != nil {
 		return nil, err
 	}
@@ -188,16 +161,16 @@ func codexRecent(worldID *string, worlds map[string]models.World) ([]map[string]
 	for _, rv := range revs {
 		out = append(out, map[string]interface{}{
 			"page_id": rv.PageID, "title": rv.Title,
-			"world": codexWorldRef(worlds, rv.WorldID), "number": rv.Number, "note": rv.Note,
+			"codex": codexCodexRef(codices, rv.CodexID), "number": rv.Number, "note": rv.Note,
 			"author_user": journalUser(users, rv.AuthorID), "created_at": rv.CreatedAt,
 		})
 	}
 	return out, nil
 }
 
-// HandleCodexRoutes dispatches /api/codex/{worlds|pages|titles|files}/...
+// HandleCodexRoutes dispatches /api/codices/{c|pages|folders|titles|files}/... and POST /api/codices.
 func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
-	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/codex/"), "/"), "/")
+	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/codices"), "/"), "/")
 	method := func(allowed ...string) bool {
 		for _, m := range allowed {
 			if r.Method == m {
@@ -208,29 +181,35 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 		return false
 	}
 	switch parts[0] {
+	case "":
+		if method(http.MethodGet, http.MethodPost) {
+			if r.Method == http.MethodGet {
+				HandleCodexHome(w, r)
+			} else {
+				handleCreateCodex(w, r)
+			}
+		}
 	case "titles":
 		if len(parts) == 1 && method(http.MethodGet) {
 			handleCodexTitles(w, r)
 		} else if len(parts) != 1 {
 			writeJSONError(w, http.StatusNotFound, "not found")
 		}
-	case "worlds":
+	case "c":
 		switch {
-		case len(parts) == 1 && method(http.MethodPost):
-			handleCreateWorld(w, r)
 		case len(parts) == 2 && method(http.MethodGet, http.MethodPut, http.MethodDelete):
 			switch r.Method {
 			case http.MethodGet:
-				handleGetWorld(w, r, parts[1])
+				handleGetCodex(w, r, parts[1])
 			case http.MethodPut:
-				handleUpdateWorld(w, r, parts[1])
+				handleUpdateCodex(w, r, parts[1])
 			default:
-				handleDeleteWorld(w, r, parts[1])
+				handleDeleteCodex(w, r, parts[1])
 			}
 		case len(parts) == 3 && parts[2] == "folders":
 			if method(http.MethodGet, http.MethodPost) {
 				if r.Method == http.MethodGet {
-					handleWorldFolders(w, r, parts[1])
+					handleCodexFolders(w, r, parts[1])
 				} else {
 					handleCreateFolder(w, r, parts[1])
 				}
@@ -253,7 +232,7 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleCodexTitles lists page titles and aliases (optionally one world: ?world=id), for the
+// handleCodexTitles lists page titles and aliases (optionally one codex: ?codex=id), for the
 // editor's autocomplete, the pin picker and link status in previews.
 func handleCodexTitles(w http.ResponseWriter, r *http.Request) {
 	if _, ok := codexUserID(w, r); !ok {
@@ -264,10 +243,10 @@ func handleCodexTitles(w http.ResponseWriter, r *http.Request) {
 		codexServerError(w, "retrieve pages")
 		return
 	}
-	filter, only := r.URL.Query().Get("world"), r.URL.Query().Has("world")
+	filter, only := r.URL.Query().Get("codex"), r.URL.Query().Has("codex")
 	out := []map[string]interface{}{}
 	for _, p := range pages {
-		if only && p.WorldID != codexWorldParam(filter) {
+		if only && p.CodexID != filter {
 			continue
 		}
 		out = append(out, map[string]interface{}{
@@ -277,31 +256,28 @@ func handleCodexTitles(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-type worldRequest struct {
+type codexRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 
-func (req *worldRequest) normalize() string {
+func (req *codexRequest) normalize() string {
 	req.Name = strings.Join(strings.Fields(req.Name), " ")
-	if n := utf8.RuneCountInString(req.Name); n < 1 || n > maxWorldNameRunes {
+	if n := utf8.RuneCountInString(req.Name); n < 1 || n > maxCodexNameRunes {
 		return "name must be 1 to 80 characters"
 	}
-	if db.NormName(req.Name) == models.UnsortedWorldID {
-		return "\"unsorted\" is reserved for the Unsorted folder"
-	}
-	if utf8.RuneCountInString(req.Description) > maxWorldDescRunes {
+	if utf8.RuneCountInString(req.Description) > maxCodexDescRunes {
 		return "description is too long"
 	}
 	return ""
 }
 
-func handleCreateWorld(w http.ResponseWriter, r *http.Request) {
+func handleCreateCodex(w http.ResponseWriter, r *http.Request) {
 	userID, ok := codexUserID(w, r)
 	if !ok {
 		return
 	}
-	var req worldRequest
+	var req codexRequest
 	if !codexDecode(w, r, 64<<10, &req) {
 		return
 	}
@@ -310,23 +286,23 @@ func handleCreateWorld(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	world := models.World{ID: db.GenerateUUID(), Name: req.Name, Description: req.Description, CreatedBy: userID, CreatedAt: now, UpdatedAt: now}
-	if err := db.CreateWorld(world); err != nil {
-		if errors.Is(err, db.ErrWorldNameTaken) {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "world_name_taken"})
+	codex := models.Codex{ID: db.GenerateUUID(), Name: req.Name, Description: req.Description, CreatedBy: userID, CreatedAt: now, UpdatedAt: now}
+	if err := db.CreateCodex(codex); err != nil {
+		if errors.Is(err, db.ErrCodexNameTaken) {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "codex_name_taken"})
 			return
 		}
-		codexServerError(w, "create world")
+		codexServerError(w, "create codex")
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]interface{}{"world": world})
+	writeJSON(w, http.StatusCreated, map[string]interface{}{"codex": codex})
 }
 
-func handleUpdateWorld(w http.ResponseWriter, r *http.Request, id string) {
+func handleUpdateCodex(w http.ResponseWriter, r *http.Request, id string) {
 	if _, ok := codexUserID(w, r); !ok {
 		return
 	}
-	var req worldRequest
+	var req codexRequest
 	if !codexDecode(w, r, 64<<10, &req) {
 		return
 	}
@@ -334,21 +310,21 @@ func handleUpdateWorld(w http.ResponseWriter, r *http.Request, id string) {
 		writeJSONError(w, http.StatusBadRequest, msg)
 		return
 	}
-	if err := db.UpdateWorld(id, req.Name, req.Description); err != nil {
+	if err := db.UpdateCodex(id, req.Name, req.Description); err != nil {
 		switch {
-		case errors.Is(err, db.ErrWorldNotFound):
+		case errors.Is(err, db.ErrCodexNotFound):
 			writeJSONError(w, http.StatusNotFound, err.Error())
-		case errors.Is(err, db.ErrWorldNameTaken):
-			writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "world_name_taken"})
+		case errors.Is(err, db.ErrCodexNameTaken):
+			writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "codex_name_taken"})
 		default:
-			codexServerError(w, "update world")
+			codexServerError(w, "update codex")
 		}
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-func handleDeleteWorld(w http.ResponseWriter, r *http.Request, id string) {
+func handleDeleteCodex(w http.ResponseWriter, r *http.Request, id string) {
 	userID, ok := codexUserID(w, r)
 	if !ok {
 		return
@@ -359,68 +335,58 @@ func handleDeleteWorld(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	if !admin {
-		writeJSONError(w, http.StatusForbidden, "only an admin can delete a world")
+		writeJSONError(w, http.StatusForbidden, "only an admin can delete a codex")
 		return
 	}
-	world, err := db.GetWorld(id)
+	codex, err := db.GetCodex(id)
 	if err != nil {
-		codexServerError(w, "retrieve world")
+		codexServerError(w, "retrieve codex")
 		return
 	}
-	if world == nil {
-		writeJSONError(w, http.StatusNotFound, db.ErrWorldNotFound.Error())
+	if codex == nil {
+		writeJSONError(w, http.StatusNotFound, db.ErrCodexNotFound.Error())
 		return
 	}
-	if err := db.DeleteWorld(id); err != nil {
-		if errors.Is(err, db.ErrWorldInUse) {
-			games, pages := codexWorldUsage(id)
+	if err := db.DeleteCodex(id); err != nil {
+		if errors.Is(err, db.ErrCodexInUse) {
 			writeJSON(w, http.StatusConflict, map[string]interface{}{
-				"error": "Move or delete its pages and unlink its games first.", "code": "world_in_use",
-				"games": games, "page_count": pages,
+				"error": "Move or delete its pages first.", "code": "codex_in_use",
+				"page_count": codexPageCount(id),
 			})
 			return
 		}
-		codexServerError(w, "delete world")
+		codexServerError(w, "delete codex")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-// codexWorldUsage returns the titles of the games in a world and how many pages it holds.
-func codexWorldUsage(id string) ([]string, int) {
-	games := []string{}
-	if campaigns, err := db.GetAllCampaigns(); err == nil {
-		for _, c := range campaigns {
-			if c.WorldID == id {
-				games = append(games, c.Title)
-			}
-		}
-	}
+// codexPageCount returns how many pages a codex holds.
+func codexPageCount(id string) int {
 	pages := 0
 	if list, err := db.GetCodexPages(); err == nil {
 		for _, p := range list {
-			if p.WorldID == id {
+			if p.CodexID == id {
 				pages++
 			}
 		}
 	}
-	return games, pages
+	return pages
 }
 
-func handleGetWorld(w http.ResponseWriter, r *http.Request, apiID string) {
+func handleGetCodex(w http.ResponseWriter, r *http.Request, id string) {
 	userID, ok := codexUserID(w, r)
 	if !ok {
 		return
 	}
-	id := codexWorldParam(apiID)
-	worlds, _, err := codexWorlds()
+	codices, _, err := codexCodices()
 	if err != nil {
-		codexServerError(w, "retrieve worlds")
+		codexServerError(w, "retrieve codices")
 		return
 	}
-	world, found := worlds[id]
+	codex, found := codices[id]
 	if !found {
-		writeJSONError(w, http.StatusNotFound, db.ErrWorldNotFound.Error())
+		writeJSONError(w, http.StatusNotFound, db.ErrCodexNotFound.Error())
 		return
 	}
 	pages, err := db.GetCodexPages()
@@ -430,7 +396,7 @@ func handleGetWorld(w http.ResponseWriter, r *http.Request, apiID string) {
 	}
 	list := []map[string]interface{}{}
 	for _, p := range pages {
-		if p.WorldID == id {
+		if p.CodexID == id {
 			list = append(list, map[string]interface{}{"id": p.ID, "title": p.Title, "has_map": p.HasMap, "aliases": p.Aliases, "folder_id": p.FolderID})
 		}
 	}
@@ -438,19 +404,6 @@ func handleGetWorld(w http.ResponseWriter, r *http.Request, apiID string) {
 	if err != nil {
 		codexServerError(w, "retrieve folders")
 		return
-	}
-	games := []map[string]interface{}{}
-	if id != "" {
-		campaigns, err := db.GetAllCampaigns()
-		if err != nil {
-			codexServerError(w, "retrieve games")
-			return
-		}
-		for _, c := range campaigns {
-			if c.WorldID == id {
-				games = append(games, map[string]interface{}{"id": c.ID, "title": c.Title, "status": c.Status})
-			}
-		}
 	}
 	admin, err := codexIsAdmin(userID)
 	if err != nil {
@@ -462,26 +415,25 @@ func handleGetWorld(w http.ResponseWriter, r *http.Request, apiID string) {
 		codexServerError(w, "retrieve wanted pages")
 		return
 	}
-	recent, err := codexRecent(&id, worlds)
+	recent, err := codexRecent(&id, codices)
 	if err != nil {
 		codexServerError(w, "retrieve recent changes")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"world":      map[string]interface{}{"id": codexWorldID(id), "name": world.Name, "description": world.Description, "unsorted": id == ""},
-		"games":      games,
+		"codex":      map[string]interface{}{"id": id, "name": codex.Name, "description": codex.Description},
 		"pages":      list,
 		"folders":    folders,
 		"wanted":     wanted,
 		"recent":     recent,
-		"can_delete": id != "" && admin,
+		"can_delete": admin,
 	})
 }
 
 type pageCreateRequest struct {
 	Title    string `json:"title"`
 	Body     string `json:"body"`
-	WorldID  string `json:"world_id"`
+	CodexID  string `json:"codex_id"`
 	FolderID string `json:"folder_id"`
 }
 
@@ -503,13 +455,17 @@ func handleCreatePage(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "body is too long")
 		return
 	}
-	page := models.Page{ID: db.GenerateUUID(), Kind: models.PageLore, WorldID: codexWorldParam(req.WorldID), FolderID: req.FolderID, Title: title, AuthorID: userID}
+	if req.CodexID == "" {
+		writeJSONError(w, http.StatusBadRequest, db.ErrCodexNotFound.Error())
+		return
+	}
+	page := models.Page{ID: db.GenerateUUID(), Kind: models.PageLore, CodexID: req.CodexID, FolderID: req.FolderID, Title: title, AuthorID: userID}
 	if err := db.CreatePage(page, req.Body); err != nil {
 		codexStoreError(w, err, "create page")
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"page": map[string]interface{}{
-		"id": page.ID, "world_id": codexWorldID(page.WorldID)}})
+		"id": page.ID, "codex_id": page.CodexID}})
 }
 
 // codexStoreError writes the response for the errors the page store returns.
@@ -520,7 +476,7 @@ func codexStoreError(w http.ResponseWriter, err error, what string) {
 		codexNameTaken(w, taken)
 	case errors.Is(err, db.ErrPageNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error(), "code": "page_deleted"})
-	case errors.Is(err, db.ErrWorldNotFound), errors.Is(err, db.ErrFolderNotFound), errors.Is(err, db.ErrNoFolders):
+	case errors.Is(err, db.ErrCodexNotFound), errors.Is(err, db.ErrFolderNotFound):
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, db.ErrRevisionNotFound):
 		writeJSONError(w, http.StatusNotFound, err.Error())
@@ -586,7 +542,7 @@ func handleCodexPageRoutes(w http.ResponseWriter, r *http.Request, parts []strin
 		if method(http.MethodPut) {
 			handleSetPageFolder(w, r, id)
 		}
-	case rest[0] == "world" && len(rest) == 1:
+	case rest[0] == "codex" && len(rest) == 1:
 		if method(http.MethodPut) {
 			handleMovePage(w, r, id)
 		}
@@ -622,9 +578,9 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 	if err != nil {
 		return nil, http.StatusInternalServerError, "failed to retrieve users"
 	}
-	worlds, _, err := codexWorlds()
+	codices, _, err := codexCodices()
 	if err != nil {
-		return nil, http.StatusInternalServerError, "failed to retrieve worlds"
+		return nil, http.StatusInternalServerError, "failed to retrieve codices"
 	}
 	links, err := db.GetPageLinks(id)
 	if err != nil {
@@ -676,7 +632,7 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 			o["aliases"] = append(o["aliases"].([]string), b.TargetText)
 		}
 	}
-	folderPath, err := codexFolderPath(page.WorldID, page.FolderID)
+	folderPath, err := codexFolderPath(page.CodexID, page.FolderID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, "failed to retrieve folders"
 	}
@@ -689,7 +645,7 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 	payload := map[string]interface{}{
 		"page": map[string]interface{}{
 			"id": page.ID, "title": page.Title,
-			"world": codexWorldRef(worlds, page.WorldID), "folder_id": page.FolderID, "folder_path": folderPath, "aliases": page.Aliases, "body": page.Body,
+			"codex": codexCodexRef(codices, page.CodexID), "folder_id": page.FolderID, "folder_path": folderPath, "aliases": page.Aliases, "body": page.Body,
 			"current_revision": page.CurrentRevision, "revision_count": page.RevisionCount,
 			"created_at": page.CreatedAt, "updated_at": page.UpdatedAt,
 			"author_user": journalUser(users, page.AuthorID), "amender_users": journalUserList(users, amenders),
@@ -897,12 +853,12 @@ func handleMovePage(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	var req struct {
-		WorldID string `json:"world_id"`
+		CodexID string `json:"codex_id"`
 	}
 	if !codexDecode(w, r, 4<<10, &req) {
 		return
 	}
-	if err := db.MovePage(id, codexWorldParam(req.WorldID)); err != nil {
+	if err := db.MovePage(id, req.CodexID); err != nil {
 		codexStoreError(w, err, "move page")
 		return
 	}
@@ -920,4 +876,20 @@ func handleDeletePage(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	removeCodexFiles(files)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// redirectOldCodexURL sends the old /codex page URLs to /codices: /codex/w/{rest} became
+// /codices/c/{rest}, /codex/p/{rest} became /codices/p/{rest}, anything else goes to the home.
+func redirectOldCodexURL(w http.ResponseWriter, r *http.Request) {
+	target := "/codices"
+	rest := strings.TrimPrefix(r.URL.EscapedPath(), "/codex")
+	if strings.HasPrefix(rest, "/w/") {
+		target = "/codices/c/" + strings.TrimPrefix(rest, "/w/")
+	} else if strings.HasPrefix(rest, "/p/") {
+		target = "/codices/p/" + strings.TrimPrefix(rest, "/p/")
+	}
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+	http.Redirect(w, r, target, http.StatusMovedPermanently)
 }
