@@ -27,7 +27,7 @@ const (
 
 var codexImageTypes = map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
 
-func codexImageURL(file string) string { return "/api/codex/files/" + file }
+func codexImageURL(file string) string { return "/api/codices/files/" + file }
 
 // currentMapImage splits a page's image rows (newest first) into its history and its current
 // image. A newest row with no file is the "map removed" marker: no current image, and markers
@@ -47,7 +47,7 @@ func currentMapImage(rows []models.MapImage) (current *models.MapImage, history 
 	return current, history
 }
 
-// handleCodexMapRoutes serves the map endpoints under /api/codex/pages/{id}/.
+// handleCodexMapRoutes serves the map endpoints under /api/codices/pages/{id}/.
 // It reports false when rest is not one of them.
 func handleCodexMapRoutes(w http.ResponseWriter, r *http.Request, id string, rest []string, method func(...string) bool) bool {
 	switch {
@@ -379,7 +379,7 @@ type pinRequest struct {
 	X          *float64 `json:"x"`
 	Y          *float64 `json:"y"`
 	TargetText string   `json:"target_text"`
-	CreatePage bool     `json:"create_page"` // add: create the lore page first (empty, in the map's world)
+	CreatePage bool     `json:"create_page"` // add: create the lore page first (empty, in the map's codex)
 }
 
 // validPosition reports whether both coordinates are present and fractions of the image.
@@ -412,7 +412,7 @@ func handleAddPin(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	pin := models.MapPin{MapPageID: id, X: *req.X, Y: *req.Y, TargetText: text, CreatedBy: userID}
 	if req.CreatePage {
-		// The page and the pin are saved together; the store sets the page's world to the map's.
+		// The page and the pin are saved together; the store sets the page's codex to the map's.
 		pin, err = db.AddMapPinWithNewPage(models.Page{ID: db.GenerateUUID(), Title: text, AuthorID: userID}, pin)
 	} else {
 		pin, err = db.AddMapPin(pin)

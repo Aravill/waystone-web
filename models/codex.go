@@ -1,14 +1,11 @@
 package models
 
-// UnsortedWorldID is how the API names the shared "Unsorted" folder; the database stores "".
-const UnsortedWorldID = "unsorted"
-
 // PageLore is the kind of every page; the kind column is kept but nothing branches on it. A map
 // is an optional part of any page (map_images, map_pins).
 const PageLore = "lore"
 
-// World is a folder of Codex pages. Games point at a world with campaigns.world_id (a label only).
-type World struct {
+// Codex is a folder of Codex pages. Games point at a codex with campaigns.codex_id (a label only).
+type Codex struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -17,11 +14,11 @@ type World struct {
 	UpdatedAt   string `json:"updated_at"`
 }
 
-// Folder organises the pages of one world into a nested tree. It is for sorting only: links,
-// titles and aliases ignore it. The Unsorted folder (world "") has none.
+// Folder organises the pages of one codex into a nested tree. It is for sorting only: links,
+// titles and aliases ignore it.
 type Folder struct {
 	ID        string `json:"id"`
-	WorldID   string `json:"-"`
+	CodexID   string `json:"-"`
 	ParentID  string `json:"parent_id"`
 	Name      string `json:"name"`
 	CreatedBy string `json:"-"`
@@ -36,12 +33,12 @@ type PageContributor struct {
 	FirstRevision int
 }
 
-// Page is a Codex page with its newest revision. WorldID "" is the Unsorted folder.
+// Page is a Codex page with its newest revision.
 type Page struct {
 	ID              string
 	Kind            string
-	WorldID         string
-	FolderID        string // "" = the world's top level
+	CodexID         string
+	FolderID        string // "" = the codex's top level
 	Title           string
 	AuthorID        string
 	CreatedAt       string
@@ -58,7 +55,7 @@ type Page struct {
 type PageListItem struct {
 	ID       string
 	HasMap   bool
-	WorldID  string
+	CodexID  string
 	FolderID string
 	Title    string
 	Aliases  []string
@@ -79,7 +76,7 @@ type RecentRevision struct {
 	PageID    string
 	Title     string
 	Kind      string
-	WorldID   string
+	CodexID   string
 	Number    int
 	Note      string
 	AuthorID  string

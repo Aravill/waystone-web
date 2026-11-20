@@ -40,8 +40,8 @@ func insertPageRevision(tx *sql.Tx, pageID string, rev models.PageRevision, keep
 	return rev, err
 }
 
-func pageWorld(q querier, id string) (world, title string, err error) {
-	err = q.QueryRow(`SELECT world_id, title FROM pages WHERE id = ?`, id).Scan(&world, &title)
+func pageCodex(q querier, id string) (codex, title string, err error) {
+	err = q.QueryRow(`SELECT codex_id, title FROM pages WHERE id = ?`, id).Scan(&codex, &title)
 	if err == sql.ErrNoRows {
 		err = ErrPageNotFound
 	}
@@ -65,20 +65,17 @@ func pageAliases(q querier, id string) ([]string, error) {
 	return out, rows.Err()
 }
 
-func worldExists(q querier, id string) error {
-	if id == "" {
-		return nil
-	}
+func codexExists(q querier, id string) error {
 	var one int
-	if err := q.QueryRow(`SELECT 1 FROM worlds WHERE id = ?`, id).Scan(&one); err == sql.ErrNoRows {
-		return ErrWorldNotFound
+	if err := q.QueryRow(`SELECT 1 FROM codices WHERE id = ?`, id).Scan(&one); err == sql.ErrNoRows {
+		return ErrCodexNotFound
 	} else {
 		return err
 	}
 }
 
 // CreatePage adds a page (revision 1, body may be empty) and any aliases in p.Aliases.
-// A title or alias already used in the world gives *NameTakenError.
+// A title or alias already used in the codex gives *NameTakenError.
 func (s *SQLiteStore) CreatePage(p models.Page, body string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -95,7 +92,7 @@ func (s *SQLiteStore) CreatePage(p models.Page, body string) error {
 
 // createPageTx does CreatePage's work inside a caller's transaction.
 func createPageTx(tx *sql.Tx, p models.Page, body string) error {
-	if err := worldExists(tx, p.WorldID); err != nil {
+	if err := codexExists(tx, p.CodexID); err != nil {
 		return err
 	}
 	// Aliases are unique by normalized name and never repeat the title.
@@ -106,17 +103,17 @@ func createPageTx(tx *sql.Tx, p models.Page, body string) error {
 			aliases = append(aliases, a)
 		}
 	}
-	if conflicts, err := nameConflicts(tx, p.WorldID, p.ID, append([]string{p.Title}, aliases...)); err != nil {
+	if conflicts, err := nameConflicts(tx, p.CodexID, p.ID, append([]string{p.Title}, aliases...)); err != nil {
 		return err
 	} else if len(conflicts) > 0 {
 		return &NameTakenError{conflicts}
 	}
-	if err := folderInWorld(tx, p.FolderID, p.WorldID); err != nil {
+	if err := folderInCodex(tx, p.FolderID, p.CodexID); err != nil {
 		return err
 	}
 	now := nowUTC()
-	if _, err := tx.Exec(`INSERT INTO pages (id, kind, world_id, folder_id, title, author_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.ID, p.Kind, p.WorldID, p.FolderID, p.Title, p.AuthorID, now, now); err != nil {
+	if _, err := tx.Exec(`INSERT INTO pages (id, kind, codex_id, folder_id, title, author_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.Kind, p.CodexID, p.FolderID, p.Title, p.AuthorID, now, now); err != nil {
 		return err
 	}
 	for _, a := range aliases {
@@ -127,14 +124,14 @@ func createPageTx(tx *sql.Tx, p models.Page, body string) error {
 	if _, err := insertPageRevision(tx, p.ID, models.PageRevision{AuthorID: p.AuthorID, Title: p.Title, Body: body, CreatedAt: now}, PageKeepRevisions); err != nil {
 		return err
 	}
-	idx, err := loadCodexIndex(tx, p.WorldID)
+	idx, err := loadCodexIndex(tx, p.CodexID)
 	if err != nil {
 		return err
 	}
-	if err := resolveLinksWith(tx, idx, p.WorldID); err != nil { // other pages' missing links may now resolve
+	if err := resolveLinksWith(tx, idx, p.CodexID); err != nil { // other pages' missing links may now resolve
 		return err
 	}
-	return rebuildPageLinks(tx, idx, p.ID, p.WorldID, body)
+	return rebuildPageLinks(tx, idx, p.ID, p.CodexID, body)
 }
 
 // GetPage returns nil, nil when the page does not exist.
@@ -142,8 +139,8 @@ func (s *SQLiteStore) GetPage(id string) (*models.Page, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	var p models.Page
-	err := s.db.QueryRow(`SELECT id, kind, world_id, folder_id, title, author_id, created_at, updated_at FROM pages WHERE id = ?`, id).
-		Scan(&p.ID, &p.Kind, &p.WorldID, &p.FolderID, &p.Title, &p.AuthorID, &p.CreatedAt, &p.UpdatedAt)
+	err := s.db.QueryRow(`SELECT id, kind, codex_id, folder_id, title, author_id, created_at, updated_at FROM pages WHERE id = ?`, id).
+		Scan(&p.ID, &p.Kind, &p.CodexID, &p.FolderID, &p.Title, &p.AuthorID, &p.CreatedAt, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -179,7 +176,7 @@ func (s *SQLiteStore) GetPage(id string) (*models.Page, error) {
 func (s *SQLiteStore) GetCodexPages() ([]models.PageListItem, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	rows, err := s.db.Query(`SELECT id, COALESCE((SELECT file != '' FROM map_images i WHERE i.page_id = pages.id ORDER BY created_at DESC, rowid DESC LIMIT 1), 0), world_id, folder_id, title FROM pages ORDER BY title COLLATE NOCASE, id`)
+	rows, err := s.db.Query(`SELECT id, COALESCE((SELECT file != '' FROM map_images i WHERE i.page_id = pages.id ORDER BY created_at DESC, rowid DESC LIMIT 1), 0), codex_id, folder_id, title FROM pages ORDER BY title COLLATE NOCASE, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +184,7 @@ func (s *SQLiteStore) GetCodexPages() ([]models.PageListItem, error) {
 	at := map[string]int{}
 	for rows.Next() {
 		var p models.PageListItem
-		if err := rows.Scan(&p.ID, &p.HasMap, &p.WorldID, &p.FolderID, &p.Title); err != nil {
+		if err := rows.Scan(&p.ID, &p.HasMap, &p.CodexID, &p.FolderID, &p.Title); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -260,16 +257,16 @@ func (s *SQLiteStore) GetBacklinks(id string) ([]models.PageBacklink, error) {
 	return out, nil
 }
 
-// GetWantedPages lists the titles that links and pins in a world point at without a page, most wanted first.
-func (s *SQLiteStore) GetWantedPages(worldID string) ([]models.WantedPage, error) {
+// GetWantedPages lists the titles that links and pins in a codex point at without a page, most wanted first.
+func (s *SQLiteStore) GetWantedPages(codexID string) ([]models.WantedPage, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	counts := map[string]*models.WantedPage{}
 	for _, q := range []string{
-		`SELECT l.target_text FROM page_links l JOIN pages p ON p.id = l.from_page_id WHERE l.to_page_id = '' AND p.world_id = ?`,
-		`SELECT m.target_text FROM map_pins m JOIN pages p ON p.id = m.map_page_id WHERE m.to_page_id = '' AND p.world_id = ?`,
+		`SELECT l.target_text FROM page_links l JOIN pages p ON p.id = l.from_page_id WHERE l.to_page_id = '' AND p.codex_id = ?`,
+		`SELECT m.target_text FROM map_pins m JOIN pages p ON p.id = m.map_page_id WHERE m.to_page_id = '' AND p.codex_id = ?`,
 	} {
-		rows, err := s.db.Query(q, worldID)
+		rows, err := s.db.Query(q, codexID)
 		if err != nil {
 			return nil, err
 		}
@@ -327,7 +324,7 @@ func (s *SQLiteStore) GetPageRevision(id string, number int) (models.PageRevisio
 	defer s.mutex.RUnlock()
 	r, err := scanPageRevision(s.db.QueryRow(`SELECT `+pageRevisionColumns+` FROM page_revisions WHERE page_id = ? AND number = ?`, id, number))
 	if err == sql.ErrNoRows {
-		if _, _, perr := pageWorld(s.db, id); perr != nil {
+		if _, _, perr := pageCodex(s.db, id); perr != nil {
 			return r, perr
 		}
 		return r, ErrRevisionNotFound
@@ -335,16 +332,16 @@ func (s *SQLiteStore) GetPageRevision(id string, number int) (models.PageRevisio
 	return r, err
 }
 
-// GetRecentRevisions lists the newest revisions, optionally only for pages in one world.
-func (s *SQLiteStore) GetRecentRevisions(worldID *string, limit int) ([]models.RecentRevision, error) {
+// GetRecentRevisions lists the newest revisions, optionally only for pages in one codex.
+func (s *SQLiteStore) GetRecentRevisions(codexID *string, limit int) ([]models.RecentRevision, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	q := `SELECT p.id, p.title, p.kind, p.world_id, r.number, r.note, r.author_id, r.created_at
+	q := `SELECT p.id, p.title, p.kind, p.codex_id, r.number, r.note, r.author_id, r.created_at
 		FROM page_revisions r JOIN pages p ON p.id = r.page_id`
 	args := []interface{}{}
-	if worldID != nil {
-		q += ` WHERE p.world_id = ?`
-		args = append(args, *worldID)
+	if codexID != nil {
+		q += ` WHERE p.codex_id = ?`
+		args = append(args, *codexID)
 	}
 	q += ` ORDER BY r.created_at DESC, r.number DESC LIMIT ?`
 	args = append(args, limit)
@@ -356,7 +353,7 @@ func (s *SQLiteStore) GetRecentRevisions(worldID *string, limit int) ([]models.R
 	out := []models.RecentRevision{}
 	for rows.Next() {
 		var r models.RecentRevision
-		if err := rows.Scan(&r.PageID, &r.Title, &r.Kind, &r.WorldID, &r.Number, &r.Note, &r.AuthorID, &r.CreatedAt); err != nil {
+		if err := rows.Scan(&r.PageID, &r.Title, &r.Kind, &r.CodexID, &r.Number, &r.Note, &r.AuthorID, &r.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -374,7 +371,7 @@ func (s *SQLiteStore) SavePageRevision(id string, base int, rev models.PageRevis
 		return models.PageSaveResult{}, err
 	}
 	defer tx.Rollback()
-	world, title, err := pageWorld(tx, id)
+	codex, title, err := pageCodex(tx, id)
 	if err != nil {
 		return models.PageSaveResult{}, err
 	}
@@ -395,11 +392,11 @@ func (s *SQLiteStore) SavePageRevision(id string, base int, rev models.PageRevis
 	if _, err := tx.Exec(`UPDATE pages SET updated_at = ? WHERE id = ?`, rev.CreatedAt, id); err != nil {
 		return models.PageSaveResult{}, err
 	}
-	idx, err := loadCodexIndex(tx, world)
+	idx, err := loadCodexIndex(tx, codex)
 	if err != nil {
 		return models.PageSaveResult{}, err
 	}
-	if err := rebuildPageLinks(tx, idx, id, world, rev.Body); err != nil {
+	if err := rebuildPageLinks(tx, idx, id, codex, rev.Body); err != nil {
 		return models.PageSaveResult{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -408,7 +405,7 @@ func (s *SQLiteStore) SavePageRevision(id string, base int, rev models.PageRevis
 	return models.PageSaveResult{Outcome: models.PageSaved, Revision: rev}, nil
 }
 
-// RenamePage retitles a page and rewrites the [[links]] to its old title in the same world
+// RenamePage retitles a page and rewrites the [[links]] to its old title in the same codex
 // (each rewritten page gets a revision). Links through aliases are left alone. It returns how
 // many pages were rewritten.
 func (s *SQLiteStore) RenamePage(id, newTitle, userID string, keep int) (int, error) {
@@ -419,7 +416,7 @@ func (s *SQLiteStore) RenamePage(id, newTitle, userID string, keep int) (int, er
 		return 0, err
 	}
 	defer tx.Rollback()
-	world, oldTitle, err := pageWorld(tx, id)
+	codex, oldTitle, err := pageCodex(tx, id)
 	if err != nil {
 		return 0, err
 	}
@@ -427,7 +424,7 @@ func (s *SQLiteStore) RenamePage(id, newTitle, userID string, keep int) (int, er
 		return 0, nil
 	}
 	if NormName(oldTitle) != NormName(newTitle) { // a case-only rename can't collide with itself
-		if conflicts, err := nameConflicts(tx, world, id, []string{newTitle}); err != nil {
+		if conflicts, err := nameConflicts(tx, codex, id, []string{newTitle}); err != nil {
 			return 0, err
 		} else if len(conflicts) > 0 {
 			return 0, &NameTakenError{conflicts}
@@ -526,8 +523,8 @@ func (s *SQLiteStore) RenamePage(id, newTitle, userID string, keep int) (int, er
 			return 0, err
 		}
 	}
-	// Re-derive links from the new bodies, then every resolution in this world.
-	idx, err := loadCodexIndex(tx, world)
+	// Re-derive links from the new bodies, then every resolution in this codex.
+	idx, err := loadCodexIndex(tx, codex)
 	if err != nil {
 		return 0, err
 	}
@@ -536,7 +533,7 @@ func (s *SQLiteStore) RenamePage(id, newTitle, userID string, keep int) (int, er
 		if err := tx.QueryRow(`SELECT body FROM page_revisions WHERE page_id = ? ORDER BY number DESC LIMIT 1`, from).Scan(&body); err != nil {
 			return 0, err
 		}
-		fw, _, err := pageWorld(tx, from)
+		fw, _, err := pageCodex(tx, from)
 		if err != nil {
 			return 0, err
 		}
@@ -544,7 +541,7 @@ func (s *SQLiteStore) RenamePage(id, newTitle, userID string, keep int) (int, er
 			return 0, err
 		}
 	}
-	if err := resolveLinksWith(tx, idx, world); err != nil {
+	if err := resolveLinksWith(tx, idx, codex); err != nil {
 		return 0, err
 	}
 	return rewritten, tx.Commit()
@@ -568,11 +565,11 @@ func (s *SQLiteStore) SetPageAliases(id string, aliases []string) error {
 		return err
 	}
 	defer tx.Rollback()
-	world, _, err := pageWorld(tx, id)
+	codex, _, err := pageCodex(tx, id)
 	if err != nil {
 		return err
 	}
-	if conflicts, err := nameConflicts(tx, world, id, aliases); err != nil {
+	if conflicts, err := nameConflicts(tx, codex, id, aliases); err != nil {
 		return err
 	} else if len(conflicts) > 0 {
 		return &NameTakenError{conflicts}
@@ -585,15 +582,15 @@ func (s *SQLiteStore) SetPageAliases(id string, aliases []string) error {
 			return err
 		}
 	}
-	if err := resolveWorldLinks(tx, world); err != nil {
+	if err := resolveCodexLinks(tx, codex); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
-// MovePage puts a page in another world ("" = Unsorted). Its title and aliases must be free there.
-// Links from the old world to it turn missing; its own links and pins re-resolve in the new world.
-func (s *SQLiteStore) MovePage(id, worldID string) error {
+// MovePage puts a page in another codex. Its title and aliases must be free there.
+// Links from the old codex to it turn missing; its own links and pins re-resolve in the new codex.
+func (s *SQLiteStore) MovePage(id, codexID string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	tx, err := s.db.Begin()
@@ -601,29 +598,29 @@ func (s *SQLiteStore) MovePage(id, worldID string) error {
 		return err
 	}
 	defer tx.Rollback()
-	world, title, err := pageWorld(tx, id)
+	codex, title, err := pageCodex(tx, id)
 	if err != nil {
 		return err
 	}
-	if world == worldID {
+	if codex == codexID {
 		return nil
 	}
-	if err := worldExists(tx, worldID); err != nil {
+	if err := codexExists(tx, codexID); err != nil {
 		return err
 	}
 	aliases, err := pageAliases(tx, id)
 	if err != nil {
 		return err
 	}
-	if conflicts, err := nameConflicts(tx, worldID, id, append([]string{title}, aliases...)); err != nil {
+	if conflicts, err := nameConflicts(tx, codexID, id, append([]string{title}, aliases...)); err != nil {
 		return err
 	} else if len(conflicts) > 0 {
 		return &NameTakenError{conflicts}
 	}
-	if _, err := tx.Exec(`UPDATE pages SET world_id = ?, folder_id = '', updated_at = ? WHERE id = ?`, worldID, nowUTC(), id); err != nil {
+	if _, err := tx.Exec(`UPDATE pages SET codex_id = ?, folder_id = '', updated_at = ? WHERE id = ?`, codexID, nowUTC(), id); err != nil {
 		return err
 	}
-	if err := resolveWorldLinks(tx, world, worldID); err != nil {
+	if err := resolveCodexLinks(tx, codex, codexID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -639,7 +636,7 @@ func (s *SQLiteStore) DeletePage(id string) ([]string, error) {
 		return nil, err
 	}
 	defer tx.Rollback()
-	world, _, err := pageWorld(tx, id)
+	codex, _, err := pageCodex(tx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -671,7 +668,7 @@ func (s *SQLiteStore) DeletePage(id string) ([]string, error) {
 			return nil, err
 		}
 	}
-	if err := resolveWorldLinks(tx, world); err != nil {
+	if err := resolveCodexLinks(tx, codex); err != nil {
 		return nil, err
 	}
 	return files, tx.Commit()

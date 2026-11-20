@@ -22,14 +22,14 @@ func scanMapPin(row rowScanner) (models.MapPin, error) {
 	return p, err
 }
 
-// mapWorld returns the page's world, or ErrPageNotFound. Any page can hold a map.
-func mapWorld(q querier, id string) (string, error) {
-	var world string
-	err := q.QueryRow(`SELECT world_id FROM pages WHERE id = ?`, id).Scan(&world)
+// mapCodex returns the page's codex, or ErrPageNotFound. Any page can hold a map.
+func mapCodex(q querier, id string) (string, error) {
+	var codex string
+	err := q.QueryRow(`SELECT codex_id FROM pages WHERE id = ?`, id).Scan(&codex)
 	if err == sql.ErrNoRows {
 		return "", ErrPageNotFound
 	}
-	return world, err
+	return codex, err
 }
 
 // hasMap reports whether the page's newest image row is a real image. "Remove map" adds a marker
@@ -43,9 +43,9 @@ func hasMap(q querier, pageID string) (bool, error) {
 	return file != "", err
 }
 
-// mapWorldWithMap is mapWorld that also requires the page to have a map (pins need an image).
-func mapWorldWithMap(q querier, id string) (string, error) {
-	world, err := mapWorld(q, id)
+// mapCodexWithMap is mapCodex that also requires the page to have a map (pins need an image).
+func mapCodexWithMap(q querier, id string) (string, error) {
+	codex, err := mapCodex(q, id)
 	if err != nil {
 		return "", err
 	}
@@ -54,7 +54,7 @@ func mapWorldWithMap(q querier, id string) (string, error) {
 	} else if !ok {
 		return "", ErrNoMap
 	}
-	return world, nil
+	return codex, nil
 }
 
 // RemoveMap clears the page's map: its pins are removed (each logged, so History shows them) and a
@@ -69,7 +69,7 @@ func (s *SQLiteStore) RemoveMap(pageID, userID string) (int, error) {
 		return 0, err
 	}
 	defer tx.Rollback()
-	if _, err := mapWorldWithMap(tx, pageID); err != nil {
+	if _, err := mapCodexWithMap(tx, pageID); err != nil {
 		return 0, err
 	}
 	rows, err := tx.Query(`SELECT `+mapPinColumns+` FROM map_pins WHERE map_page_id = ? ORDER BY created_at, id`, pageID)
@@ -127,7 +127,7 @@ func (s *SQLiteStore) GetMapImages(pageID string) ([]models.MapImage, error) {
 func (s *SQLiteStore) AddMapImage(img models.MapImage) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	if _, err := mapWorld(s.db, img.PageID); err != nil {
+	if _, err := mapCodex(s.db, img.PageID); err != nil {
 		return err
 	}
 	_, err := s.db.Exec(`INSERT INTO map_images (`+mapImageColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -140,7 +140,7 @@ func (s *SQLiteStore) AddMapImage(img models.MapImage) error {
 func (s *SQLiteStore) RestoreMapImage(pageID, imageID, userID string) (models.MapImage, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	if _, err := mapWorld(s.db, pageID); err != nil {
+	if _, err := mapCodex(s.db, pageID); err != nil {
 		return models.MapImage{}, err
 	}
 	old, err := scanMapImage(s.db.QueryRow(`SELECT `+mapImageColumns+` FROM map_images WHERE id = ? AND page_id = ? AND file != ''`, imageID, pageID))
@@ -191,19 +191,19 @@ func logPinEvent(tx *sql.Tx, mapID, pinID, userID, action, before, after string)
 	return err
 }
 
-// insertPin resolves the pin's target in the map's world and stores it.
-func insertPin(tx *sql.Tx, world string, pin models.MapPin) (models.MapPin, error) {
-	idx, err := loadCodexIndex(tx, world)
+// insertPin resolves the pin's target in the map's codex and stores it.
+func insertPin(tx *sql.Tx, codex string, pin models.MapPin) (models.MapPin, error) {
+	idx, err := loadCodexIndex(tx, codex)
 	if err != nil {
 		return pin, err
 	}
-	pin.ToPageID = idx.resolve(world, pin.TargetText)
+	pin.ToPageID = idx.resolve(codex, pin.TargetText)
 	_, err = tx.Exec(`INSERT INTO map_pins (`+mapPinColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		pin.ID, pin.MapPageID, pin.X, pin.Y, pin.TargetText, pin.ToPageID, pin.CreatedBy, pin.CreatedAt, pin.UpdatedAt)
 	return pin, err
 }
 
-// AddMapPin pins target_text on a map; it points at the page of that name in the map's world, if any.
+// AddMapPin pins target_text on a map; it points at the page of that name in the map's codex, if any.
 func (s *SQLiteStore) AddMapPin(pin models.MapPin) (models.MapPin, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -218,9 +218,9 @@ func (s *SQLiteStore) AddMapPin(pin models.MapPin) (models.MapPin, error) {
 	return pin, tx.Commit()
 }
 
-// AddMapPinWithNewPage creates an empty lore page titled pin.TargetText in the map's world and
+// AddMapPinWithNewPage creates an empty lore page titled pin.TargetText in the map's codex and
 // pins it, in one transaction: a name clash leaves neither behind. page.ID, Title and AuthorID
-// are used; the kind and world are set here, and the page lands in the map page's folder.
+// are used; the kind and codex are set here, and the page lands in the map page's folder.
 func (s *SQLiteStore) AddMapPinWithNewPage(page models.Page, pin models.MapPin) (models.MapPin, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -229,11 +229,11 @@ func (s *SQLiteStore) AddMapPinWithNewPage(page models.Page, pin models.MapPin) 
 		return pin, err
 	}
 	defer tx.Rollback()
-	world, err := mapWorldWithMap(tx, pin.MapPageID)
+	codex, err := mapCodexWithMap(tx, pin.MapPageID)
 	if err != nil {
 		return pin, err
 	}
-	page.Kind, page.WorldID, page.Aliases = models.PageLore, world, nil
+	page.Kind, page.CodexID, page.Aliases = models.PageLore, codex, nil
 	if err := tx.QueryRow(`SELECT folder_id FROM pages WHERE id = ?`, pin.MapPageID).Scan(&page.FolderID); err != nil {
 		return pin, err
 	}
@@ -247,13 +247,13 @@ func (s *SQLiteStore) AddMapPinWithNewPage(page models.Page, pin models.MapPin) 
 }
 
 func addMapPinTx(tx *sql.Tx, pin models.MapPin) (models.MapPin, error) {
-	world, err := mapWorldWithMap(tx, pin.MapPageID)
+	codex, err := mapCodexWithMap(tx, pin.MapPageID)
 	if err != nil {
 		return pin, err
 	}
 	pin.ID, pin.CreatedAt = GenerateUUID(), nowUTC()
 	pin.UpdatedAt = pin.CreatedAt
-	if pin, err = insertPin(tx, world, pin); err != nil {
+	if pin, err = insertPin(tx, codex, pin); err != nil {
 		return pin, err
 	}
 	err = logPinEvent(tx, pin.MapPageID, pin.ID, pin.CreatedBy, "add", "", pinJSON(pin))
@@ -332,7 +332,7 @@ func (s *SQLiteStore) GetMapPinEvents(mapID string, limit int) ([]models.MapPinE
 
 // UndoMapPinEvent reverses one pin change: an added pin is removed, a moved pin goes back, a
 // removed pin is restored as it was (named after its target page's current title, if that page
-// is still in the map's world). The event stays in the log, marked undone, and the undo is logged
+// is still in the map's codex). The event stays in the log, marked undone, and the undo is logged
 // as an event of its own, which can be undone in turn.
 func (s *SQLiteStore) UndoMapPinEvent(mapID, eventID, userID string) error {
 	s.mutex.Lock()
@@ -342,7 +342,7 @@ func (s *SQLiteStore) UndoMapPinEvent(mapID, eventID, userID string) error {
 		return err
 	}
 	defer tx.Rollback()
-	world, err := mapWorld(tx, mapID)
+	codex, err := mapCodex(tx, mapID)
 	if err != nil {
 		return err
 	}
@@ -412,7 +412,7 @@ func (s *SQLiteStore) UndoMapPinEvent(mapID, eventID, userID string) error {
 		}
 		if before.ToPageID != "" { // the page may have been renamed since
 			var title string
-			err := tx.QueryRow(`SELECT title FROM pages WHERE id = ? AND world_id = ?`, before.ToPageID, world).Scan(&title)
+			err := tx.QueryRow(`SELECT title FROM pages WHERE id = ? AND codex_id = ?`, before.ToPageID, codex).Scan(&title)
 			if err == nil {
 				before.TargetText = title
 			} else if err != sql.ErrNoRows {
@@ -420,7 +420,7 @@ func (s *SQLiteStore) UndoMapPinEvent(mapID, eventID, userID string) error {
 			}
 		}
 		before.UpdatedAt = nowUTC()
-		restored, err := insertPin(tx, world, before)
+		restored, err := insertPin(tx, codex, before)
 		if err != nil {
 			return err
 		}

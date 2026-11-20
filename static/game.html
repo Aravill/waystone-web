@@ -19,7 +19,7 @@
             <a href="/" class="nav-item" data-page="dashboard">Home</a>
             <a href="/campaigns" class="nav-item active" aria-current="page" data-page="campaigns">Games</a>
             <a href="/characters" class="nav-item" data-page="characters">Characters</a>
-            <a href="/codex" class="nav-item" data-page="codex" data-codex hidden>Codex</a>
+            <a href="/codices" class="nav-item" data-page="codex" data-codex hidden>Codices</a>
             <a href="/admin/users" class="nav-item" data-page="admin-users" x-show="isAdmin">Admin</a>
         </nav>
         <div class="header-right">
@@ -61,6 +61,7 @@
                                 <template x-if="campaign.system_logo_url">
                                     <img class="campaign-system-logo" :src="campaign.system_logo_url" :alt="campaign.system" :title="campaign.system">
                                 </template>
+                                <span class="game-kind" x-show="campaign.codex"><span>Codex: </span><a x-show="codexAccess" :href="campaign.codex ? '/codices/c/' + encodeURIComponent(campaign.codex.id) : '#'" x-text="campaign.codex ? campaign.codex.name : ''"></a><span x-show="!codexAccess" x-text="campaign.codex ? campaign.codex.name : ''"></span></span>
                                 <span class="campaign-status-badge" x-text="campaign.status"></span>
                             </div>
                             <h1 class="page-title game-title" x-text="campaign.title"></h1>
@@ -470,8 +471,8 @@
     </div>
 
     <script src="/static/notifications.js?v=11"></script>
-    <script src="/campaigns.js?v=61"></script>
+    <script src="/campaigns.js?v=62"></script>
     <script src="/static/characters.js?v=2"></script>
-    <script src="/static/game.js?v=12"></script>
+    <script src="/static/game.js?v=13"></script>
 </body>
 </html>

@@ -43,53 +43,53 @@ type querier interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
-// codexIndex maps world -> normalized title or alias -> page id. Names are unique per world.
+// codexIndex maps codex -> normalized title or alias -> page id. Names are unique per codex.
 type codexIndex struct {
-	byWorld map[string]map[string]string
+	byCodex map[string]map[string]string
 }
 
-// worldFilter returns " WHERE col IN (?, ?)" and its args for the given worlds, or "" for all.
-func worldFilter(col string, worlds []string) (string, []interface{}) {
-	if len(worlds) == 0 {
+// codexFilter returns " WHERE col IN (?, ?)" and its args for the given codices, or "" for all.
+func codexFilter(col string, codices []string) (string, []interface{}) {
+	if len(codices) == 0 {
 		return "", nil
 	}
-	args := make([]interface{}, len(worlds))
-	for i, w := range worlds {
+	args := make([]interface{}, len(codices))
+	for i, w := range codices {
 		args[i] = w
 	}
-	return " WHERE " + col + " IN (?" + strings.Repeat(", ?", len(worlds)-1) + ")", args
+	return " WHERE " + col + " IN (?" + strings.Repeat(", ?", len(codices)-1) + ")", args
 }
 
-// loadCodexIndex indexes the pages of the given worlds (every world when none is given).
-func loadCodexIndex(q querier, worlds ...string) (*codexIndex, error) {
-	idx := &codexIndex{byWorld: map[string]map[string]string{}}
-	add := func(world, name, id string) {
-		m := idx.byWorld[world]
+// loadCodexIndex indexes the pages of the given codices (every codex when none is given).
+func loadCodexIndex(q querier, codices ...string) (*codexIndex, error) {
+	idx := &codexIndex{byCodex: map[string]map[string]string{}}
+	add := func(codex, name, id string) {
+		m := idx.byCodex[codex]
 		if m == nil {
 			m = map[string]string{}
-			idx.byWorld[world] = m
+			idx.byCodex[codex] = m
 		}
 		if _, taken := m[NormName(name)]; !taken {
 			m[NormName(name)] = id
 		}
 	}
-	where, args := worldFilter("p.world_id", worlds)
+	where, args := codexFilter("p.codex_id", codices)
 	// Titles first so a title wins over an alias if legacy data ever collides.
 	for _, query := range []string{
-		`SELECT p.id, p.world_id, p.title FROM pages p` + where + ` ORDER BY p.created_at, p.id`,
-		`SELECT p.id, p.world_id, a.alias FROM page_aliases a JOIN pages p ON p.id = a.page_id` + where + ` ORDER BY p.created_at, p.id, a.alias`,
+		`SELECT p.id, p.codex_id, p.title FROM pages p` + where + ` ORDER BY p.created_at, p.id`,
+		`SELECT p.id, p.codex_id, a.alias FROM page_aliases a JOIN pages p ON p.id = a.page_id` + where + ` ORDER BY p.created_at, p.id, a.alias`,
 	} {
 		rows, err := q.Query(query, args...)
 		if err != nil {
 			return nil, err
 		}
 		for rows.Next() {
-			var id, world, name string
-			if err := rows.Scan(&id, &world, &name); err != nil {
+			var id, codex, name string
+			if err := rows.Scan(&id, &codex, &name); err != nil {
 				rows.Close()
 				return nil, err
 			}
-			add(world, name, id)
+			add(codex, name, id)
 		}
 		if err := rows.Err(); err != nil {
 			rows.Close()
@@ -100,19 +100,19 @@ func loadCodexIndex(q querier, worlds ...string) (*codexIndex, error) {
 	return idx, nil
 }
 
-// resolve returns the page a [[text]] in the given world points at, or "" when there is none.
-func (idx *codexIndex) resolve(world, text string) string {
-	return idx.byWorld[world][NormName(text)]
+// resolve returns the page a [[text]] in the given codex points at, or "" when there is none.
+func (idx *codexIndex) resolve(codex, text string) string {
+	return idx.byCodex[codex][NormName(text)]
 }
 
-// nameConflicts lists pages in the world (other than pageID) whose title or alias equals one of names.
-func nameConflicts(q querier, world, pageID string, names []string) ([]NameConflict, error) {
+// nameConflicts lists pages in the codex (other than pageID) whose title or alias equals one of names.
+func nameConflicts(q querier, codex, pageID string, names []string) ([]NameConflict, error) {
 	taken := map[string]NameConflict{}
 	for _, query := range []string{
-		`SELECT id, title, title FROM pages WHERE world_id = ? AND id <> ?`,
-		`SELECT p.id, p.title, a.alias FROM page_aliases a JOIN pages p ON p.id = a.page_id WHERE p.world_id = ? AND p.id <> ?`,
+		`SELECT id, title, title FROM pages WHERE codex_id = ? AND id <> ?`,
+		`SELECT p.id, p.title, a.alias FROM page_aliases a JOIN pages p ON p.id = a.page_id WHERE p.codex_id = ? AND p.id <> ?`,
 	} {
-		rows, err := q.Query(query, world, pageID)
+		rows, err := q.Query(query, codex, pageID)
 		if err != nil {
 			return nil, err
 		}
@@ -144,7 +144,7 @@ func nameConflicts(q querier, world, pageID string, names []string) ([]NameConfl
 }
 
 // rebuildPageLinks replaces a page's link rows with the distinct [[targets]] in body.
-func rebuildPageLinks(tx *sql.Tx, idx *codexIndex, pageID, world, body string) error {
+func rebuildPageLinks(tx *sql.Tx, idx *codexIndex, pageID, codex, body string) error {
 	if _, err := tx.Exec(`DELETE FROM page_links WHERE from_page_id = ?`, pageID); err != nil {
 		return err
 	}
@@ -156,34 +156,34 @@ func rebuildPageLinks(tx *sql.Tx, idx *codexIndex, pageID, world, body string) e
 		}
 		seen[k] = true
 		if _, err := tx.Exec(`INSERT INTO page_links (from_page_id, target_text, to_page_id) VALUES (?, ?, ?)`,
-			pageID, l.Text, idx.resolve(world, l.Text)); err != nil {
+			pageID, l.Text, idx.resolve(codex, l.Text)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// resolveWorldLinks re-resolves the stored links and pins of the given worlds (pages and maps
+// resolveCodexLinks re-resolves the stored links and pins of the given codices (pages and maps
 // that live there) against the current titles and aliases. Call it at the end of every
-// transaction that changes what a name in a world can point at: CreatePage, RenamePage,
-// SetPageAliases, DeletePage (that page's world) and MovePage (the old and the new world).
-// Body saves only rebuild that page's rows; world deletes need none because a world with pages
-// can't be deleted; game-to-world labels never affect links.
-func resolveWorldLinks(tx *sql.Tx, worlds ...string) error {
-	idx, err := loadCodexIndex(tx, worlds...)
+// transaction that changes what a name in a codex can point at: CreatePage, RenamePage,
+// SetPageAliases, DeletePage (that page's codex) and MovePage (the old and the new codex).
+// Body saves only rebuild that page's rows; codex deletes need none because a codex with pages
+// can't be deleted; game-to-codex labels never affect links.
+func resolveCodexLinks(tx *sql.Tx, codices ...string) error {
+	idx, err := loadCodexIndex(tx, codices...)
 	if err != nil {
 		return err
 	}
-	return resolveLinksWith(tx, idx, worlds...)
+	return resolveLinksWith(tx, idx, codices...)
 }
 
-func resolveLinksWith(tx *sql.Tx, idx *codexIndex, worlds ...string) error {
-	where, args := worldFilter("p.world_id", worlds)
-	type row struct{ a, b, to, world string }
+func resolveLinksWith(tx *sql.Tx, idx *codexIndex, codices ...string) error {
+	where, args := codexFilter("p.codex_id", codices)
+	type row struct{ a, b, to, codex string }
 	for _, t := range []struct{ sel, upd string }{
-		{`SELECT l.from_page_id, l.target_text, l.to_page_id, p.world_id FROM page_links l JOIN pages p ON p.id = l.from_page_id` + where,
+		{`SELECT l.from_page_id, l.target_text, l.to_page_id, p.codex_id FROM page_links l JOIN pages p ON p.id = l.from_page_id` + where,
 			`UPDATE page_links SET to_page_id = ? WHERE from_page_id = ? AND target_text = ?`},
-		{`SELECT m.id, m.target_text, m.to_page_id, p.world_id FROM map_pins m JOIN pages p ON p.id = m.map_page_id` + where,
+		{`SELECT m.id, m.target_text, m.to_page_id, p.codex_id FROM map_pins m JOIN pages p ON p.id = m.map_page_id` + where,
 			`UPDATE map_pins SET to_page_id = ? WHERE id = ? AND target_text = ?`},
 	} {
 		rows, err := tx.Query(t.sel, args...)
@@ -193,11 +193,11 @@ func resolveLinksWith(tx *sql.Tx, idx *codexIndex, worlds ...string) error {
 		var changes []row
 		for rows.Next() {
 			var r row
-			if err := rows.Scan(&r.a, &r.b, &r.to, &r.world); err != nil {
+			if err := rows.Scan(&r.a, &r.b, &r.to, &r.codex); err != nil {
 				rows.Close()
 				return err
 			}
-			if now := idx.resolve(r.world, r.b); now != r.to {
+			if now := idx.resolve(r.codex, r.b); now != r.to {
 				r.to = now
 				changes = append(changes, r)
 			}

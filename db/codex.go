@@ -15,13 +15,12 @@ const (
 )
 
 var (
-	ErrWorldNotFound    = errors.New("world not found")
-	ErrWorldNameTaken   = errors.New("a world with that name already exists")
-	ErrWorldInUse       = errors.New("world still has games or pages")
+	ErrCodexNotFound    = errors.New("codex not found")
+	ErrCodexNameTaken   = errors.New("a codex with that name already exists")
+	ErrCodexInUse       = errors.New("codex still has pages")
 	ErrFolderNotFound   = errors.New("folder not found")
 	ErrFolderNameTaken  = errors.New("a folder with that name already exists here")
 	ErrFolderCycle      = errors.New("a folder can't go inside itself")
-	ErrNoFolders        = errors.New("the Unsorted folder has no folders")
 	ErrParentNotFound   = errors.New("parent folder not found")
 	ErrFolderTooDeep    = errors.New("folders can nest up to 10 levels")
 	ErrPageNotFound     = errors.New("page not found")
@@ -33,14 +32,14 @@ var (
 	ErrRevisionNotFound = errors.New("revision not found")
 )
 
-// NameConflict is another page in the same world that already has a title or alias.
+// NameConflict is another page in the same codex that already has a title or alias.
 type NameConflict struct {
 	Name   string `json:"name"`
 	PageID string `json:"page_id"`
 	Title  string `json:"title"`
 }
 
-// NameTakenError is returned when a title or alias is already used inside the target world.
+// NameTakenError is returned when a title or alias is already used inside the target codex.
 type NameTakenError struct{ Conflicts []NameConflict }
 
 func (e *NameTakenError) Error() string {
@@ -48,26 +47,26 @@ func (e *NameTakenError) Error() string {
 	for i, c := range e.Conflicts {
 		names[i] = c.Name
 	}
-	return fmt.Sprintf("already used in this world: %s", strings.Join(names, ", "))
+	return fmt.Sprintf("already used in this codex: %s", strings.Join(names, ", "))
 }
 
-func GetWorlds() ([]models.World, error)        { return GetStore().GetWorlds() }
-func GetWorld(id string) (*models.World, error) { return GetStore().GetWorld(id) }
-func CreateWorld(w models.World) error          { return GetStore().CreateWorld(w) }
-func UpdateWorld(id, name, description string) error {
-	return GetStore().UpdateWorld(id, name, description)
+func GetCodices() ([]models.Codex, error)        { return GetStore().GetCodices() }
+func GetCodex(id string) (*models.Codex, error) { return GetStore().GetCodex(id) }
+func CreateCodex(w models.Codex) error          { return GetStore().CreateCodex(w) }
+func UpdateCodex(id, name, description string) error {
+	return GetStore().UpdateCodex(id, name, description)
 }
-func DeleteWorld(id string) error { return GetStore().DeleteWorld(id) }
-func SetCampaignWorld(campaignID, worldID string) error {
-	return GetStore().SetCampaignWorld(campaignID, worldID)
+func DeleteCodex(id string) error { return GetStore().DeleteCodex(id) }
+func SetCampaignCodex(campaignID, codexID string) error {
+	return GetStore().SetCampaignCodex(campaignID, codexID)
 }
 
 func GetCodexPages() ([]models.PageListItem, error)         { return GetStore().GetCodexPages() }
 func GetPage(id string) (*models.Page, error)               { return GetStore().GetPage(id) }
 func GetPageLinks(fromID string) ([]models.PageLink, error) { return GetStore().GetPageLinks(fromID) }
 func GetBacklinks(id string) ([]models.PageBacklink, error) { return GetStore().GetBacklinks(id) }
-func GetWantedPages(worldID string) ([]models.WantedPage, error) {
-	return GetStore().GetWantedPages(worldID)
+func GetWantedPages(codexID string) ([]models.WantedPage, error) {
+	return GetStore().GetWantedPages(codexID)
 }
 func GetPageRevisions(id string) ([]models.PageRevision, error) {
 	return GetStore().GetPageRevisions(id)
@@ -76,9 +75,9 @@ func GetPageRevision(id string, number int) (models.PageRevision, error) {
 	return GetStore().GetPageRevision(id, number)
 }
 
-// GetRecentRevisions lists recent changes; worldID nil means every world.
-func GetRecentRevisions(worldID *string, limit int) ([]models.RecentRevision, error) {
-	return GetStore().GetRecentRevisions(worldID, limit)
+// GetRecentRevisions lists recent changes; codexID nil means every codex.
+func GetRecentRevisions(codexID *string, limit int) ([]models.RecentRevision, error) {
+	return GetStore().GetRecentRevisions(codexID, limit)
 }
 func CreatePage(p models.Page, body string) error { return GetStore().CreatePage(p, body) }
 func SavePageRevision(id string, base int, rev models.PageRevision) (models.PageSaveResult, error) {
@@ -88,9 +87,9 @@ func RenamePage(id, newTitle, userID string) (int, error) {
 	return GetStore().RenamePage(id, newTitle, userID, PageKeepRevisions)
 }
 func SetPageAliases(id string, aliases []string) error { return GetStore().SetPageAliases(id, aliases) }
-func MovePage(id, worldID string) error                { return GetStore().MovePage(id, worldID) }
+func MovePage(id, codexID string) error                { return GetStore().MovePage(id, codexID) }
 
-func GetFolders(worldID string) ([]models.Folder, error) { return GetStore().GetFolders(worldID) }
+func GetFolders(codexID string) ([]models.Folder, error) { return GetStore().GetFolders(codexID) }
 func GetFolder(id string) (*models.Folder, error)        { return GetStore().GetFolder(id) }
 func CreateFolder(f models.Folder) error                 { return GetStore().CreateFolder(f) }
 func RenameFolder(id, name string) error                 { return GetStore().RenameFolder(id, name) }
@@ -112,7 +111,7 @@ func RemoveMap(pageID, userID string) (int, error)       { return GetStore().Rem
 func GetMapPins(pageID string) ([]models.MapPin, error)  { return GetStore().GetMapPins(pageID) }
 func AddMapPin(pin models.MapPin) (models.MapPin, error) { return GetStore().AddMapPin(pin) }
 
-// AddMapPinWithNewPage creates the page (in the map's world) and pins it, in one transaction.
+// AddMapPinWithNewPage creates the page (in the map's codex) and pins it, in one transaction.
 func AddMapPinWithNewPage(page models.Page, pin models.MapPin) (models.MapPin, error) {
 	return GetStore().AddMapPinWithNewPage(page, pin)
 }

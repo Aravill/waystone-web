@@ -22,7 +22,7 @@
 
     // createCodexEditor(el, { doc, titles, onChange }) mounts the editor in el and resolves to
     // { view }. doc is the text, or a function returning it (read after the library has loaded, so
-    // text typed meanwhile in the fallback box is kept). titles() returns [{ title, aliases }] for this world; onChange(text) gets every edit.
+    // text typed meanwhile in the fallback box is kept). titles() returns [{ title, aliases }] for this codex; onChange(text) gets every edit.
     window.createCodexEditor = async function (el, { doc, titles, onChange }) {
         await loadScriptOnce('/static/vendor/codemirror.bundle.js?v=1');
         const { EditorView, EditorState, keymap, Decoration, ViewPlugin, MatchDecorator, placeholder, drawSelection,

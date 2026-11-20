@@ -115,6 +115,7 @@ type campaignViewer struct {
 	sessions       map[string]campaignSessionSummary
 	systems        map[string]models.System
 	characters     map[string]models.CharacterAssignment // the viewer's active character per campaign
+	codices        map[string]string                     // codex id -> name, for the game label
 }
 
 // loadCampaignViewer fetches the per-viewer data for campaigns. It returns an
@@ -146,6 +147,14 @@ func loadCampaignViewer(r *http.Request, campaigns []models.Campaign) (*campaign
 	if v.systems, err = systemsByName(); err != nil {
 		return nil, "failed to retrieve systems"
 	}
+	codices, err := db.GetCodices()
+	if err != nil {
+		return nil, "failed to retrieve codices"
+	}
+	v.codices = make(map[string]string, len(codices))
+	for _, c := range codices {
+		v.codices[c.ID] = c.Name
+	}
 	if v.characters, err = db.GetActiveAssignmentsByUser(v.userID); err != nil {
 		return nil, "failed to retrieve characters"
 	}
@@ -158,6 +167,14 @@ func loadCampaignViewer(r *http.Request, campaigns []models.Campaign) (*campaign
 		v.isAdmin = currentUser.IsAdmin()
 	}
 	return v, ""
+}
+
+// codexRef is the game's codex label ({id, name}), or nil when it has none.
+func (v *campaignViewer) codexRef(id string) interface{} {
+	if name, ok := v.codices[id]; ok && id != "" {
+		return map[string]string{"id": id, "name": name}
+	}
+	return nil
 }
 
 // enrich builds the API object for one campaign as seen by the viewer.
@@ -175,7 +192,8 @@ func (v *campaignViewer) enrich(campaign models.Campaign) map[string]interface{}
 		"sign_ups_open":              campaign.SignUpsOpen,
 		"desired_player_count":       campaign.DesiredPlayerCount,
 		"system":                     campaign.System,
-		"world_id":                   campaign.WorldID,
+		"codex_id":                   campaign.CodexID,
+		"codex":                      v.codexRef(campaign.CodexID),
 		"system_logo_url":            v.systems[strings.ToLower(campaign.System)].LogoURL(),
 		"can_manage":                 v.isAdmin || (currentUserID != "" && campaign.DM == currentUserID),
 		"allowed_status_transitions": campaign.Status.AllowedTransitions(),
@@ -581,7 +599,7 @@ type campaignRequest struct {
 	Type               models.CampaignType `json:"type"`
 	DesiredPlayerCount int                 `json:"desired_player_count"`
 	System             string              `json:"system"`
-	WorldID            *string             `json:"world_id"` // update only: the Codex world the game is set in; "" clears it
+	CodexID            *string             `json:"codex_id"` // update only: the codex the game is set in; "" clears it
 }
 
 // normalize trims the text fields and returns a validation error message, or "" if valid.
@@ -694,18 +712,18 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve systems")
 		return
 	}
-	// Validate the world before anything is saved ("unsorted" and "" both mean no world).
-	newWorld := campaign.WorldID
-	if userID, _ := r.Context().Value("user_id").(string); req.WorldID != nil && codexAllowedFor(userID) {
-		newWorld = codexWorldParam(*req.WorldID)
-		if newWorld != "" {
-			world, err := db.GetWorld(newWorld)
+	// Validate the codex before anything is saved ("" means no codex).
+	newCodex := campaign.CodexID
+	if userID, _ := r.Context().Value("user_id").(string); req.CodexID != nil && codexAllowedFor(userID) {
+		newCodex = *req.CodexID
+		if newCodex != "" {
+			codex, err := db.GetCodex(newCodex)
 			if err != nil {
-				writeJSONError(w, http.StatusInternalServerError, "failed to retrieve world")
+				writeJSONError(w, http.StatusInternalServerError, "failed to retrieve codex")
 				return
 			}
-			if world == nil {
-				writeJSONError(w, http.StatusBadRequest, db.ErrWorldNotFound.Error())
+			if codex == nil {
+				writeJSONError(w, http.StatusBadRequest, db.ErrCodexNotFound.Error())
 				return
 			}
 		}
@@ -726,13 +744,13 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 		writeJSONError(w, http.StatusInternalServerError, "failed to update game")
 		return
 	}
-	if newWorld != campaign.WorldID {
-		if err := db.SetCampaignWorld(campaignID, newWorld); err != nil {
-			if errors.Is(err, db.ErrWorldNotFound) {
+	if newCodex != campaign.CodexID {
+		if err := db.SetCampaignCodex(campaignID, newCodex); err != nil {
+			if errors.Is(err, db.ErrCodexNotFound) {
 				writeJSONError(w, http.StatusBadRequest, err.Error())
 				return
 			}
-			writeJSONError(w, http.StatusInternalServerError, "failed to set the game's world")
+			writeJSONError(w, http.StatusInternalServerError, "failed to set the game's codex")
 			return
 		}
 	}
