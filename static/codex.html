@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=74">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=14">
+    <link rel="stylesheet" href="/static/codex.css?v=15">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -35,8 +35,8 @@
     </div>
 
     <!-- Codices top bar: codex picker and search (the site header above stays as on every page) -->
-    <div class="cx-top">
-        <button type="button" class="cx-icon cx-menu-btn" x-show="screen !== 'home'" x-cloak aria-label="Open the page list" aria-controls="cxNav" :aria-expanded="navOpen ? 'true' : 'false'" @click="toggleNav()">
+    <div class="cx-top" :inert="navOpen ? '' : null">
+        <button type="button" class="cx-icon cx-menu-btn" x-ref="menuBtn" x-show="screen !== 'home'" x-cloak aria-label="Open the page list" aria-controls="cxNav" :aria-expanded="navOpen ? 'true' : 'false'" @click="toggleNav()">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
         </button>
         <a class="cx-brand" href="/codices">Codices</a>
@@ -50,7 +50,7 @@
                 <p class="cx-pick-note" x-show="allCodices === null">Loading...</p>
             </div>
         </div>
-        <div class="cx-search" role="search" @click.outside="searchOpen = false">
+        <div class="cx-search" role="search" @click.outside="searchOpen = false" @focusout="if (!$event.relatedTarget || !$event.currentTarget.contains($event.relatedTarget)) searchOpen = false">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
             <label class="visually-hidden" for="cxSearch" x-text="screen === 'home' ? 'Search all codices' : 'Search this codex'"></label>
             <input type="search" id="cxSearch" x-ref="search" :placeholder="searchPlaceholder" autocomplete="off" x-model="searchQ" @focus="onSearchFocus()" @input="onSearchInput()" @keydown="onSearchKey($event)">
@@ -100,7 +100,7 @@
             </div>
         </aside>
 
-        <main class="cx-main">
+        <main class="cx-main" :inert="navOpen ? '' : null">
             <!-- Recently opened pages of this codex -->
             <nav class="cx-tabs" x-show="screen !== 'home' && tabs.length" x-cloak aria-label="Recently opened pages">
                 <template x-for="t in tabs" :key="t.id">
@@ -224,7 +224,7 @@
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>History <span class="cx-count" x-text="page.revision_count"></span>
                                 </a>
                                 <span class="cx-spacer"></span>
-                                <div class="cx-more" x-show="canEdit" @click.outside="moreOpen = false" @keydown="onMoreKey($event)">
+                                <div class="cx-more" x-show="canEdit && screen !== 'edit'" @click.outside="moreOpen = false" @keydown="onMoreKey($event)">
                                     <button type="button" class="cx-act" id="cxMoreBtn" aria-haspopup="menu" :aria-expanded="moreOpen ? 'true' : 'false'" aria-controls="cxMoreMenu" @click="toggleMore()">
                                         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span class="cx-act-long">More</span><span class="visually-hidden"> page actions</span>
                                     </button>
@@ -265,7 +265,7 @@
                                 <summary>Contents</summary>
                                 <ul>
                                     <template x-for="t in toc" :key="t.id">
-                                        <li><a :href="'#' + t.id" :class="{ sub: t.level === 3 }" x-text="t.text"></a></li>
+                                        <li><a :href="'#' + t.id" :class="{ sub: t.level === 3 }" @click="tocActive = t.id" x-text="t.text"></a></li>
                                     </template>
                                 </ul>
                             </details>
@@ -378,15 +378,15 @@
         </main>
 
         <!-- Right rail: outline, backlinks, wanted pages -->
-        <aside class="cx-rail" x-show="(screen === 'page' && pageData) || (screen === 'codex' && codex)" x-cloak aria-label="Side panel">
+        <aside class="cx-rail" :inert="navOpen ? '' : null" x-show="(screen === 'page' && pageData) || (screen === 'codex' && codex)" x-cloak aria-label="Side panel">
             <div class="cx-rail-in">
                 <template x-if="screen === 'page' && pageData">
                     <div>
-                        <section class="cx-box cx-box--outline" aria-label="Outline" x-show="toc.length >= 1">
+                        <section class="cx-box cx-box--outline" aria-label="Outline" x-show="toc.length >= 2">
                             <h2>Outline</h2>
                             <ul class="cx-outline">
                                 <template x-for="t in toc" :key="t.id">
-                                    <li><a :href="'#' + t.id" :class="{ on: tocActive === t.id, sub: t.level === 3 }" :aria-current="tocActive === t.id ? 'location' : null" x-text="t.text"></a></li>
+                                    <li><a :href="'#' + t.id" @click="tocActive = t.id" :class="{ on: tocActive === t.id, sub: t.level === 3 }" :aria-current="tocActive === t.id ? 'location' : null" x-text="t.text"></a></li>
                                 </template>
                             </ul>
                         </section>
@@ -410,6 +410,7 @@
                                 <li><button type="button" class="wikilink wikilink--missing" :title="codex.can_edit ? 'No page yet. Click to create.' : 'No page yet.'" @click="openCreatePage(w.text)" x-text="w.text"></button><small class="muted" x-text="'wanted ' + w.count + (w.count === 1 ? ' time' : ' times')"></small></li>
                             </template>
                         </ul>
+                        <p class="cx-box-empty" x-show="screen === 'codex' && codex.wanted.length > 200" x-text="'and ' + (codex.wanted.length - 200) + ' more'"></p>
                         <p class="cx-box-empty" x-show="screen === 'page' && codex.wanted.length > 10"><a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#wanted'" x-text="'All ' + codex.wanted.length + ' on the codex home'"></a></p>
                     </section>
                 </template>
@@ -562,6 +563,6 @@
     <script src="/campaigns.js?v=63"></script>
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=2"></script>
-    <script src="/static/codex.js?v=12"></script>
+    <script src="/static/codex.js?v=13"></script>
 </body>
 </html>

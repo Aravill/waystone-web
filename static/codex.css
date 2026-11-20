@@ -1781,6 +1781,13 @@ button.wikilink {
         padding-block: 0.75rem;
     }
 
+    .cx-results {
+        position: fixed;
+        left: 0.5rem;
+        right: 0.5rem;
+        top: calc(var(--cx-results-top, 6rem) + 0.25rem);
+    }
+
     .codex-contents > summary {
         min-height: 2.75rem;
     }

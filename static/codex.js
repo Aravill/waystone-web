@@ -41,6 +41,8 @@ function codexMarkdown(body, lookup, canCreate = true) {
 // Folder tree. Folders only sort pages. Open/closed state is kept per codex in localStorage and
 // is deliberately not reactive, so toggling a folder never re-renders the tree.
 let codexOpenState = {};
+// Folders opened only to show the current page or a deep link: never saved, and a user toggle drops them.
+const codexTransientOpen = new Set();
 const codexOpenKey = (codexId) => 'codex-folders-open:' + codexId;
 
 function codexLoadOpenState(codexId) {
@@ -123,11 +125,11 @@ function codexPageItemHtml(p, currentId) {
 }
 
 function codexFolderHtml(n, depth, canEdit, currentId) {
-    const open = codexOpenState[n.id] === undefined ? depth === 0 : codexOpenState[n.id];
+    const open = codexTransientOpen.has(n.id) || (codexOpenState[n.id] === undefined ? depth === 0 : codexOpenState[n.id]);
     const id = escapeHtml(n.id);
     const pages = n.pages.length ? `<ul class="page-list">${n.pages.map((p) => codexPageItemHtml(p, currentId)).join('')}</ul>` : '';
     return `<details class="codex-folder${depth >= 4 ? ' codex-folder--deep' : ''}" id="folder-${id}" data-id="${id}"${open ? ' open' : ''}>` +
-        `<summary><span class="codex-folder-name">${escapeHtml(n.name)}</span><span class="codex-folder-count muted" title="${n.count} ${n.count === 1 ? 'page' : 'pages'}">${n.count}</span>` +
+        `<summary><span class="codex-folder-name">${escapeHtml(n.name)}</span><span class="codex-folder-count muted" title="${n.count} ${n.count === 1 ? 'page' : 'pages'}"><span aria-hidden="true">${n.count}</span><span class="visually-hidden"> ${n.count} ${n.count === 1 ? 'page' : 'pages'}</span></span>` +
         (canEdit ? `<button type="button" class="codex-menu-btn" data-menu="${id}" aria-label="Actions for folder ${escapeHtml(n.name)}" aria-haspopup="menu" aria-expanded="false">⋯</button>` : '') + '</summary>' +
         `<div class="codex-folder-body">` +
         n.children.map((c) => codexFolderHtml(c, depth + 1, canEdit, currentId)).join('') + pages + '</div></details>';
@@ -170,7 +172,7 @@ window.codexPage = function () {
         toggledBy: null, // the folder a user just clicked, so only user toggles are saved
         folderMenu: { id: '', top: 0, right: 0, html: '' },
         tocHashDone: false,
-        titles: [], // pages of the current page's codex, for previews and the editor
+        navPromise: null,
         codexChoices: [],
         dlg: { type: '' },
         // Editor
@@ -234,7 +236,11 @@ window.codexPage = function () {
                 return;
             }
             document.addEventListener('keydown', (event) => this.onGlobalKey(event));
-            window.addEventListener('scroll', () => this.peek.open && this.hidePeek(), { passive: true });
+            window.matchMedia('(min-width: 901px)').addEventListener('change', (e) => e.matches && this.closeNav());
+            window.addEventListener('scroll', () => {
+                if (this.peek.open) this.hidePeek();
+                if (this.searchOpen) this.placeResults();
+            }, { passive: true });
             window.addEventListener('beforeunload', (event) => {
                 if (this.isDirty) {
                     event.preventDefault();
@@ -325,26 +331,25 @@ window.codexPage = function () {
                         this.revealFolderFromHash(data.folders);
                     }
                     this.codex = data;
-                    this.tabs = this.readTabs(data.codex.id);
+                    this.syncTabs(data);
                     document.title = 'Waystone - ' + data.codex.name;
                     this.$nextTick(() => this.scrollToFolder());
                 } else {
-                    this.pageData = data;
-                    this.trackTab(data.page);
-                    this.loadNav(data.page);
-                    document.title = 'Waystone - ' + data.page.title;
-                    if (location.pathname !== this.pageUrl(data.page) + (r.screen === 'page' ? '' : '/' + r.screen)) {
-                        history.replaceState(null, '', this.pageUrl(data.page) + (r.screen === 'page' ? '' : '/' + r.screen) + location.search);
-                    }
                     if (r.screen === 'edit' && !data.can_edit) {
                         window.location.replace(this.pageUrl(data.page));
                         return;
+                    }
+                    this.pageData = data;
+                    this.trackTab(data.page);
+                    this.navPromise = this.loadNav(data.page);
+                    document.title = 'Waystone - ' + data.page.title;
+                    if (location.pathname !== this.pageUrl(data.page) + (r.screen === 'page' ? '' : '/' + r.screen)) {
+                        history.replaceState(null, '', this.pageUrl(data.page) + (r.screen === 'page' ? '' : '/' + r.screen) + location.search);
                     }
                     if (r.screen === 'edit' && !this.draft) await this.initDraft();
                     if (r.screen === 'history') {
                         await this.loadHistory(Number(new URLSearchParams(location.search).get('r')) || 0);
                     }
-                    if (r.screen === 'page') await this.loadTitles();
                 }
             } catch (error) {
                 if (seq === this.loadSeq) this.loadError = 'Could not load the codices: ' + error.message;
@@ -389,10 +394,11 @@ window.codexPage = function () {
             return tree.roots.map((r) => codexFolderHtml(r, 0, this.codex.can_edit, cur)).join('') + pages;
         },
         // Marks a folder and the ones above it open.
-        openFolderChain(id, folders) {
+        openFolderChain(id, folders, transient = false) {
             const byID = new Map(folders.map((f) => [f.id, f]));
             for (let cur = id, hops = 0; byID.has(cur) && hops <= folders.length; hops++) {
-                codexOpenState[cur] = true;
+                if (transient) codexTransientOpen.add(cur);
+                else codexOpenState[cur] = true;
                 cur = byID.get(cur).parent_id;
             }
         },
@@ -412,8 +418,31 @@ window.codexPage = function () {
             }
             const m = /^#folder-(.+)$/.exec(hash);
             if (!m) return;
-            this.openFolderChain(m[1], folders);
+            this.openFolderChain(m[1], folders, true);
             this.folderTarget = m[1];
+        },
+        // A folder with only sub-folders has no group of its own: its first descendant group stands in.
+        firstGroupUnder(id) {
+            const tree = codexFolderTree(this.codex.folders, this.codex.pages);
+            const find = (nodes) => {
+                for (const n of nodes) {
+                    if (n.id === id) return n;
+                    const f = find(n.children);
+                    if (f) return f;
+                }
+                return null;
+            };
+            const first = (n) => {
+                for (const c of n.children) {
+                    if (c.pages.length) return c;
+                    const f = first(c);
+                    if (f) return f;
+                }
+                return null;
+            };
+            const start = find(tree.roots);
+            const g = start && first(start);
+            return g ? document.getElementById('group-' + g.id) : null;
         },
         scrollToFolder() {
             if (!this.hashScrolled && (location.hash === '#wanted' || location.hash === '#recent')) {
@@ -422,7 +451,7 @@ window.codexPage = function () {
                 return;
             }
             if (!this.folderTarget) return;
-            const el = document.getElementById('group-' + this.folderTarget) || document.getElementById('folder-' + this.folderTarget);
+            const el = document.getElementById('group-' + this.folderTarget) || this.firstGroupUnder(this.folderTarget) || document.getElementById('folder-' + this.folderTarget);
             this.folderTarget = '';
             if (!el) return;
             el.classList.add('codex-folder--target');
@@ -440,6 +469,7 @@ window.codexPage = function () {
             const d = event.target;
             if (!this.codex || !d.matches || !d.matches('details.codex-folder') || d !== this.toggledBy) return;
             this.toggledBy = null;
+            codexTransientOpen.delete(d.dataset.id);
             codexOpenState[d.dataset.id] = d.open;
             codexSaveOpenState(this.codex.codex.id);
         },
@@ -616,19 +646,24 @@ window.codexPage = function () {
                 const el = document.getElementById(t.id);
                 if (el && el.getBoundingClientRect().top <= 140) active = t.id;
             }
+            // At the very bottom the last heading may never reach the top: use the last one in view.
+            if (this.toc.length && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) {
+                for (let i = this.toc.length - 1; i >= 0; i--) {
+                    const el = document.getElementById(this.toc[i].id);
+                    if (el && el.getBoundingClientRect().top < window.innerHeight) {
+                        active = this.toc[i].id;
+                        break;
+                    }
+                }
+            }
             this.tocActive = active;
         },
         get previewHtml() {
             return this.draft ? codexMarkdown(this.draft.body, this.titleLookup) : '';
         },
-        async loadTitles() {
-            if (!this.page) return;
-            try {
-                const { response, data } = await this.send(`/api/codices/titles?codex=${encodeURIComponent(this.page.codex.id)}`, 'GET');
-                if (response.ok) this.titles = data;
-            } catch (error) {
-                console.error('Failed to load titles:', error);
-            }
+        // Pages of the current codex (from the codex payload loadNav fetched), for previews and the editor.
+        get titles() {
+            return this.codex ? this.codex.pages : [];
         },
         onBodyClick(event) {
             const a = event.target.closest('a.wikilink--missing');
@@ -662,8 +697,9 @@ window.codexPage = function () {
                 const { response, data } = await this.send(`/api/codices/c/${encodeURIComponent(page.codex.id)}`, 'GET');
                 if (seq !== this.navSeq || !response.ok) return;
                 codexLoadOpenState(data.codex.id);
-                this.openFolderChain(page.folder_id, data.folders); // in memory only: the current page's folders show open
+                this.openFolderChain(page.folder_id, data.folders, true); // the current page's folders show open, unsaved
                 this.codex = data;
+                this.syncTabs(data);
                 this.$nextTick(() => this.revealCurrentPage());
             } catch (error) {
                 console.error('Failed to load the page list:', error);
@@ -679,12 +715,20 @@ window.codexPage = function () {
             if (e.top < b.top || e.bottom > b.bottom) box.scrollTop += e.top - b.top - box.clientHeight / 3;
         },
         toggleNav() {
+            if (this.navOpen) {
+                this.closeNav();
+                return;
+            }
             this.navAnim = true;
-            this.navOpen = !this.navOpen;
-            if (this.navOpen) this.$nextTick(() => this.$refs.navClose?.focus());
+            this.navOpen = true;
+            document.body.style.overflow = 'hidden'; // no scrolling the page behind the drawer
+            this.$nextTick(() => this.$refs.navClose?.focus());
         },
         closeNav() {
+            if (!this.navOpen) return;
             this.navOpen = false;
+            document.body.style.overflow = '';
+            this.$nextTick(() => this.$refs.menuBtn?.focus()); // once the page is no longer inert
         },
         onNavClick(event) {
             if (event.target.closest('a')) this.closeNav();
@@ -715,25 +759,29 @@ window.codexPage = function () {
             event.preventDefault();
             this.$refs.search?.focus();
         },
+        // On phones the results are full width right under the top bar (CSS reads this).
+        placeResults() {
+            const bar = document.querySelector('.cx-top');
+            if (bar) document.documentElement.style.setProperty('--cx-results-top', bar.getBoundingClientRect().bottom + 'px');
+        },
         onSearchFocus() {
+            this.placeResults();
             this.searchOpen = !!this.searchQ.trim();
             this.ensureSearchTitles();
         },
         onSearchInput() {
+            this.placeResults();
             this.searchOpen = true;
             this.searchIdx = -1;
             this.ensureSearchTitles();
         },
-        // Titles and aliases of the current codex (all visible codices on Home), fetched once.
+        // Titles and aliases of all visible codices, fetched once on Home; elsewhere the codex payload is searched.
         async ensureSearchTitles() {
-            const home = this.screen === 'home';
-            if (!home && !this.currentCodexId) return; // still loading
-            const key = home ? '*' : this.currentCodexId;
-            if (this.searchKey === key) return;
-            this.searchKey = key;
+            if (this.screen !== 'home' || this.searchKey) return; // other screens search the codex payload
+            this.searchKey = '*';
             this.searchLoading = true;
             try {
-                const { response, data } = await this.send(home ? '/api/codices/titles' : `/api/codices/titles?codex=${encodeURIComponent(key)}`, 'GET');
+                const { response, data } = await this.send('/api/codices/titles', 'GET');
                 if (response.ok) this.searchTitles = data;
                 else this.searchKey = '';
             } catch (error) {
@@ -748,7 +796,7 @@ window.codexPage = function () {
             if (!q) return [];
             const names = new Map((this.allCodices || []).map((c) => [c.id, c.name]));
             const out = [];
-            for (const t of this.searchTitles) {
+            for (const t of this.screen === 'home' ? this.searchTitles : this.titles) {
                 const title = codexNorm(t.title);
                 let score = title.startsWith(q) ? 0 : title.includes(q) ? 1 : -1;
                 let via = '';
@@ -800,6 +848,13 @@ window.codexPage = function () {
             } catch (error) {
                 // storage may be blocked; the tabs just don't persist
             }
+        },
+        // Drops tabs for pages that are gone or moved away, and refreshes titles from the codex payload.
+        syncTabs(data) {
+            const byId = new Map(data.pages.map((p) => [p.id, p]));
+            const list = this.readTabs(data.codex.id).filter((t) => byId.has(t.id)).map((t) => ({ id: t.id, title: byId.get(t.id).title }));
+            this.writeTabs(data.codex.id, list);
+            this.tabs = list;
         },
         trackTab(page) {
             const list = this.readTabs(page.codex.id);
@@ -883,7 +938,6 @@ window.codexPage = function () {
                     const p = data.page;
                     return { title: p.title, where: [p.codex.name, ...(p.folder_path || []).map((f) => f.name)].join(' › '), text: codexPlainExcerpt(p.body) || 'This page is empty.' };
                 }).catch((error) => {
-                    delete codexPeekCache[id];
                     console.error('Failed to load the preview:', error);
                     return null;
                 });
@@ -939,7 +993,7 @@ window.codexPage = function () {
                 return;
             }
             const codexId = this.screen === 'codex' ? this.codex.codex.id : this.page ? this.page.codex.id : this.codexChoices[0].id;
-            const folders = this.screen === 'codex' ? this.codex.folders || [] : (await this.fetchFolders(codexId)) || [];
+            const folders = this.codex && this.codex.codex.id === codexId ? this.codex.folders || [] : (await this.fetchFolders(codexId)) || [];
             if (folderId === null) folderId = this.page ? this.page.folder_id || '' : '';
             if (!folders.some((f) => f.id === folderId)) folderId = '';
             this.dlg = { type: 'createPage', title, codexId, folders, folderId, error: '', busy: false };
@@ -981,7 +1035,7 @@ window.codexPage = function () {
             this.focusDlg();
         },
         async openPageFolder() {
-            const folders = await this.fetchFolders(this.page.codex.id);
+            const folders = this.codex && this.codex.codex.id === this.page.codex.id ? this.codex.folders || [] : await this.fetchFolders(this.page.codex.id);
             if (!folders) return;
             this.dlg = { type: 'pageFolder', folders, excludeId: '', folderId: this.page.folder_id || '', error: '', busy: false };
             this.focusDlg();
@@ -1199,6 +1253,7 @@ window.codexPage = function () {
         async submitMove(d) {
             const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/codex`, 'PUT', { codex_id: d.codexId });
             if (response.ok) {
+                this.writeTabs(this.page.codex.id, this.tabs.filter((t) => t.id !== this.page.id));
                 window.location.href = codexPageUrl(this.page) + '?moved=1';
                 return;
             }
@@ -1273,7 +1328,7 @@ window.codexPage = function () {
         async initDraft() {
             const p = this.page;
             this.draft = { body: p.body, note: '', base: p.current_revision, tab: 'write', error: '', locked: false, initial: { body: p.body } };
-            await this.loadTitles();
+            await this.navPromise;
             if (!window.createCodexEditor) return;
             await this.$nextTick();
             try {
