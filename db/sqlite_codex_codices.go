@@ -215,17 +215,17 @@ func (s *SQLiteStore) rescueUnsortedPages() error {
 		}
 		name = fmt.Sprintf("Unsorted pages (%d)", i)
 	}
-	id := GenerateUUID()
-	now := nowUTC()
-	if _, err := s.db.Exec(`INSERT INTO codices (id, name, description, created_by, created_at, updated_at) VALUES (?, ?, ?, '', ?, ?)`,
-		id, name, "Pages that were in the old Unsorted folder.", now, now); err != nil {
-		return fmt.Errorf("failed to create the rescue codex: %w", err)
-	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	id := GenerateUUID()
+	now := nowUTC()
+	if _, err := tx.Exec(`INSERT INTO codices (id, name, description, created_by, created_at, updated_at) VALUES (?, ?, ?, '', ?, ?)`,
+		id, name, "Pages that were in the old Unsorted folder.", now, now); err != nil {
+		return fmt.Errorf("failed to create the rescue codex: %w", err)
+	}
 	if _, err := tx.Exec(`UPDATE pages SET codex_id = ?, folder_id = '' WHERE codex_id = ''`, id); err != nil {
 		return fmt.Errorf("failed to move unsorted pages: %w", err)
 	}
