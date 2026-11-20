@@ -52,15 +52,28 @@ func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
+// CreateCodex adds the codex and gives its creator Edit on it, in one transaction.
 func (s *SQLiteStore) CreateCodex(w models.Codex) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	_, err := s.db.Exec(`INSERT INTO codices (`+codexColumns+`) VALUES (?, ?, ?, ?, ?, ?)`,
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	_, err = tx.Exec(`INSERT INTO codices (`+codexColumns+`) VALUES (?, ?, ?, ?, ?, ?)`,
 		w.ID, w.Name, w.Description, w.CreatedBy, w.CreatedAt, w.UpdatedAt)
 	if isUniqueViolation(err) {
 		return ErrCodexNameTaken
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`INSERT OR IGNORE INTO codex_access (codex_id, user_id, level) VALUES (?, ?, ?)`,
+		w.ID, w.CreatedBy, models.CodexLevelEdit); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *SQLiteStore) UpdateCodex(id, name, description string) error {
@@ -100,6 +113,9 @@ func (s *SQLiteStore) DeleteCodex(id string) error {
 		return ErrCodexInUse
 	}
 	if _, err := tx.Exec(`DELETE FROM codex_folders WHERE codex_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM codex_access WHERE codex_id = ?`, id); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`UPDATE campaigns SET codex_id = '' WHERE codex_id = ?`, id); err != nil {

@@ -23,6 +23,29 @@ func seedCodex() error {
 	if err := store.CreateCodex(w); err != nil {
 		return fmt.Errorf("failed to seed codex: %w", err)
 	}
+	// Demo users can see Codices and read the codex; Roy (its creator, so Edit already) can also manage
+	// codices, and Testy can edit this one. The rest only read it.
+	for _, u := range config.InitialUsers {
+		if u.IsAdmin() {
+			continue
+		}
+		level := models.CodexLevelSee
+		if u.ID == w.CreatedBy || u.Username == "testy" {
+			level = models.CodexLevelEdit
+		}
+		rights := []string{models.RightCodicesSee}
+		if u.ID == w.CreatedBy {
+			rights = append(rights, models.RightCodicesEdit)
+		}
+		for _, a := range rights {
+			if err := store.SetUserRight(u.ID, a, true); err != nil {
+				return fmt.Errorf("failed to seed rights: %w", err)
+			}
+		}
+		if err := store.SetCodexAccess(w.ID, u.ID, level); err != nil {
+			return fmt.Errorf("failed to seed codex access: %w", err)
+		}
+	}
 	if err := store.SetCampaignCodex(config.InitialCodexCampaignID, w.ID); err != nil {
 		return fmt.Errorf("failed to set the seed game's codex: %w", err)
 	}

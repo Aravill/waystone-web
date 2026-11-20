@@ -100,6 +100,14 @@ type Store interface {
 	UpdateCodex(id, name, description string) error
 	DeleteCodex(id string) error
 	SetCampaignCodex(campaignID, codexID string) error
+	GetUserRights(userID string) ([]string, error)
+	GetAllUserRights() (map[string][]string, error)
+	SetUserRight(userID, action string, on bool) error
+	GetCodexAccessForUser(userID string) (map[string]string, error)
+	GetAllCodexAccess() ([]models.CodexAccess, error)
+	SetCodexAccess(codexID, userID, level string) error
+	GetPageCodexID(pageID string) (string, error)
+	GetImageCodexID(file string) (string, error)
 	GetCodexPages() ([]models.PageListItem, error)
 	GetPage(id string) (*models.Page, error)
 	GetPageLinks(fromID string) ([]models.PageLink, error)
