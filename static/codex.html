@@ -62,7 +62,7 @@
                         <span class="cx-results-meta" x-show="r.meta" x-text="r.meta"></span>
                     </a>
                 </template>
-                <p class="cx-pick-note" x-show="searchResults.length === 0" x-text="searchLoading ? 'Searching...' : 'No page matches.'"></p>
+                <p class="cx-pick-note" x-show="searchResults.length === 0" x-text="searchLoading || (screen !== 'home' && !codex) ? 'Searching...' : 'No page matches.'"></p>
             </div>
         </div>
     </div>
@@ -563,6 +563,6 @@
     <script src="/campaigns.js?v=63"></script>
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=2"></script>
-    <script src="/static/codex.js?v=13"></script>
+    <script src="/static/codex.js?v=14"></script>
 </body>
 </html>

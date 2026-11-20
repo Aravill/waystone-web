@@ -241,8 +241,8 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleCodexTitles lists page titles and aliases (optionally one codex: ?codex=id), for the
-// editor's autocomplete, the pin picker and link status in previews.
+// handleCodexTitles lists the titles and aliases of every page the user can see (optionally one
+// codex: ?codex=id), for search on the Codices home.
 func handleCodexTitles(w http.ResponseWriter, r *http.Request) {
 	_, rt, ok := codexRightsFor(w, r)
 	if !ok {

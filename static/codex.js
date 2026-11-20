@@ -236,7 +236,7 @@ window.codexPage = function () {
                 return;
             }
             document.addEventListener('keydown', (event) => this.onGlobalKey(event));
-            window.matchMedia('(min-width: 901px)').addEventListener('change', (e) => e.matches && this.closeNav());
+            window.matchMedia('(min-width: 901px)').addEventListener('change', (e) => e.matches && this.closeNav(false));
             window.addEventListener('scroll', () => {
                 if (this.peek.open) this.hidePeek();
                 if (this.searchOpen) this.placeResults();
@@ -724,11 +724,11 @@ window.codexPage = function () {
             document.body.style.overflow = 'hidden'; // no scrolling the page behind the drawer
             this.$nextTick(() => this.$refs.navClose?.focus());
         },
-        closeNav() {
+        closeNav(refocus = true) {
             if (!this.navOpen) return;
             this.navOpen = false;
             document.body.style.overflow = '';
-            this.$nextTick(() => this.$refs.menuBtn?.focus()); // once the page is no longer inert
+            if (refocus) this.$nextTick(() => this.$refs.menuBtn?.focus()); // once the page is no longer inert
         },
         onNavClick(event) {
             if (event.target.closest('a')) this.closeNav();
@@ -934,11 +934,13 @@ window.codexPage = function () {
             if (!id) return Promise.resolve(null);
             if (!codexPeekCache[id]) {
                 codexPeekCache[id] = this.send(`/api/codices/pages/${encodeURIComponent(id)}`, 'GET').then(({ response, data }) => {
+                    if (response.status === 404) return null; // gone: cached, so it isn't asked again
                     if (!response.ok || !data.page) throw new Error('request failed');
                     const p = data.page;
                     return { title: p.title, where: [p.codex.name, ...(p.folder_path || []).map((f) => f.name)].join(' › '), text: codexPlainExcerpt(p.body) || 'This page is empty.' };
                 }).catch((error) => {
                     console.error('Failed to load the preview:', error);
+                    delete codexPeekCache[id]; // a passing failure: try again on the next hover
                     return null;
                 });
             }
