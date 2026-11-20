@@ -72,6 +72,30 @@
     color-scheme: dark;
 }
 
+/* ---------- tokens: D Vault + Waystone (the chosen direction) ----------
+   B's layout (data-variant="b") with data-skin="ws": C's dark header bar, condensed headings,
+   banded section headings and boxed side panel, coloured with STYLE_GUIDE.md's tokens
+   (Parchment / Candlelight, rubric as the one accent). Missing links are muted + dashed, as in the app. */
+[data-variant][data-skin="ws"] {
+    --bg: #F2EAD8; --surface: #E6DBC2; --surface-2: #D9CCAF;
+    --text: #2B241C; --muted: #6B5E4B; --border: rgba(43, 36, 28, 0.4); --border-soft: rgba(43, 36, 28, 0.16);
+    --link: #8E2A1E; --missing: #6B5E4B; --accent: #8E2A1E; --on-accent: #F2EAD8;
+    --brand: #8E2A1E; --pin: #8E2A1E; --map-land: #E9DFC6; --map-water: #A9BDB4; --map-road: #6B5E4B;
+    --bar: #2B241C; --bar-text: #F2EAD8; --bar-accent: #D9735C; --bar-line: rgba(242, 234, 216, 0.22); --bar-fill: #3A3128;
+    --head-font: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    --body-font: Inter, -apple-system, 'Segoe UI', sans-serif;
+    --radius: 3px;
+    color-scheme: light;
+}
+[data-variant][data-skin="ws"][data-mode="dark"] {
+    --bg: #16120E; --surface: #2A231B; --surface-2: #3A3127;
+    --text: #E8DCC4; --muted: #A8997F; --border: rgba(232, 220, 196, 0.3); --border-soft: rgba(232, 220, 196, 0.13);
+    --link: #D9735C; --missing: #A8997F; --accent: #D9735C; --on-accent: #16120E;
+    --brand: #D9735C; --pin: #D9735C; --map-land: #2A231B; --map-water: #2F4A43; --map-road: #A8997F;
+    --bar: #0C0A07; --bar-text: #E8DCC4; --bar-accent: #D9735C; --bar-line: rgba(232, 220, 196, 0.2); --bar-fill: #2A231B;
+    color-scheme: dark;
+}
+
 /* ---------- base ---------- */
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -370,6 +394,50 @@ h1 {
 [data-variant="b"] .rail-b { display: block; }
 [data-variant="c"] .rail-c { display: block; }
 
+/* ---------- D skin: C's look on B's layout ---------- */
+[data-skin="ws"] .top { background: var(--bar); color: var(--bar-text); border-bottom: 2px solid var(--bar-accent); }
+[data-skin="ws"] .top .brand { color: var(--bar-text); }
+[data-skin="ws"] .top .brand-mark { color: var(--bar-accent); }
+[data-skin="ws"] .top .brand-sub { color: var(--bar-text); font-family: var(--head-font); text-transform: uppercase; letter-spacing: .06em; font-size: 1.05rem; }
+[data-skin="ws"] .top .world-pick { color: var(--bar-text); border-color: var(--bar-line); }
+[data-skin="ws"] .top .search input { background: var(--bar-fill); color: var(--bar-text); border-color: var(--bar-line); }
+[data-skin="ws"] .top .search input::placeholder { color: var(--bar-text); opacity: .6; }
+[data-skin="ws"] .top .search kbd { border-color: var(--bar-line); color: var(--bar-text); opacity: .7; }
+[data-skin="ws"] .top .icon-btn:hover { background: var(--bar-fill); }
+[data-skin="ws"] .top .avatar { background: var(--bar-fill); color: var(--bar-text); }
+[data-skin="ws"] .side-left { background: var(--surface); }
+[data-skin="ws"] .nav-new { background: var(--bg); }
+[data-skin="ws"] .tree a[aria-current] { background: var(--bg); box-shadow: inset 3px 0 0 var(--accent); }
+[data-skin="ws"] .tabs span[aria-current] { font-weight: 600; box-shadow: inset 0 2px 0 var(--accent); }
+[data-skin="ws"] h1 { font-family: var(--head-font); text-transform: uppercase; letter-spacing: .02em; font-weight: 700; }
+[data-skin="ws"] .page-head { border-bottom: 2px solid var(--accent); margin-bottom: 0; }
+[data-skin="ws"] .act { border-color: var(--border); background: var(--surface); }
+[data-skin="ws"] .act.primary { background: var(--accent); border-color: var(--accent); }
+[data-skin="ws"] a.wl { text-decoration-color: color-mix(in srgb, var(--link) 45%, transparent); }
+[data-skin="ws"] a.wl-missing { opacity: 1; color: var(--missing); text-decoration: underline dashed; text-decoration-color: var(--missing); }
+[data-skin="ws"] .article h2 {
+    font-family: var(--head-font); text-transform: uppercase; letter-spacing: .03em; font-size: 1.35rem; font-weight: 700;
+    background: var(--surface); border-left: 4px solid var(--accent); padding: 4px 10px;
+}
+[data-skin="ws"] .article h3 { font-family: var(--head-font); font-size: 1.2rem; font-weight: 600; letter-spacing: .02em; }
+[data-skin="ws"] .infobox .prop-label { font-family: var(--head-font); text-transform: uppercase; letter-spacing: .06em; font-size: .85rem; }
+[data-skin="ws"] .data-table th, [data-skin="ws"] .data-table td { border: 1px solid var(--border-soft); }
+[data-skin="ws"] .data-table th { background: var(--surface); }
+[data-skin="ws"] .data-table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--surface) 45%, transparent); }
+[data-skin="ws"] .article blockquote { border-left-color: var(--accent); background: var(--surface); color: var(--text); font-style: italic; }
+[data-skin="ws"] .side-right { background: var(--bg); }
+[data-skin="ws"] .rail-box { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); }
+[data-skin="ws"] .rail-box h3 {
+    margin: 0; padding: 6px 12px; background: var(--bar); color: var(--bar-text);
+    font-family: var(--head-font); font-size: 1rem; letter-spacing: .06em; border-bottom: 2px solid var(--bar-accent);
+}
+[data-skin="ws"] .rail-box ul { padding: 6px 12px 10px; }
+[data-skin="ws"] .rail-box li + li { border-top: 1px solid var(--border-soft); }
+[data-skin="ws"] .outline li + li { border-top: 0; }
+[data-skin="ws"] .graph svg { border: 0; border-radius: 0; }
+[data-skin="ws"] .toc { background: var(--surface); }
+[data-skin="ws"] .map-foot { background: var(--surface); }
+
 /* ---------- link preview ---------- */
 .preview {
     position: fixed; z-index: 50; width: 300px; padding: 12px 14px;
@@ -440,6 +508,7 @@ h1 {
         <button type="button" data-set-variant="a">A Encyclopedia</button>
         <button type="button" data-set-variant="b">B Vault</button>
         <button type="button" data-set-variant="c">C Game wiki</button>
+        <button type="button" data-set-variant="d">D Vault + Waystone</button>
     </span>
     <span class="mock-seg" role="group" aria-label="Colour mode">
         <button type="button" data-set-mode="light">Light</button>
@@ -670,6 +739,10 @@ h1 {
                     <li><a class="wl" href="#" data-p="road">The Karrow Road</a><small>The only road north out of Karrow Ford.</small></li>
                 </ul>
             </section>
+            <section class="rail-box">
+                <h3>Wanted pages</h3>
+                <ul><li><a class="wl wl-missing" href="#" data-p="tor">Hollow Tor</a><small>wanted 2 times · linked here</small></li><li><a class="wl wl-missing" href="#" data-p="missing">Mother Ilse</a><small>wanted 1 time · linked here</small></li><li><a class="wl wl-missing" href="#" data-p="missing">The Ember Choir</a><small>wanted 1 time</small></li></ul>
+            </section>
             <section class="rail-box graph">
                 <h3>Local graph</h3>
                 <svg viewBox="0 0 240 180" role="img" aria-label="Pages linked to and from Karrow Ford">
@@ -715,20 +788,23 @@ document.addEventListener('DOMContentLoaded', function () {
     var notes = {
         a: 'Encyclopedia (Wikipedia): white page, serif headings, Read / Edit / History tabs on the title rule, infobox on the right, folder tree on the left.',
         b: 'Vault (Obsidian): three panes, open-page tabs, properties instead of an infobox, outline, backlinks with context and a local graph on the right.',
-        c: 'Game wiki (Fextralife): dark header and a section bar instead of a side tree, framed page, banded headings, sidebar boxes for siblings, backlinks, wanted pages and recent changes.'
+        c: 'Game wiki (Fextralife): dark header and a section bar instead of a side tree, framed page, banded headings, sidebar boxes for siblings, backlinks, wanted pages and recent changes.',
+        d: 'Chosen direction: B\'s layout with C\'s header bar, condensed headings, banded sections and boxed side panel (now with Wanted pages), in the app\'s Parchment / Candlelight colours.'
     };
     function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
     function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 
     function apply(variant, mode) {
-        root.dataset.variant = variant;
+        // D is B's layout with the Waystone skin
+        root.dataset.variant = variant === 'd' ? 'b' : variant;
+        if (variant === 'd') root.dataset.skin = 'ws'; else delete root.dataset.skin;
         root.dataset.mode = mode;
         document.querySelectorAll('[data-set-variant]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.setVariant === variant)); });
         document.querySelectorAll('[data-set-mode]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.setMode === mode)); });
         document.getElementById('mockNote').textContent = notes[variant];
     }
     var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    var variant = load('codex-mock-variant') || 'a';
+    var variant = load('codex-mock-variant') || 'd';
     var mode = load('codex-mock-mode') || (prefersDark ? 'dark' : 'light');
     apply(variant, mode);
     document.querySelectorAll('[data-set-variant]').forEach(function (b) {
@@ -822,7 +898,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var heads = Array.prototype.slice.call(document.querySelectorAll('.article h2[id], .article h3[id]'));
     function onScroll() {
         var cur = heads[0] && heads[0].id;
-        heads.forEach(function (h) { if (h.getBoundingClientRect().top < 140) cur = h.id; });
+        heads.forEach(function (h) { if (h.offsetParent && h.getBoundingClientRect().top < 140) cur = h.id; }); // skip hidden ones
         document.querySelectorAll('.outline a').forEach(function (a) { a.classList.toggle('on', a.dataset.o === cur); });
     }
     window.addEventListener('scroll', onScroll, { passive: true });
