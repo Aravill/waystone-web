@@ -445,12 +445,85 @@ h1 {
 .outline a { color: var(--muted); display: block; padding: 2px 0 2px 10px; border-left: 2px solid var(--border-soft); }
 .outline a.on { color: var(--accent); border-left-color: var(--accent); }
 .outline .sub a { padding-left: 22px; }
-.graph svg { width: 100%; height: auto; display: block; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); }
-.graph text { font: 10px Inter, sans-serif; fill: var(--muted); }
-.graph line { stroke: var(--border); }
-.graph circle { fill: var(--muted); }
-.graph circle.me { fill: var(--accent); }
-.graph circle.ghost { fill: none; stroke: var(--muted); stroke-dasharray: 2 2; }
+/* ---------- graph (full view and the side panel's local graph) ---------- */
+:root {
+    /* node colours by top-level folder; the D skin swaps in the style guide's inks */
+    --g-places: #3a7d6b; --g-factions: #a87b1c; --g-people: #b03a2e; --g-top: #8a8a8a;
+}
+[data-variant][data-skin="ws"] { --g-places: #355E52; --g-factions: #7A5A12; --g-people: #8E2A1E; --g-top: #6B5E4B; }
+[data-variant][data-skin="ws"][data-mode="dark"] { --g-places: #7FB09E; --g-factions: #D4A94A; --g-people: #D9735C; --g-top: #A8997F; }
+.gv-svg .edge { stroke: var(--border); stroke-width: 1.2; }
+.gv-svg .node circle { fill: var(--c); stroke: var(--bg); stroke-width: 1.5; }
+.gv-svg .node.missing circle { fill: var(--bg); stroke: var(--muted); stroke-dasharray: 3 2; stroke-width: 1.5; }
+.gv-svg .node.current circle { stroke: var(--text); stroke-width: 2.5; }
+.gv-svg .node text {
+    font: 500 11px Inter, sans-serif; fill: var(--text); text-anchor: middle; pointer-events: none;
+    paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round;
+}
+.gv-svg .node.current text { font-weight: 700; }
+.gv-svg .node.missing text { fill: var(--muted); font-style: italic; }
+.gv-svg.hovering .node:not(.hl), .gv-svg.filtering .node:not(.match) { opacity: .2; }
+.gv-svg.hovering .edge:not(.hl), .gv-svg.filtering .edge { opacity: .12; }
+.gv-svg .edge.hl { stroke: var(--text); stroke-width: 1.8; opacity: .8; }
+.gv-svg .node.sel circle { stroke: var(--text); stroke-width: 3; }
+.gv-svg.nolabels .node:not(.hl):not(.sel):not(.current):not(.match) text { display: none; }
+.gv-svg .is-hidden { display: none; }
+.gv-svg .node { cursor: pointer; }
+
+.graph-view[hidden] { display: none; }
+.page.graphing .page-inner { display: none; }
+[data-variant="b"] .shell.graphing { grid-template-columns: 270px minmax(0, 1fr); }
+.shell.graphing .side-right { display: none !important; }
+.graph-view { padding: 16px 20px 20px; }
+.gv-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 20px; margin-bottom: 12px; }
+.gv-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .84rem; color: var(--muted); margin-left: auto; }
+.gv-legend i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 50%; background: var(--c); vertical-align: -1px; }
+.gv-legend i.ghost { background: none; border: 1.5px dashed var(--muted); }
+.gv-stage {
+    position: relative; height: calc(100vh - 260px); min-height: 440px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+    touch-action: none;
+}
+[data-skin="ws"] .gv-stage { border-top: 2px solid var(--accent); }
+.gv-stage > .gv-svg { display: block; width: 100%; height: 100%; cursor: grab; }
+.gv-stage > .gv-svg.panning { cursor: grabbing; }
+.gv-zoom { position: absolute; left: 10px; top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.gv-zoom button { min-width: 36px; height: 36px; padding: 0 8px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); font-size: .95rem; }
+.gv-zoom button:hover { background: var(--surface-2); }
+.gv-settings {
+    position: absolute; right: 10px; top: 10px; width: 236px; padding: 8px 12px 10px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); font-size: .86rem;
+}
+.gv-settings summary { cursor: pointer; font-weight: 600; }
+[data-skin="ws"] .gv-settings summary { font-family: var(--head-font); text-transform: uppercase; letter-spacing: .06em; font-size: .95rem; }
+.gv-settings label { display: block; margin-top: 9px; color: var(--muted); }
+.gv-settings input[type="search"], .gv-settings select {
+    display: block; width: 100%; height: 34px; margin-top: 3px; padding: 0 8px;
+    background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); font: inherit;
+}
+.gv-settings label.ck { display: flex; align-items: center; gap: 8px; color: var(--text); }
+.gv-settings label.ck input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+.gv-card {
+    position: absolute; left: 10px; bottom: 34px; width: 290px; padding: 12px 14px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .2); font-size: .88rem; line-height: 1.5;
+}
+.gv-card[hidden] { display: none; }
+.gv-card strong { display: block; padding-right: 36px; font-family: var(--head-font); font-size: 1.15rem; }
+[data-skin="ws"] .gv-card strong { text-transform: uppercase; letter-spacing: .02em; }
+.gv-card .where { color: var(--muted); font-size: .8rem; }
+.gv-card p { margin: 6px 0; }
+.gv-card-count { color: var(--muted); font-size: .8rem; }
+.gv-card-close { position: absolute; top: 6px; right: 6px; width: 34px; height: 34px; }
+.gv-card-tags:empty { display: none; }
+.gv-card-tags { margin-top: 4px; }
+.gv-hint { position: absolute; left: 0; right: 0; bottom: 8px; margin: 0; text-align: center; font-size: .78rem; color: var(--muted); pointer-events: none; }
+.local-graph { display: block; width: 100%; padding: 0; background: var(--surface); border: 0; cursor: pointer; text-align: left; }
+.local-graph .gv-svg { display: block; width: 100%; height: auto; }
+.local-graph .local-open { display: block; padding: 6px 10px; font-size: .82rem; color: var(--link); border-top: 1px solid var(--border-soft); }
+.local-graph:hover .local-open { text-decoration: underline; }
+.local-graph .node text { font-size: 10px; }
+.local-graph .node { cursor: inherit; }
 [data-variant="c"] .rail-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 [data-variant="c"] .rail-box h3 { margin: 0; padding: 7px 12px; background: var(--bar); color: var(--bar-accent); font-family: var(--head-font); font-size: 1rem; letter-spacing: .06em; }
 [data-variant="c"] .rail-box ul { padding: 6px 12px 10px; }
@@ -499,7 +572,6 @@ h1 {
 [data-skin="ws"] .rail-box ul { padding: 6px 12px 10px; }
 [data-skin="ws"] .rail-box li + li { border-top: 1px solid var(--border-soft); }
 [data-skin="ws"] .outline li + li { border-top: 0; }
-[data-skin="ws"] .graph svg { border: 0; border-radius: 0; }
 [data-skin="ws"] .toc { background: var(--surface); }
 
 /* ---------- link preview ---------- */
@@ -561,6 +633,12 @@ h1 {
     .tb .tb-label { display: none; }
     .ed-body { min-height: 260px; font-size: .9rem; }
     .ed-actions .act { flex: 1; justify-content: center; }
+    .graph-view { padding: 12px 12px 16px; }
+    .gv-legend { order: 3; width: 100%; margin-left: 0; }
+    .gv-stage { height: calc(100svh - 56px - 160px); min-height: 380px; }
+    .gv-settings { width: min(236px, calc(100% - 66px)); }
+    .gv-card { left: 8px; right: 8px; bottom: 8px; width: auto; }
+    .gv-hint { display: none; }
     .toc, [data-variant="b"] .toc { display: block; }
     .toc summary { padding: 4px 0; }
     .tree summary, .tree a, .nav-group a { padding-top: 9px; padding-bottom: 9px; }
@@ -635,7 +713,7 @@ h1 {
         <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
     </button>
     <a class="brand" href="#"><span class="brand-mark">Waystone</span><span class="brand-sub">Codices</span></a>
-    <button class="world-pick" type="button" title="Switch world">The Karrow Marches</button>
+    <button class="world-pick" type="button" title="Switch codex">The Karrow Marches</button>
     <div class="search" role="search">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <label class="sr-only" for="q">Search the Codices</label>
@@ -687,18 +765,20 @@ h1 {
                 <li><a href="#">The Karrow Road</a></li>
             </ul></details></li>
             <li><a href="#">Map of the Karrow</a></li>
+            <li><a href="#">Wandering Merchants</a></li>
         </ul>
         <div class="nav-group">
-            <p class="nav-title">This world</p>
-            <a href="#">World home</a>
-            <a href="#">Wanted pages <span class="count">2</span></a>
+            <p class="nav-title">This codex</p>
+            <a href="#">Codex home</a>
+            <a href="#" data-open-graph>Graph view <span class="count">16 pages</span></a>
+            <a href="#">Tags <span class="count">9</span></a>
+            <a href="#">Wanted pages <span class="count">3</span></a>
             <a href="#">Recent changes</a>
-            <a href="#">Age of Sojourn <span class="count">game</span></a>
         </div>
     </aside>
 
     <main class="page" id="main">
-        <div class="tabs" aria-hidden="true"><span>The Karrow Road</span><span aria-current="page">Karrow Ford</span><span>Old Hesk</span></div>
+        <div class="tabs" aria-hidden="true"><span>The Karrow Road</span><span aria-current="page" id="pageTab">Karrow Ford</span><span>Old Hesk</span><span id="graphTab" hidden>Graph</span></div>
         <div class="page-inner">
         <div class="page-frame">
             <nav class="crumbs" aria-label="Breadcrumb">
@@ -741,10 +821,10 @@ h1 {
                     </figure>
                     <span class="prop-label">Properties</span>
                     <dl>
-                        <dt>World</dt><dd><a href="#">The Karrow Marches</a></dd>
+                        <dt>Codex</dt><dd><a href="#">The Karrow Marches</a></dd>
                         <dt>Folder</dt><dd>Places › Settlements</dd>
                         <dt>Also known as</dt><dd><span class="chip">the Ford</span></dd>
-                        <dt>Games</dt><dd><a href="#">Age of Sojourn</a></dd>
+                        <dt>Tags</dt><dd><a class="chip" href="#">settlement</a> <a class="chip" href="#">river</a></dd>
                         <dt>Started</dt><dd>Adam, Nov 20</dd>
                         <dt>Scribes</dt><dd>Adam, Roy</dd>
                         <dt>Revisions</dt><dd>3</dd>
@@ -875,6 +955,49 @@ Market day is the first of every week. Traders come down from the pass with wool
             </section>
         </div>
         </div>
+
+        <section class="graph-view" id="graphView" aria-labelledby="gvTitle" hidden>
+            <div class="gv-head">
+                <div>
+                    <nav class="crumbs" aria-label="Breadcrumb"><a href="#">The Karrow Marches</a></nav>
+                    <h1 id="gvTitle">Graph</h1>
+                </div>
+                <div class="gv-legend" aria-label="Node colours">
+                    <span><i style="--c: var(--g-places)"></i>Places</span>
+                    <span><i style="--c: var(--g-factions)"></i>Factions</span>
+                    <span><i style="--c: var(--g-people)"></i>People</span>
+                    <span><i style="--c: var(--g-top)"></i>Top level</span>
+                    <span><i class="ghost"></i>Not written yet</span>
+                </div>
+                <button class="act" type="button" id="gvBack">← Karrow Ford</button>
+            </div>
+            <div class="gv-stage" id="gvStage">
+                <svg class="gv-svg" id="gvSvg" role="img" aria-label="The pages of The Karrow Marches and the links between them"></svg>
+                <div class="gv-zoom">
+                    <button type="button" id="gvIn" aria-label="Zoom in">+</button>
+                    <button type="button" id="gvOut" aria-label="Zoom out">−</button>
+                    <button type="button" id="gvFit" aria-label="Fit the whole graph">Fit</button>
+                </div>
+                <details class="gv-settings" id="gvSettings" open>
+                    <summary>Filters</summary>
+                    <label>Find a page<input type="search" id="gvFind" placeholder="Title" autocomplete="off"></label>
+                    <label>Highlight a tag<select id="gvTag"><option value="">None</option></select></label>
+                    <label class="ck"><input type="checkbox" id="gvMissing" checked> Pages not written yet</label>
+                    <label class="ck"><input type="checkbox" id="gvOrphans" checked> Pages with no links</label>
+                    <label class="ck"><input type="checkbox" id="gvLabels" checked> Always show titles</label>
+                </details>
+                <div class="gv-card" id="gvCard" role="dialog" aria-labelledby="gvCardTitle" hidden>
+                    <button class="icon-btn gv-card-close" type="button" id="gvCardClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+                    <strong id="gvCardTitle"></strong>
+                    <div class="where" id="gvCardWhere"></div>
+                    <div class="gv-card-tags" id="gvCardTags"></div>
+                    <p id="gvCardText"></p>
+                    <p class="gv-card-count" id="gvCardCount"></p>
+                    <button class="act primary" type="button" id="gvCardOpen">Open page</button>
+                </div>
+                <p class="gv-hint">Drag to move around · scroll or pinch to zoom · drag a page to move it · click a page for details</p>
+            </div>
+        </section>
     </main>
 
     <aside class="side-right" aria-label="Page side panel">
@@ -905,18 +1028,10 @@ Market day is the first of every week. Traders come down from the pass with wool
             </section>
             <section class="rail-box graph">
                 <h3>Local graph</h3>
-                <svg viewBox="0 0 240 180" role="img" aria-label="Pages linked to and from Karrow Ford">
-                    <line x1="120" y1="90" x2="50" y2="40"/><line x1="120" y1="90" x2="190" y2="38"/><line x1="120" y1="90" x2="205" y2="105"/>
-                    <line x1="120" y1="90" x2="160" y2="155"/><line x1="120" y1="90" x2="60" y2="150"/><line x1="120" y1="90" x2="30" y2="98"/><line x1="120" y1="90" x2="120" y2="22"/>
-                    <circle cx="50" cy="40" r="5"/><text x="50" y="30" text-anchor="middle">Ferrymen</text>
-                    <circle cx="190" cy="38" r="5"/><text x="190" y="28" text-anchor="middle">Karrow Road</text>
-                    <circle cx="205" cy="105" r="5"/><text x="205" y="122" text-anchor="middle">Saltmarsh</text>
-                    <circle cx="160" cy="155" r="5"/><text x="160" y="172" text-anchor="middle">Old Hesk</text>
-                    <circle cx="60" cy="150" r="5"/><text x="60" y="167" text-anchor="middle">Cloveswick</text>
-                    <circle cx="30" cy="98" r="5" class="ghost"/><text x="30" y="115" text-anchor="middle">Mother Ilse</text>
-                    <circle cx="120" cy="22" r="5"/><text x="120" y="12" text-anchor="middle">Map</text>
-                    <circle cx="120" cy="90" r="8" class="me"/>
-                </svg>
+                <button class="local-graph" type="button" data-open-graph aria-label="Open the graph view">
+                    <svg class="gv-svg" id="localSvg" viewBox="0 0 240 200" aria-hidden="true"></svg>
+                    <span class="local-open">Open graph view →</span>
+                </button>
             </section>
         </div>
         <div class="rail-c">
@@ -957,7 +1072,7 @@ document.addEventListener('DOMContentLoaded', function () {
         a: 'Encyclopedia (Wikipedia): white page, serif headings, Read / Edit / History tabs on the title rule, infobox on the right, folder tree on the left.',
         b: 'Vault (Obsidian): three panes, open-page tabs, properties instead of an infobox, outline, backlinks with context and a local graph on the right.',
         c: 'Game wiki (Fextralife): dark header and a section bar instead of a side tree, framed page, banded headings, sidebar boxes for siblings, backlinks, wanted pages and recent changes.',
-        d: 'Chosen direction: B\'s layout with C\'s header bar, condensed headings, banded sections and boxed side panel (now with Wanted pages), in the app\'s Parchment / Candlelight colours. No map: pages hold images instead. Click one to enlarge it, or press Edit to add your own (drop, paste or choose).'
+        d: 'Chosen direction: B\'s layout with C\'s header bar, condensed headings, banded sections and boxed side panel (now with Wanted pages), in the app\'s Parchment / Candlelight colours. No map: pages hold images instead. Click one to enlarge it, or press Edit to add your own (drop, paste or choose). Graph view: the local graph in the side panel, or Graph view in the left nav.'
     };
     function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
     function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -1176,6 +1291,254 @@ document.addEventListener('DOMContentLoaded', function () {
             li.querySelector('.name').append(tag); b.remove();
         }
     });
+
+    // ---------- graph: the seed codex's pages and links (plus this mock-up's extra links) ----------
+    var NS = 'http://www.w3.org/2000/svg', CURRENT = 'ford';
+    var GN = [
+        { id: 'road', t: 'The Karrow Road', f: 'places', path: 'Places', tags: ['road'], s: 'The only road north out of Karrow Ford. It follows the river for a day, then climbs towards the pass.' },
+        { id: 'hesk', t: 'Old Hesk', f: 'people', path: 'People', tags: ['npc'], s: 'Toll-keeper at The Toll House. Takes two silver a head and answers one question for free.' },
+        { id: 'ford', t: 'Karrow Ford', f: 'places', path: 'Places › Settlements', tags: ['settlement', 'river'], s: 'A river crossing and a market of about forty families.' },
+        { id: 'ferrymen', t: 'Ferrymen of the Ford', f: 'factions', path: 'Factions', tags: ['faction', 'river'], s: 'A loose guild of boatmen. They know every shallow on the river.' },
+        { id: 'waystones', t: 'The Waystones', f: 'places', path: 'Places › Landmarks › Waystones', tags: ['waystone', 'mystery'], s: 'Standing stones set along The Karrow Road, one a day\'s walk from the next.' },
+        { id: 'third', t: 'The Third Waystone', f: 'places', path: 'Places › Landmarks › Waystones', tags: ['waystone', 'mystery'], s: 'The stone at the third bend of The Karrow Road. It went dark in the autumn.' },
+        { id: 'toll', t: 'The Toll House', f: 'places', path: 'Places › Landmarks', tags: ['landmark'], s: 'A squat stone house with a lamp that is never lit.' },
+        { id: 'cloveswick', t: 'Cloveswick', f: 'places', path: 'Places › Settlements', tags: ['settlement', 'mystery'], s: 'A village that burned a few weeks ago. The ash smelled of cloves.' },
+        { id: 'saltmarsh', t: 'Saltmarsh Reach', f: 'places', path: 'Places › Settlements', tags: ['settlement'], s: 'Brackish flats to the east of Karrow Ford.' },
+        { id: 'wardens', t: 'The Marsh Wardens', f: 'factions', path: 'Factions', tags: ['faction'], s: 'Lantern-bearers who keep the causeways of Saltmarsh Reach open.' },
+        { id: 'lamp', t: 'Lamplighters\' Guild', f: 'factions', path: 'Factions', tags: ['faction'], s: 'Keepers of the lamps along the great roads.' },
+        { id: 'map', t: 'Map of the Karrow', f: 'top', path: 'Top level', tags: ['reference'], s: 'The road from Karrow Ford north to the pass, as the toll-keeper drew it.' },
+        { id: 'merchants', t: 'Wandering Merchants', f: 'top', path: 'Top level', tags: [], s: 'Peddlers who go wherever the roads are open.' },
+        { id: 'tor', t: 'Hollow Tor', missing: true },
+        { id: 'ilse', t: 'Mother Ilse', missing: true },
+        { id: 'choir', t: 'The Ember Choir', missing: true }
+    ];
+    var GL = [
+        ['road', 'ford'], ['road', 'toll'], ['road', 'hesk'], ['road', 'waystones'], ['road', 'cloveswick'],
+        ['hesk', 'toll'], ['hesk', 'third'], ['hesk', 'ford'], ['hesk', 'ferrymen'],
+        ['ford', 'ferrymen'], ['ford', 'road'], ['ford', 'saltmarsh'], ['ford', 'toll'], ['ford', 'hesk'], ['ford', 'ilse'], ['ford', 'cloveswick'], ['ford', 'third'], ['ford', 'tor'],
+        ['ferrymen', 'hesk'], ['waystones', 'road'], ['waystones', 'third'], ['waystones', 'choir'],
+        ['third', 'road'], ['third', 'hesk'], ['toll', 'hesk'], ['toll', 'road'],
+        ['cloveswick', 'ford'], ['cloveswick', 'tor'], ['saltmarsh', 'ford'], ['saltmarsh', 'wardens'],
+        ['wardens', 'saltmarsh'], ['wardens', 'hesk'], ['lamp', 'waystones'], ['map', 'ford']
+    ];
+    var BY = {}, NB = {}, PAIRS = {};
+    GN.forEach(function (n) { BY[n.id] = n; n.out = 0; n.inn = 0; NB[n.id] = {}; });
+    GL.forEach(function (l) {
+        BY[l[0]].out++; BY[l[1]].inn++;
+        NB[l[0]][l[1]] = NB[l[1]][l[0]] = true;
+        PAIRS[[l[0], l[1]].sort().join('|')] = [l[0], l[1]];
+    });
+    var EDGES = Object.keys(PAIRS).map(function (k) { return PAIRS[k]; });
+    function el(tag, cls) { var e = document.createElementNS(NS, tag); if (cls) e.setAttribute('class', cls); return e; }
+    function copyNodes(ids) { return GN.filter(function (n) { return !ids || ids[n.id]; }).map(function (n) { return Object.assign({}, n); }); }
+
+    function layout(nodes, edges, rest) {
+        var idx = {}, n = nodes.length;
+        nodes.forEach(function (d, i) { var a = i / n * Math.PI * 2, r = 110 + (i % 3) * 40; d.x = Math.cos(a) * r; d.y = Math.sin(a) * r; d.vx = d.vy = 0; idx[d.id] = d; });
+        for (var it = 0; it < 500; it++) {
+            var alpha = 1 - it / 500;
+            for (var i = 0; i < n; i++) for (var j = i + 1; j < n; j++) {
+                var a = nodes[i], b = nodes[j], dx = b.x - a.x, dy = b.y - a.y, d2 = Math.max(dx * dx + dy * dy, 1), d = Math.sqrt(d2), f = 12000 / d2;
+                a.vx -= dx / d * f; a.vy -= dy / d * f; b.vx += dx / d * f; b.vy += dy / d * f;
+            }
+            edges.forEach(function (e) {
+                var a = idx[e[0]], b = idx[e[1]]; if (!a || !b) return;
+                var dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1, f = (d - rest) * 0.04;
+                a.vx += dx / d * f; a.vy += dy / d * f; b.vx -= dx / d * f; b.vy -= dy / d * f;
+            });
+            nodes.forEach(function (d) {
+                var pull = (d.inn + d.out) ? 0.006 : 0.03; // pages with no links stay near the edge, not far out
+                d.vx -= d.x * pull; d.vy -= d.y * pull;
+                d.x += Math.max(-25, Math.min(25, d.vx)) * alpha; d.y += Math.max(-25, Math.min(25, d.vy)) * alpha;
+                d.vx *= 0.55; d.vy *= 0.55;
+            });
+        }
+        return idx;
+    }
+
+    function draw(svg, nodes, edges) {
+        svg.textContent = '';
+        var vp = el('g'), eg = el('g'), ng = el('g'), idx = {}, nodeEls = {}, lines = [];
+        vp.append(eg, ng); svg.append(vp);
+        nodes.forEach(function (d) { idx[d.id] = d; });
+        edges.forEach(function (e) {
+            var a = idx[e[0]], b = idx[e[1]]; if (!a || !b) return;
+            var ln = el('line', 'edge'); ln._a = a; ln._b = b; eg.append(ln); lines.push(ln);
+        });
+        nodes.forEach(function (d) {
+            var g = el('g', 'node' + (d.missing ? ' missing' : '') + (d.id === CURRENT ? ' current' : ''));
+            g.style.setProperty('--c', 'var(--g-' + (d.f || 'top') + ')');
+            var r = d.missing ? 5 : 5 + Math.sqrt(d.inn + d.out) * 1.8;
+            if (d.id === CURRENT) r += 2;
+            var c = el('circle'); c.setAttribute('r', r.toFixed(1));
+            var t = el('text'); t.setAttribute('y', (r + 13).toFixed(1)); t.textContent = d.t;
+            var title = el('title'); title.textContent = d.t;
+            g.append(title, c, t); g._d = d; ng.append(g); nodeEls[d.id] = g;
+        });
+        function place() {
+            nodes.forEach(function (d) { nodeEls[d.id].setAttribute('transform', 'translate(' + d.x.toFixed(1) + ',' + d.y.toFixed(1) + ')'); });
+            lines.forEach(function (l) { l.setAttribute('x1', l._a.x); l.setAttribute('y1', l._a.y); l.setAttribute('x2', l._b.x); l.setAttribute('y2', l._b.y); });
+        }
+        place();
+        return { svg: svg, vp: vp, nodes: nodes, idx: idx, nodeEls: nodeEls, lines: lines, place: place };
+    }
+    function bbox(nodes) {
+        var b = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+        nodes.forEach(function (d) { b.x0 = Math.min(b.x0, d.x); b.y0 = Math.min(b.y0, d.y); b.x1 = Math.max(b.x1, d.x); b.y1 = Math.max(b.y1, d.y); });
+        return b;
+    }
+
+    // local graph in the side panel: this page and its neighbours
+    (function () {
+        var ids = {}; ids[CURRENT] = true; Object.keys(NB[CURRENT]).forEach(function (k) { ids[k] = true; });
+        var nodes = copyNodes(ids), edges = EDGES.filter(function (e) { return ids[e[0]] && ids[e[1]]; });
+        layout(nodes, edges, 70);
+        var g = draw(document.getElementById('localSvg'), nodes, edges), b = bbox(nodes);
+        g.svg.setAttribute('viewBox', [b.x0 - 55, b.y0 - 22, b.x1 - b.x0 + 110, b.y1 - b.y0 + 52].map(Math.round).join(' '));
+    })();
+
+    // full graph view
+    var full = null, view = { k: 1, tx: 0, ty: 0 }, selected = null;
+    var shell = document.querySelector('.shell'), graphView = document.getElementById('graphView');
+    var gvSvg = document.getElementById('gvSvg'), card = document.getElementById('gvCard');
+    var find = document.getElementById('gvFind'), tagSel = document.getElementById('gvTag');
+    var showMissing = document.getElementById('gvMissing'), showOrphans = document.getElementById('gvOrphans'), showLabels = document.getElementById('gvLabels');
+    var allTags = {}; GN.forEach(function (n) { (n.tags || []).forEach(function (t) { allTags[t] = true; }); });
+    Object.keys(allTags).sort().forEach(function (t) { var o = document.createElement('option'); o.value = t; o.textContent = t; tagSel.append(o); });
+
+    function applyView() { full.vp.setAttribute('transform', 'translate(' + view.tx + ',' + view.ty + ') scale(' + view.k + ')'); }
+    function visibleNodes() { return full.nodes.filter(function (d) { return !full.nodeEls[d.id].classList.contains('is-hidden'); }); }
+    function fit() {
+        var w = gvSvg.clientWidth, h = gvSvg.clientHeight, b = bbox(visibleNodes()), pad = w < 600 ? 34 : 70;
+        var bw = Math.max(b.x1 - b.x0, 1), bh = Math.max(b.y1 - b.y0, 1);
+        view.k = Math.min((w - pad * 2) / bw, (h - pad * 2) / bh, 1.6);
+        view.tx = w / 2 - (b.x0 + bw / 2) * view.k; view.ty = h / 2 - (b.y0 + bh / 2) * view.k;
+        applyView();
+    }
+    function zoomAt(f, cx, cy) {
+        var k2 = Math.max(0.3, Math.min(4, view.k * f)); f = k2 / view.k;
+        view.tx = cx - (cx - view.tx) * f; view.ty = cy - (cy - view.ty) * f; view.k = k2; applyView();
+    }
+    function centerOn(d) { view.tx = gvSvg.clientWidth / 2 - d.x * view.k; view.ty = gvSvg.clientHeight / 2 - d.y * view.k; applyView(); }
+    function hover(id) {
+        gvSvg.classList.toggle('hovering', !!id);
+        full.nodes.forEach(function (d) { full.nodeEls[d.id].classList.toggle('hl', !!id && (d.id === id || !!NB[id][d.id])); });
+        full.lines.forEach(function (l) { l.classList.toggle('hl', !!id && (l._a.id === id || l._b.id === id)); });
+    }
+    function select(id) {
+        if (selected) full.nodeEls[selected].classList.remove('sel');
+        selected = id;
+        if (!id) { card.hidden = true; return; }
+        full.nodeEls[id].classList.add('sel');
+        var d = BY[id];
+        document.getElementById('gvCardTitle').textContent = d.t;
+        document.getElementById('gvCardWhere').textContent = d.missing ? 'Not written yet · linked from ' + d.inn + (d.inn === 1 ? ' page' : ' pages') : d.path;
+        var tags = document.getElementById('gvCardTags'); tags.textContent = '';
+        (d.tags || []).forEach(function (t) { var c = document.createElement('span'); c.className = 'chip'; c.textContent = t; tags.append(c, ' '); });
+        document.getElementById('gvCardText').textContent = d.missing ? 'Nobody has written this page yet.' : d.s;
+        document.getElementById('gvCardCount').textContent = d.missing ? '' : 'Links to ' + d.out + ' · linked from ' + d.inn;
+        document.getElementById('gvCardOpen').textContent = d.missing ? 'Create page' : 'Open page';
+        card.hidden = false;
+    }
+    function applyFilters() {
+        var q = find.value.trim().toLowerCase(), tag = tagSel.value, filtering = !!(q || tag);
+        gvSvg.classList.toggle('filtering', filtering);
+        gvSvg.classList.toggle('nolabels', !showLabels.checked);
+        full.nodes.forEach(function (d) {
+            var e = full.nodeEls[d.id];
+            var hide = (d.missing && !showMissing.checked) || (!d.missing && d.inn + d.out === 0 && !showOrphans.checked);
+            e.classList.toggle('is-hidden', hide);
+            e.classList.toggle('match', filtering && (!q || d.t.toLowerCase().indexOf(q) >= 0) && (!tag || (d.tags || []).indexOf(tag) >= 0));
+        });
+        full.lines.forEach(function (l) {
+            l.classList.toggle('is-hidden', full.nodeEls[l._a.id].classList.contains('is-hidden') || full.nodeEls[l._b.id].classList.contains('is-hidden'));
+        });
+        if (selected && full.nodeEls[selected].classList.contains('is-hidden')) select(null);
+    }
+    [find, tagSel, showMissing, showOrphans, showLabels].forEach(function (c) { c.addEventListener('input', applyFilters); c.addEventListener('change', applyFilters); });
+    find.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        var m = full.nodes.filter(function (d) { return full.nodeEls[d.id].classList.contains('match') && !full.nodeEls[d.id].classList.contains('is-hidden'); })[0];
+        if (m) { select(m.id); centerOn(m); }
+    });
+
+    function buildFull() {
+        var nodes = copyNodes();
+        layout(nodes, EDGES, 120);
+        full = draw(gvSvg, nodes, EDGES);
+        applyFilters();
+        var pointers = {}, drag = null;
+        function pts() { return Object.keys(pointers).map(function (k) { return pointers[k]; }); }
+        gvSvg.addEventListener('pointerdown', function (e) {
+            gvSvg.setPointerCapture(e.pointerId);
+            pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+            var p = pts();
+            if (p.length === 2) { drag = { pinch: true, d0: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1, k0: view.k }; return; }
+            var g = e.target.closest && e.target.closest('.node');
+            drag = { node: g || null, lx: e.clientX, ly: e.clientY, moved: 0 };
+            if (!g) gvSvg.classList.add('panning');
+        });
+        gvSvg.addEventListener('pointermove', function (e) {
+            if (!pointers[e.pointerId]) return;
+            pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+            if (!drag) return;
+            if (drag.pinch) {
+                var p = pts(); if (p.length < 2) return;
+                var r = gvSvg.getBoundingClientRect(), d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+                zoomAt(drag.k0 * d / drag.d0 / view.k, (p[0].x + p[1].x) / 2 - r.left, (p[0].y + p[1].y) / 2 - r.top);
+                return;
+            }
+            var dx = e.clientX - drag.lx, dy = e.clientY - drag.ly;
+            drag.lx = e.clientX; drag.ly = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
+            if (drag.node) { var n = drag.node._d; n.x += dx / view.k; n.y += dy / view.k; full.place(); }
+            else { view.tx += dx; view.ty += dy; applyView(); }
+        });
+        function up(e) {
+            delete pointers[e.pointerId];
+            if (drag && !drag.pinch && drag.moved < 5) select(drag.node ? drag.node._d.id : null);
+            if (!drag || drag.pinch || pts().length === 0) drag = null;
+            gvSvg.classList.remove('panning');
+        }
+        gvSvg.addEventListener('pointerup', up);
+        gvSvg.addEventListener('pointercancel', up);
+        gvSvg.addEventListener('wheel', function (e) {
+            e.preventDefault();
+            var r = gvSvg.getBoundingClientRect();
+            zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+        }, { passive: false });
+        gvSvg.addEventListener('pointerover', function (e) {
+            if (e.pointerType !== 'mouse' || drag) return;
+            var g = e.target.closest && e.target.closest('.node'); if (g) hover(g._d.id);
+        });
+        gvSvg.addEventListener('pointerout', function (e) {
+            var g = e.target.closest && e.target.closest('.node');
+            if (g && !(e.relatedTarget && g.contains(e.relatedTarget))) hover(null);
+        });
+    }
+    document.getElementById('gvIn').addEventListener('click', function () { zoomAt(1.3, gvSvg.clientWidth / 2, gvSvg.clientHeight / 2); });
+    document.getElementById('gvOut').addEventListener('click', function () { zoomAt(1 / 1.3, gvSvg.clientWidth / 2, gvSvg.clientHeight / 2); });
+    document.getElementById('gvFit').addEventListener('click', fit);
+    document.getElementById('gvCardClose').addEventListener('click', function () { select(null); });
+
+    var pageTab = document.getElementById('pageTab'), graphTab = document.getElementById('graphTab');
+    function setGraph(on) {
+        shell.classList.toggle('graphing', on); page.classList.toggle('graphing', on);
+        graphView.hidden = !on; graphTab.hidden = !on;
+        if (on) { pageTab.removeAttribute('aria-current'); graphTab.setAttribute('aria-current', 'page'); }
+        else { graphTab.removeAttribute('aria-current'); pageTab.setAttribute('aria-current', 'page'); }
+        if (document.body.classList.contains('nav-open')) setNav(false);
+        window.scrollTo(0, 0);
+        if (on) {
+            if (window.matchMedia('(max-width: 900px)').matches) document.getElementById('gvSettings').open = false;
+            if (!full) buildFull();
+            requestAnimationFrame(fit);
+        }
+    }
+    document.querySelectorAll('[data-open-graph]').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); setEditing(false); setGraph(true); }); });
+    document.getElementById('gvBack').addEventListener('click', function () { setGraph(false); });
+    document.getElementById('gvCardOpen').addEventListener('click', function () { select(null); setGraph(false); });
+    pageTab.addEventListener('click', function () { setGraph(false); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !card.hidden) select(null); });
 
     // outline highlight (Vault)
     var heads = Array.prototype.slice.call(document.querySelectorAll('.article h2[id], .article h3[id]'));
