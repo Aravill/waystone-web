@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codex Wiki Layouts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Barlow+Condensed:wght@500;600;700&family=IM+Fell+English+SC&display=swap">
+<style>
+/* Codex wiki mock-up: three layouts over the same page (the seed world's Karrow Ford),
+   to compare against the Scriptorium page view in static/codex.html.
+   A Encyclopedia (Wikipedia), B Vault (Obsidian), C Game wiki (Fextralife).
+   Every layout: sans body text, one Edit button plus a "More" menu instead of seven buttons,
+   a search box in the top bar, a folder tree in a side nav (a drawer on phones),
+   link previews on hover, and the infobox after the lead on phones.
+   Only the brand mark keeps the Waystone face so the Codex still reads as part of the app. */
+
+/* ---------- tokens: A Encyclopedia ---------- */
+:root, [data-variant="a"] {
+    --bg: #ffffff; --surface: #f8f9fa; --surface-2: #eaecf0;
+    --text: #202122; --muted: #54595d; --border: #a2a9b1; --border-soft: #dfe2e6;
+    --link: #3366cc; --missing: #d73333; --accent: #3366cc; --on-accent: #ffffff;
+    --brand: #8E2A1E; --pin: #8E2A1E; --map-land: #efe8d6; --map-water: #9fc0d8; --map-road: #6b5e4b;
+    --head-font: 'Source Serif 4', Georgia, serif;
+    --body-font: -apple-system, 'Segoe UI', Inter, Roboto, sans-serif;
+    --radius: 2px; --measure: 46rem;
+    color-scheme: light;
+}
+[data-variant="a"][data-mode="dark"] {
+    --bg: #101418; --surface: #181c21; --surface-2: #262a30;
+    --text: #eaecf0; --muted: #a2a9b1; --border: #54595d; --border-soft: #30343a;
+    --link: #88a3e8; --missing: #fd7865; --accent: #88a3e8; --on-accent: #101418;
+    --brand: #D9735C; --pin: #D9735C; --map-land: #2b2e33; --map-water: #36546b; --map-road: #a2a9b1;
+    color-scheme: dark;
+}
+/* ---------- tokens: B Vault ---------- */
+[data-variant="b"] {
+    --bg: #ffffff; --surface: #f6f6f7; --surface-2: #ebebee;
+    --text: #222222; --muted: #5c5c66; --border: #d8d8de; --border-soft: #e8e8ec;
+    --link: #6a4fd6; --missing: #6a4fd6; --accent: #6a4fd6; --on-accent: #ffffff;
+    --brand: #8E2A1E; --pin: #6a4fd6; --map-land: #f0edf8; --map-water: #b9c8e6; --map-road: #77778a;
+    --head-font: Inter, -apple-system, 'Segoe UI', sans-serif;
+    --body-font: Inter, -apple-system, 'Segoe UI', sans-serif;
+    --radius: 6px; --measure: 44rem;
+    color-scheme: light;
+}
+[data-variant="b"][data-mode="dark"] {
+    --bg: #1e1e1e; --surface: #262626; --surface-2: #313131;
+    --text: #dcddde; --muted: #9d9da4; --border: #3a3a3a; --border-soft: #2f2f2f;
+    --link: #a88bfa; --missing: #a88bfa; --accent: #8b6cef; --on-accent: #ffffff;
+    --brand: #D9735C; --pin: #a88bfa; --map-land: #2a2733; --map-water: #34405a; --map-road: #9d9da4;
+    color-scheme: dark;
+}
+/* ---------- tokens: C Game wiki ---------- */
+[data-variant="c"] {
+    --bg: #f3efe6; --surface: #fffdf8; --surface-2: #e8e1d1;
+    --text: #1d1b17; --muted: #5d574c; --border: #c9bfa9; --border-soft: #ddd5c3;
+    --link: #93530a; --missing: #b3261e; --accent: #93530a; --on-accent: #ffffff;
+    --brand: #8E2A1E; --pin: #b3261e; --map-land: #ece2c8; --map-water: #94b6c9; --map-road: #5d574c;
+    --bar: #24211c; --bar-text: #efe6d2; --bar-accent: #e0a85a;
+    --head-font: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    --body-font: Inter, -apple-system, 'Segoe UI', sans-serif;
+    --radius: 3px; --measure: none;
+    color-scheme: light;
+}
+[data-variant="c"][data-mode="dark"] {
+    --bg: #0f0f10; --surface: #18181a; --surface-2: #232326;
+    --text: #d9d5cc; --muted: #9c978b; --border: #3a3732; --border-soft: #2a2826;
+    --link: #e0a85a; --missing: #ef7b67; --accent: #c8973f; --on-accent: #111111;
+    --brand: #D9735C; --pin: #e0a85a; --map-land: #2a2620; --map-water: #2c4352; --map-road: #9c978b;
+    --bar: #070707; --bar-text: #e9e2d2; --bar-accent: #e0a85a;
+    color-scheme: dark;
+}
+
+/* ---------- base ---------- */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--body-font); font-size: 1rem; line-height: 1.6;
+    -webkit-text-size-adjust: 100%;
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* wikilinks: existing = plain link; missing = dashed underline plus colour, never colour alone */
+a.wl-missing { color: var(--missing); text-decoration: underline dashed; text-underline-offset: 3px; }
+[data-variant="b"] a.wl { text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--link) 35%, transparent); text-underline-offset: 3px; }
+[data-variant="b"] a.wl-missing { opacity: .7; text-decoration: underline dashed; }
+
+/* ---------- mock-up controls (not part of the design) ---------- */
+.mock-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+    padding: 8px 16px; background: #2b2b2b; color: #eee; font: 13px/1.4 Inter, sans-serif;
+}
+.mock-bar strong { font-weight: 600; letter-spacing: .02em; }
+.mock-seg { display: inline-flex; border: 1px solid #555; border-radius: 6px; overflow: hidden; }
+.mock-seg button { background: none; border: 0; color: #ddd; padding: 5px 10px; font-size: 13px; }
+.mock-seg button + button { border-left: 1px solid #555; }
+.mock-seg button[aria-pressed="true"] { background: #eee; color: #111; }
+.mock-note { color: #bbb; flex: 1 1 18rem; }
+
+/* ---------- top bar ---------- */
+.top {
+    position: sticky; top: 0; z-index: 30;
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 16px; min-height: 56px;
+    background: var(--bg); border-bottom: 1px solid var(--border-soft);
+}
+.icon-btn {
+    display: inline-grid; place-items: center; width: 40px; height: 40px; flex: none;
+    background: none; border: 1px solid transparent; border-radius: var(--radius);
+}
+.icon-btn:hover { background: var(--surface-2); }
+.icon-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.brand { display: flex; align-items: baseline; gap: 10px; color: var(--text); white-space: nowrap; }
+.brand:hover { text-decoration: none; }
+.brand-mark { font-family: 'IM Fell English SC', Georgia, serif; font-size: 1.35rem; color: var(--brand); }
+.brand-sub { font-weight: 600; font-size: .95rem; color: var(--muted); }
+.world-pick {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+    background: none; border: 1px solid var(--border-soft); border-radius: var(--radius);
+    font-size: .9rem; white-space: nowrap;
+}
+.world-pick::after { content: "▾"; color: var(--muted); font-size: .75rem; }
+.search { flex: 1 1 auto; max-width: 30rem; margin-left: auto; position: relative; }
+.search input {
+    width: 100%; height: 40px; padding: 0 12px 0 36px;
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: .95rem;
+}
+.search svg { position: absolute; left: 11px; top: 11px; width: 18px; height: 18px; stroke: var(--muted); fill: none; stroke-width: 2; }
+.search kbd {
+    position: absolute; right: 8px; top: 9px; padding: 1px 6px;
+    font: 12px/20px Inter, sans-serif; color: var(--muted);
+    border: 1px solid var(--border-soft); border-radius: 4px;
+}
+.avatar {
+    display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none;
+    border-radius: 50%; background: var(--surface-2); font-weight: 600; font-size: .9rem;
+}
+.menu-btn, .search-btn { display: none; }
+
+/* C: dark header bar and a category bar under it */
+[data-variant="c"] .top { background: var(--bar); color: var(--bar-text); border-bottom: 2px solid var(--bar-accent); }
+[data-variant="c"] .top .brand { color: var(--bar-text); }
+[data-variant="c"] .top .brand-mark { color: var(--bar-accent); }
+[data-variant="c"] .top .brand-sub { color: var(--bar-text); font-family: var(--head-font); text-transform: uppercase; letter-spacing: .06em; font-size: 1.05rem; }
+[data-variant="c"] .top .world-pick { color: var(--bar-text); border-color: #4a453c; }
+[data-variant="c"] .top .search input { background: #34302a; color: #f2ead8; border-color: #4a453c; }
+[data-variant="c"] .top .icon-btn:hover { background: #3a352d; }
+[data-variant="c"] .top .avatar { background: #3a352d; }
+.catbar { display: none; }
+[data-variant="c"] .catbar {
+    display: flex; gap: 2px; overflow-x: auto; padding: 0 16px;
+    background: var(--surface-2); border-bottom: 1px solid var(--border);
+    font-family: var(--head-font); text-transform: uppercase; letter-spacing: .05em; font-weight: 600;
+}
+[data-variant="c"] .catbar a { padding: 9px 12px; color: var(--text); white-space: nowrap; border-bottom: 3px solid transparent; }
+[data-variant="c"] .catbar a[aria-current] { border-bottom-color: var(--accent); color: var(--accent); }
+[data-variant="c"] .catbar a:hover { text-decoration: none; background: var(--surface); }
+
+/* ---------- shell ---------- */
+.shell { display: grid; grid-template-columns: 250px minmax(0, 1fr); max-width: 1320px; margin: 0 auto; }
+.side-right { display: none; }
+[data-variant="b"] .shell { grid-template-columns: 270px minmax(0, 1fr) 280px; max-width: none; }
+[data-variant="b"] .side-right { display: block; }
+[data-variant="c"] .shell { grid-template-columns: minmax(0, 1fr) 300px; max-width: 1240px; gap: 24px; padding: 20px 16px 0; }
+[data-variant="c"] .side-left { display: none; }
+[data-variant="c"] .side-right { display: block; }
+
+/* ---------- left nav ---------- */
+.side-left {
+    position: sticky; top: 56px; align-self: start;
+    height: calc(100vh - 56px); overflow-y: auto;
+    padding: 16px 12px 40px 16px; font-size: .92rem;
+}
+[data-variant="b"] .side-left { background: var(--surface); border-right: 1px solid var(--border); }
+.drawer-head { display: none; }
+.nav-title { margin: 0 0 4px; font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.nav-new {
+    display: block; width: 100%; margin: 4px 0 18px; padding: 8px 10px; text-align: left;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+}
+[data-variant="b"] .nav-new { background: var(--bg); }
+.nav-new:hover { background: var(--surface-2); }
+.tree, .tree ul { list-style: none; margin: 0; padding: 0; }
+.tree ul { padding-left: 14px; border-left: 1px solid var(--border-soft); margin-left: 7px; }
+.tree summary { list-style: none; cursor: pointer; padding: 4px 6px; border-radius: var(--radius); font-weight: 600; display: flex; gap: 6px; align-items: center; }
+.tree summary::-webkit-details-marker { display: none; }
+.tree summary::before { content: "▸"; width: 10px; color: var(--muted); font-size: .8rem; transition: transform .15s; }
+.tree details[open] > summary::before { transform: rotate(90deg); }
+.tree summary .count { margin-left: auto; color: var(--muted); font-weight: 400; font-size: .8rem; }
+.tree summary:hover, .tree a:hover { background: var(--surface-2); text-decoration: none; }
+.tree a { display: block; padding: 4px 6px 4px 22px; color: var(--text); border-radius: var(--radius); }
+.tree a[aria-current] { background: var(--surface-2); color: var(--accent); font-weight: 600; }
+.tree a .has-map { color: var(--muted); }
+.nav-group { margin-top: 20px; }
+.nav-group a { display: flex; justify-content: space-between; padding: 4px 6px; color: var(--text); border-radius: var(--radius); }
+.nav-group a:hover { background: var(--surface-2); text-decoration: none; }
+.nav-group .count { color: var(--muted); font-size: .8rem; }
+
+/* ---------- page ---------- */
+.page { min-width: 0; padding: 20px 32px 80px; }
+[data-variant="a"] .page { border-left: 1px solid var(--border-soft); }
+[data-variant="b"] .page { padding: 0 0 80px; }
+[data-variant="b"] .page-inner { max-width: var(--measure); margin: 0 auto; padding: 28px 32px 0; }
+[data-variant="c"] .page { padding: 0 0 80px; }
+
+.tabs { display: none; }
+[data-variant="b"] .tabs {
+    display: flex; gap: 0; height: 40px; background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0 8px; font-size: .85rem; overflow-x: auto;
+}
+[data-variant="b"] .tabs span {
+    display: inline-flex; align-items: center; gap: 10px; padding: 0 14px; margin-top: 6px;
+    border-radius: 6px 6px 0 0; color: var(--muted); white-space: nowrap;
+}
+[data-variant="b"] .tabs span[aria-current] { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-bottom-color: var(--bg); margin-bottom: -1px; }
+[data-variant="b"] .tabs span::after { content: "×"; opacity: .5; }
+
+.crumbs { font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
+.crumbs a { color: var(--muted); }
+.crumbs a:hover { color: var(--link); }
+.crumbs .sep { margin: 0 6px; opacity: .6; }
+
+.page-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 16px; padding-bottom: 6px; }
+h1 {
+    margin: 0; font-family: var(--head-font); font-weight: 600; line-height: 1.15;
+    font-size: clamp(1.75rem, 1.3rem + 2vw, 2.25rem); overflow-wrap: anywhere;
+}
+[data-variant="a"] .page-head { border-bottom: 1px solid var(--border); }
+[data-variant="a"] h1 { font-weight: 400; }
+[data-variant="b"] h1 { font-weight: 700; letter-spacing: -.01em; }
+[data-variant="c"] h1 { text-transform: uppercase; letter-spacing: .02em; font-weight: 700; }
+.subtitle { margin: 6px 0 18px; color: var(--muted); font-size: .88rem; }
+
+.actions { display: flex; align-items: center; gap: 4px; position: relative; }
+.act {
+    display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px;
+    background: none; border: 1px solid transparent; border-radius: var(--radius); font-size: .9rem; color: var(--text);
+}
+.act:hover { background: var(--surface-2); text-decoration: none; }
+.act svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.act.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+.act.primary:hover { filter: brightness(1.08); }
+.act .count { color: var(--muted); }
+/* A: Wikipedia-style tabs sitting on the title rule */
+[data-variant="a"] .actions { gap: 0; margin-bottom: -1px; }
+[data-variant="a"] .act { border-radius: 0; border: 0; border-bottom: 2px solid transparent; height: 38px; color: var(--link); }
+[data-variant="a"] .act[aria-current] { color: var(--text); border-bottom-color: var(--text); }
+[data-variant="a"] .act.primary { background: none; color: var(--link); font-weight: 400; }
+[data-variant="c"] .act { border-color: var(--border); background: var(--surface); }
+[data-variant="c"] .act.primary { background: var(--accent); }
+
+.more-menu {
+    position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 200px;
+    padding: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+}
+.more-menu[hidden] { display: none; }
+.more-menu button { display: block; width: 100%; text-align: left; padding: 9px 10px; background: none; border: 0; border-radius: var(--radius); font-size: .9rem; }
+.more-menu button:hover { background: var(--surface-2); }
+.more-menu hr { border: 0; border-top: 1px solid var(--border-soft); margin: 6px 0; }
+.more-menu .danger { color: var(--missing); }
+
+/* C: page frame */
+[data-variant="c"] .page-frame { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px 28px; }
+[data-variant="c"] .page-head { border-bottom: 2px solid var(--accent); }
+
+/* ---------- article ---------- */
+.article { font-size: 1.02rem; }
+[data-variant="a"] .article, [data-variant="c"] .article { max-width: none; }
+.article p { margin: 0 0 1em; }
+.article p.lead { font-size: 1.06rem; }
+.article h2 {
+    font-family: var(--head-font); font-weight: 600; font-size: 1.5rem; line-height: 1.25;
+    margin: 1.6em 0 .5em; scroll-margin-top: 72px;
+}
+.article h3 { font-size: 1.1rem; margin: 1.3em 0 .4em; scroll-margin-top: 72px; }
+[data-variant="a"] .article h2 { font-weight: 400; border-bottom: 1px solid var(--border); padding-bottom: 3px; }
+[data-variant="b"] .article h2 { font-size: 1.35rem; font-weight: 700; }
+[data-variant="c"] .article h2 {
+    text-transform: uppercase; letter-spacing: .03em; font-size: 1.35rem;
+    background: var(--surface-2); border-left: 4px solid var(--accent); padding: 4px 10px;
+}
+.article blockquote { margin: 1em 0; padding: 8px 16px; border-left: 3px solid var(--border); color: var(--muted); font-style: italic; }
+[data-variant="b"] .article blockquote { border-left-color: var(--accent); background: var(--surface); border-radius: 0 var(--radius) var(--radius) 0; font-style: normal; color: var(--text); }
+.article ul { padding-left: 1.3em; margin: 0 0 1em; }
+.article li { margin: .2em 0; }
+.data-table { border-collapse: collapse; width: 100%; margin: .4em 0 1.2em; font-size: .93rem; }
+.table-wrap { overflow-x: auto; }
+.data-table th, .data-table td { text-align: left; padding: 7px 10px; border: 1px solid var(--border-soft); vertical-align: top; }
+.data-table th { background: var(--surface-2); font-weight: 600; }
+[data-variant="c"] .data-table tbody tr:nth-child(even) { background: var(--bg); }
+[data-variant="b"] .data-table th, [data-variant="b"] .data-table td { border-width: 0 0 1px; }
+
+/* infobox */
+.infobox {
+    float: right; clear: right; width: 290px; margin: 0 0 16px 24px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    font-size: .88rem; line-height: 1.45;
+}
+.infobox h2 { margin: 0; padding: 8px 12px; font-family: var(--head-font); font-size: 1.15rem; font-weight: 600; text-align: center; background: var(--surface-2); border: 0; }
+[data-variant="c"] .infobox { background: var(--bg); }
+[data-variant="c"] .infobox h2 { background: var(--bar); color: var(--bar-accent); text-transform: uppercase; letter-spacing: .05em; border-left: 0; }
+.infobox figure { margin: 0; padding: 10px 10px 4px; }
+.infobox figure svg { display: block; width: 100%; height: auto; border: 1px solid var(--border-soft); border-radius: var(--radius); }
+.infobox figcaption { padding: 6px 2px 2px; text-align: center; color: var(--muted); font-size: .82rem; }
+.infobox dl { display: grid; grid-template-columns: max-content 1fr; margin: 0; padding: 4px 12px 10px; gap: 0 12px; }
+.infobox dt { font-weight: 600; padding: 5px 0; border-top: 1px solid var(--border-soft); }
+.infobox dd { margin: 0; padding: 5px 0; border-top: 1px solid var(--border-soft); }
+/* B: an Obsidian "properties" list instead of a floating box */
+[data-variant="b"] .infobox { float: none; width: auto; margin: 0 0 22px; background: none; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; }
+[data-variant="b"] .infobox h2, [data-variant="b"] .infobox figure { display: none; }
+[data-variant="b"] .infobox dl { padding: 0 0 10px; grid-template-columns: 9rem 1fr; }
+[data-variant="b"] .infobox dt { font-weight: 400; color: var(--muted); border: 0; }
+[data-variant="b"] .infobox dd { border: 0; }
+[data-variant="b"] .infobox .prop-label { display: block; font-size: .78rem; color: var(--muted); margin-bottom: 4px; }
+.prop-label { display: none; }
+.chip { display: inline-block; padding: 0 8px; border-radius: 999px; background: var(--surface-2); font-size: .82rem; margin: 1px 2px 1px 0; }
+
+/* inline contents */
+.toc { display: inline-block; min-width: 14rem; margin: 0 0 1.2em; padding: 8px 14px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: .9rem; }
+.toc summary { cursor: pointer; font-weight: 600; }
+.toc ol { margin: 6px 0 0; padding-left: 1.4em; }
+.toc ol ol { padding-left: 1.2em; }
+.toc li { margin: 2px 0; }
+[data-variant="b"] .toc { display: none; }
+[data-variant="c"] .toc { background: var(--bg); }
+
+/* map section */
+.map-card { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin: .4em 0 1.4em; clear: none; }
+.map-card svg { display: block; width: 100%; height: auto; }
+.map-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 14px; padding: 8px 12px; background: var(--surface); border-top: 1px solid var(--border-soft); font-size: .85rem; color: var(--muted); }
+
+/* linked from */
+.backlinks { clear: both; margin-top: 2.4em; padding-top: 12px; border-top: 1px solid var(--border); }
+.backlinks h2 { margin-top: 0 !important; }
+.backlinks ul { columns: 2 14rem; padding-left: 1.2em; }
+[data-variant="b"] .page .backlinks, [data-variant="c"] .page .backlinks { display: none; }
+.page-foot { margin-top: 2em; font-size: .82rem; color: var(--muted); border-top: 1px solid var(--border-soft); padding-top: 10px; }
+
+/* ---------- right rail ---------- */
+.side-right { position: sticky; top: 56px; align-self: start; max-height: calc(100vh - 56px); overflow-y: auto; font-size: .9rem; }
+[data-variant="b"] .side-right { padding: 16px; border-left: 1px solid var(--border); height: calc(100vh - 56px); background: var(--bg); }
+[data-variant="c"] .side-right { top: 112px; max-height: calc(100vh - 112px); }
+.rail-box { margin-bottom: 18px; }
+.rail-box h3 { margin: 0 0 6px; font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.rail-box ul { list-style: none; margin: 0; padding: 0; }
+.rail-box li { padding: 3px 0; }
+.rail-box li small { color: var(--muted); display: block; font-size: .8rem; }
+.outline a { color: var(--muted); display: block; padding: 2px 0 2px 10px; border-left: 2px solid var(--border-soft); }
+.outline a.on { color: var(--accent); border-left-color: var(--accent); }
+.outline .sub a { padding-left: 22px; }
+.graph svg { width: 100%; height: auto; display: block; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); }
+.graph text { font: 10px Inter, sans-serif; fill: var(--muted); }
+.graph line { stroke: var(--border); }
+.graph circle { fill: var(--muted); }
+.graph circle.me { fill: var(--accent); }
+.graph circle.ghost { fill: none; stroke: var(--muted); stroke-dasharray: 2 2; }
+[data-variant="c"] .rail-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+[data-variant="c"] .rail-box h3 { margin: 0; padding: 7px 12px; background: var(--bar); color: var(--bar-accent); font-family: var(--head-font); font-size: 1rem; letter-spacing: .06em; }
+[data-variant="c"] .rail-box ul { padding: 6px 12px 10px; }
+[data-variant="c"] .rail-box li + li { border-top: 1px solid var(--border-soft); }
+.rail-c, .rail-b { display: none; }
+[data-variant="b"] .rail-b { display: block; }
+[data-variant="c"] .rail-c { display: block; }
+
+/* ---------- link preview ---------- */
+.preview {
+    position: fixed; z-index: 50; width: 300px; padding: 12px 14px;
+    background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgba(0,0,0,.22); font-size: .88rem; line-height: 1.5; pointer-events: none;
+}
+.preview[hidden] { display: none; }
+.preview strong { display: block; font-family: var(--head-font); font-size: 1.05rem; margin-bottom: 4px; }
+.preview .where { color: var(--muted); font-size: .78rem; margin-bottom: 6px; }
+
+/* ---------- phones and narrow windows ---------- */
+.scrim { display: none; }
+@media (max-width: 1180px) {
+    [data-variant="b"] .shell { grid-template-columns: 250px minmax(0, 1fr); }
+    [data-variant="b"] .side-right { display: none; }
+    [data-variant="b"] .page .backlinks { display: block; }
+    [data-variant="b"] .toc { display: inline-block; }
+}
+@media (max-width: 900px) {
+    .shell, [data-variant="b"] .shell, [data-variant="c"] .shell { display: block; padding: 0; }
+    .top { gap: 6px; padding: 6px 8px 6px 4px; }
+    .menu-btn, .search-btn { display: inline-grid; }
+    .brand-sub, .world-pick, .top .search, .search kbd { display: none; }
+    .brand { margin-right: auto; }
+    .top.searching .search { display: block; position: absolute; inset: 6px 8px; max-width: none; margin: 0; }
+    .top.searching .search input { height: 44px; }
+    .top.searching .search svg { top: 13px; }
+    .side-right, [data-variant="b"] .side-right, [data-variant="c"] .side-right { display: none; }
+    .side-left, [data-variant="c"] .side-left {
+        display: block; position: fixed; z-index: 40; top: 0; left: 0; bottom: 0; height: auto;
+        width: min(86vw, 320px); background: var(--bg); border-right: 1px solid var(--border);
+        transform: translateX(-102%); padding-top: 8px;
+    }
+    body.nav-anim .side-left { transition: transform .2s ease; }
+    body.nav-open .side-left { transform: none; box-shadow: 8px 0 30px rgba(0,0,0,.25); }
+    body.nav-open .scrim { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(0,0,0,.35); }
+    .drawer-head { display: flex; align-items: center; justify-content: space-between; margin: 0 -4px 10px 0; }
+    .drawer-head .world { font-weight: 700; }
+    .page, [data-variant="b"] .page, [data-variant="c"] .page { padding: 0 0 64px; border: 0; }
+    .page-inner, [data-variant="b"] .page-inner { padding: 14px 16px 0; }
+    [data-variant="c"] .page-frame { border-width: 0 0 1px; border-radius: 0; padding: 14px 16px 24px; }
+    [data-variant="b"] .tabs { display: none; }
+    [data-variant="b"] .page .backlinks, [data-variant="c"] .page .backlinks { display: block; }
+    .page-head { align-items: flex-start; flex-direction: column; }
+    [data-variant="a"] .page-head { flex-direction: column-reverse; }
+    [data-variant="a"] .actions { width: 100%; border-bottom: 1px solid var(--border-soft); margin: 0 0 8px; }
+    .act { height: 44px; }
+    .act .label-long { display: none; }
+    .actions .spacer { flex: 1; }
+    .article { font-size: 1.05rem; display: flex; flex-direction: column; }
+    .article > .lead { order: -1; }
+    .infobox, [data-variant="b"] .infobox { float: none; width: auto; margin: 0 0 1.2em; }
+    .toc, [data-variant="b"] .toc { display: block; }
+    .toc summary { padding: 4px 0; }
+    .tree summary, .tree a, .nav-group a { padding-top: 9px; padding-bottom: 9px; }
+    .more-menu button { padding: 12px 12px; }
+    .data-table { font-size: .9rem; }
+}
+@media (min-width: 901px) { .toc[open] summary { margin-bottom: 0; } }
+@media (prefers-reduced-motion: reduce) { .side-left { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="mock-bar" role="region" aria-label="Mock-up controls">
+    <strong>Codex mock-up</strong>
+    <span class="mock-seg" role="group" aria-label="Layout">
+        <button type="button" data-set-variant="a">A Encyclopedia</button>
+        <button type="button" data-set-variant="b">B Vault</button>
+        <button type="button" data-set-variant="c">C Game wiki</button>
+    </span>
+    <span class="mock-seg" role="group" aria-label="Colour mode">
+        <button type="button" data-set-mode="light">Light</button>
+        <button type="button" data-set-mode="dark">Dark</button>
+    </span>
+    <span class="mock-note" id="mockNote"></span>
+</div>
+
+<header class="top" id="top">
+    <button class="icon-btn menu-btn" type="button" aria-label="Open pages" aria-controls="sideNav" aria-expanded="false" id="menuBtn">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <a class="brand" href="#"><span class="brand-mark">Waystone</span><span class="brand-sub">Codex</span></a>
+    <button class="world-pick" type="button" title="Switch world">The Karrow Marches</button>
+    <div class="search" role="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <label class="sr-only" for="q">Search the Codex</label>
+        <input id="q" type="search" placeholder="Search The Karrow Marches" autocomplete="off">
+        <kbd>/</kbd>
+    </div>
+    <button class="icon-btn search-btn" type="button" aria-label="Search" id="searchBtn">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    </button>
+    <span class="avatar" aria-label="Signed in as Testy">T</span>
+</header>
+
+<nav class="catbar" aria-label="Sections">
+    <a href="#">Home</a><a href="#">Factions</a><a href="#">People</a><a href="#" aria-current="page">Places</a><a href="#">Maps</a><a href="#">Wanted pages</a><a href="#">Recent changes</a>
+</nav>
+
+<div class="scrim" id="scrim"></div>
+
+<div class="shell">
+    <aside class="side-left" id="sideNav" aria-label="Pages in this world">
+        <div class="drawer-head">
+            <span class="world">The Karrow Marches</span>
+            <button class="icon-btn" type="button" aria-label="Close pages" id="closeNav"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+        </div>
+        <button class="nav-new" type="button">+ New page</button>
+        <p class="nav-title">Pages</p>
+        <ul class="tree">
+            <li><details><summary>Factions <span class="count">3</span></summary><ul>
+                <li><a class="wl" href="#" data-p="ferrymen">Ferrymen of the Ford</a></li>
+                <li><a href="#">Lamplighters' Guild</a></li>
+                <li><a href="#">The Marsh Wardens</a></li>
+            </ul></details></li>
+            <li><details><summary>People <span class="count">1</span></summary><ul>
+                <li><a class="wl" href="#" data-p="hesk">Old Hesk</a></li>
+            </ul></details></li>
+            <li><details open><summary>Places <span class="count">7</span></summary><ul>
+                <li><details><summary>Landmarks <span class="count">3</span></summary><ul>
+                    <li><a href="#">The Toll House</a></li>
+                    <li><details><summary>Waystones <span class="count">2</span></summary><ul>
+                        <li><a href="#">The Waystones</a></li>
+                        <li><a href="#">The Third Waystone</a></li>
+                    </ul></details></li>
+                </ul></details></li>
+                <li><details open><summary>Settlements <span class="count">3</span></summary><ul>
+                    <li><a href="#">Cloveswick</a></li>
+                    <li><a href="#" aria-current="page"><span class="has-map" title="Has a map">◈</span> Karrow Ford</a></li>
+                    <li><a href="#">Saltmarsh Reach</a></li>
+                </ul></details></li>
+                <li><a href="#">The Karrow Road</a></li>
+            </ul></details></li>
+            <li><a href="#"><span class="has-map" title="Has a map">◈</span> Map of the Karrow</a></li>
+        </ul>
+        <div class="nav-group">
+            <p class="nav-title">This world</p>
+            <a href="#">World home</a>
+            <a href="#">Wanted pages <span class="count">2</span></a>
+            <a href="#">Recent changes</a>
+            <a href="#">Age of Sojourn <span class="count">game</span></a>
+        </div>
+    </aside>
+
+    <main class="page" id="main">
+        <div class="tabs" aria-hidden="true"><span>The Karrow Road</span><span aria-current="page">Karrow Ford</span><span>Old Hesk</span></div>
+        <div class="page-inner">
+        <div class="page-frame">
+            <nav class="crumbs" aria-label="Breadcrumb">
+                <a href="#">The Karrow Marches</a><span class="sep">›</span><a href="#">Places</a><span class="sep">›</span><a href="#">Settlements</a>
+            </nav>
+            <div class="page-head">
+                <h1>Karrow Ford</h1>
+                <div class="actions">
+                    <a class="act" href="#" aria-current="page">Read</a>
+                    <button class="act primary" type="button">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Edit
+                    </button>
+                    <a class="act" href="#" title="3 revisions">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>History <span class="count">3</span>
+                    </a>
+                    <span class="spacer"></span>
+                    <button class="act" type="button" id="moreBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span class="label-long">More</span><span class="sr-only">page actions</span>
+                    </button>
+                    <div class="more-menu" id="moreMenu" role="menu" hidden>
+                        <button role="menuitem" type="button">Rename</button>
+                        <button role="menuitem" type="button">Aliases</button>
+                        <button role="menuitem" type="button">Move to folder…</button>
+                        <button role="menuitem" type="button">Move to another world…</button>
+                        <hr>
+                        <button role="menuitem" type="button">Replace map image</button>
+                        <button role="menuitem" type="button" class="danger">Remove map</button>
+                        <hr>
+                        <button role="menuitem" type="button" class="danger">Delete page</button>
+                    </div>
+                </div>
+            </div>
+            <p class="subtitle">A settlement in The Karrow Marches · last edited by Roy, 2 days ago</p>
+
+            <article class="article" id="article">
+                <aside class="infobox" aria-label="Summary">
+                    <h2>Karrow Ford</h2>
+                    <figure>
+                        <svg viewBox="0 0 280 170" role="img" aria-label="Map of the Karrow with Karrow Ford pinned">
+                            <rect width="280" height="170" fill="var(--map-land)"/>
+                            <path d="M0 132 C40 120 60 150 100 140 S170 110 200 128 280 150 280 150 V170 H0Z" fill="var(--map-water)"/>
+                            <path d="M38 128 L110 96 L170 70 L236 34" stroke="var(--map-road)" stroke-width="2" stroke-dasharray="5 4" fill="none"/>
+                            <g fill="none" stroke="var(--map-road)" stroke-width="1.4" opacity=".6"><path d="M180 30l12-14 12 14M205 28l10-12 10 12M226 40l9-11 9 11"/></g>
+                            <rect x="28" y="118" width="20" height="20" fill="var(--bg)" stroke="var(--pin)" stroke-width="2.5"/>
+                            <text x="38" y="132" text-anchor="middle" font-size="12" fill="var(--pin)">✦</text>
+                        </svg>
+                        <figcaption>Pinned on <a class="wl" href="#" data-p="map">Map of the Karrow</a></figcaption>
+                    </figure>
+                    <span class="prop-label">Properties</span>
+                    <dl>
+                        <dt>World</dt><dd><a href="#">The Karrow Marches</a></dd>
+                        <dt>Folder</dt><dd>Places › Settlements</dd>
+                        <dt>Also known as</dt><dd><span class="chip">the Ford</span></dd>
+                        <dt>Games</dt><dd><a href="#">Age of Sojourn</a></dd>
+                        <dt>Started</dt><dd>Adam, Nov 20</dd>
+                        <dt>Scribes</dt><dd>Adam, Roy</dd>
+                        <dt>Revisions</dt><dd>3</dd>
+                    </dl>
+                </aside>
+
+                <p class="lead">A river crossing and a market of about forty families. The <a class="wl" href="#" data-p="ferrymen">Ferrymen of the Ford</a> run the boats when the water is too high to wade. The Ford is the start of <a class="wl" href="#" data-p="road">The Karrow Road</a>.</p>
+
+                <details class="toc" open>
+                    <summary>Contents</summary>
+                    <ol>
+                        <li><a href="#map">Map</a></li>
+                        <li><a href="#crossing">The crossing</a></li>
+                        <li><a href="#market">The market</a>
+                            <ol><li><a href="#folk">Notable folk</a></li></ol></li>
+                        <li><a href="#cloveswick">Since Cloveswick</a>
+                            <ol><li><a href="#rumours">Rumours</a></li></ol></li>
+                    </ol>
+                </details>
+
+                <h2 id="map">Map</h2>
+                <div class="map-card">
+                    <svg viewBox="0 0 640 260" role="img" aria-label="Map of Karrow Ford with two pins">
+                        <rect width="640" height="260" fill="var(--map-land)"/>
+                        <path d="M0 190 C90 170 140 220 230 200 S380 150 450 178 640 214 640 214 V260 H0Z" fill="var(--map-water)"/>
+                        <g fill="var(--map-road)" opacity=".45"><circle cx="330" cy="96" r="9"/><circle cx="356" cy="88" r="9"/><circle cx="384" cy="96" r="9"/><circle cx="346" cy="114" r="9"/><circle cx="374" cy="118" r="9"/><circle cx="402" cy="110" r="9"/></g>
+                        <path d="M96 188 L288 130 L420 100 L620 40" stroke="var(--map-road)" stroke-width="2.5" stroke-dasharray="7 5" fill="none"/>
+                        <g><rect x="81" y="173" width="30" height="30" fill="var(--bg)" stroke="var(--pin)" stroke-width="2.5"/><text x="96" y="194" text-anchor="middle" font-size="15" fill="var(--pin)">✦</text></g>
+                        <g><rect x="273" y="115" width="30" height="30" fill="var(--bg)" stroke="var(--pin)" stroke-width="2.5"/><text x="288" y="136" text-anchor="middle" font-size="15" fill="var(--pin)">✦</text></g>
+                    </svg>
+                    <div class="map-foot"><span>2 pins · <a class="wl" href="#" data-p="ferrymen">Ferrymen of the Ford</a>, <a class="wl" href="#" data-p="toll">The Toll House</a></span><a href="#">Open full map →</a></div>
+                </div>
+
+                <h2 id="crossing">The crossing</h2>
+                <p>The river runs wide and shallow here for most of the year. In late spring the meltwater comes down from the pass and the ford can't be waded for weeks; the ferrymen charge double and nobody argues. East of the crossing the banks give way to the brackish flats of <a class="wl" href="#" data-p="saltmarsh">Saltmarsh Reach</a>.</p>
+                <p>Before he kept <a class="wl" href="#" data-p="toll">the toll house</a>, <a class="wl" href="#" data-p="hesk">Old Hesk</a> worked the boats here. He doesn't say why he stopped.</p>
+
+                <h2 id="market">The market</h2>
+                <p>Market day is the first of every week. Traders come down from the pass with wool and iron and go home with salt, fish and gossip.</p>
+                <h3 id="folk">Notable folk</h3>
+                <div class="table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Name</th><th>Role</th><th>Notes</th></tr></thead>
+                    <tbody>
+                        <tr><td><a class="wl" href="#" data-p="hesk">Old Hesk</a></td><td>Former ferryman</td><td>Now keeps the toll house on the road north</td></tr>
+                        <tr><td><a class="wl wl-missing" href="#" data-p="missing" title="No page yet. Click to create.">Mother Ilse</a></td><td>Innkeeper</td><td>Took in the boy from Cloveswick</td></tr>
+                        <tr><td><a class="wl" href="#" data-p="ferrymen">Ferrymen of the Ford</a></td><td>Boatmen's guild</td><td>Run the crossing when the water is high</td></tr>
+                    </tbody>
+                </table>
+                </div>
+
+                <h2 id="cloveswick">Since Cloveswick</h2>
+                <p>One survivor of <a class="wl" href="#" data-p="cloveswick">Cloveswick</a>, a boy who only says <em>up, up, up</em>, was taken in here. He points north, past <a class="wl" href="#" data-p="third">the third waystone</a>, towards <a class="wl wl-missing" href="#" data-p="tor" title="No page yet. Click to create.">Hollow Tor</a>.</p>
+                <h3 id="rumours">Rumours</h3>
+                <ul>
+                    <li>The ash at Cloveswick smelled of cloves, and so did the boy.</li>
+                    <li>A ferryman saw lights on the water the night before the fire.</li>
+                </ul>
+                <blockquote>Two silver a head, and one question for free. Ask a good one. — Old Hesk</blockquote>
+
+                <section class="backlinks" aria-labelledby="linkedFrom">
+                    <h2 id="linkedFrom">Linked from</h2>
+                    <ul>
+                        <li><a class="wl" href="#" data-p="cloveswick">Cloveswick</a></li>
+                        <li><a class="wl" href="#" data-p="map">Map of the Karrow</a> · pin</li>
+                        <li><a class="wl" href="#" data-p="hesk">Old Hesk</a></li>
+                        <li><a class="wl" href="#" data-p="saltmarsh">Saltmarsh Reach</a></li>
+                        <li><a class="wl" href="#" data-p="road">The Karrow Road</a></li>
+                    </ul>
+                </section>
+                <p class="page-foot">Revision 3 · last edited by Roy, Nov 18, 2026 · <a href="#">History</a></p>
+            </article>
+        </div>
+        </div>
+    </main>
+
+    <aside class="side-right" aria-label="Page side panel">
+        <div class="rail-b">
+            <section class="rail-box outline" aria-label="Outline">
+                <h3>Outline</h3>
+                <ul>
+                    <li><a href="#map" data-o="map">Map</a></li>
+                    <li><a href="#crossing" data-o="crossing">The crossing</a></li>
+                    <li><a href="#market" data-o="market">The market</a></li>
+                    <li class="sub"><a href="#folk" data-o="folk">Notable folk</a></li>
+                    <li><a href="#cloveswick" data-o="cloveswick">Since Cloveswick</a></li>
+                    <li class="sub"><a href="#rumours" data-o="rumours">Rumours</a></li>
+                </ul>
+            </section>
+            <section class="rail-box">
+                <h3>Linked from · 5</h3>
+                <ul>
+                    <li><a class="wl" href="#" data-p="cloveswick">Cloveswick</a><small>One survivor … was taken in at Karrow Ford.</small></li>
+                    <li><a class="wl" href="#" data-p="map">Map of the Karrow</a><small>Pin</small></li>
+                    <li><a class="wl" href="#" data-p="hesk">Old Hesk</a><small>… ferried people across at Karrow Ford …</small></li>
+                    <li><a class="wl" href="#" data-p="saltmarsh">Saltmarsh Reach</a><small>Brackish flats to the east of Karrow Ford.</small></li>
+                    <li><a class="wl" href="#" data-p="road">The Karrow Road</a><small>The only road north out of Karrow Ford.</small></li>
+                </ul>
+            </section>
+            <section class="rail-box graph">
+                <h3>Local graph</h3>
+                <svg viewBox="0 0 240 180" role="img" aria-label="Pages linked to and from Karrow Ford">
+                    <line x1="120" y1="90" x2="50" y2="40"/><line x1="120" y1="90" x2="190" y2="38"/><line x1="120" y1="90" x2="205" y2="105"/>
+                    <line x1="120" y1="90" x2="160" y2="155"/><line x1="120" y1="90" x2="60" y2="150"/><line x1="120" y1="90" x2="30" y2="98"/><line x1="120" y1="90" x2="120" y2="22"/>
+                    <circle cx="50" cy="40" r="5"/><text x="50" y="30" text-anchor="middle">Ferrymen</text>
+                    <circle cx="190" cy="38" r="5"/><text x="190" y="28" text-anchor="middle">Karrow Road</text>
+                    <circle cx="205" cy="105" r="5"/><text x="205" y="122" text-anchor="middle">Saltmarsh</text>
+                    <circle cx="160" cy="155" r="5"/><text x="160" y="172" text-anchor="middle">Old Hesk</text>
+                    <circle cx="60" cy="150" r="5"/><text x="60" y="167" text-anchor="middle">Cloveswick</text>
+                    <circle cx="30" cy="98" r="5" class="ghost"/><text x="30" y="115" text-anchor="middle">Mother Ilse</text>
+                    <circle cx="120" cy="22" r="5"/><text x="120" y="12" text-anchor="middle">Map</text>
+                    <circle cx="120" cy="90" r="8" class="me"/>
+                </svg>
+            </section>
+        </div>
+        <div class="rail-c">
+            <section class="rail-box">
+                <h3>In Settlements</h3>
+                <ul><li><a href="#">Cloveswick</a></li><li><strong>Karrow Ford</strong></li><li><a href="#">Saltmarsh Reach</a></li></ul>
+            </section>
+            <section class="rail-box">
+                <h3>Linked from</h3>
+                <ul><li><a class="wl" href="#" data-p="cloveswick">Cloveswick</a></li><li><a class="wl" href="#" data-p="map">Map of the Karrow</a> · pin</li><li><a class="wl" href="#" data-p="hesk">Old Hesk</a></li><li><a class="wl" href="#" data-p="saltmarsh">Saltmarsh Reach</a></li><li><a class="wl" href="#" data-p="road">The Karrow Road</a></li></ul>
+            </section>
+            <section class="rail-box">
+                <h3>Wanted pages</h3>
+                <ul><li><a class="wl wl-missing" href="#" data-p="tor">Hollow Tor</a><small>wanted 2 times</small></li><li><a class="wl wl-missing" href="#" data-p="missing">Mother Ilse</a><small>wanted 1 time</small></li><li><a class="wl wl-missing" href="#" data-p="missing">The Ember Choir</a><small>wanted 1 time</small></li></ul>
+            </section>
+            <section class="rail-box">
+                <h3>Recent changes</h3>
+                <ul><li><a href="#">Karrow Ford</a><small>Roy · added the market</small></li><li><a href="#">Old Hesk</a><small>Adam · added his past</small></li><li><a href="#">The Waystones</a><small>Testy</small></li></ul>
+            </section>
+        </div>
+    </aside>
+</div>
+
+<div class="preview" id="preview" role="tooltip" hidden></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var root = document.documentElement;
+    var notes = {
+        a: 'Encyclopedia (Wikipedia): white page, serif headings, Read / Edit / History tabs on the title rule, infobox on the right, folder tree on the left.',
+        b: 'Vault (Obsidian): three panes, open-page tabs, properties instead of an infobox, outline, backlinks with context and a local graph on the right.',
+        c: 'Game wiki (Fextralife): dark header and a section bar instead of a side tree, framed page, banded headings, sidebar boxes for siblings, backlinks, wanted pages and recent changes.'
+    };
+    function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+    function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+    function apply(variant, mode) {
+        root.dataset.variant = variant;
+        root.dataset.mode = mode;
+        document.querySelectorAll('[data-set-variant]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.setVariant === variant)); });
+        document.querySelectorAll('[data-set-mode]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.setMode === mode)); });
+        document.getElementById('mockNote').textContent = notes[variant];
+    }
+    var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var variant = load('codex-mock-variant') || 'a';
+    var mode = load('codex-mock-mode') || (prefersDark ? 'dark' : 'light');
+    apply(variant, mode);
+    document.querySelectorAll('[data-set-variant]').forEach(function (b) {
+        b.addEventListener('click', function () { variant = b.dataset.setVariant; store('codex-mock-variant', variant); apply(variant, mode); });
+    });
+    document.querySelectorAll('[data-set-mode]').forEach(function (b) {
+        b.addEventListener('click', function () { mode = b.dataset.setMode; store('codex-mock-mode', mode); apply(variant, mode); });
+    });
+
+    // phones start with Contents folded so the article comes first
+    if (window.matchMedia('(max-width: 900px)').matches) document.querySelector('.toc').open = false;
+
+    // drawer
+    var menuBtn = document.getElementById('menuBtn');
+    function setNav(open) {
+        document.body.classList.add('nav-anim'); // no slide-out animation on load
+        void document.body.offsetWidth;
+        document.body.classList.toggle('nav-open', open);
+        menuBtn.setAttribute('aria-expanded', String(open));
+        if (open) document.getElementById('closeNav').focus(); else menuBtn.focus();
+    }
+    menuBtn.addEventListener('click', function () { setNav(true); });
+    document.getElementById('closeNav').addEventListener('click', function () { setNav(false); });
+    document.getElementById('scrim').addEventListener('click', function () { setNav(false); });
+
+    // phone search
+    var top = document.getElementById('top'), q = document.getElementById('q');
+    document.getElementById('searchBtn').addEventListener('click', function () { top.classList.add('searching'); q.focus(); });
+    q.addEventListener('blur', function () { top.classList.remove('searching'); });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === '/' && document.activeElement !== q) { e.preventDefault(); top.classList.add('searching'); q.focus(); }
+        if (e.key === 'Escape') {
+            if (document.body.classList.contains('nav-open')) setNav(false);
+            closeMenu();
+            q.blur();
+        }
+    });
+
+    // More menu
+    var moreBtn = document.getElementById('moreBtn'), moreMenu = document.getElementById('moreMenu');
+    function closeMenu() { if (!moreMenu.hidden) { moreMenu.hidden = true; moreBtn.setAttribute('aria-expanded', 'false'); } }
+    moreBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var open = moreMenu.hidden;
+        moreMenu.hidden = !open;
+        moreBtn.setAttribute('aria-expanded', String(open));
+        if (open) moreMenu.querySelector('button').focus();
+    });
+    document.addEventListener('click', function (e) { if (!moreMenu.contains(e.target)) closeMenu(); });
+
+    // link previews (mouse only)
+    var pages = {
+        ferrymen: ['Ferrymen of the Ford', 'Factions', 'A loose guild of boatmen. They know every shallow on the river and gossip about everyone who crosses.'],
+        road: ['The Karrow Road', 'Places', 'The only road north out of Karrow Ford. It follows the river for a day, then climbs towards the pass.'],
+        hesk: ['Old Hesk', 'People · also Hesk', 'Toll-keeper at The Toll House. Takes two silver a head and answers one question for free.'],
+        saltmarsh: ['Saltmarsh Reach', 'Places › Settlements', 'Brackish flats to the east of Karrow Ford. The Marsh Wardens patrol it.'],
+        toll: ['The Toll House', 'Places › Landmarks', 'A squat stone house with a lamp that is never lit. Old Hesk lives here.'],
+        cloveswick: ['Cloveswick', 'Places › Settlements', 'A village that burned a few weeks ago. The ash smelled of cloves.'],
+        third: ['The Third Waystone', 'Places › Landmarks › Waystones', 'The stone at the third bend of The Karrow Road. It went dark in the autumn and is cold to the touch.'],
+        map: ['Map of the Karrow', 'Has a map · 4 pins', 'The road from Karrow Ford north to the pass, as the toll-keeper drew it.'],
+        tor: ['Hollow Tor', 'No page yet', 'Linked from 2 pages. Click to create it.'],
+        missing: ['No page yet', '', 'Linked but not written. Click to create it.']
+    };
+    var preview = document.getElementById('preview'), timer;
+    var canHover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (canHover) {
+        document.querySelectorAll('a[data-p]').forEach(function (a) {
+            a.addEventListener('mouseenter', function () {
+                clearTimeout(timer);
+                timer = setTimeout(function () {
+                    var p = pages[a.dataset.p]; if (!p) return;
+                    preview.textContent = '';
+                    var t = document.createElement('strong'); t.textContent = a.dataset.p === 'missing' ? a.textContent : p[0];
+                    var w = document.createElement('div'); w.className = 'where'; w.textContent = p[1];
+                    var s = document.createElement('div'); s.textContent = p[2];
+                    preview.append(t, w, s);
+                    preview.hidden = false;
+                    var r = a.getBoundingClientRect();
+                    var x = Math.min(r.left, window.innerWidth - 316);
+                    var y = r.bottom + 8;
+                    if (y + preview.offsetHeight > window.innerHeight - 8) y = r.top - preview.offsetHeight - 8;
+                    preview.style.left = Math.max(8, x) + 'px';
+                    preview.style.top = y + 'px';
+                }, 250);
+            });
+            a.addEventListener('mouseleave', function () { clearTimeout(timer); preview.hidden = true; });
+        });
+    }
+
+    // outline highlight (Vault)
+    var heads = Array.prototype.slice.call(document.querySelectorAll('.article h2[id], .article h3[id]'));
+    function onScroll() {
+        var cur = heads[0] && heads[0].id;
+        heads.forEach(function (h) { if (h.getBoundingClientRect().top < 140) cur = h.id; });
+        document.querySelectorAll('.outline a').forEach(function (a) { a.classList.toggle('on', a.dataset.o === cur); });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+});
+</script>
+</body>
+</html>
