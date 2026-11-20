@@ -96,7 +96,7 @@ type Store interface {
 	CountCharactersBySystem(systemID string) (int, error)
 	GetCodices() ([]models.Codex, error)
 	GetCodex(id string) (*models.Codex, error)
-	CreateCodex(w models.Codex) error
+	CreateCodex(w models.Codex, creatorGetsEdit bool) error
 	UpdateCodex(id, name, description string) error
 	DeleteCodex(id string) error
 	SetCampaignCodex(campaignID, codexID string) error
@@ -115,7 +115,7 @@ type Store interface {
 	GetWantedPages(codexID string) ([]models.WantedPage, error)
 	GetPageRevisions(id string) ([]models.PageRevision, error)
 	GetPageRevision(id string, number int) (models.PageRevision, error)
-	GetRecentRevisions(codexID *string, limit int) ([]models.RecentRevision, error)
+	GetRecentRevisions(codexIDs []string, limit int) ([]models.RecentRevision, error)
 	CreatePage(p models.Page, body string) error
 	SavePageRevision(id string, base int, rev models.PageRevision, keep int) (models.PageSaveResult, error)
 	RenamePage(id, newTitle, userID string, keep int) (int, error)

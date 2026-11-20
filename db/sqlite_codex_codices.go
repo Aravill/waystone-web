@@ -52,8 +52,8 @@ func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
-// CreateCodex adds the codex and gives its creator Edit on it, in one transaction.
-func (s *SQLiteStore) CreateCodex(w models.Codex) error {
+// CreateCodex adds the codex and, if asked, gives its creator Edit on it, in one transaction.
+func (s *SQLiteStore) CreateCodex(w models.Codex, creatorGetsEdit bool) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	tx, err := s.db.Begin()
@@ -68,6 +68,9 @@ func (s *SQLiteStore) CreateCodex(w models.Codex) error {
 	}
 	if err != nil {
 		return err
+	}
+	if !creatorGetsEdit {
+		return tx.Commit()
 	}
 	if _, err := tx.Exec(`INSERT OR IGNORE INTO codex_access (codex_id, user_id, level) VALUES (?, ?, ?)`,
 		w.ID, w.CreatedBy, models.CodexLevelEdit); err != nil {

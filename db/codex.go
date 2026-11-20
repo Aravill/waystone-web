@@ -50,9 +50,9 @@ func (e *NameTakenError) Error() string {
 	return fmt.Sprintf("already used in this codex: %s", strings.Join(names, ", "))
 }
 
-func GetCodices() ([]models.Codex, error)        { return GetStore().GetCodices() }
+func GetCodices() ([]models.Codex, error)       { return GetStore().GetCodices() }
 func GetCodex(id string) (*models.Codex, error) { return GetStore().GetCodex(id) }
-func CreateCodex(w models.Codex) error          { return GetStore().CreateCodex(w) }
+func CreateCodex(w models.Codex, creatorGetsEdit bool) error          { return GetStore().CreateCodex(w, creatorGetsEdit) }
 func UpdateCodex(id, name, description string) error {
 	return GetStore().UpdateCodex(id, name, description)
 }
@@ -75,9 +75,9 @@ func GetPageRevision(id string, number int) (models.PageRevision, error) {
 	return GetStore().GetPageRevision(id, number)
 }
 
-// GetRecentRevisions lists recent changes; codexID nil means every codex.
-func GetRecentRevisions(codexID *string, limit int) ([]models.RecentRevision, error) {
-	return GetStore().GetRecentRevisions(codexID, limit)
+// GetRecentRevisions lists recent changes in the given codices; nil means every codex.
+func GetRecentRevisions(codexIDs []string, limit int) ([]models.RecentRevision, error) {
+	return GetStore().GetRecentRevisions(codexIDs, limit)
 }
 func CreatePage(p models.Page, body string) error { return GetStore().CreatePage(p, body) }
 func SavePageRevision(id string, base int, rev models.PageRevision) (models.PageSaveResult, error) {

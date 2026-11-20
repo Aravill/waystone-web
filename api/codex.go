@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -137,27 +136,16 @@ func HandleCodexHome(w http.ResponseWriter, r *http.Request) {
 			"page_count": pageCount[wd.ID], "can_edit": rt.canEdit(wd.ID),
 		})
 	}
-	var recent []map[string]interface{}
-	if rt.admin {
-		recent, err = codexRecent(nil, codices)
-	} else {
-		// Only visible codices: ask for each one's latest changes and keep the newest overall.
-		recent = []map[string]interface{}{}
+	var visible []string // nil = every codex (admins)
+	if !rt.admin {
+		visible = []string{}
 		for _, wd := range list {
-			if !rt.canSee(wd.ID) {
-				continue
+			if rt.canSee(wd.ID) {
+				visible = append(visible, wd.ID)
 			}
-			var part []map[string]interface{}
-			if part, err = codexRecent(&wd.ID, codices); err != nil {
-				break
-			}
-			recent = append(recent, part...)
-		}
-		sort.SliceStable(recent, func(i, j int) bool { return recent[i]["created_at"].(string) > recent[j]["created_at"].(string) })
-		if len(recent) > 15 {
-			recent = recent[:15]
 		}
 	}
+	recent, err := codexRecent(visible, codices)
 	if err != nil {
 		codexServerError(w, "retrieve recent changes")
 		return
@@ -169,8 +157,8 @@ func HandleCodexHome(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func codexRecent(codexID *string, codices map[string]models.Codex) ([]map[string]interface{}, error) {
-	revs, err := db.GetRecentRevisions(codexID, 15)
+func codexRecent(codexIDs []string, codices map[string]models.Codex) ([]map[string]interface{}, error) {
+	revs, err := db.GetRecentRevisions(codexIDs, 15)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +297,8 @@ func handleCreateCodex(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	codex := models.Codex{ID: db.GenerateUUID(), Name: req.Name, Description: req.Description, CreatedBy: userID, CreatedAt: now, UpdatedAt: now}
-	if err := db.CreateCodex(codex); err != nil {
+	// Admins have every right anyway; a stored row would outlive a demotion unseen.
+	if err := db.CreateCodex(codex, !rt.admin); err != nil {
 		if errors.Is(err, db.ErrCodexNameTaken) {
 			writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "codex_name_taken"})
 			return
@@ -424,7 +413,7 @@ func handleGetCodex(w http.ResponseWriter, r *http.Request, id string) {
 		codexServerError(w, "retrieve wanted pages")
 		return
 	}
-	recent, err := codexRecent(&id, codices)
+	recent, err := codexRecent([]string{id}, codices)
 	if err != nil {
 		codexServerError(w, "retrieve recent changes")
 		return

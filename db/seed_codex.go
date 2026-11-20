@@ -20,7 +20,7 @@ func seedCodex() error {
 	w := config.InitialCodex
 	now := time.Now().UTC().Format(time.RFC3339)
 	w.CreatedAt, w.UpdatedAt = now, now
-	if err := store.CreateCodex(w); err != nil {
+	if err := store.CreateCodex(w, true); err != nil {
 		return fmt.Errorf("failed to seed codex: %w", err)
 	}
 	// Demo users can see Codices and read the codex; Roy (its creator, so Edit already) can also manage
