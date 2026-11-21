@@ -294,7 +294,7 @@
                                 <h1 class="cx-title" tabindex="-1" x-text="page.title"></h1>
                             </div>
                             <div class="cx-actions">
-                                <a class="cx-act" :href="pageUrl(page)" :aria-current="screen === 'page' ? 'page' : null">Read</a>
+                                <a class="cx-act" x-show="screen !== 'page'" :href="pageUrl(page)">Read</a>
                                 <a class="cx-act cx-act--primary" x-show="canEdit" :href="pageUrl(page, '/edit')" :aria-current="screen === 'edit' ? 'page' : null">
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Edit
                                 </a>
