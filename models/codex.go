@@ -59,13 +59,15 @@ type Page struct {
 
 // PageListItem is a page without its body, for lists and link resolution in the client.
 type PageListItem struct {
-	ID       string
-	Kind     string
-	HasMap   bool
-	CodexID  string
-	FolderID string
-	Title    string
-	Aliases  []string
+	ID        string
+	Kind      string
+	HasMap    bool
+	CodexID   string
+	FolderID  string
+	Title     string
+	Aliases   []string
+	CreatedAt string
+	UpdatedAt string
 }
 
 type PageRevision struct {

@@ -188,7 +188,7 @@ func (s *SQLiteStore) GetPage(id string) (*models.Page, error) {
 func (s *SQLiteStore) GetCodexPages() ([]models.PageListItem, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	rows, err := s.db.Query(`SELECT id, kind, COALESCE((SELECT file != '' FROM map_images i WHERE i.page_id = pages.id ORDER BY created_at DESC, rowid DESC LIMIT 1), 0), codex_id, folder_id, title FROM pages ORDER BY title COLLATE NOCASE, id`)
+	rows, err := s.db.Query(`SELECT id, kind, COALESCE((SELECT file != '' FROM map_images i WHERE i.page_id = pages.id ORDER BY created_at DESC, rowid DESC LIMIT 1), 0), codex_id, folder_id, title, created_at, updated_at FROM pages ORDER BY title COLLATE NOCASE, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (s *SQLiteStore) GetCodexPages() ([]models.PageListItem, error) {
 	at := map[string]int{}
 	for rows.Next() {
 		var p models.PageListItem
-		if err := rows.Scan(&p.ID, &p.Kind, &p.HasMap, &p.CodexID, &p.FolderID, &p.Title); err != nil {
+		if err := rows.Scan(&p.ID, &p.Kind, &p.HasMap, &p.CodexID, &p.FolderID, &p.Title, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			rows.Close()
 			return nil, err
 		}

@@ -35,16 +35,93 @@ function codexPicHtml(pic, name, caption, kind) {
     return `<figure class="cx-figure">${btn}${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ''}</figure>`;
 }
 
+// ---- Live lists: a paragraph of its own, {{list tag:npc folder:Places/Inns links:here kind:lore sort:updated limit:20}} ----
+// Rendered in the browser from the codex payload, never stored: so a list adds no [[links]], no
+// backlinks and nothing to the graph. Values are bare or "quoted".
+const CODEX_LIST_RE = /^[ \t]*\{\{list(?:[ \t][^\n{}]*)?\}\}[ \t]*$/gm;
+const CODEX_LIST_MAX = 200;
+
+function codexParseList(spec) {
+    const q = { tags: [], folder: '', links: false, kind: '', sort: 'title', limit: 50, unknown: [] };
+    for (const m of spec.matchAll(/(?:(\w+):)?("[^"]*"|\S+)/g)) {
+        const key = (m[1] || '').toLowerCase();
+        const val = m[2].replace(/^"|"$/g, '').trim();
+        if (key === 'tag' && val) q.tags.push(val);
+        else if (key === 'folder' && val) q.folder = val;
+        else if (key === 'links' && val.toLowerCase() === 'here') q.links = true;
+        else if (key === 'kind' && ['lore', 'timeline'].includes(val.toLowerCase())) q.kind = val.toLowerCase();
+        else if (key === 'sort' && ['title', 'updated', 'created'].includes(val.toLowerCase())) q.sort = val.toLowerCase();
+        else if (key === 'limit' && /^\d+$/.test(val)) q.limit = Math.min(CODEX_LIST_MAX, Math.max(1, Number(val)));
+        else q.unknown.push(key ? `${key}:${val}` : val);
+    }
+    return q;
+}
+
+// ctx: { pages, tags, folders, cur (current page id), back (Set of page ids linking to it) }, or
+// null while the codex payload is still loading. Returns the list box.
+function codexLiveList(spec, ctx) {
+    if (!ctx) return '<div class="cx-live"><p class="cx-live-note">Loading…</p></div>';
+    const q = codexParseList(spec);
+    const folderById = new Map(ctx.folders.map((f) => [f.id, f]));
+    const pathOf = (id) => {
+        const names = [];
+        for (let f = folderById.get(id), n = 0; f && n < 12; f = folderById.get(f.parent_id), n++) names.unshift(f.name);
+        return names;
+    };
+    let rows = ctx.pages.filter((p) => p.id !== ctx.cur);
+    const label = [];
+    for (const name of q.tags) {
+        const ids = ctx.tags.filter((t) => codexNorm(t.name) === codexNorm(name)).map((t) => t.id);
+        rows = rows.filter((p) => (p.tag_ids || []).some((id) => ids.includes(id)));
+        label.push('tag ' + name);
+    }
+    if (q.folder) {
+        const want = q.folder.split('/').map((s) => codexNorm(s)).filter(Boolean);
+        // A bare name matches every folder with that name, a path matches from the top; sub-folders count too.
+        const hit = (id) => {
+            const path = pathOf(id).map((s) => codexNorm(s));
+            return want.length === 1 ? path.includes(want[0]) : path.length >= want.length && want.every((w, i) => path[i] === w);
+        };
+        rows = rows.filter((p) => p.folder_id && hit(p.folder_id));
+        label.push('in ' + q.folder);
+    }
+    if (q.links) {
+        rows = rows.filter((p) => ctx.back.has(p.id));
+        label.push('linking here');
+    }
+    if (q.kind) {
+        rows = rows.filter((p) => p.kind === q.kind);
+        label.push('kind ' + q.kind);
+    }
+    if (q.sort === 'title') rows.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
+    else rows.sort((a, b) => (b[q.sort + '_at'] || '').localeCompare(a[q.sort + '_at'] || ''));
+    const shown = rows.slice(0, q.limit);
+    const more = rows.length - shown.length;
+    const items = shown.map((p) => {
+        const path = pathOf(p.folder_id).join(' › ');
+        return `<li><a class="wikilink" href="${codexPageUrl(p)}" data-pid="${escapeHtml(p.id)}">${escapeHtml(p.title)}</a> <small>${escapeHtml(path || 'Top level')}</small></li>`;
+    }).join('') + (more > 0 ? `<li class="cx-live-more">and ${more} more</li>` : '');
+    const notes = q.unknown.map((u) => `<p class="cx-live-note">Unknown list option: ${escapeHtml(u)}</p>`).join('');
+    return `<div class="cx-live"><div class="cx-live-h"><span><b>Live list</b> · ${escapeHtml(label.join(' · ') || 'all pages')}</span><span>${rows.length} ${rows.length === 1 ? 'page' : 'pages'}</span></div>${notes}` +
+        (shown.length ? `<ul>${items}</ul>` : '<p class="cx-live-note">No pages match yet.</p>') + '</div>';
+}
+
 // Markdown with [[wikilinks]] and ![[pictures]]. lookup(text) returns the target page ({id, title})
 // or null for a missing page; with no lookup (old revisions) links are shown plain. images(name)
 // returns a picture of the page ({name, url, width, height}) or null. Links and pictures are swapped
 // for placeholders before rendering so the Markdown renderer never sees them. A placeholder holds
 // spaces, which a Markdown link URL can't, so one inside "(...)" is never swallowed into an href.
 // A paragraph made only of pictures becomes a figure; two or more in a row become a gallery.
-function codexMarkdown(body, lookup, canCreate = true, images = null) {
+// A {{list ...}} line is swapped the same way for a live list: lists(spec) returns its HTML, and with
+// no lists callback (old revisions, template previews) it shows as a plain "Live list: ..." line.
+function codexMarkdown(body, lookup, canCreate = true, images = null, lists = null) {
     const found = [];
     const pics = [];
-    const text = String(body || '').replace(/[\u0001\u0002]/g, '').replace(CODEX_IMAGE_RE, (m, n, caption) => {
+    const specs = [];
+    const text = String(body || '').replace(/[\u0001\u0002\u0003]/g, '').replace(CODEX_LIST_RE, (m) => {
+        specs.push(m.trim().slice(6, -2).trim());
+        return `\u0003 ${specs.length - 1} \u0003`;
+    }).replace(CODEX_IMAGE_RE, (m, n, caption) => {
         pics.push({ name: n.trim(), caption: (caption || '').trim() });
         return `\u0002 ${pics.length - 1} \u0002`;
     }).replace(CODEX_LINK_RE, (m, t, label) => {
@@ -55,7 +132,12 @@ function codexMarkdown(body, lookup, canCreate = true, images = null) {
         const p = pics[Number(i)];
         return p ? codexPicHtml(images ? images(p.name) : null, p.name, p.caption, kind) : '';
     };
-    return renderMarkdown(text).replace(/(?:<p>(?:\u0002 \d+ \u0002(?:<br>| )*)+<\/p>)+/g, (run) => {
+    const list = (i) => {
+        const spec = specs[Number(i)];
+        if (spec === undefined) return '';
+        return lists ? lists(spec) : `<p class="cx-live-plain">Live list: ${escapeHtml(spec)}</p>`;
+    };
+    return renderMarkdown(text).replace(/<p>\u0003 (\d+) \u0003<\/p>/g, (m, i) => list(i)).replace(/\u0003 (\d+) \u0003/g, (m, i) => escapeHtml(`{{list ${specs[Number(i)] || ''}}}`)).replace(/(?:<p>(?:\u0002 \d+ \u0002(?:<br>| )*)+<\/p>)+/g, (run) => {
         const ids = Array.from(run.matchAll(/\u0002 (\d+) \u0002/g), (m) => m[1]);
         if (ids.length === 1) return pic(ids[0], 'figure');
         return `<div class="cx-gallery">${ids.map((i) => pic(i, 'figure')).join('')}</div>`;
@@ -237,7 +319,7 @@ const codexPeekCache = {};
 
 // A few plain lines from the start of a page, for the link preview card.
 function codexPlainExcerpt(body, max = 220) {
-    const text = String(body || '').split('\n').map((l) => l.trim()).filter((l) => l && !/^#{1,6}\s/.test(l)).map((l) => l.replace(/^([-*+]|\d+\.|>)\s+/, '')).join(' ')
+    const text = String(body || '').split('\n').map((l) => l.trim()).filter((l) => l && !/^#{1,6}\s/.test(l) && !/^\{\{list(?:[ \t][^{}]*)?\}\}$/.test(l)).map((l) => l.replace(/^([-*+]|\d+\.|>)\s+/, '')).join(' ')
         .replace(CODEX_IMAGE_RE, '')
         .replace(CODEX_LINK_RE, (m, t, label) => label || t)
         .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
@@ -1031,8 +1113,16 @@ window.codexPage = function () {
             const map = new Map(Object.values(this.pageData?.image_index || {}).map((p) => [codexNorm(p.name), p]));
             return (name) => map.get(codexNorm(name)) || null;
         },
+        // Renders {{list ...}} from the codex payload (none yet: "Loading…"; reading this.codex makes
+        // bodyHtml render again when it arrives). Links here are the page's "Linked from" list.
+        get listRenderer() {
+            const c = this.codex;
+            const cur = this.page ? this.page.id : '';
+            const ctx = c && this.page && c.codex.id === this.page.codex.id ? { pages: c.pages, tags: c.tags, folders: c.folders, cur, back: new Set(this.linkedFrom.map((b) => b.id)) } : null;
+            return (spec) => codexLiveList(spec, ctx);
+        },
         get bodyHtml() {
-            return this.page ? codexMarkdown(this.page.body, this.linkLookup, this.canEdit, this.imageLookup) : '';
+            return this.page ? codexMarkdown(this.page.body, this.linkLookup, this.canEdit, this.imageLookup, this.listRenderer) : '';
         },
         // Pages that link here by [[link]]; map pins are not shown.
         get linkedFrom() {
@@ -1091,7 +1181,7 @@ window.codexPage = function () {
             this.tocActive = active;
         },
         get previewHtml() {
-            return this.draft ? codexMarkdown(this.draft.body, this.titleLookup, true, this.imageLookup) : '';
+            return this.draft ? codexMarkdown(this.draft.body, this.titleLookup, true, this.imageLookup, this.listRenderer) : '';
         },
         // Pages of the current codex (from the codex payload loadNav fetched), for previews and the editor.
         get titles() {
