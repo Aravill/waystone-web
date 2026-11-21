@@ -15,6 +15,7 @@ var (
 	graphLinkRe    = regexp.MustCompile(`\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{1,200}))?\]\]`)
 	graphMdLink    = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
 	graphHeadingRe = regexp.MustCompile(`^#{1,6}\s`)
+	graphLiveRe    = regexp.MustCompile(`^{{list(?:[ 	][^{}]*)?}}$`)
 	graphListRe    = regexp.MustCompile(`^([-*+]|\d+\.|>)\s+`)
 	graphMarkup    = strings.NewReplacer("*", "", "_", "", "`", "")
 )
@@ -25,7 +26,7 @@ func graphExcerpt(body string) string {
 	var lines []string
 	for _, l := range strings.Split(body, "\n") {
 		l = strings.TrimSpace(l)
-		if l == "" || graphHeadingRe.MatchString(l) {
+		if l == "" || graphHeadingRe.MatchString(l) || graphLiveRe.MatchString(l) {
 			continue
 		}
 		lines = append(lines, graphListRe.ReplaceAllString(l, ""))

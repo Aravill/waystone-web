@@ -445,7 +445,7 @@ func handleGetCodex(w http.ResponseWriter, r *http.Request, id string) {
 			if tagIDs == nil {
 				tagIDs = []string{}
 			}
-			list = append(list, map[string]interface{}{"id": p.ID, "kind": p.Kind, "title": p.Title, "has_map": p.HasMap, "aliases": p.Aliases, "folder_id": p.FolderID, "tag_ids": tagIDs})
+			list = append(list, map[string]interface{}{"id": p.ID, "kind": p.Kind, "title": p.Title, "has_map": p.HasMap, "aliases": p.Aliases, "folder_id": p.FolderID, "tag_ids": tagIDs, "created_at": p.CreatedAt, "updated_at": p.UpdatedAt})
 		}
 	}
 	folders, err := db.GetFolders(id)
