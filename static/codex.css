@@ -2164,6 +2164,35 @@ html:has(dialog.cx-lightbox[open]) {
     }
 }
 
+/* Codices dialogs: the header wears the dark bar */
+.codex-page .modal-header {
+    background: var(--cx-bar);
+    border-bottom: 2px solid var(--cx-bar-accent);
+}
+
+.codex-page .modal-header h2 {
+    color: var(--cx-bar-text);
+    font-weight: 600;
+    font-size: 1.625rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.codex-page .modal-header .modal-eyebrow {
+    color: var(--cx-bar-text);
+    opacity: 0.72;
+}
+
+.codex-page .modal-close {
+    color: var(--cx-bar-text);
+}
+
+.codex-page .modal-close:hover {
+    background: none;
+    border-color: var(--cx-bar-line);
+    color: var(--cx-bar-text);
+}
+
 /* Templates: the New page dialog (template cards and preview), the Templates list and editor,
    Save as template and Copy page */
 .modal-content.cx-dlg--wide {
@@ -2397,13 +2426,11 @@ html:has(dialog.cx-lightbox[open]) {
         min-height: 8rem;
         max-height: 30vh;
     }
+}
 
-    .modal-content.cx-dlg--wide .modal-form {
-        padding: 1rem;
-    }
-
-    .modal-content.cx-dlg--wide .modal-header {
-        padding: 1rem;
+@media (max-width: 600px) {
+    .modal-content.cx-dlg--wide {
+        max-width: none;
     }
 }
 
