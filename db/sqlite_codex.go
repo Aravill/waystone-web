@@ -269,6 +269,28 @@ func (s *SQLiteStore) GetBacklinks(id string) ([]models.PageBacklink, error) {
 	return out, nil
 }
 
+// GetCodexBodies lists the pages of a codex with the body of their newest revision, ordered by title.
+func (s *SQLiteStore) GetCodexBodies(codexID string) ([]models.PageBody, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	rows, err := s.db.Query(`SELECT p.id, p.title, r.number, r.body FROM pages p
+		JOIN page_revisions r ON r.page_id = p.id AND r.number = (SELECT MAX(number) FROM page_revisions WHERE page_id = p.id)
+		WHERE p.codex_id = ? ORDER BY p.title COLLATE NOCASE, p.id`, codexID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []models.PageBody{}
+	for rows.Next() {
+		var b models.PageBody
+		if err := rows.Scan(&b.ID, &b.Title, &b.CurrentRevision, &b.Body); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
 // GetWantedPages lists the titles that links and pins in a codex point at without a page, most wanted first.
 func (s *SQLiteStore) GetWantedPages(codexID string) ([]models.WantedPage, error) {
 	s.mutex.RLock()

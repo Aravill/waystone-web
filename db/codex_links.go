@@ -3,7 +3,10 @@ package db
 import (
 	"database/sql"
 	"regexp"
+	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // wikiLinkRe matches [[Title]] and [[Title|label]]. Mirrored in static/codex.js.
@@ -236,4 +239,148 @@ func rewriteLinksTo(body, oldTitle, newTitle string) (string, int) {
 	}
 	b.WriteString(body[last:])
 	return b.String(), n
+}
+
+// Mention is one plain-text occurrence of a page name in a body (byte offsets, End exclusive).
+type Mention struct {
+	Start, End int
+	Text       string
+}
+
+var (
+	mentionCodeSpanRe = regexp.MustCompile("`[^`\n]+`")
+	mentionMdLinkRe   = regexp.MustCompile(`\[[^\]\n]*\]\([^)\n]*\)`)
+	mentionURLRe      = regexp.MustCompile(`https?://[^\s<>)\]]+`)
+	mentionListRe     = regexp.MustCompile(`(?m)^[ \t]*\{\{list\b[^\n]*`)
+)
+
+// mentionMask marks the bytes of body that are never searched: fenced and inline code, [[links]],
+// ![[embeds]], [text](url), bare URLs and {{list ...}} lines.
+func mentionMask(body string) []bool {
+	mask := make([]bool, len(body))
+	set := func(a, b int) {
+		for i := a; i < b; i++ {
+			mask[i] = true
+		}
+	}
+	pos, fenced := 0, false
+	for pos < len(body) {
+		end := strings.IndexByte(body[pos:], '\n')
+		if end < 0 {
+			end = len(body)
+		} else {
+			end += pos + 1
+		}
+		fence := strings.HasPrefix(strings.TrimLeft(body[pos:end], " \t"), "```")
+		if fence || fenced {
+			set(pos, end)
+		}
+		if fence {
+			fenced = !fenced
+		}
+		pos = end
+	}
+	for _, re := range []*regexp.Regexp{wikiLinkRe, mentionCodeSpanRe, mentionMdLinkRe, mentionURLRe, mentionListRe} {
+		for _, m := range re.FindAllStringIndex(body, -1) {
+			set(m[0], m[1])
+		}
+	}
+	return mask
+}
+
+func isMentionWordRune(r rune) bool {
+	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+// mentionNames dedupes names by NormName, drops those under 3 runes (or that can't sit in a
+// [[link]]) and returns them longest first.
+func mentionNames(names []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, n := range names {
+		k := NormName(n)
+		if seen[k] || utf8.RuneCountInString(k) < 3 || strings.ContainsAny(k, "[]|") {
+			continue
+		}
+		seen[k] = true
+		out = append(out, k)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return len(out[i]) > len(out[j]) })
+	return out
+}
+
+// FindMentions lists the plain-text, case-insensitive whole-word occurrences of any of names in
+// body, in order, longest name first and without overlaps. Any run of spaces or tabs inside a name
+// matches any run of whitespace except newlines. Masked spans (see mentionMask) are skipped.
+func FindMentions(body string, names []string) []Mention {
+	names = mentionNames(names)
+	if len(names) == 0 {
+		return nil
+	}
+	pats := make([]string, len(names))
+	anchored := make([]*regexp.Regexp, len(names))
+	for i, n := range names {
+		parts := strings.Fields(n)
+		for j := range parts {
+			parts[j] = regexp.QuoteMeta(parts[j])
+		}
+		pats[i] = strings.Join(parts, `[ \t]+`)
+		anchored[i] = regexp.MustCompile(`(?i)^(?:` + pats[i] + `)`)
+	}
+	any := regexp.MustCompile(`(?i)(?:` + strings.Join(pats, "|") + `)`)
+	mask := mentionMask(body)
+	var out []Mention
+	for pos := 0; pos < len(body); {
+		loc := any.FindStringIndex(body[pos:])
+		if loc == nil {
+			break
+		}
+		start := pos + loc[0]
+		found := false
+		if !mask[start] {
+			if before, _ := utf8.DecodeLastRuneInString(body[:start]); start == 0 || !isMentionWordRune(before) {
+				for _, re := range anchored {
+					l := re.FindStringIndex(body[start:])
+					if l == nil {
+						continue
+					}
+					end := start + l[1]
+					after, _ := utf8.DecodeRuneInString(body[end:])
+					masked := false
+					for i := start; i < end; i++ {
+						if mask[i] {
+							masked = true
+							break
+						}
+					}
+					if masked || (end < len(body) && isMentionWordRune(after)) {
+						continue
+					}
+					out = append(out, Mention{Start: start, End: end, Text: body[start:end]})
+					pos, found = end, true
+					break
+				}
+			}
+		}
+		if !found {
+			_, size := utf8.DecodeRuneInString(body[start:])
+			pos = start + size
+		}
+	}
+	return out
+}
+
+// LinkMentions turns every mention of the names into a [[link]] to title: [[Title]] when written
+// exactly as the title, otherwise [[Title|as written]]. It returns the new body and the count.
+func LinkMentions(body, title string, names []string) (string, int) {
+	ms := FindMentions(body, names)
+	for i := len(ms) - 1; i >= 0; i-- {
+		m := ms[i]
+		link := "[[" + title + "]]"
+		if m.Text != title {
+			link = "[[" + title + "|" + m.Text + "]]"
+		}
+		body = body[:m.Start] + link + body[m.End:]
+	}
+	return body, len(ms)
 }

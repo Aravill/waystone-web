@@ -543,3 +543,92 @@ test.describe('Codices live lists', () => {
     await expect(page.locator('.cx-box', { hasText: 'Linked from' })).toContainText('No other page links here yet.');
   });
 });
+
+test.describe('Codices unlinked mentions', () => {
+  let editor;
+  let codex;
+  const ids = [];
+
+  test.beforeEach(async () => {
+    editor = await apiAs('roy');
+    const home = await (await editor.get('/api/codices')).json();
+    codex = home.codices.find((c) => c.can_edit);
+    expect(codex, 'roy can edit a codex').toBeTruthy();
+  });
+
+  test.afterEach(async () => {
+    for (const id of ids.splice(0)) await editor.delete(`/api/codices/pages/${id}`);
+    await editor.dispose();
+  });
+
+  async function makePage(title, body) {
+    const res = await editor.post('/api/codices/pages', { data: { title, body, codex_id: codex.id } });
+    expect(res.status(), 'create ' + title).toBe(201);
+    const id = (await res.json()).page.id;
+    ids.push(id);
+    return id;
+  }
+
+  test('a plain mention can be linked; links and URLs are not mentions; See sees no button', async ({ page }) => {
+    const bId = await makePage('E2E Mention Source', 'We met at the Old Mill at dawn. Old Mill again.');
+    const cId = await makePage('E2E Mention Safe', 'Already [[Old Mill]], see https://example.com/old-mill and `old mill`.');
+    const aId = await makePage('Old Mill', 'A mill.');
+
+    // The API lists B (two mentions) and leaves out the page with only links, URLs and code.
+    const list = await (await editor.get(`/api/codices/pages/${aId}/mentions`)).json();
+    expect(list.total).toBe(1);
+    expect(list.mentions[0].page.id).toBe(bId);
+    expect(list.mentions[0].count).toBe(2);
+    expect(list.mentions[0].snippets[0].match).toBe('Old Mill');
+    expect(list.can_edit).toBe(true);
+    expect(list.mentions.some((m) => m.page.id === cId)).toBe(false);
+
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/p/${aId}/old-mill`);
+    const box = page.locator('.cx-box--mentions');
+    await expect(box.locator('li')).toHaveCount(1);
+    await expect(box.locator('mark.cx-mention').first()).toHaveText('Old Mill');
+    await expect(page.locator('[aria-label="Linked from"]')).not.toContainText('E2E Mention Source');
+    await box.getByRole('button', { name: /^Link 2/ }).click();
+    await expect(page.locator('.message, [role=status], .toast').filter({ hasText: 'Linked 2 mentions in E2E Mention Source' }).first()).toBeVisible();
+    await expect(box.locator('li')).toHaveCount(0);
+    await expect(box.locator('.cx-box-empty').first()).toHaveText('No plain mentions of this title.');
+    await expect(page.locator('[aria-label="Linked from"]')).toContainText('E2E Mention Source');
+
+    const b = await (await editor.get(`/api/codices/pages/${bId}`)).json();
+    expect(b.page.body).toBe('We met at the [[Old Mill]] at dawn. [[Old Mill]] again.');
+    const c = await (await editor.get(`/api/codices/pages/${cId}`)).json();
+    expect(c.page.body).toContain('https://example.com/old-mill');
+
+    // Spelled differently, the text is kept as the label.
+    const dId = await makePage('E2E Mention Lower', 'down by the  old mill, a ruin.');
+    const d = await (await editor.get(`/api/codices/pages/${dId}`)).json();
+    const res = await editor.post(`/api/codices/pages/${aId}/mentions/link`, { data: { from_page_id: dId, base_revision: d.page.current_revision } });
+    expect(res.ok()).toBeTruthy();
+    const d2 = await (await editor.get(`/api/codices/pages/${dId}`)).json();
+    expect(d2.page.body).toBe('down by the  [[Old Mill|old mill]], a ruin.');
+    // A stale base is refused; nothing left to link is 200 with linked 0.
+    const stale = await editor.post(`/api/codices/pages/${aId}/mentions/link`, { data: { from_page_id: dId, base_revision: 1 } });
+    expect(stale.ok()).toBeTruthy();
+    expect((await stale.json()).linked).toBe(0);
+
+    // A See-only user gets the list without Link buttons, and the POST is refused.
+    const admin = await apiAs(env.ADMIN_USERNAME);
+    const data = await access(admin);
+    const user = data.users.find((u) => u.username === USER);
+    await setRight(admin, user.id, 'codices.see', true);
+    await setLevel(admin, codex.id, user.id, 'see');
+    const eId = await makePage('E2E Mention Viewer', 'Back to the old mill.');
+    try {
+      await loginAs(page, USER);
+      await page.goto(`/codices/p/${aId}/old-mill`);
+      await expect(box.locator('li')).toHaveCount(1);
+      await expect(box.getByRole('button')).toHaveCount(0);
+      const e = await (await page.request.get(`/api/codices/pages/${eId}`)).json();
+      const denied = await page.request.post(`/api/codices/pages/${aId}/mentions/link`, { data: { from_page_id: eId, base_revision: e.page.current_revision } });
+      expect(denied.status()).toBe(403);
+    } finally {
+      await admin.dispose();
+    }
+  });
+});

@@ -538,6 +538,9 @@ window.codexPage = function () {
         graphFrom: null, // the page the graph was opened from (?from=), if it is in this codex
         graphSummary: '',
         localGraph: false,
+        // Mentioned, not linked: plain mentions of this page elsewhere in the codex
+        mentions: { loaded: false, total: 0, list: [], can_edit: false, busy: false, progress: '' },
+        mentionSeq: 0,
         localSeq: 0,
         navOpen: false,
         navAnim: false, // the drawer only animates after the first open, so it never slides shut on load
@@ -722,7 +725,10 @@ window.codexPage = function () {
                     this.ensureCodices(true); // the codices Copy page can go to
                     this.trackTab(data.page);
                     this.navPromise = this.loadNav(data.page);
-                    if (r.screen === 'page') this.loadLocalGraph(data);
+                    if (r.screen === 'page') {
+                        this.loadLocalGraph(data);
+                        this.loadMentions(data.page.id);
+                    }
                     if (r.screen === 'page' && data.page.kind === 'timeline') this.$nextTick(() => this.scrollToEventHash());
                     document.title = 'Waystone - ' + data.page.title;
                     if (location.pathname !== this.pageUrl(data.page) + (r.screen === 'page' ? '' : '/' + r.screen)) {
@@ -1266,6 +1272,78 @@ window.codexPage = function () {
             } catch (error) {
                 this.localGraph = false;
                 console.error('Failed to draw the local graph:', error);
+            }
+        },
+        // The Mentioned, not linked box: fetched after the page, quietly (it's only a hint).
+        async loadMentions(id) {
+            const seq = ++this.mentionSeq;
+            this.mentions.loaded = false;
+            try {
+                const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(id)}/mentions`, 'GET');
+                if (seq !== this.mentionSeq || !response.ok) return;
+                this.mentions = { total: data.total, list: data.mentions, can_edit: data.can_edit, loaded: true, busy: false, progress: '' };
+            } catch (error) {
+                console.error('Failed to load the mentions:', error);
+            }
+        },
+        // Links the mentions in one page; returns 'linked', 'stale' or 'failed' (failures are reported here).
+        async linkMentionsIn(m, quiet) {
+            const id = this.page.id;
+            const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(id)}/mentions/link`, 'POST', { from_page_id: m.page.id, base_revision: m.current_revision });
+            if (response.status === 409 && data.code === 'stale_base') return 'stale';
+            if (!response.ok) {
+                this.showMessage(this.sentence(data.error || 'Could not link the mentions'), 'error');
+                return 'failed';
+            }
+            if (!quiet) this.showMessage(`Linked ${this.countLabel(m.count, 'mention')} in ${m.page.title}.`, 'success');
+            return 'linked';
+        },
+        // After linking: the list and the Linked from list are reloaded.
+        async refreshMentions() {
+            const id = this.page.id;
+            await this.loadMentions(id);
+            try {
+                const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(id)}`, 'GET');
+                if (response.ok && this.pageData && this.pageData.page.id === id) this.pageData.backlinks = data.backlinks;
+            } catch (error) {
+                console.error('Failed to reload the links:', error);
+            }
+        },
+        async linkMentions(m) {
+            if (this.mentions.busy) return;
+            this.mentions.busy = true;
+            try {
+                const res = await this.linkMentionsIn(m, false);
+                if (res === 'stale') this.showMessage(`${m.page.title} changed in the meantime. The list is reloaded.`, 'info');
+                await this.refreshMentions();
+            } catch (error) {
+                this.showMessage('Could not link the mentions: ' + error.message, 'error');
+                this.mentions.busy = false;
+            }
+        },
+        async linkAllMentions() {
+            if (this.mentions.busy) return;
+            const todo = [...this.mentions.list];
+            this.mentions.busy = true;
+            let pages = 0, mentions = 0, stale = 0;
+            try {
+                for (const m of todo) {
+                    this.mentions.progress = `Linking ${pages + stale + 1} of ${todo.length}…`;
+                    const res = await this.linkMentionsIn(m, true);
+                    if (res === 'failed') break;
+                    if (res === 'stale') stale++;
+                    else {
+                        pages++;
+                        mentions += m.count;
+                    }
+                }
+                if (pages) this.showMessage(`Linked ${this.countLabel(mentions, 'mention')} in ${this.countLabel(pages, 'page')}.` + (stale ? ` ${this.countLabel(stale, 'page')} changed in the meantime.` : ''), 'success');
+                else if (stale) this.showMessage('The pages changed in the meantime. The list is reloaded.', 'info');
+                await this.refreshMentions();
+            } catch (error) {
+                this.showMessage('Could not link the mentions: ' + error.message, 'error');
+                this.mentions.busy = false;
+                this.mentions.progress = '';
             }
         },
         // The tree and the side panel need the codex's own payload on the page screens too.

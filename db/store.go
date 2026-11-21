@@ -112,6 +112,7 @@ type Store interface {
 	GetPage(id string) (*models.Page, error)
 	GetPageLinks(fromID string) ([]models.PageLink, error)
 	GetBacklinks(id string) ([]models.PageBacklink, error)
+	GetCodexBodies(codexID string) ([]models.PageBody, error)
 	GetWantedPages(codexID string) ([]models.WantedPage, error)
 	GetPageRevisions(id string) ([]models.PageRevision, error)
 	GetPageRevision(id string, number int) (models.PageRevision, error)
