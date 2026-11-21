@@ -1488,6 +1488,7 @@ window.codexPage = function () {
                 try {
                     const response = await fetch(`/api/codices/pages/${encodeURIComponent(this.page.id)}/pictures`, {
                         method: 'POST',
+                        signal: AbortSignal.timeout(180000), // a hung upload mustn't keep Save disabled
                         headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name || 'image') },
                         body: file
                     });

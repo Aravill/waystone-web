@@ -298,10 +298,14 @@ func receiveCodexImage(w http.ResponseWriter, r *http.Request) (string, image.Co
 		return "", image.Config{}, false
 	}
 	cfg, _, err := image.DecodeConfig(io.NewSectionReader(tmp, 0, size))
-	if err != nil || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > maxMapImageSide || cfg.Height > maxMapImageSide ||
-		(ext == ".gif" && !gifFramesFit(io.NewSectionReader(tmp, 0, size))) {
+	if err != nil || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > maxMapImageSide || cfg.Height > maxMapImageSide {
 		db.DiscardUpload(tmp)
 		writeJSONError(w, http.StatusBadRequest, "the image could not be read, or is larger than 16384 pixels on a side")
+		return "", image.Config{}, false
+	}
+	if ext == ".gif" && !gifFramesFit(io.NewSectionReader(tmp, 0, size)) {
+		db.DiscardUpload(tmp)
+		writeJSONError(w, http.StatusBadRequest, "this GIF is damaged, has more than 1000 frames, or has a frame larger than the image")
 		return "", image.Config{}, false
 	}
 	file := db.GenerateUUID() + ext
@@ -313,11 +317,11 @@ func receiveCodexImage(w http.ResponseWriter, r *http.Request) (string, image.Co
 	return file, cfg, true
 }
 
-// removeCodexFiles deletes stored map images after their page is gone; failures are only logged.
+// removeCodexFiles deletes stored map images and pictures after their page is gone; failures are only logged.
 func removeCodexFiles(files []string) {
 	dir, err := db.UploadDir()
 	if err != nil {
-		log.Printf("cannot remove map images: %v", err)
+		log.Printf("cannot remove images: %v", err)
 		return
 	}
 	for _, f := range files {
@@ -325,7 +329,7 @@ func removeCodexFiles(files []string) {
 			continue
 		}
 		if err := os.Remove(filepath.Join(dir, f)); err != nil && !os.IsNotExist(err) {
-			log.Printf("failed to remove map image %s: %v", f, err)
+			log.Printf("failed to remove image %s: %v", f, err)
 		}
 	}
 }
