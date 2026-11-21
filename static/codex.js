@@ -1,4 +1,5 @@
-// Codices page: /codices (home), /codices/c/{id} (codex), /codices/p/{id}/{slug}[/edit|/history] (page).
+// Codices page: /codices (home), /codices/c/{id} (codex), /codices/c/{id}/graph (graph),
+// /codices/p/{id}/{slug}[/edit|/history] (page).
 // Relies on campaigns.js (escapeHtml, renderMarkdown, journalByline, userAvatarHtml), journal.js
 // (diffWords, diffHtml) and codex-editor.js (createCodexEditor). One component picks the screen
 // from the path. Top-level names here must not clash with those scripts' (const clashes throw).
@@ -250,6 +251,14 @@ window.codexPage = function () {
         deltas: {},
         // Codices shell: nav drawer, codex picker, search, page tabs, More menu, link preview
         navSeq: 0,
+        // Graph screen and the page's local graph (the drawing lives in codex-graph.js)
+        graphLoading: false,
+        graphError: '',
+        graphReady: false,
+        graphFrom: null, // the page the graph was opened from (?from=), if it is in this codex
+        graphSummary: '',
+        localGraph: false,
+        localSeq: 0,
         navOpen: false,
         navAnim: false, // the drawer only animates after the first open, so it never slides shut on load
         hashScrolled: false,
@@ -316,7 +325,9 @@ window.codexPage = function () {
             this.showArrivalMessage();
         },
 
-        // /codices, /codices/c/{id}[/slug], /codices/p/{id}/{slug}[/edit|/history]
+        // /codices, /codices/c/{id}[/slug], /codices/c/{id}/graph, /codices/p/{id}/{slug}[/edit|/history]
+        // A last segment "graph" straight after the codex id is always the graph screen, so the
+        // codex's own links never carry a slug.
         // Returns null for a malformed URL.
         parseRoute() {
             let parts;
@@ -325,7 +336,7 @@ window.codexPage = function () {
             } catch (error) {
                 return null;
             }
-            if (parts[1] === 'c' && parts[2]) return { screen: 'codex', id: parts[2] };
+            if (parts[1] === 'c' && parts[2]) return { screen: parts.length === 4 && parts[3] === 'graph' ? 'graph' : 'codex', id: parts[2] };
             if (parts[1] === 'p' && parts[2]) {
                 const tail = parts[4] || '';
                 return { screen: tail === 'edit' || tail === 'history' ? tail : 'page', id: parts[2] };
@@ -336,12 +347,20 @@ window.codexPage = function () {
         get screen() {
             return this.route.screen;
         },
+        // The screens that show the codex itself rather than a page.
+        get onCodexScreen() {
+            return this.screen === 'codex' || this.screen === 'graph';
+        },
+        graphUrl(fromId = '') {
+            const id = this.currentCodexId || (this.page && this.page.codex.id) || '';
+            return '/codices/c/' + encodeURIComponent(id) + '/graph' + (fromId ? '?from=' + encodeURIComponent(fromId) : '');
+        },
         get page() {
             return this.pageData ? this.pageData.page : null;
         },
         // Whether the viewer may change what is on screen: the codex's pages and folders, or this page.
         get canEdit() {
-            if (this.screen === 'codex') return !!(this.codex && this.codex.can_edit);
+            if (this.onCodexScreen) return !!(this.codex && this.codex.can_edit);
             return !!(this.pageData && this.pageData.can_edit);
         },
         // Copy page needs See on the page (it is on screen) and Edit on some codex to copy into.
@@ -351,8 +370,9 @@ window.codexPage = function () {
         get crumbs() {
             const s = this.screen;
             if (s === 'codex' && this.codex) return [{ label: this.codex.codex.name, href: '' }];
+            if (s === 'graph' && this.codex) return [{ label: this.codex.codex.name, href: '/codices/c/' + encodeURIComponent(this.codex.codex.id) }, { label: 'Graph', href: '' }];
             if (!this.page) return [];
-            const codexHref = '/codices/c/' + encodeURIComponent(this.page.codex.id) + '/' + encodeURIComponent(codexSlug(this.page.codex.name));
+            const codexHref = '/codices/c/' + encodeURIComponent(this.page.codex.id);
             const list = [{ label: this.page.codex.name, href: '/codices/c/' + encodeURIComponent(this.page.codex.id) }];
             // Folder crumbs link to the codex page with that folder opened. With more than two
             // folders the middle ones collapse to "…" on narrow screens (CSS).
@@ -370,7 +390,7 @@ window.codexPage = function () {
             try {
                 const r = this.route;
                 const url = r.screen === 'home' ? '/api/codices'
-                    : r.screen === 'codex' ? `/api/codices/c/${encodeURIComponent(r.id)}`
+                    : r.screen === 'codex' || r.screen === 'graph' ? `/api/codices/c/${encodeURIComponent(r.id)}`
                     : `/api/codices/pages/${encodeURIComponent(r.id)}`;
                 const { response, data } = await this.send(url, 'GET');
                 if (response.status === 401) {
@@ -393,7 +413,7 @@ window.codexPage = function () {
                     this.home = data;
                     this.allCodices = data.codices;
                     document.title = 'Waystone - Codices';
-                } else if (r.screen === 'codex') {
+                } else if (r.screen === 'codex' || r.screen === 'graph') {
                     codexLoadOpenState(data.codex.id);
                     if (!this.folderRevealed) {
                         this.folderRevealed = true;
@@ -401,8 +421,9 @@ window.codexPage = function () {
                     }
                     this.codex = data;
                     this.syncTabs(data);
-                    document.title = 'Waystone - ' + data.codex.name;
-                    this.$nextTick(() => this.scrollToFolder());
+                    document.title = 'Waystone - ' + data.codex.name + (r.screen === 'graph' ? ' graph' : '');
+                    if (r.screen === 'graph') await this.loadGraph();
+                    else this.$nextTick(() => this.scrollToFolder());
                 } else {
                     if (r.screen === 'edit' && !data.can_edit) {
                         window.location.replace(this.pageUrl(data.page));
@@ -412,6 +433,7 @@ window.codexPage = function () {
                     this.ensureCodices(true); // the codices Copy page can go to
                     this.trackTab(data.page);
                     this.navPromise = this.loadNav(data.page);
+                    if (r.screen === 'page') this.loadLocalGraph(data);
                     document.title = 'Waystone - ' + data.page.title;
                     if (location.pathname !== this.pageUrl(data.page) + (r.screen === 'page' ? '' : '/' + r.screen)) {
                         history.replaceState(null, '', this.pageUrl(data.page) + (r.screen === 'page' ? '' : '/' + r.screen) + location.search);
@@ -459,7 +481,7 @@ window.codexPage = function () {
         get treeHtml() {
             if (!this.codex) return '';
             const tree = codexFolderTree(this.codex.folders, this.codex.pages);
-            const cur = this.screen !== 'codex' && this.page ? this.page.id : '';
+            const cur = !this.onCodexScreen && this.page ? this.page.id : '';
             const pages = tree.pages.length ? `<ul class="page-list">${tree.pages.map((p) => codexPageItemHtml(p, cur)).join('')}</ul>` : '';
             return tree.roots.map((r) => codexFolderHtml(r, 0, this.codex.can_edit, cur)).join('') + pages;
         },
@@ -751,21 +773,77 @@ window.codexPage = function () {
 
         // ---- Codices shell ----
         get currentCodexId() {
-            if (this.screen === 'codex') return this.codex ? this.codex.codex.id : this.route.id;
+            if (this.onCodexScreen) return this.codex ? this.codex.codex.id : this.route.id;
             return this.page ? this.page.codex.id : '';
         },
         get currentCodexName() {
-            if (this.screen === 'codex') return this.codex ? this.codex.codex.name : '';
+            if (this.onCodexScreen) return this.codex ? this.codex.codex.name : '';
             return this.page ? this.page.codex.name : '';
         },
         get currentPageId() {
-            return this.screen !== 'home' && this.screen !== 'codex' && this.page ? this.page.id : '';
+            return this.screen !== 'home' && !this.onCodexScreen && this.page ? this.page.id : '';
         },
         get pickLabel() {
             return this.screen === 'home' ? 'All codices' : this.currentCodexName || 'Switch codex';
         },
         get searchPlaceholder() {
             return this.screen === 'home' ? 'Search all codices' : this.currentCodexName ? 'Search ' + this.currentCodexName : 'Search this codex';
+        },
+        // The graph screen: fetches the codex's graph and hands it to codex-graph.js to draw.
+        async loadGraph() {
+            const id = this.route.id;
+            this.graphLoading = true;
+            this.graphError = '';
+            this.graphReady = false;
+            try {
+                const { response, data } = await this.send(`/api/codices/c/${encodeURIComponent(id)}/graph`, 'GET');
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+                if (!response.ok) {
+                    this.graphError = data.error || 'Could not load the graph';
+                    return;
+                }
+                const from = (new URLSearchParams(location.search).get('from') || '').trim();
+                const fromNode = data.nodes.find((n) => n.id === from && !n.missing);
+                this.graphFrom = fromNode || null;
+                const pages = data.nodes.filter((n) => !n.missing).length;
+                const wanted = data.nodes.length - pages;
+                const pairs = new Set(data.links.map((l) => (l.source < l.target ? l.source + '|' + l.target : l.target + '|' + l.source))).size;
+                this.graphSummary = `${this.countLabel(pages, 'page')} · ${this.countLabel(pairs, 'link')}` + (wanted ? ` · ${wanted} not written yet` : '');
+                this.graphReady = true;
+                await this.$nextTick();
+                await window.mountCodexGraph(document.getElementById('gvRoot'), {
+                    data,
+                    currentId: fromNode ? fromNode.id : '',
+                    canEdit: this.canEdit,
+                    pageUrl: (n) => this.pageUrl(n),
+                    onCreate: (title) => this.openCreatePage(title),
+                });
+            } catch (error) {
+                this.graphError = 'Could not draw the graph: ' + error.message;
+                this.graphReady = false;
+            } finally {
+                this.graphLoading = false;
+            }
+        },
+        // The page screen's Local graph box: only fetched when the page has links either way.
+        async loadLocalGraph(pageData) {
+            const seq = ++this.localSeq;
+            this.localGraph = false;
+            if (!(pageData.links || []).length && !pageData.backlinks.some((b) => b.via.some((v) => v !== 'pin'))) return;
+            try {
+                const { response, data } = await this.send(`/api/codices/c/${encodeURIComponent(pageData.page.codex.id)}/graph`, 'GET');
+                if (seq !== this.localSeq || !response.ok) return;
+                this.localGraph = true;
+                await this.$nextTick();
+                const svg = document.getElementById('localSvg');
+                if (!svg || !(await window.mountCodexLocalGraph(svg, data, pageData.page.id)) || seq !== this.localSeq) this.localGraph = false;
+            } catch (error) {
+                this.localGraph = false;
+                console.error('Failed to draw the local graph:', error);
+            }
         },
         // The tree and the side panel need the codex's own payload on the page screens too.
         async loadNav(page) {
