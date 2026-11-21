@@ -11,12 +11,12 @@ import (
 const graphExcerptChars = 200
 
 var (
-	graphImageRe = regexp.MustCompile(`!\[\[[^\[\]\n]*\]\]`)
-	graphLinkRe  = regexp.MustCompile(`\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{1,200}))?\]\]`)
-	graphMdLink  = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
-	graphHeadingRe = regexp.MustCompile(`^#{1,6}s`)
-	graphListRe  = regexp.MustCompile(`^([-*+]|\d+\.|>)\s+`)
-	graphMarkup  = strings.NewReplacer("*", "", "_", "", "`", "")
+	graphImageRe   = regexp.MustCompile(`!\[\[[^\[\]\n]*\]\]`)
+	graphLinkRe    = regexp.MustCompile(`\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{1,200}))?\]\]`)
+	graphMdLink    = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
+	graphHeadingRe = regexp.MustCompile(`^#{1,6}\s`)
+	graphListRe    = regexp.MustCompile(`^([-*+]|\d+\.|>)\s+`)
+	graphMarkup    = strings.NewReplacer("*", "", "_", "", "`", "")
 )
 
 // graphExcerpt is the first lines of a page as plain text (mirrors codexPlainExcerpt in codex.js):

@@ -318,7 +318,8 @@
             noMatch.hidden = !filtering || hits > 0;
             svg.classList.toggle('filtering', filtering && hits > 0);
             if (selected && hiddenOf(selected)) select(null);
-            if (!tabbed || hiddenOf(tabbed._d.id)) setTab(dr.nodeEls.get((visibleNodes()[0] || g.nodes[0]).id));
+            const first = visibleNodes()[0] || g.nodes[0]; // none in an empty codex
+            if (first && (!tabbed || hiddenOf(tabbed._d.id))) setTab(dr.nodeEls.get(first.id));
         }
         [find, tagSel, showMissing, showOrphans, showLabels].forEach((c) => {
             on(c, 'input', applyFilters);
@@ -349,7 +350,7 @@
                 return;
             }
             const n = nodeAt(e);
-            drag = { node: n ? n._d : null, lx: e.clientX, ly: e.clientY, moved: 0 };
+            drag = { node: n ? n._d : null, lx: e.clientX, ly: e.clientY, sx: e.clientX, sy: e.clientY, moved: 0 };
             if (!n) svg.classList.add('panning');
         });
         on(svg, 'pointermove', (e) => {
@@ -368,7 +369,7 @@
             const dy = e.clientY - drag.ly;
             drag.lx = e.clientX;
             drag.ly = e.clientY;
-            drag.moved += Math.abs(dx) + Math.abs(dy);
+            drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy)); // distance from the press, not summed jitter
             if (drag.node) {
                 if (drag.moved < 5) {
                     drag.lx -= dx; // not a drag yet: keep the distance so the page doesn't lag behind the pointer
