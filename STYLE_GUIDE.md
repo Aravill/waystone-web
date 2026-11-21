@@ -17,7 +17,7 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 | `ux-reading.dc.html` | The reading pass: type scale, IBM Plex Mono, dates, red means you, contrast (board 1, Today against Proposed) |
 | `ux-home-games.dc.html` | Home, the Games page sections, the user menu header and the toast (board 2). Its blue `.tag` labels are review notes and never ship |
 | `ux-game-calendar.dc.html` | The game page as a normal page, Ahead as ledger rows and the calendar (board 3). Its two-number calendar cells are superseded: the cells keep the four-column tally (see Session replies) |
-| `modals.html` | Proposed modal redesign (not built yet): every dialog in the app in the folio-banded sheet, filled field cells and one button order, with a Today toggle for comparison |
+| `modals.html` | Modal redesign (built): every dialog in the app in the folio-banded sheet, filled field cells and one button order, with a Today toggle for comparison |
 
 ## Design Philosophy
 
@@ -25,7 +25,7 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 
 - A calm parchment page with iron-gall ink, and a single red accent. Red means you: things that need the viewer's action
 - Inter for everything you read, Barlow Condensed for titles and headings, blackletter only for the brand. Markdown is written in IBM Plex Mono. Dates are never set in the display face: its old-style zero reads like a letter o
-- Minimal: square corners, hairline and double rules, no textures, shadows, gradients or glows
+- Minimal: square corners, hairline and double rules, no textures, gradients or glows, and no shadows except the one under a modal sheet
 - Decoration is typographic and sparse: `§`, `❦`, `✦`, `♛`. Never images of parchment, wax seals or scrolls
 - Copy is plain, modern English ("Your reply", "Yes / Maybe / No"). The medieval feel comes from the visuals, never from archaic wording ("thy", "aye", "well met")
 - Mobile-first and responsive
@@ -147,7 +147,7 @@ On screens ≤ 768px drop h1 to 34px and card titles to 23px.
 - **Card grid**: `grid-template-columns: repeat(auto-fill, min(100%, 360px)); gap: 28px;` (1.75rem), centred. The Games page uses `.container--wide` (`max-width: 74rem`), which fits three per row. It goes to one column on its own on phones.
 - **Units**: sizes in this guide are given in px for readability. The CSS writes them in rem (px / 16), with hairline border and outline widths kept in px.
 - **Breakpoint**: `@media (max-width: 768px)` for header stacking and type scale-down.
-- **Rules**: a `3px double var(--ink)` rule closes the header and modal headers. Hairlines (`1px solid var(--line)`) divide content within cards. A plain `1px solid var(--ink)` separates major sections.
+- **Rules**: a `3px double var(--ink)` rule closes the header. Hairlines (`1px solid var(--line)`) divide content within cards. A plain `1px solid var(--ink)` separates major sections.
 - **Corners**: always square. `border-radius` only on the round unread-count dot.
 
 ---
@@ -281,7 +281,7 @@ input::placeholder { color: var(--muted); }
 .form-hint { font-size: 14px; color: var(--muted); }
 ```
 
-Textareas and multi-line fields may use a full `1px solid var(--line)` box.
+Textareas and multi-line fields may use a full `1px solid var(--line)` box. Inside modals fields are filled ledger cells (see Modals).
 
 ### Cards
 
@@ -394,7 +394,17 @@ Counts on buttons (pending sign-ups, unanswered sessions) are a small rubric tab
 
 ### Modals
 
-The page dims to `--folio` (or `rgba(0,0,0,0.6)` in dark). The sheet is `--bg` with a double frame: `border: 1px solid var(--ink); outline: 1px solid var(--ink); outline-offset: 5px`. The header has an eyebrow + display title on the left, a text link + square `×` close button (40×40, `aria-label="Close"`) on the right, and a double rule underneath.
+Mock-up: `docs/design/mockups/modals.html`.
+
+- **Scrim**: `--scrim` (`rgba(43,36,28,0.55)` light, `rgba(0,0,0,0.74)` dark). `--backdrop` is only for the Codices nav scrim.
+- **Sheet**: `--bg` with a `1px solid var(--ink)` border, a hairline `outline: 1px solid var(--line)` at 4px offset, and the one shadow in the app (`0 1.5rem 4rem var(--shadow)`). The sheet scrolls; the header and footer stay put (sticky).
+- **Header**: a `--folio` band closed by one `1px solid var(--ink)` rule. Eyebrow + display title (1.75rem) on the left, a square `×` close (40×40, `aria-label="Close"`, hairline-free until hover, then an ink outline) on the right.
+- **Body**: padding `22px 24px 0`, 20px between fields. Labels are 15px, weight 600. Confirm text is 16px `--ink`, never muted.
+- **Fields**: filled ledger cells: `--folio` fill, transparent sides, `1px solid var(--ink)` bottom, 44px minimum height. Focus turns the border `--rubric` with an inset 2px rubric bottom line. Checkboxes, radios, files and the duration spinner keep their own look.
+- **Footer**: a sticky `--folio` band that bleeds to the sheet edges, a hairline above. Order: [Delete / text link, left] [Cancel] [Primary]. Buttons are at least 7rem wide. The destructive confirm is rubric-filled; Cancel is always present.
+- **Widths**: S 28rem (confirms, create session), M 36rem (default), L 56rem (`.cx-dlg--wide`, Codices templates). The sign-ups modal is 40rem.
+- **Codices**: the header wears the dark bar (`--cx-bar`, `--cx-bar-accent` 2px rule, uppercase 600 title).
+- **Phones (600px and below)**: a bottom sheet, full width, top border only, no outline. Buttons stack full width with the main action on top.
 
 ### Messages
 

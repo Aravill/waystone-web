@@ -6,7 +6,7 @@
     <title>Waystone - Game</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=8"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=76">
+    <link rel="stylesheet" href="/static/styles.css?v=77">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -462,10 +462,10 @@
 
                 <p class="game-form-error" role="alert" x-show="picker.error" x-text="'✗ ' + picker.error"></p>
                 <div class="modal-actions">
+                    <button type="button" class="text-link" x-show="myCharacter" :disabled="picker.busy" @click="clearCharacter()">Clear character (back to TBD)</button>
                     <button type="button" class="btn-create" :disabled="picker.busy || !picker.selected" @click="confirmCharacter()">Confirm</button>
                     <button type="button" class="btn-cancel" @click="closePicker()">Cancel</button>
                 </div>
-                <p class="game-leave" x-show="myCharacter"><button type="button" class="text-link" :disabled="picker.busy" @click="clearCharacter()">Clear character (back to TBD)</button></p>
             </div>
         </div>
     </div>

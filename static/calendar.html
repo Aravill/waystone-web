@@ -6,7 +6,7 @@
     <title>Waystone - Calendar</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=8"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=76">
+    <link rel="stylesheet" href="/static/styles.css?v=77">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -238,13 +238,13 @@
 
     <!-- Session Creation Modal -->
     <div id="createSessionModal" class="modal create-session-modal" :class="{ 'modal-open': showCreateSessionModal }" @click="handleCreateSessionBackdropClick($event)">
-        <div class="modal-content create-session-modal-content compact-modal-content">
+        <div class="modal-content create-session-modal-content">
             <div class="modal-header">
                 <div class="modal-title-block"><p class="modal-eyebrow" x-text="currentCampaignTitle"></p>
                 <h2>Suggest a session</h2></div>
                 <button type="button" class="modal-close" aria-label="Close" @click="closeCreateSessionModal()">&times;</button>
             </div>
-            <form @submit.prevent="createSession()" class="modal-form compact-modal-form">
+            <form @submit.prevent="createSession()" class="modal-form">
                 <div class="form-group">
                     <label for="sessionDate">Date</label>
                     <input type="date" id="sessionDate" x-model="sessionFormData.date" readonly>
