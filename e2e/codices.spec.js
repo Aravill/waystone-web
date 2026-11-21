@@ -324,7 +324,7 @@ test.describe('Codices folder default templates', () => {
     made.push(created.id);
     await loginAs(page, 'roy');
     await page.goto(`/codices/p/${created.id}/e2e-linker`);
-    await page.locator('.wikilink--missing', { hasText: 'E2E Nobody Yet' }).click();
+    await page.locator('a.wikilink--missing', { hasText: 'E2E Nobody Yet' }).click(); // the link in the text, not the Wanted pages button
     await expect(page.getByLabel('Title')).toHaveValue('E2E Nobody Yet');
     await expect(page.getByRole('radio', { name: /Character/ })).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('.cx-tpl-def:visible')).toHaveText('Folder default');
