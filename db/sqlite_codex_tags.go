@@ -167,6 +167,9 @@ func (s *SQLiteStore) DeleteCodexTag(id string) (int, error) {
 	} else if err != nil {
 		return 0, err
 	}
+	if _, err := tx.Exec(`DELETE FROM codex_template_tags WHERE tag_id = ?`, id); err != nil {
+		return 0, err
+	}
 	res, err := tx.Exec(`DELETE FROM page_tags WHERE tag_id = ?`, id)
 	if err != nil {
 		return 0, err
@@ -179,6 +182,49 @@ func (s *SQLiteStore) DeleteCodexTag(id string) (int, error) {
 		return 0, err
 	}
 	return int(n), tx.Commit()
+}
+
+// ensureCodexTags returns the codex's tag for each name (names repeating by NormName give the same
+// tag once), creating the ones it lacks.
+func ensureCodexTags(tx *sql.Tx, codexID string, names []string, userID string) ([]models.CodexTag, error) {
+	tags, err := codexTags(tx, codexID)
+	if err != nil {
+		return nil, err
+	}
+	out := []models.CodexTag{}
+	seen := map[string]bool{}
+	for _, name := range names {
+		if seen[NormName(name)] {
+			continue
+		}
+		seen[NormName(name)] = true
+		t := tagByName(tags, name, "")
+		if t == nil {
+			nt := models.CodexTag{ID: GenerateUUID(), CodexID: codexID, Name: name, CreatedBy: userID, CreatedAt: nowUTC()}
+			if _, err := tx.Exec(`INSERT INTO codex_tags (id, codex_id, name, created_by, created_at) VALUES (?, ?, ?, ?, ?)`,
+				nt.ID, nt.CodexID, nt.Name, nt.CreatedBy, nt.CreatedAt); err != nil {
+				return nil, err
+			}
+			tags = append(tags, nt)
+			t = &tags[len(tags)-1]
+		}
+		out = append(out, *t)
+	}
+	return out, nil
+}
+
+// addPageTags gives the page the tags with these names, creating the codex's missing ones.
+func addPageTags(tx *sql.Tx, pageID, codexID string, names []string, userID string) error {
+	tags, err := ensureCodexTags(tx, codexID, names, userID)
+	if err != nil {
+		return err
+	}
+	for _, t := range tags {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO page_tags (page_id, tag_id) VALUES (?, ?)`, pageID, t.ID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SetPageTags makes names the page's tags, creating the ones the page's codex doesn't have yet.
@@ -195,27 +241,11 @@ func (s *SQLiteStore) SetPageTags(pageID string, names []string, userID string) 
 	if err != nil {
 		return nil, err
 	}
-	tags, err := codexTags(tx, codexID)
-	if err != nil {
-		return nil, err
-	}
 	if _, err := tx.Exec(`DELETE FROM page_tags WHERE page_id = ?`, pageID); err != nil {
 		return nil, err
 	}
-	for _, name := range names {
-		t := tagByName(tags, name, "")
-		if t == nil {
-			nt := models.CodexTag{ID: GenerateUUID(), CodexID: codexID, Name: name, CreatedBy: userID, CreatedAt: nowUTC()}
-			if _, err := tx.Exec(`INSERT INTO codex_tags (id, codex_id, name, created_by, created_at) VALUES (?, ?, ?, ?, ?)`,
-				nt.ID, nt.CodexID, nt.Name, nt.CreatedBy, nt.CreatedAt); err != nil {
-				return nil, err
-			}
-			tags = append(tags, nt)
-			t = &tags[len(tags)-1]
-		}
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO page_tags (page_id, tag_id) VALUES (?, ?)`, pageID, t.ID); err != nil {
-			return nil, err
-		}
+	if err := addPageTags(tx, pageID, codexID, names, userID); err != nil {
+		return nil, err
 	}
 	out, err := pageTags(tx, pageID)
 	if err != nil {

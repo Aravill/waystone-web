@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=74">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=17">
+    <link rel="stylesheet" href="/static/codex.css?v=20">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -95,6 +95,7 @@
                             <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#tags'">Tags <span class="cx-count" x-text="codex.tags.length"></span></a>
                             <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#wanted'">Wanted pages <span class="cx-count" x-text="codex.wanted.length"></span></a>
                             <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#recent'">Recent changes</a>
+                            <a href="#templates" id="cxTemplatesLink" @click.prevent="openTemplates()">Templates</a>
                         </div>
                     </div>
                 </template>
@@ -253,17 +254,19 @@
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>History <span class="cx-count" x-text="page.revision_count"></span>
                                 </a>
                                 <span class="cx-spacer"></span>
-                                <div class="cx-more" x-show="canEdit && screen !== 'edit'" @click.outside="moreOpen = false" @keydown="onMoreKey($event)">
+                                <div class="cx-more" x-show="(canEdit || canCopy) && screen !== 'edit'" @click.outside="moreOpen = false" @keydown="onMoreKey($event)">
                                     <button type="button" class="cx-act" id="cxMoreBtn" aria-haspopup="menu" :aria-expanded="moreOpen ? 'true' : 'false'" aria-controls="cxMoreMenu" @click="toggleMore()">
                                         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span class="cx-act-long">More</span><span class="visually-hidden"> page actions</span>
                                     </button>
                                     <div class="cx-more-menu" id="cxMoreMenu" role="menu" x-ref="moreMenu" x-show="moreOpen" x-cloak>
-                                        <button type="button" role="menuitem" @click="moreDo('openRename')">Rename</button>
-                                        <button type="button" role="menuitem" @click="moreDo('openAliases')">Aliases</button>
-                                        <button type="button" role="menuitem" @click="moreDo('openPageFolder')">Change folder</button>
-                                        <button type="button" role="menuitem" @click="moreDo('openMove')">Move to another codex…</button>
-                                        <hr>
-                                        <button type="button" role="menuitem" class="cx-danger" @click="moreDo('deletePage')">Delete page</button>
+                                        <button type="button" role="menuitem" x-show="canEdit" @click="moreDo('openRename')">Rename</button>
+                                        <button type="button" role="menuitem" x-show="canEdit" @click="moreDo('openAliases')">Aliases</button>
+                                        <button type="button" role="menuitem" x-show="canEdit" @click="moreDo('openPageFolder')">Change folder</button>
+                                        <button type="button" role="menuitem" x-show="canEdit" @click="moreDo('openMove')">Move to another codex…</button>
+                                        <button type="button" role="menuitem" x-show="canCopy" @click="moreDo('openCopyPage')">Copy page…</button>
+                                        <button type="button" role="menuitem" x-show="canEdit" @click="moreDo('openSaveTemplate')">Save as template…</button>
+                                        <hr x-show="canEdit">
+                                        <button type="button" role="menuitem" class="cx-danger" x-show="canEdit" @click="moreDo('deletePage')">Delete page</button>
                                     </div>
                                 </div>
                             </div>
@@ -500,35 +503,146 @@
     </div>
 
     <!-- Form dialogs -->
-    <div class="modal" :class="{ 'modal-open': dlg.type }" @click.self="closeDlg()" @keydown.escape.window="dlg.type && closeDlg()" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
-        <div class="modal-content confirm-modal-content">
+    <div class="modal" :class="{ 'modal-open': dlg.type }" @click.self="cancelDlg()" @keydown.escape.window="dlg.type && !confirmDialog.open && cancelDlg()" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+        <div class="modal-content confirm-modal-content" :class="{ 'cx-dlg--wide': dlgWide }">
             <div class="modal-header">
                 <div>
                     <span class="modal-eyebrow" x-text="dlgEyebrow"></span>
                     <h2 id="dlgTitle" x-text="dlgTitle"></h2>
                 </div>
-                <button type="button" class="modal-close" @click="closeDlg()" aria-label="Close">&times;</button>
+                <button type="button" class="modal-close" @click="cancelDlg()" aria-label="Close">&times;</button>
             </div>
             <form class="modal-form" @submit.prevent="submitDlg()" novalidate>
                 <template x-if="dlg.type === 'createPage'">
+                    <div class="cx-np">
+                        <div class="cx-np-fields">
+                            <div class="form-group">
+                                <label for="dTitle">Title</label>
+                                <input type="text" id="dTitle" maxlength="120" autocomplete="off" placeholder="Name the page" x-model="dlg.title" x-ref="dlgFocus">
+                            </div>
+                            <div class="form-group" x-show="dlg.folders && dlg.folders.length">
+                                <label for="dFolder">Folder</label>
+                                <select id="dFolder" x-model="dlg.folderId">
+                                    <option value="">Top level</option>
+                                    <template x-for="o in folderOptions(dlg.folders)" :key="o.id"><option :value="o.id" x-text="o.label" :selected="o.id === dlg.folderId"></option></template>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="cx-np-cols">
+                            <div class="cx-np-pick">
+                                <p class="cx-np-label" id="dTplLabel">Start from</p>
+                                <div class="cx-tpl-pick" role="radiogroup" aria-labelledby="dTplLabel" @keydown="onTplKey($event)">
+                                    <template x-for="g in tplGroups(dlg.templates)" :key="g.label">
+                                        <div class="cx-tpl-group">
+                                            <p class="cx-tpl-grouplabel" x-text="g.label"></p>
+                                            <div class="cx-tpl-cards">
+                                                <template x-for="t in g.items" :key="t.id">
+                                                    <button type="button" class="cx-tpl-card" role="radio" :aria-checked="t.id === tplSelected.id ? 'true' : 'false'" :tabindex="t.id === tplSelected.id ? 0 : -1" @click="dlg.tplId = t.id">
+                                                        <strong x-text="t.name"></strong>
+                                                        <span x-text="t.description"></span>
+                                                    </button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                                <p class="hint"><button type="button" class="text-link" @click="openTemplates()">Manage templates</button></p>
+                            </div>
+                            <div class="cx-np-side">
+                                <p class="cx-np-label">Preview · <span x-text="tplSelected.name"></span></p>
+                                <div class="cx-tpl-preview game-text codex-text" role="region" aria-label="Starting text of the page" tabindex="0" x-html="tplPreviewHtml"></div>
+                                <p class="cx-np-tags" x-show="tplSelected.tags.length" x-text="'Adds tags: ' + tplSelected.tags.join(', ')"></p>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'templates'">
+                    <div>
+                        <p class="hint" id="dTplsIntro" tabindex="-1">The built-in templates are the same in every codex: copy one to change it. Changing or deleting a template never changes pages already made from it.</p>
+                        <ul class="cx-tpl-list">
+                            <template x-for="t in dlg.templates" :key="t.id">
+                                <li class="cx-tpl-row">
+                                    <div class="cx-tpl-info">
+                                        <strong x-text="t.name"></strong>
+                                        <span class="cx-tpl-badge" x-text="t.by ? 'by ' + t.by : 'Built-in'"></span>
+                                        <small x-text="t.description"></small>
+                                        <span class="cx-tpl-tags" x-show="t.tags.length"><template x-for="n in t.tags" :key="n"><span class="cx-chip cx-chip--tag" x-text="n"></span></template></span>
+                                    </div>
+                                    <div class="cx-tpl-acts">
+                                        <button type="button" class="text-link" x-show="dlg.canEdit" @click="openCreatePage('', null, t.id)" :aria-label="'Use the ' + t.name + ' template'">Use</button>
+                                        <button type="button" class="text-link" x-show="dlg.canEdit && t.id !== 'builtin:blank'" @click="copyTemplate(t)" :aria-label="'Copy the ' + t.name + ' template'">Copy</button>
+                                        <button type="button" class="text-link" x-show="dlg.canEdit && t.by" @click="openTemplateEditor(t)" :aria-label="'Edit the ' + t.name + ' template'">Edit</button>
+                                        <button type="button" class="text-link cx-tpl-del" x-show="dlg.canEdit && t.by" @click="deleteTemplate(t)" :aria-label="'Delete the ' + t.name + ' template'">Delete</button>
+                                    </div>
+                                </li>
+                            </template>
+                        </ul>
+                        <p><button type="button" class="campaign-action-btn" x-show="dlg.canEdit" @click="openTemplateEditor(null)">+ New template</button></p>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'template'">
                     <div>
                         <div class="form-group">
-                            <label for="dTitle">Title</label>
-                            <input type="text" id="dTitle" maxlength="120" x-model="dlg.title" x-ref="dlgFocus">
+                            <label for="dTplName">Name</label>
+                            <input type="text" id="dTplName" maxlength="80" x-model="dlg.name" x-init="$nextTick(() => requestAnimationFrame(() => $el.focus()))">
                         </div>
                         <div class="form-group">
-                            <label for="dCodex">Codex</label>
-                            <select id="dCodex" x-model="dlg.codexId" @change="onDlgCodexChange()">
+                            <label for="dTplDesc">Description</label>
+                            <input type="text" id="dTplDesc" maxlength="160" placeholder="One line, shown in the New page list" x-model="dlg.description">
+                        </div>
+                        <div class="form-group">
+                            <label for="dTplTags">Adds tags</label>
+                            <input type="text" id="dTplTags" placeholder="tavern, settlement" x-model="dlg.tags">
+                            <p class="hint">Separate tags with commas. A page made from this template gets them.</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="dTplBody">Text</label>
+                            <textarea id="dTplBody" class="cx-tpl-body" rows="12" spellcheck="false" x-model="dlg.body"></textarea>
+                            <p class="hint">Write {{title}} where the page's title should go and {{date}} for the day it's made. [[ ]] leaves an empty link to fill in.</p>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'saveTemplate'">
+                    <div>
+                        <div class="form-group">
+                            <label for="dStName">Name</label>
+                            <input type="text" id="dStName" maxlength="80" x-model="dlg.name" x-ref="dlgFocus">
+                        </div>
+                        <div class="form-group">
+                            <label for="dStDesc">Description</label>
+                            <input type="text" id="dStDesc" maxlength="160" placeholder="One line, shown in the New page list" x-model="dlg.description">
+                        </div>
+                        <fieldset class="cx-fieldset">
+                            <legend>Keep</legend>
+                            <label class="cx-check"><input type="radio" name="dStKeep" value="headings" x-model="dlg.keep"><span>Headings only <small>The ## and ### headings, empty. Best for a structure to fill in.</small></span></label>
+                            <label class="cx-check"><input type="radio" name="dStKeep" value="all" x-model="dlg.keep"><span>All the text <small>Pictures are not kept.</small></span></label>
+                        </fieldset>
+                        <label class="cx-check"><input type="checkbox" x-model="dlg.tags"><span>New pages get this page's tags</span></label>
+                        <p class="hint">The template belongs to this codex. Anyone who can edit it can use, change or delete it.</p>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'copyPage'">
+                    <div>
+                        <div class="form-group">
+                            <label for="dCpTitle">Title</label>
+                            <input type="text" id="dCpTitle" maxlength="120" autocomplete="off" x-model="dlg.title" x-ref="dlgFocus">
+                        </div>
+                        <div class="form-group">
+                            <label for="dCpCodex">Codex</label>
+                            <select id="dCpCodex" x-model="dlg.codexId" @change="onDlgCodexChange()">
                                 <template x-for="w in codexChoices" :key="w.id"><option :value="w.id" x-text="w.name" :selected="w.id === dlg.codexId"></option></template>
                             </select>
                         </div>
                         <div class="form-group" x-show="dlg.folders && dlg.folders.length">
-                            <label for="dFolder">Folder</label>
-                            <select id="dFolder" x-model="dlg.folderId">
+                            <label for="dCpFolder">Folder</label>
+                            <select id="dCpFolder" x-model="dlg.folderId">
                                 <option value="">Top level</option>
                                 <template x-for="o in folderOptions(dlg.folders)" :key="o.id"><option :value="o.id" x-text="o.label" :selected="o.id === dlg.folderId"></option></template>
                             </select>
                         </div>
+                        <label class="cx-check" x-show="pageData.tags.length"><input type="checkbox" x-model="dlg.copyTags"><span x-text="'Copy its tags (' + pageData.tags.map((t) => t.name).join(', ') + ')'"></span></label>
+                        <label class="cx-check" x-show="pageData.images.length"><input type="checkbox" x-model="dlg.copyImages"><span><span x-text="'Copy its ' + countLabel(pageData.images.length, 'image')"></span> <small>The files are duplicated, so each page keeps its own.</small></span></label>
+                        <p class="hint">The copy starts its own history at revision 1. Aliases are not copied, and [[links]] stay as written and point at pages of the codex it goes to.</p>
                     </div>
                 </template>
                 <template x-if="dlg.type === 'folder'">
@@ -618,8 +732,8 @@
                 </template>
                 <div class="notice" role="alert" x-show="dlg.error"><p x-text="dlg.error"></p></div>
                 <div class="modal-actions">
-                    <button type="submit" class="submit-btn" :disabled="dlg.busy" x-text="dlgSubmit"></button>
-                    <button type="button" class="btn-cancel" @click="closeDlg()">Cancel</button>
+                    <button type="submit" class="submit-btn" x-show="dlg.type !== 'templates'" :disabled="dlg.busy" x-text="dlgSubmit"></button>
+                    <button type="button" class="btn-cancel" @click="cancelDlg()" x-text="dlg.type === 'templates' ? 'Close' : dlg.type === 'template' && dlg.back ? 'Back' : 'Cancel'"></button>
                 </div>
             </form>
         </div>
@@ -658,6 +772,6 @@
     <script src="/campaigns.js?v=63"></script>
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=3"></script>
-    <script src="/static/codex.js?v=17"></script>
+    <script src="/static/codex.js?v=20"></script>
 </body>
 </html>

@@ -200,3 +200,27 @@ type PageImage struct {
 	CreatedAt  string `json:"created_at"`
 	RemovedAt  string `json:"removed_at"`
 }
+
+// CodexTemplate is a page template that belongs to one codex. Tags are the tags a page made from
+// it gets (they exist in the codex).
+type CodexTemplate struct {
+	ID          string     `json:"id"`
+	CodexID     string     `json:"codex_id"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	Body        string     `json:"body"`
+	Tags        []CodexTag `json:"tags"`
+	CreatedBy   string     `json:"created_by"`
+	CreatedAt   string     `json:"created_at"`
+	UpdatedAt   string     `json:"updated_at"`
+}
+
+// NewPageExtras is what a new page gets besides its text: a revision note, tags (by name; the
+// codex's missing ones are created), pictures (rows already pointing at their own copied files)
+// and which of those pictures is the cover.
+type NewPageExtras struct {
+	Note         string
+	TagNames     []string
+	Images       []PageImage
+	CoverImageID string
+}

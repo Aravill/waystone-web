@@ -137,6 +137,13 @@ type Store interface {
 	RenameCodexTag(id, name string) error
 	DeleteCodexTag(id string) (int, error)
 	SetPageTags(pageID string, names []string, userID string) ([]models.CodexTag, error)
+	CreatePageWith(p models.Page, body string, x models.NewPageExtras) error
+	CheckNewPage(codexID, folderID, title string) error
+	GetCodexTemplates(codexID string) ([]models.CodexTemplate, error)
+	GetCodexTemplate(id string) (*models.CodexTemplate, error)
+	CreateCodexTemplate(t models.CodexTemplate, tagNames []string) (models.CodexTemplate, error)
+	UpdateCodexTemplate(id, name, description, body string, tagNames []string, userID string) error
+	DeleteCodexTemplate(id string) error
 	GetPageImages(pageID string) ([]models.PageImage, string, error)
 	AddPageImage(img models.PageImage) (models.PageImage, error)
 	RemovePageImage(pageID, imageID string) error
