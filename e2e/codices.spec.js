@@ -389,3 +389,89 @@ test.describe('Codices local drafts', () => {
     await expect(page.getByText('You have unsaved changes from')).toBeHidden();
   });
 });
+
+test.describe('Codices tree drag and drop', () => {
+  let editor;
+  let codex;
+  const pages = [];
+  const folders = []; // children first, so each delete finds an empty parent
+
+  async function makeFolder(name, parentId = '') {
+    const res = await editor.post(`/api/codices/c/${codex.id}/folders`, { data: { name, parent_id: parentId } });
+    expect(res.status(), 'create folder').toBe(201);
+    const id = (await res.json()).folder.id;
+    folders.unshift(id);
+    return id;
+  }
+  async function folderOf(id) {
+    return (await (await editor.get(`/api/codices/pages/${id}`)).json()).page.folder_id;
+  }
+  async function parentOf(id) {
+    const data = await (await editor.get(`/api/codices/c/${codex.id}`)).json();
+    return data.folders.find((f) => f.id === id).parent_id;
+  }
+
+  test.beforeEach(async () => {
+    editor = await apiAs('roy');
+    const home = await (await editor.get('/api/codices')).json();
+    codex = home.codices.find((c) => c.can_edit);
+    expect(codex, 'roy can edit a codex').toBeTruthy();
+  });
+
+  test.afterEach(async () => {
+    for (const id of pages.splice(0)) await editor.delete(`/api/codices/pages/${id}`);
+    for (const id of folders.splice(0)) await editor.delete(`/api/codices/folders/${id}`);
+    await editor.dispose();
+  });
+
+  test('a page dropped on a folder moves there and Undo moves it back; a folder goes to the top level; a folder into its child sends nothing', async ({ page }) => {
+    const tag = Date.now().toString(36);
+    const target = await makeFolder(`E2E drop target ${tag}`);
+    const outer = await makeFolder(`E2E outer ${tag}`, target);
+    const inner = await makeFolder(`E2E inner ${tag}`, outer);
+    const made = await editor.post('/api/codices/pages', { data: { title: `E2E dragged ${tag}`, codex_id: codex.id } });
+    expect(made.status(), 'create page').toBe(201);
+    const pageId = (await made.json()).page.id;
+    pages.push(pageId);
+
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/c/${codex.id}`);
+    const tree = page.locator('.codex-tree');
+    const row = (id) => tree.locator(`details[data-id="${id}"] > summary`);
+    // Step by step: the Top level strip appears (and the tree shifts down) a moment after the drag starts.
+    const drag = async (from, to) => {
+      await from.hover();
+      await page.mouse.down();
+      await page.mouse.move(10, 10);
+      await expect(page.locator('.codex-root-drop')).toBeVisible();
+      await to.hover();
+      await to.hover({ position: { x: 20, y: 8 } });
+      await page.mouse.up();
+    };
+
+    // 1. A page onto a folder, then Undo.
+    await drag(tree.getByRole('link', { name: `E2E dragged ${tag}` }), row(target));
+    const toast = page.getByRole('status').filter({ hasText: 'Moved' });
+    await expect(toast).toContainText(`Moved E2E dragged ${tag} to E2E drop target ${tag}.`);
+    expect(await folderOf(pageId)).toBe(target);
+    await toast.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'back.' })).toBeVisible();
+    expect(await folderOf(pageId)).toBe('');
+
+    // 2. A folder onto the Top level strip.
+    await expect(row(outer)).toBeVisible();
+    await drag(row(outer), page.locator('.codex-root-drop'));
+    await expect(page.getByRole('status').filter({ hasText: 'to the top level.' })).toBeVisible();
+    expect(await parentOf(outer)).toBe('');
+
+    // 3. A folder onto its own child: refused on the client, no move request.
+    const moves = [];
+    page.on('request', (req) => req.method() === 'PUT' && moves.push(req.url()));
+    await expect(row(inner)).toBeVisible();
+    await drag(row(outer), row(inner));
+    await page.waitForTimeout(300);
+    expect(moves).toEqual([]);
+    expect(await parentOf(outer)).toBe('');
+    expect(await parentOf(inner)).toBe(outer);
+  });
+});
