@@ -262,3 +262,45 @@ test.describe('Codices templates and copying', () => {
     await viewer.dispose();
   });
 });
+
+test.describe('Codices graph', () => {
+  test('the graph lists the codex pages; find, card and Open page work; no See means 404', async ({ page }) => {
+    const admin = await apiAs(env.ADMIN_USERNAME);
+    const data = await access(admin);
+    const codex = data.codices[0];
+    const adam = data.users.find((u) => u.username === 'adam');
+    const corvin = data.users.find((u) => u.username === USER);
+    await setRight(admin, adam.id, 'codices.see', true);
+    await setLevel(admin, codex.id, adam.id, 'see');
+    await setLevel(admin, codex.id, corvin.id, 'none');
+
+    // The API follows the codex's See right.
+    const stranger = await apiAs(USER);
+    expect((await stranger.get(`/api/codices/c/${codex.id}/graph`)).status()).toBe(404);
+    await stranger.dispose();
+    await admin.dispose();
+
+    await loginAs(page, 'adam');
+    const graph = await (await page.request.get(`/api/codices/c/${codex.id}/graph`)).json();
+    const pages = graph.nodes.filter((n) => !n.missing);
+    expect(pages.length).toBeGreaterThan(1);
+    await page.goto(`/codices/c/${codex.id}/graph`);
+    await expect(page.locator('#gvSvg .node')).toHaveCount(graph.nodes.length);
+    await expect(page.locator('#gvSvg .node.missing')).toHaveCount(graph.nodes.length - pages.length);
+
+    // The filters are folded on narrow screens.
+    if (!(await page.locator('#gvSettings').evaluate((el) => el.open))) await page.locator('#gvSettings summary').click();
+    await page.getByLabel('Find a page').fill('Karrow Ford');
+    await page.getByLabel('Find a page').press('Enter');
+    await expect(page.locator('#gvCardTitle')).toHaveText('Karrow Ford');
+    await expect(page.locator('#gvCardCreate')).toBeHidden();
+    await page.getByRole('link', { name: 'Open page' }).click();
+    await expect(page).toHaveURL(/\/codices\/p\/[^/]+\/karrow-ford$/);
+    await expect(page.locator('h1.cx-title')).toHaveText('Karrow Ford');
+    // The page's Local graph opens the full graph from this page.
+    await expect(page.locator('#localSvg .node').first()).toBeAttached();
+    await page.locator('.local-graph').click();
+    await expect(page).toHaveURL(/\/graph\?from=/);
+    await expect(page.locator('#gvSvg .node.current')).toHaveCount(1);
+  });
+});
