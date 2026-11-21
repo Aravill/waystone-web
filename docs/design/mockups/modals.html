@@ -8,8 +8,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IM+Fell+English+SC&family=Inter:wght@400;500;600&family=Barlow+Condensed:wght@600&display=swap">
 <style>
 /* Modal mock-up: every dialog in the app, redrawn for readability, plus "Today" for comparison.
-   Tokens are STYLE_GUIDE.md's (Parchment / Candlelight). Codices dialogs use the Codices pair
-   (Inter + Barlow Condensed) and the Codices dark bar, the way their pages do. */
+   Tokens are STYLE_GUIDE.md's (Parchment / Candlelight), in the site faces Inter + Barlow Condensed;
+   Today shows the old IBM Plex Mono + IM Fell. Codices dialogs get the Codices dark bar for the header. */
 :root, [data-theme="light"] {
     --bg: #F2EAD8; --folio: #E6DBC2; --ink: #2B241C; --muted: #6B5E4B;
     --line: rgba(43, 36, 28, 0.4); --ctl: rgba(43, 36, 28, 0.64);
@@ -17,8 +17,8 @@
     --shadow: rgba(43, 36, 28, 0.32);
     --scrim: rgba(43, 36, 28, 0.55);
     --cx-bar: #2B241C; --cx-bar-text: #F2EAD8; --cx-bar-accent: #D9735C; --cx-bar-line: rgba(242, 234, 216, 0.22);
-    --font-text: 'IBM Plex Mono', 'Courier New', monospace;
-    --font-display: 'IM Fell English SC', serif;
+    --font-text: 'Inter', system-ui, sans-serif;
+    --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
     color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -181,7 +181,6 @@ fieldset.f { border: 0; }
 .dur { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 15px; }
 
 /* Codices dialogs: Codices type and the dark bar, as on their pages */
-.cx { --font-text: 'Inter', system-ui, sans-serif; --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif; font-family: var(--font-text); }
 .cx .m-head { background: var(--cx-bar); border-bottom: 2px solid var(--cx-bar-accent); }
 .cx .m-eyebrow { color: var(--cx-bar-text); opacity: .72; }
 .cx .m-title { color: var(--cx-bar-text); font-weight: 600; font-size: 26px; letter-spacing: .02em; text-transform: uppercase; }
@@ -228,7 +227,7 @@ fieldset.f { border: 0; }
 [data-look="today"] .f-label { font-size: 14.5px; font-weight: 500; }
 [data-look="today"] .f-input { background: transparent; border: 0; border-bottom: 1px solid var(--ink); padding: 10px 2px; box-shadow: none; }
 [data-look="today"] .f-input.is-focus { border-bottom: 2px solid var(--rubric); }
-[data-look="today"] .cx { --font-text: 'IBM Plex Mono', monospace; --font-display: 'IM Fell English SC', serif; }
+[data-look="today"] { --font-text: 'IBM Plex Mono', monospace; --font-display: 'IM Fell English SC', serif; }
 [data-look="today"] .cx .m-head { background: none; border-bottom: 3px double var(--ink); }
 [data-look="today"] .cx .m-title, [data-look="today"] .cx .m-x { color: var(--ink); text-transform: none; font-weight: 400; letter-spacing: 0; }
 [data-look="today"] .cx .m-eyebrow { color: var(--muted); opacity: 1; }
@@ -262,7 +261,7 @@ fieldset.f { border: 0; }
             <li><b>The sheet melts into the page.</b> It is the same <code>--bg</code> as the page under the backdrop, with no shadow, so in Candlelight its edge is only a thin line.</li>
             <li><b>Four parallel rules in the first 80px:</b> the border, the outline 5px out and the 3px double header rule all compete with the content.</li>
             <li><b>An empty field is just a line.</b> The ledger-line input reads like another divider (in the screenshot, the rubric line under "Folder name" looks like a rule, not a field).</li>
-            <li><b>Explanations are small and muted.</b> Confirm messages are 14px <code>--muted</code> monospace: the one thing you have to read is the faintest text.</li>
+            <li><b>Explanations are small and muted.</b> Confirm messages are 14px <code>--muted</code>: the one thing you have to read is the faintest text.</li>
             <li><b>The buttons break the layout.</b> The main button is <code>.submit-btn</code> at <code>width: 100%</code>, a bright slab in dark mode, so Cancel wraps underneath on the right. Every dialog orders its buttons differently.</li>
         </ol>
 
@@ -274,7 +273,7 @@ fieldset.f { border: 0; }
             <li><b>Read text is ink, 16px, line-height 1.6.</b> Muted stays for hints and meta only.</li>
             <li><b>One button order everywhere:</b> right-aligned, Cancel then the main action (auto width, min 7rem); a destructive or secondary action (Delete game, Clear character, Manage templates) sits at the far left. On phones the sheet docks to the bottom and buttons stack full width, main action on top.</li>
             <li><b>Three widths:</b> S 28rem (confirms, one or two fields), M 36rem (longer forms, lists), L 56rem (Codices New page, Templates, template editor).</li>
-            <li><b>Codices dialogs</b> wear the Codices pair (Inter + Barlow Condensed, from the font fix) and the Codices dark bar for the header, so they match the page they open from.</li>
+            <li><b>Type:</b> Inter for text and Barlow Condensed for titles, the site faces since the font change. <b>Codices dialogs</b> get the Codices dark bar for the header, so they match the page they open from.</li>
         </ol>
         <p class="ask"><b>Two calls for you:</b> (a) a destructive confirm ("Delete page") gets a <b>rubric-filled</b> button rather than the outlined danger button, because it is the one action in the dialog; (b) inputs in dialogs become filled ledger cells, which bends the guide's "a ledger line, not a box". Both show in every sheet below.</p>
     </section>
