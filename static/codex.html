@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=74">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=16">
+    <link rel="stylesheet" href="/static/codex.css?v=17">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -379,7 +379,7 @@
                             </div>
                             <div class="notice" role="alert" x-show="draft.error"><p x-text="draft.error"></p></div>
                             <div class="form-foot">
-                                <button type="submit" class="submit-btn" :disabled="busy || draft.locked">Save changes</button>
+                                <button type="submit" class="submit-btn" :disabled="busy || draft.locked || !!uploading">Save changes</button>
                                 <a class="campaign-action-btn" :href="pageUrl(page)">Cancel</a>
                             </div>
                         </form>
@@ -658,6 +658,6 @@
     <script src="/campaigns.js?v=63"></script>
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=3"></script>
-    <script src="/static/codex.js?v=15"></script>
+    <script src="/static/codex.js?v=16"></script>
 </body>
 </html>

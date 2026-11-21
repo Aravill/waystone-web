@@ -28,7 +28,7 @@ function codexPicHtml(pic, name, caption, kind) {
     if (!pic) return `<span class="cx-img-missing">Missing image: ${escapeHtml(name)}</span>`;
     const shown = escapeHtml(caption || pic.name);
     const meta = escapeHtml(`${pic.name} · ${pic.width}×${pic.height}`);
-    const btn = `<button type="button" class="cx-img-btn" data-url="${escapeHtml(pic.url)}" data-caption="${shown}" data-meta="${meta}" aria-label="View larger: ${shown}">` +
+    const btn = `<button type="button" class="cx-img-btn${kind === 'inline' ? ' cx-img-btn--inline' : ''}" data-url="${escapeHtml(pic.url)}" data-caption="${shown}" data-meta="${meta}" aria-label="View larger: ${shown}">` +
         `<img src="${escapeHtml(pic.url)}" alt="${shown}" width="${Number(pic.width) || ''}" height="${Number(pic.height) || ''}" loading="lazy"></button>`;
     if (kind === 'inline') return btn;
     return `<figure class="cx-figure">${btn}${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ''}</figure>`;
@@ -47,7 +47,7 @@ function codexMarkdown(body, lookup, canCreate = true, images = null) {
         pics.push({ name: n.trim(), caption: (caption || '').trim() });
         return `\u0002 ${pics.length - 1} \u0002`;
     }).replace(CODEX_LINK_RE, (m, t, label) => {
-        found.push({ text: t.trim(), label });
+        found.push({ text: t.trim(), label: label && label.replace(/\u0002 \d+ \u0002/g, '') });
         return `\u0001 ${found.length - 1} \u0001`;
     });
     const pic = (i, kind) => {
@@ -210,7 +210,8 @@ window.codexPage = function () {
         // Tags and pictures
         tagFilter: '', // ?tag=name on the codex screen: list only the pages with that tag
         lightbox: { url: '', caption: '', meta: '' },
-        uploading: '',
+        uploading: '', // status text while a batch uploads
+        uploadJobs: 0,
         dragOver: false,
         // Editor
         draft: null,
@@ -280,8 +281,16 @@ window.codexPage = function () {
                 if (this.peek.open) this.hidePeek();
                 if (this.searchOpen) this.placeResults();
             }, { passive: true });
+            // A file dropped outside the drop targets of the editor would make the browser open it and
+            // leave the draft: take it as an upload instead.
+            window.addEventListener('dragover', (event) => {
+                if (this.screen === 'edit' && this.hasFiles(event)) event.preventDefault();
+            });
+            window.addEventListener('drop', (event) => {
+                if (this.screen === 'edit' && this.hasFiles(event)) this.onDrop(event);
+            });
             window.addEventListener('beforeunload', (event) => {
-                if (this.isDirty) {
+                if (this.isDirty || this.uploading) {
                     event.preventDefault();
                     event.returnValue = '';
                 }
@@ -1457,6 +1466,14 @@ window.codexPage = function () {
         },
         // Uploads, one after another, and puts each into the text where the cursor is.
         async uploadPictures(files) {
+            this.uploadJobs++;
+            try {
+                await this.uploadBatch(files);
+            } finally {
+                if (--this.uploadJobs === 0) this.uploading = '';
+            }
+        },
+        async uploadBatch(files) {
             const list = Array.from(files).filter((f) => f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(f.name));
             if (!list.length) {
                 this.showMessage('Choose PNG, JPEG, WebP or GIF images.', 'error');
@@ -1491,7 +1508,6 @@ window.codexPage = function () {
                     this.showMessage(`Could not upload ${file.name}: ${error.message}`, 'error');
                 }
             }
-            this.uploading = '';
         },
         // ![[name|]] on a paragraph of its own (the renderer makes a figure of a picture-only paragraph),
         // with the cursor after it.
@@ -1538,6 +1554,8 @@ window.codexPage = function () {
             this.uploadPictures(event.dataTransfer.files);
         },
         onPaste(event) {
+            // Text copied from a spreadsheet or document comes with a picture of it: keep the text.
+            if (event.clipboardData?.getData('text/plain')) return;
             const files = Array.from(event.clipboardData?.files || []).filter((f) => f.type.startsWith('image/'));
             if (!files.length) return;
             event.preventDefault();
@@ -1662,7 +1680,7 @@ window.codexPage = function () {
             }
         },
         async save() {
-            if (this.busy || !this.draft || this.draft.locked) return;
+            if (this.busy || this.uploading || !this.draft || this.draft.locked) return;
             const d = this.draft;
             d.error = '';
             this.busy = true;

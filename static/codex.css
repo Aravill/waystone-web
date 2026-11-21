@@ -158,7 +158,8 @@ button.wikilink {
     text-underline-offset: 0.2rem;
 }
 
-.cm-imgref {
+.cm-imgref,
+.cm-imgref * {
     color: var(--muted);
 }
 
@@ -1335,6 +1336,12 @@ button.wikilink {
 }
 
 /* Tags: chips that link to the pages with the tag */
+.codex-section .section-header .cx-chip {
+    font: 0.875rem/1.4 var(--font-text);
+    letter-spacing: normal;
+    text-transform: none;
+}
+
 .cx-chip--tag {
     color: var(--ink);
     text-decoration: none;
@@ -1360,6 +1367,13 @@ a.cx-chip--tag[aria-current] {
     color: var(--muted);
     font: inherit;
     cursor: pointer;
+}
+
+@media (pointer: coarse) {
+    .cx-chip-x {
+        min-height: 2rem;
+        min-width: 2rem;
+    }
 }
 
 .cx-chip-x:hover,
@@ -1428,15 +1442,14 @@ a.cx-chip--tag[aria-current] {
     height: auto;
 }
 
-.cx-img-btn--inline,
-.codex-text p > .cx-img-btn {
+.cx-img-btn--inline {
     display: inline-block;
     width: auto;
     max-width: 100%;
     vertical-align: middle;
 }
 
-.codex-text p > .cx-img-btn img {
+.cx-img-btn--inline img {
     max-height: 12rem;
     width: auto;
 }
@@ -1509,6 +1522,10 @@ a.cx-chip--tag[aria-current] {
 
 .cx-lightbox::backdrop {
     background: rgba(10, 8, 6, 0.78);
+}
+
+html:has(dialog.cx-lightbox[open]) {
+    overflow: hidden;
 }
 
 .cx-lightbox figure {
