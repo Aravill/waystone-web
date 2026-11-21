@@ -314,3 +314,78 @@ test.describe('Codices graph', () => {
     await expect(page.locator('#gvSvg .node.current')).toHaveCount(1);
   });
 });
+
+test.describe('Codices local drafts', () => {
+  let editor;
+  let pageId;
+  let editUrl;
+
+  test.beforeEach(async () => {
+    editor = await apiAs('roy');
+    const home = await (await editor.get('/api/codices')).json();
+    const codex = home.codices.find((c) => c.can_edit);
+    expect(codex, 'roy can edit a codex').toBeTruthy();
+    const res = await editor.post('/api/codices/pages', { data: { title: 'E2E drafts page', codex_id: codex.id } });
+    expect(res.status(), 'create page').toBe(201);
+    pageId = (await res.json()).page.id;
+    editUrl = `/codices/p/${pageId}/e2e-drafts-page/edit`;
+  });
+
+  test.afterEach(async () => {
+    await editor.delete(`/api/codices/pages/${pageId}`);
+    await editor.dispose();
+  });
+
+  async function typeAndWait(page, text) {
+    await page.locator('.cm-content').click();
+    await page.keyboard.type(text);
+    await expect(page.getByText('Draft kept on this device')).toBeVisible();
+  }
+
+  test('a draft is restored after a reload and gone after saving', async ({ page }) => {
+    await loginAs(page, 'roy');
+    await page.goto(editUrl);
+    await typeAndWait(page, 'Half written thought');
+
+    await page.reload();
+    await expect(page.getByText('You have unsaved changes from')).toBeVisible();
+    await page.getByRole('button', { name: 'Restore them' }).click();
+    await expect(page.locator('.cm-content')).toContainText('Half written thought');
+    await expect(page.getByText('You have unsaved changes from')).toBeHidden();
+
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await page.waitForURL(/saved=/);
+    await page.goto(editUrl);
+    await expect(page.locator('.cm-content')).toContainText('Half written thought');
+    await expect(page.getByText('You have unsaved changes from')).toBeHidden();
+  });
+
+  test('a draft on an older revision opens the conflict panel on save', async ({ page }) => {
+    await loginAs(page, 'roy');
+    await page.goto(editUrl);
+    await typeAndWait(page, 'My side of the story');
+
+    const cur = await (await editor.get(`/api/codices/pages/${pageId}`)).json();
+    const saved = await editor.put(`/api/codices/pages/${pageId}`, { data: { base_revision: cur.page.current_revision, body: 'Someone else wrote this', note: '' } });
+    expect(saved.status(), 'other save').toBe(201);
+
+    await page.reload();
+    await page.getByRole('button', { name: 'Restore them' }).click();
+    await expect(page.locator('.cm-content')).toContainText('My side of the story');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.locator('.conflict')).toBeVisible();
+    await expect(page.locator('.conflict .diff')).toContainText('Someone else wrote this');
+  });
+
+  test('Cancel asks before dropping changes and clears the draft', async ({ page }) => {
+    await loginAs(page, 'roy');
+    await page.goto(editUrl);
+    await typeAndWait(page, 'Not wanted');
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByText('Discard your changes?')).toBeVisible();
+    await page.getByRole('button', { name: 'Discard changes' }).click();
+    await page.waitForURL(new RegExp(`/codices/p/${pageId}/e2e-drafts-page$`));
+    await page.goto(editUrl);
+    await expect(page.getByText('You have unsaved changes from')).toBeHidden();
+  });
+});
