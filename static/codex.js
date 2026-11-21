@@ -353,22 +353,23 @@ function codexTlHtml(events, cal, opts) {
     return html;
 }
 
-function codexPageItemHtml(p, currentId) {
+function codexPageItemHtml(p, currentId, canDrag = false) {
     const also = p.aliases.length ? `<span class="muted"> · also ${escapeHtml(p.aliases.join(', '))}</span>` : '';
     const kind = p.kind === 'timeline' ? `<span class="cx-ty" aria-hidden="true">${CODEX_TL_ICON}</span>` : '';
     const kindText = p.kind === 'timeline' ? '<span class="visually-hidden"> (timeline)</span>' : '';
-    return `<li><a href="${codexPageUrl(p)}"${p.id === currentId ? ' aria-current="page"' : ''}>${kind}${escapeHtml(p.title)}${kindText}</a>${also}</li>`;
+    const drag = canDrag ? ` draggable="true" data-drag="page:${escapeHtml(p.id)}"` : '';
+    return `<li><a href="${codexPageUrl(p)}"${p.id === currentId ? ' aria-current="page"' : ''}${drag}>${kind}${escapeHtml(p.title)}${kindText}</a>${also}</li>`;
 }
 
-function codexFolderHtml(n, depth, canEdit, currentId) {
+function codexFolderHtml(n, depth, canEdit, currentId, canDrag = false) {
     const open = codexTransientOpen.has(n.id) || (codexOpenState[n.id] === undefined ? depth === 0 : codexOpenState[n.id]);
     const id = escapeHtml(n.id);
-    const pages = n.pages.length ? `<ul class="page-list">${n.pages.map((p) => codexPageItemHtml(p, currentId)).join('')}</ul>` : '';
+    const pages = n.pages.length ? `<ul class="page-list">${n.pages.map((p) => codexPageItemHtml(p, currentId, canDrag)).join('')}</ul>` : '';
     return `<details class="codex-folder${depth >= 4 ? ' codex-folder--deep' : ''}" id="folder-${id}" data-id="${id}"${open ? ' open' : ''}>` +
-        `<summary><span class="codex-folder-name">${escapeHtml(n.name)}</span><span class="codex-folder-count muted" title="${n.count} ${n.count === 1 ? 'page' : 'pages'}"><span aria-hidden="true">${n.count}</span><span class="visually-hidden"> ${n.count} ${n.count === 1 ? 'page' : 'pages'}</span></span>` +
+        `<summary${canDrag ? ` draggable="true" data-drag="folder:${id}"` : ''}><span class="codex-folder-name">${escapeHtml(n.name)}</span><span class="codex-folder-count muted" title="${n.count} ${n.count === 1 ? 'page' : 'pages'}"><span aria-hidden="true">${n.count}</span><span class="visually-hidden"> ${n.count} ${n.count === 1 ? 'page' : 'pages'}</span></span>` +
         (canEdit ? `<button type="button" class="codex-menu-btn" data-menu="${id}" aria-label="Actions for folder ${escapeHtml(n.name)}" aria-haspopup="menu" aria-expanded="false">⋯</button>` : '') + '</summary>' +
         `<div class="codex-folder-body">` +
-        n.children.map((c) => codexFolderHtml(c, depth + 1, canEdit, currentId)).join('') + pages + '</div></details>';
+        n.children.map((c) => codexFolderHtml(c, depth + 1, canEdit, currentId, canDrag)).join('') + pages + '</div></details>';
 }
 
 // The ⋯ menu's items; every label names the folder for screen readers.
@@ -396,6 +397,11 @@ window.codexPage = function () {
         messageVisible: false,
         messageText: '',
         messageType: '',
+        messageAction: null,
+        dragOn: false, // a tree drag is in progress: shows the Top level strip
+        treeDrag: null, // { kind: 'page' | 'folder', id } being dragged
+        springId: '',
+        springTimer: null,
         confirmDialog: { open: false, eyebrow: '', title: '', message: '', confirmLabel: '', danger: true, resolve: null },
         home: null,
         codex: null,
@@ -684,8 +690,10 @@ window.codexPage = function () {
             if (!this.codex) return '';
             const tree = codexFolderTree(this.codex.folders, this.codex.pages);
             const cur = !this.onCodexScreen && this.page ? this.page.id : '';
-            const pages = tree.pages.length ? `<ul class="page-list">${tree.pages.map((p) => codexPageItemHtml(p, cur)).join('')}</ul>` : '';
-            return tree.roots.map((r) => codexFolderHtml(r, 0, this.codex.can_edit, cur)).join('') + pages;
+            // Mouse drag and drop only: on touch the folder menu's Move and the page's Folder > Change stay the way.
+            const canDrag = !!this.codex.can_edit && window.matchMedia('(pointer: fine)').matches;
+            const pages = tree.pages.length ? `<ul class="page-list">${tree.pages.map((p) => codexPageItemHtml(p, cur, canDrag)).join('')}</ul>` : '';
+            return tree.roots.map((r) => codexFolderHtml(r, 0, this.codex.can_edit, cur, canDrag)).join('') + pages;
         },
         // Marks a folder and the ones above it open.
         openFolderChain(id, folders, transient = false) {
@@ -775,6 +783,129 @@ window.codexPage = function () {
                 event.preventDefault();
                 if (this.folderMenu.id === m.dataset.menu) this.closeFolderMenu();
                 else this.openFolderMenu(m);
+            }
+        },
+        // Tree drag and drop (mouse, Edit only). The custom type keeps the image file-drop handlers out of it.
+        // A drop reuses the two move routes; the checks below mirror the server, so a refused drop has no drop cursor.
+        treeDragTarget(event) {
+            const strip = event.target.closest?.('.codex-root-drop');
+            if (strip) return { el: strip, id: '' };
+            const sum = event.target.closest?.('.codex-tree summary');
+            return sum ? { el: sum, id: sum.parentElement.dataset.id } : null;
+        },
+        // Mirrors db.folderDepth: a top-level folder is level 1 (db.MaxFolderDepth is 10).
+        folderLevels(id) {
+            let n = 0;
+            for (let cur = id; cur && n <= this.codex.folders.length; n++) cur = (this.folderById(cur) || {}).parent_id;
+            return n;
+        },
+        // Mirrors db.folderHeight: the levels in the subtree under id, itself included.
+        folderHeight(id, hops = 0) {
+            let h = 0;
+            if (hops <= this.codex.folders.length) {
+                for (const f of this.codex.folders) {
+                    if (f.parent_id === id) h = Math.max(h, this.folderHeight(f.id, hops + 1));
+                }
+            }
+            return h + 1;
+        },
+        treeDropOk(targetId) {
+            const it = this.treeDrag;
+            if (!it || !this.codex) return false;
+            if (it.kind === 'page') {
+                const p = this.codex.pages.find((x) => x.id === it.id);
+                return !!p && (p.folder_id || '') !== targetId;
+            }
+            const f = this.folderById(it.id);
+            if (!f || (f.parent_id || '') === targetId) return false;
+            for (let cur = targetId, n = 0; cur && n <= this.codex.folders.length; n++) {
+                if (cur === f.id) return false; // itself or a descendant
+                cur = (this.folderById(cur) || {}).parent_id;
+            }
+            return this.folderLevels(targetId) + this.folderHeight(f.id) <= 10;
+        },
+        onTreeDragStart(event) {
+            const el = event.target.closest?.('[data-drag]');
+            if (!el) return;
+            const [kind, id] = el.dataset.drag.split(':');
+            this.treeDrag = { kind, id };
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('application/x-codex-item', el.dataset.drag);
+            setTimeout(() => { // not inside the handler: changing the layout there can cancel the drag
+                if (!this.treeDrag) return;
+                el.classList.add('dragging');
+                this.dragOn = true;
+            });
+        },
+        clearTreeDrag() {
+            this.treeDrag = null;
+            this.dragOn = false;
+            clearTimeout(this.springTimer);
+            this.springId = '';
+            document.querySelectorAll('.codex-tree-wrap .dragging, .codex-tree-wrap .over').forEach((el) => el.classList.remove('dragging', 'over'));
+        },
+        onTreeDragOver(event) {
+            if (!this.treeDrag) return;
+            const t = this.treeDragTarget(event);
+            document.querySelectorAll('.codex-tree-wrap .over').forEach((el) => el !== (t && t.el) && el.classList.remove('over'));
+            if (t && this.treeDropOk(t.id)) {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                t.el.classList.add('over');
+            }
+            // Hovering a closed folder for a moment opens it, so the drop can go deeper.
+            const d = t && t.id ? t.el.parentElement : null;
+            if (!d || d.open) {
+                clearTimeout(this.springTimer);
+                this.springId = '';
+                return;
+            }
+            if (this.springId === t.id) return;
+            clearTimeout(this.springTimer);
+            this.springId = t.id;
+            this.springTimer = setTimeout(() => {
+                codexTransientOpen.add(t.id);
+                d.open = true; // onFolderToggle ignores it: the user did not toggle it
+            }, 700);
+        },
+        onTreeDragLeave(event) {
+            if (event.currentTarget.contains(event.relatedTarget)) return;
+            document.querySelectorAll('.codex-tree-wrap .over').forEach((el) => el.classList.remove('over'));
+            clearTimeout(this.springTimer);
+            this.springId = '';
+        },
+        onTreeDrop(event) {
+            const t = this.treeDragTarget(event);
+            const it = this.treeDrag;
+            if (!it || !t) return;
+            event.preventDefault();
+            const ok = this.treeDropOk(t.id);
+            this.clearTreeDrag();
+            if (ok) this.moveTreeItem(it.kind, it.id, t.id);
+        },
+        async moveTreeItem(kind, id, targetId, back = false) {
+            const rec = kind === 'page' ? this.codex.pages.find((x) => x.id === id) : this.folderById(id);
+            if (!rec) return;
+            const name = kind === 'page' ? rec.title : rec.name;
+            const from = (kind === 'page' ? rec.folder_id : rec.parent_id) || '';
+            try {
+                const { response, data } = kind === 'page'
+                    ? await this.send(`/api/codices/pages/${encodeURIComponent(id)}/folder`, 'PUT', { folder_id: targetId })
+                    : await this.send(`/api/codices/folders/${encodeURIComponent(id)}`, 'PUT', { parent_id: targetId });
+                if (!response.ok) {
+                    const d = {};
+                    this.failDlg(d, response, data);
+                    this.showMessage(d.error, 'error');
+                    if (response.status === 404) await this.load();
+                    return;
+                }
+                this.keepFolderOpen(targetId);
+                const where = targetId ? (this.folderById(targetId) || {}).name : '';
+                await this.load();
+                const action = back ? null : { label: 'Undo', run: () => this.moveTreeItem(kind, id, from, true) };
+                this.showMessage(back ? `Moved ${name} back.` : `Moved ${name} to ${where || 'the top level'}.`, 'success', action);
+            } catch (error) {
+                this.showMessage('Could not move it: ' + error.message, 'error');
             }
         },
         openFolderMenu(btn) {
@@ -2750,14 +2881,23 @@ window.codexPage = function () {
                 this.showMessage('Logout failed: ' + error.message, 'error');
             }
         },
-        showMessage(text, type) {
+        // A toast; action is an optional { label, run } text button ("Undo").
+        showMessage(text, type, action = null) {
             this.messageText = text;
             this.messageType = type;
+            this.messageAction = action;
             this.messageVisible = true;
             clearTimeout(this.messageTimer);
             this.messageTimer = setTimeout(() => {
                 this.messageVisible = false;
+                this.messageAction = null;
             }, 5000);
+        },
+        runMessageAction() {
+            const action = this.messageAction;
+            this.messageVisible = false;
+            this.messageAction = null;
+            if (action) action.run();
         }
     };
 };

@@ -1020,6 +1020,37 @@ button.wikilink {
     position: relative;
 }
 
+/* Tree drag and drop: the dragged item fades; a target gets a dashed rubric box and a hint, never colour alone. */
+.codex-tree [draggable='true'] {
+    cursor: grab;
+}
+
+.codex-tree .dragging {
+    opacity: 0.45;
+}
+
+.codex-tree summary.over,
+.codex-root-drop.over {
+    outline: 1px dashed var(--rubric);
+    outline-offset: -1px;
+    background: color-mix(in srgb, var(--rubric) 10%, transparent);
+}
+
+.codex-tree summary.over .codex-folder-name::after,
+.codex-root-drop.over::after {
+    content: ' \2190 drop here';
+    font-weight: 400;
+    color: var(--rubric);
+}
+
+.codex-root-drop {
+    margin: 0 0 0.375rem;
+    padding: 0.375rem 0.5rem;
+    border: 1px dashed var(--line);
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
 .codex-menu {
     position: absolute;
     z-index: 5;
