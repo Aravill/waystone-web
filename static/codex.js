@@ -6,6 +6,10 @@
 // Mirrors wikiLinkRe in db/codex_links.go.
 const CODEX_LINK_RE = /\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{1,200}))?\]\]/g;
 
+// ![[name]] and ![[name|caption]] embed a picture uploaded to the page. Same shape as the link
+// regex; the leading "!" makes it a picture, so pictures are swapped out before links.
+const CODEX_IMAGE_RE = /!\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{0,200}))?\]\]/g;
+
 const codexNorm = (s) => String(s || '').trim().split(/\s+/).join(' ').toLowerCase();
 
 function codexSlug(title) {
@@ -17,17 +21,44 @@ function codexPageUrl(p, tail = '') {
     return `/codices/p/${encodeURIComponent(p.id)}/${encodeURIComponent(codexSlug(p.title))}${tail}`;
 }
 
-// Markdown with [[wikilinks]]. lookup(text) returns the target page ({id, title}) or null for a
-// missing page; with no lookup (old revisions) links are shown plain. The links are swapped for
-// placeholders before rendering so the Markdown renderer never sees them. A placeholder holds
+// A picture of the page as the Markdown renderer's output: a button (opens the lightbox) around
+// the image, and a caption under it when the text has one. pic is null when the name isn't one of
+// the page's pictures.
+function codexPicHtml(pic, name, caption, kind) {
+    if (!pic) return `<span class="cx-img-missing">Missing image: ${escapeHtml(name)}</span>`;
+    const shown = escapeHtml(caption || pic.name);
+    const meta = escapeHtml(`${pic.name} · ${pic.width}×${pic.height}`);
+    const btn = `<button type="button" class="cx-img-btn" data-url="${escapeHtml(pic.url)}" data-caption="${shown}" data-meta="${meta}" aria-label="View larger: ${shown}">` +
+        `<img src="${escapeHtml(pic.url)}" alt="${shown}" width="${Number(pic.width) || ''}" height="${Number(pic.height) || ''}" loading="lazy"></button>`;
+    if (kind === 'inline') return btn;
+    return `<figure class="cx-figure">${btn}${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ''}</figure>`;
+}
+
+// Markdown with [[wikilinks]] and ![[pictures]]. lookup(text) returns the target page ({id, title})
+// or null for a missing page; with no lookup (old revisions) links are shown plain. images(name)
+// returns a picture of the page ({name, url, width, height}) or null. Links and pictures are swapped
+// for placeholders before rendering so the Markdown renderer never sees them. A placeholder holds
 // spaces, which a Markdown link URL can't, so one inside "(...)" is never swallowed into an href.
-function codexMarkdown(body, lookup, canCreate = true) {
+// A paragraph made only of pictures becomes a figure; two or more in a row become a gallery.
+function codexMarkdown(body, lookup, canCreate = true, images = null) {
     const found = [];
-    const text = String(body || '').replace(/\u0001/g, '').replace(CODEX_LINK_RE, (m, t, label) => {
+    const pics = [];
+    const text = String(body || '').replace(/[\u0001\u0002]/g, '').replace(CODEX_IMAGE_RE, (m, n, caption) => {
+        pics.push({ name: n.trim(), caption: (caption || '').trim() });
+        return `\u0002 ${pics.length - 1} \u0002`;
+    }).replace(CODEX_LINK_RE, (m, t, label) => {
         found.push({ text: t.trim(), label });
         return `\u0001 ${found.length - 1} \u0001`;
     });
-    return renderMarkdown(text).replace(/\u0001 (\d+) \u0001/g, (m, i) => {
+    const pic = (i, kind) => {
+        const p = pics[Number(i)];
+        return p ? codexPicHtml(images ? images(p.name) : null, p.name, p.caption, kind) : '';
+    };
+    return renderMarkdown(text).replace(/(?:<p>(?:\u0002 \d+ \u0002(?:<br>| )*)+<\/p>)+/g, (run) => {
+        const ids = Array.from(run.matchAll(/\u0002 (\d+) \u0002/g), (m) => m[1]);
+        if (ids.length === 1) return pic(ids[0], 'figure');
+        return `<div class="cx-gallery">${ids.map((i) => pic(i, 'figure')).join('')}</div>`;
+    }).replace(/\u0002 (\d+) \u0002/g, (m, i) => pic(i, 'inline')).replace(/\u0001 (\d+) \u0001/g, (m, i) => {
         const l = found[Number(i)];
         if (!l) return '';
         const shown = escapeHtml(l.label || l.text);
@@ -111,6 +142,7 @@ const codexPeekCache = {};
 // A few plain lines from the start of a page, for the link preview card.
 function codexPlainExcerpt(body, max = 220) {
     const text = String(body || '').split('\n').map((l) => l.trim()).filter((l) => l && !/^#{1,6}\s/.test(l)).map((l) => l.replace(/^([-*+]|\d+\.|>)\s+/, '')).join(' ')
+        .replace(CODEX_IMAGE_RE, '')
         .replace(CODEX_LINK_RE, (m, t, label) => label || t)
         .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
         .replace(/[*_`]/g, '')
@@ -175,6 +207,11 @@ window.codexPage = function () {
         navPromise: null,
         codexChoices: [],
         dlg: { type: '' },
+        // Tags and pictures
+        tagFilter: '', // ?tag=name on the codex screen: list only the pages with that tag
+        lightbox: { url: '', caption: '', meta: '' },
+        uploading: '',
+        dragOver: false,
         // Editor
         draft: null,
         conflict: null,
@@ -235,7 +272,9 @@ window.codexPage = function () {
                 this.loading = false;
                 return;
             }
+            this.tagFilter = (new URLSearchParams(location.search).get('tag') || '').trim();
             document.addEventListener('keydown', (event) => this.onGlobalKey(event));
+            document.addEventListener('click', (event) => this.onImageClick(event));
             window.matchMedia('(min-width: 901px)').addEventListener('change', (e) => e.matches && this.closeNav(false));
             window.addEventListener('scroll', () => {
                 if (this.peek.open) this.hidePeek();
@@ -366,7 +405,7 @@ window.codexPage = function () {
             return renderMarkdown(text);
         },
         codexMarkdown(body, lookup) {
-            return codexMarkdown(body, lookup);
+            return codexMarkdown(body, lookup, true, this.imageLookup);
         },
         countLabel(n, word) {
             return `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -445,7 +484,7 @@ window.codexPage = function () {
             return g ? document.getElementById('group-' + g.id) : null;
         },
         scrollToFolder() {
-            if (!this.hashScrolled && (location.hash === '#wanted' || location.hash === '#recent')) {
+            if (!this.hashScrolled && ['#wanted', '#recent', '#tags'].includes(location.hash)) {
                 this.hashScrolled = true;
                 document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: 'start' });
                 return;
@@ -599,8 +638,14 @@ window.codexPage = function () {
             }
             return (text) => map.get(codexNorm(text)) || null;
         },
+        // Lookup by name among every picture ever uploaded to the page (removed ones too, so old
+        // revisions still show theirs).
+        get imageLookup() {
+            const map = new Map(Object.values(this.pageData?.image_index || {}).map((p) => [codexNorm(p.name), p]));
+            return (name) => map.get(codexNorm(name)) || null;
+        },
         get bodyHtml() {
-            return this.page ? codexMarkdown(this.page.body, this.linkLookup, this.canEdit) : '';
+            return this.page ? codexMarkdown(this.page.body, this.linkLookup, this.canEdit, this.imageLookup) : '';
         },
         // Pages that link here by [[link]]; map pins are not shown.
         get linkedFrom() {
@@ -659,7 +704,7 @@ window.codexPage = function () {
             this.tocActive = active;
         },
         get previewHtml() {
-            return this.draft ? codexMarkdown(this.draft.body, this.titleLookup) : '';
+            return this.draft ? codexMarkdown(this.draft.body, this.titleLookup, true, this.imageLookup) : '';
         },
         // Pages of the current codex (from the codex payload loadNav fetched), for previews and the editor.
         get titles() {
@@ -949,24 +994,25 @@ window.codexPage = function () {
 
         // ---- Dialogs ----
         get dlgEyebrow() {
-            return { createPage: 'Codex', codex: 'Codex', rename: 'Page', aliases: 'Page', move: 'Page', folder: 'Folder', folderMove: 'Folder', pageFolder: 'Page' }[this.dlg.type] || '';
+            return { createPage: 'Codex', codex: 'Codex', rename: 'Page', aliases: 'Page', move: 'Page', folder: 'Folder', folderMove: 'Folder', pageFolder: 'Page', tags: 'Page', tag: 'Tag' }[this.dlg.type] || '';
         },
         get dlgTitle() {
             const d = this.dlg;
             if (d.type === 'createPage') return 'New page';
-            return { codex: d.codex ? 'Edit codex' : 'New codex', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another codex', folder: d.folder ? 'Rename folder' : 'New folder', folderMove: 'Move folder', pageFolder: 'Change folder' }[d.type] || '';
+            return { codex: d.codex ? 'Edit codex' : 'New codex', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another codex', folder: d.folder ? 'Rename folder' : 'New folder', folderMove: 'Move folder', pageFolder: 'Change folder', tags: 'Tags', tag: d.tag ? 'Rename tag' : 'New tag' }[d.type] || '';
         },
         get dlgSubmit() {
             const d = this.dlg;
             if (d.type === 'createPage') return d.busy ? 'Creating...' : 'Create';
-            return d.busy ? 'Saving...' : d.type === 'move' ? 'Move page' : d.type === 'folderMove' ? 'Move folder' : (d.type === 'codex' && !d.codex) || (d.type === 'folder' && !d.folder) ? 'Create' + (d.type === 'codex' ? ' codex' : ' folder') : 'Save';
+            return d.busy ? 'Saving...' : d.type === 'tag' && !d.tag ? 'Create tag' : d.type === 'move' ? 'Move page' : d.type === 'folderMove' ? 'Move folder' : (d.type === 'codex' && !d.codex) || (d.type === 'folder' && !d.folder) ? 'Create' + (d.type === 'codex' ? ' codex' : ' folder') : 'Save';
         },
         get moveWarning() {
             const n = this.pageData?.incoming_count || 0;
             const here = this.page?.codex.name;
             return (n > 0
                 ? `${this.countLabel(n, 'link')} from ${here} will turn into missing links, because links only reach pages in their own codex. `
-                : '') + "This page's own links are checked again in the new codex, and it goes to the top level of its folders.";
+                : '') + "This page's own links are checked again in the new codex, and it goes to the top level of its folders." +
+                (this.pageData?.tags?.length ? ' Its tags stay behind, because tags belong to a codex.' : '');
         },
         async ensureCodices() {
             if (this.codexChoices.length) return;
@@ -1123,6 +1169,8 @@ window.codexPage = function () {
                 else if (d.type === 'folder') await this.submitFolder(d);
                 else if (d.type === 'folderMove') await this.submitFolderMove(d);
                 else if (d.type === 'pageFolder') await this.submitPageFolder(d);
+                else if (d.type === 'tags') await this.submitTags(d);
+                else if (d.type === 'tag') await this.submitTag(d);
             } catch (error) {
                 d.error = 'Something went wrong: ' + error.message;
             } finally {
@@ -1260,6 +1308,275 @@ window.codexPage = function () {
                 return;
             }
             this.failDlg(d, response, data);
+        },
+
+        // ---- Tags ----
+        tagUrl(name) {
+            return `/codices/c/${encodeURIComponent(this.currentCodexId)}?tag=${encodeURIComponent(name)}`;
+        },
+        // The tag named by ?tag= on the codex screen, if this codex has it.
+        get filterTag() {
+            const q = codexNorm(this.tagFilter);
+            return q && this.codex ? this.codex.tags.find((t) => codexNorm(t.name) === q) || null : null;
+        },
+        get taggedPages() {
+            const t = this.filterTag;
+            if (!t) return [];
+            return this.codex.pages.filter((p) => p.tag_ids.includes(t.id)).sort((a, b) => (codexNorm(a.title) < codexNorm(b.title) ? -1 : 1));
+        },
+        // Tags of the codex not yet picked in the page's Tags dialog (offered as suggestions).
+        get tagSuggestions() {
+            const d = this.dlg;
+            if (d.type !== 'tags' || !this.codex) return [];
+            const have = new Set(d.names.map(codexNorm));
+            return this.codex.tags.filter((t) => !have.has(codexNorm(t.name)));
+        },
+        async openTags() {
+            await this.navPromise; // the codex's tags come with the codex payload
+            if (!this.codex) {
+                this.showMessage('Could not load the tags of this codex. Try again.', 'error');
+                return;
+            }
+            this.dlg = { type: 'tags', names: this.pageData.tags.map((t) => t.name), input: '', error: '', busy: false };
+            this.focusDlg();
+        },
+        // Adds what is typed in the Tags dialog (commas separate several); false when it was refused.
+        addTagInput(d) {
+            for (const raw of d.input.split(',')) {
+                const name = raw.trim().split(/\s+/).join(' ');
+                if (!name) continue;
+                if (Array.from(name).length > 40) {
+                    d.error = 'A tag name can be at most 40 characters.';
+                    return false;
+                }
+                if (!d.names.some((n) => codexNorm(n) === codexNorm(name))) d.names.push(name);
+            }
+            d.input = '';
+            d.error = '';
+            return true;
+        },
+        removeTagName(d, name) {
+            d.names = d.names.filter((n) => n !== name);
+            this.$refs.dlgFocus?.focus();
+        },
+        async submitTags(d) {
+            if (!this.addTagInput(d)) return;
+            const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/tags`, 'PUT', { names: d.names });
+            if (!response.ok) {
+                this.failDlg(d, response, data);
+                return;
+            }
+            this.closeDlg();
+            await this.load();
+            this.showMessage('Tags saved', 'success');
+        },
+        openNewTag() {
+            this.dlg = { type: 'tag', tag: null, name: '', error: '', busy: false };
+            this.focusDlg();
+        },
+        openRenameTag(t) {
+            this.dlg = { type: 'tag', tag: t, name: t.name, error: '', busy: false };
+            this.focusDlg();
+        },
+        async submitTag(d) {
+            const name = d.name.trim().split(/\s+/).join(' ');
+            if (!name || Array.from(name).length > 40) {
+                d.error = 'Give the tag a name of 1 to 40 characters.';
+                return;
+            }
+            if (d.tag && name === d.tag.name) {
+                this.closeDlg();
+                return;
+            }
+            const { response, data } = d.tag
+                ? await this.send(`/api/codices/tags/${encodeURIComponent(d.tag.id)}`, 'PUT', { name })
+                : await this.send(`/api/codices/c/${encodeURIComponent(this.codex.codex.id)}/tags`, 'POST', { name });
+            if (!response.ok) {
+                if (data.code === 'tag_name_taken') d.error = 'A tag with that name already exists in this codex.';
+                else this.failDlg(d, response, data);
+                return;
+            }
+            if (d.tag && codexNorm(this.tagFilter) === codexNorm(d.tag.name)) {
+                this.tagFilter = name;
+                history.replaceState(null, '', location.pathname + '?tag=' + encodeURIComponent(name) + location.hash);
+            }
+            this.closeDlg();
+            await this.load();
+            this.showMessage(d.tag ? 'Tag renamed' : 'Tag created', 'success');
+        },
+        async deleteTag(t) {
+            const ok = await this.askConfirm({
+                eyebrow: 'Tag',
+                title: `Delete the tag “${t.name}”?`,
+                message: `${t.page_count ? `It will be removed from ${this.countLabel(t.page_count, 'page')}.` : 'No page has it.'} The pages themselves are not changed.`,
+                confirmLabel: 'Delete tag'
+            });
+            if (!ok) return;
+            try {
+                const { response, data } = await this.send(`/api/codices/tags/${encodeURIComponent(t.id)}`, 'DELETE');
+                if (response.status === 401) {
+                    this.showMessage('Your login has expired. Log in again, then try once more.', 'error');
+                    return;
+                }
+                if (!response.ok && response.status !== 404) {
+                    this.showMessage(this.sentence(data.error || 'Could not delete the tag'), 'error');
+                    return;
+                }
+                if (codexNorm(this.tagFilter) === codexNorm(t.name)) {
+                    this.tagFilter = '';
+                    history.replaceState(null, '', location.pathname + '#tags');
+                }
+                await this.load();
+                this.showMessage(response.ok ? 'Tag deleted' : 'That tag was already gone', response.ok ? 'success' : 'info');
+            } catch (error) {
+                this.showMessage('Could not delete the tag: ' + error.message, 'error');
+            }
+        },
+
+        // ---- Pictures ----
+        // Any button that carries a picture (data-url) opens the lightbox: article figures, the
+        // editor preview, history, the cover.
+        onImageClick(event) {
+            const b = event.target.closest && event.target.closest('button.cx-img-btn[data-url]');
+            if (!b) return;
+            this.openLightbox({ url: b.dataset.url, caption: b.dataset.caption, meta: b.dataset.meta });
+        },
+        openLightbox(pic) {
+            this.lightbox = pic;
+            this.$refs.lightbox.showModal();
+        },
+        onLightboxClick(event) {
+            if (event.target === this.$refs.lightbox) this.$refs.lightbox.close();
+        },
+        coverPic() {
+            const c = this.pageData.cover;
+            return { url: c.url, caption: c.name, meta: `${c.name} · ${c.width}×${c.height}` };
+        },
+        thumbPic(img) {
+            return { url: img.url, caption: img.name, meta: `${img.name} · ${img.width}×${img.height}` };
+        },
+        // Uploads, one after another, and puts each into the text where the cursor is.
+        async uploadPictures(files) {
+            const list = Array.from(files).filter((f) => f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(f.name));
+            if (!list.length) {
+                this.showMessage('Choose PNG, JPEG, WebP or GIF images.', 'error');
+                return;
+            }
+            for (const [i, file] of list.entries()) {
+                if (file.size > 25 << 20) {
+                    this.showMessage(`${file.name} is larger than 25 MB.`, 'error');
+                    continue;
+                }
+                this.uploading = `Uploading ${file.name}${list.length > 1 ? ` (${i + 1} of ${list.length})` : ''}...`;
+                try {
+                    const response = await fetch(`/api/codices/pages/${encodeURIComponent(this.page.id)}/pictures`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name || 'image') },
+                        body: file
+                    });
+                    if (response.status === 401 || (response.redirected && new URL(response.url).pathname.includes('login'))) {
+                        this.showMessage('Your login has expired. Log in again in another tab, then add the image.', 'error');
+                        break;
+                    }
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        this.showMessage(`${file.name}: ${this.sentence(data.error || 'upload failed')}`, 'error');
+                        continue;
+                    }
+                    const img = data.image;
+                    this.pageData.images = [...this.pageData.images, img];
+                    this.pageData.image_index = { ...this.pageData.image_index, [img.name]: { name: img.name, url: img.url, width: img.width, height: img.height } };
+                    this.insertPicture(img);
+                } catch (error) {
+                    this.showMessage(`Could not upload ${file.name}: ${error.message}`, 'error');
+                }
+            }
+            this.uploading = '';
+        },
+        // ![[name|]] on a paragraph of its own (the renderer makes a figure of a picture-only paragraph),
+        // with the cursor after it.
+        insertPicture(img) {
+            const text = `![[${img.name}|]]`;
+            const v = this.editorReady ? this.editor.view : null;
+            const ta = this.$refs.bodyArea;
+            const doc = v ? v.state.doc.toString() : this.draft.body;
+            const from = v ? v.state.selection.main.from : ta.selectionStart || 0;
+            const to = v ? v.state.selection.main.to : ta.selectionEnd || 0;
+            const before = doc.slice(0, from), after = doc.slice(to);
+            const pre = !before ? '' : before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+            const post = !after ? '\n' : after.startsWith('\n\n') ? '' : after.startsWith('\n') ? '\n' : '\n\n';
+            const insert = pre + text + post;
+            if (v) {
+                v.dispatch({ changes: { from, to, insert }, selection: { anchor: from + insert.length }, scrollIntoView: true });
+                v.focus();
+            } else {
+                this.draft.body = before + insert + after;
+                this.$nextTick(() => {
+                    ta.focus();
+                    ta.setSelectionRange(from + insert.length, from + insert.length);
+                });
+            }
+        },
+        onPickFiles(event) {
+            this.uploadPictures(event.target.files);
+            event.target.value = '';
+        },
+        hasFiles(event) {
+            return Array.from(event.dataTransfer?.types || []).includes('Files');
+        },
+        onDragOver(event) {
+            if (!this.hasFiles(event)) return;
+            event.preventDefault();
+            this.dragOver = true;
+        },
+        // Capture phase: CodeMirror would otherwise read a dropped file as text.
+        onDrop(event) {
+            this.dragOver = false;
+            if (!this.hasFiles(event)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.uploadPictures(event.dataTransfer.files);
+        },
+        onPaste(event) {
+            const files = Array.from(event.clipboardData?.files || []).filter((f) => f.type.startsWith('image/'));
+            if (!files.length) return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.uploadPictures(files);
+        },
+        async setCover(img) {
+            try {
+                const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/cover`, 'PUT', { image_id: img ? img.id : '' });
+                if (!response.ok) {
+                    this.showMessage(response.status === 401 ? 'Your login has expired. Log in again in another tab, then try again.' : this.sentence(data.error || 'Could not set the cover'), 'error');
+                    return;
+                }
+                this.pageData.cover = img ? { id: img.id, name: img.name, url: img.url, width: img.width, height: img.height } : null;
+                this.showMessage(img ? 'Cover set' : 'Cover removed', 'success');
+            } catch (error) {
+                this.showMessage('Could not set the cover: ' + error.message, 'error');
+            }
+        },
+        async removePicture(img) {
+            const ok = await this.askConfirm({
+                eyebrow: 'Image',
+                title: `Remove “${img.name}”?`,
+                message: 'It leaves this list and can no longer be the cover. Older revisions that show it keep showing it, and so does any ![[…]] still in the text.',
+                confirmLabel: 'Remove image'
+            });
+            if (!ok) return;
+            try {
+                const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/pictures/${encodeURIComponent(img.id)}`, 'DELETE');
+                if (!response.ok && response.status !== 404) {
+                    this.showMessage(response.status === 401 ? 'Your login has expired. Log in again in another tab, then try again.' : this.sentence(data.error || 'Could not remove the image'), 'error');
+                    return;
+                }
+                this.pageData.images = this.pageData.images.filter((x) => x.id !== img.id);
+                if (this.pageData.cover && this.pageData.cover.id === img.id) this.pageData.cover = null;
+                this.showMessage('Image removed', 'success');
+            } catch (error) {
+                this.showMessage('Could not remove the image: ' + error.message, 'error');
+            }
         },
 
         // ---- Delete ----
