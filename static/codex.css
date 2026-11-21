@@ -3312,8 +3312,6 @@ a.tl-title:hover {
     color: var(--muted);
     font-size: 0.8125rem;
     font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
 }
 
 .tl-jump a {
