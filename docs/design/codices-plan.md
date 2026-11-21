@@ -1,6 +1,6 @@
 # Codices: restructure plan
 
-**Status:** agreed on 2026-11-20, not started. Replaces the Codex as merged in PR 58 (`8eea696`).
+**Status:** agreed on 2026-11-20 and built in PRs 60–66 (live as v0.14.0 on 2026-11-21). It replaced the Codex as merged in PR 58 (`8eea696`). Where this plan and the code disagree, the code and CLAUDE.md win.
 
 - **Design source:** layout **D Vault + Waystone** in `docs/design/mockups/codex-wiki.html`. A, B and C stay in the file only for comparison.
 - **Code references** are from `main` at `8eea696` and will drift.
@@ -88,13 +88,13 @@ The exact texts are in the mock-up's `TEMPLATES`. Each starts with a one-line pr
 
 Shown in the mock-up: the side panel's **Local graph**, and **Graph view** in the left nav.
 
-- **Full graph** (`/codices/{id}/graph`, a tab like a page): every page in the codex as a node, every `[[link]]` as a line. Links count in both directions but are drawn without arrows.
+- **Full graph** (`/codices/c/{id}/graph`, a tab like a page): every page in the codex as a node, every `[[link]]` as a line. Links count in both directions but are drawn without arrows.
 - **Nodes:** coloured by top-level folder (Places, Factions, People, top level) in the style guide's inks (verdigris, ochre, rubric, muted). Size grows with the number of links. Pages not written yet are hollow and dashed. The page you came from has a ring.
 - **Moving around:** drag to pan, wheel or pinch to zoom, + / − / Fit buttons, and drag a node to move it.
 - **Hover** (mouse only) highlights a page and its neighbours and fades the rest. **Click** opens a card with the title, folder, tags, the first lines, link counts and **Open page** (or **Create page** for a missing one).
 - **Filters** (folded on phones): find a page by title (Enter centres on it), highlight a tag, show or hide pages not written yet, show or hide pages with no links, always show titles or only on hover.
 - **Local graph** in the side panel: the current page and its direct neighbours, with the links between them. Clicking it opens the full graph.
-- **Data:** one endpoint, `GET /api/codices/{id}/graph`, returning nodes (id, title, top-level folder, folder path, tags, first line, missing) and links, from `page_links`. It follows the codex's See right.
+- **Data:** one endpoint, `GET /api/codices/c/{id}/graph` (and `?around={pageId}` for the local graph), returning nodes (id, title, top-level folder, folder path, tags, first line, missing) and links, from `page_links`. It follows the codex's See right.
 - **Layout:** the mock-up hand-rolls a small force layout, which is enough for a codex of tens of pages. For the build, vendor `d3-force` through `tools/vendor` the way CodeMirror and Leaflet are, and keep drawing with plain SVG. Node positions aren't saved.
 
 ## Maps
