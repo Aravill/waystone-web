@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -130,6 +131,18 @@ func (req *templateRequest) normalize() string {
 	return ""
 }
 
+// builtinNameTaken reports whether name is a built-in template's name (two cards of one name
+// would look identical in the New page dialog).
+func builtinNameTaken(w http.ResponseWriter, name string) bool {
+	for _, b := range builtinTemplates {
+		if db.NormName(b.Name) == db.NormName(name) {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "A built-in template has that name.", "code": "template_name_taken"})
+			return true
+		}
+	}
+	return false
+}
+
 func codexTemplateError(w http.ResponseWriter, err error, what string) {
 	switch {
 	case errors.Is(err, db.ErrTemplateNotFound):
@@ -174,6 +187,9 @@ func handleCodexTemplates(w http.ResponseWriter, r *http.Request, codexID string
 		writeJSONError(w, http.StatusBadRequest, msg)
 		return
 	}
+	if builtinNameTaken(w, req.Name) {
+		return
+	}
 	t, err := db.CreateCodexTemplate(models.CodexTemplate{CodexID: codexID, Name: req.Name, Description: req.Description, Body: req.Body, CreatedBy: userID}, req.Tags)
 	if err != nil {
 		codexTemplateError(w, err, "create template")
@@ -216,6 +232,9 @@ func handleCodexTemplate(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	if msg := req.normalize(); msg != "" {
 		writeJSONError(w, http.StatusBadRequest, msg)
+		return
+	}
+	if builtinNameTaken(w, req.Name) {
 		return
 	}
 	if err := db.UpdateCodexTemplate(id, req.Name, req.Description, req.Body, req.Tags, userID); err != nil {
@@ -311,9 +330,14 @@ func handleCopyPage(w http.ResponseWriter, r *http.Request, id string) {
 		}
 	}
 	page := models.Page{ID: db.GenerateUUID(), Kind: models.PageLore, CodexID: req.CodexID, FolderID: req.FolderID, Title: title, AuthorID: userID}
+	// Cheap checks first, so a refused copy never duplicates a file.
+	if err := db.CheckNewPage(req.CodexID, req.FolderID, title); err != nil {
+		codexStoreError(w, err, "copy page")
+		return
+	}
 	var newFiles []string
 	if req.CopyImages {
-		if x.Images, x.CoverImageID, newFiles, err = duplicatePictures(id); err != nil {
+		if x.Images, x.CoverImageID, newFiles, err = duplicatePictures(id, src.Body, userID); err != nil {
 			removeCodexFiles(newFiles)
 			log.Printf("codex copy page: %v", err)
 			codexServerError(w, "copy the images")
@@ -328,10 +352,13 @@ func handleCopyPage(w http.ResponseWriter, r *http.Request, id string) {
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"page": map[string]interface{}{"id": page.ID, "codex_id": page.CodexID}})
 }
 
-// duplicatePictures copies the files of a page's current pictures under new random names and
-// returns the new rows (same picture names, new ids), the new id of the cover (or "") and the new
-// file names. A picture whose file is gone is left out. On error the caller removes the files.
-func duplicatePictures(pageID string) ([]models.PageImage, string, []string, error) {
+var pictureRefRe = regexp.MustCompile(`!\[\[([^\[\]\n|]{1,200})(?:\|[^\[\]\n]{0,200})?\]\]`)
+
+// duplicatePictures copies the files of a page's current pictures, and of removed ones the body
+// still embeds, under new random names and returns the new rows (same picture names and removed
+// state, new ids, uploaded by the copier now), the new id of the cover (or "") and the new file
+// names. A picture whose file is gone is left out. On error the caller removes the files.
+func duplicatePictures(pageID, body, userID string) ([]models.PageImage, string, []string, error) {
 	all, coverID, err := db.GetPageImages(pageID)
 	if err != nil {
 		return nil, "", nil, err
@@ -340,11 +367,16 @@ func duplicatePictures(pageID string) ([]models.PageImage, string, []string, err
 	if err != nil {
 		return nil, "", nil, err
 	}
+	embedded := map[string]bool{}
+	for _, m := range pictureRefRe.FindAllStringSubmatch(body, -1) {
+		embedded[db.NormName(m[1])] = true
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
 	var out []models.PageImage
 	var files []string
 	cover := ""
 	for _, img := range all {
-		if img.RemovedAt != "" || !db.UploadFileRe.MatchString(img.File) {
+		if (img.RemovedAt != "" && !embedded[db.NormName(img.Name)]) || !db.UploadFileRe.MatchString(img.File) {
 			continue
 		}
 		src, err := os.Open(filepath.Join(dir, img.File))
@@ -366,7 +398,7 @@ func duplicatePictures(pageID string) ([]models.PageImage, string, []string, err
 		}
 		files = append(files, file)
 		n := img
-		n.ID, n.File = db.GenerateUUID(), file
+		n.ID, n.File, n.UploadedBy, n.CreatedAt = db.GenerateUUID(), file, userID, now
 		out = append(out, n)
 		if img.ID == coverID {
 			cover = n.ID

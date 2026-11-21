@@ -26,8 +26,8 @@ func (s *SQLiteStore) CreatePageWith(p models.Page, body string, x models.NewPag
 		return err
 	}
 	for _, img := range x.Images {
-		if _, err := tx.Exec(`INSERT INTO page_images (`+pageImageColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '')`,
-			img.ID, p.ID, img.Name, img.File, img.Width, img.Height, img.UploadedBy, img.CreatedAt); err != nil {
+		if _, err := tx.Exec(`INSERT INTO page_images (`+pageImageColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			img.ID, p.ID, img.Name, img.File, img.Width, img.Height, img.UploadedBy, img.CreatedAt, img.RemovedAt); err != nil {
 			return err
 		}
 	}
@@ -37,6 +37,22 @@ func (s *SQLiteStore) CreatePageWith(p models.Page, body string, x models.NewPag
 		}
 	}
 	return tx.Commit()
+}
+
+// CheckNewPage reports what creating a page with this title in the codex/folder would fail on
+// (ErrCodexNotFound, *NameTakenError, ErrFolderNotFound), without writing anything.
+func (s *SQLiteStore) CheckNewPage(codexID, folderID, title string) error {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	if err := codexExists(s.db, codexID); err != nil {
+		return err
+	}
+	if conflicts, err := nameConflicts(s.db, codexID, "", []string{title}); err != nil {
+		return err
+	} else if len(conflicts) > 0 {
+		return &NameTakenError{conflicts}
+	}
+	return folderInCodex(s.db, folderID, codexID)
 }
 
 const templateColumns = `id, codex_id, name, description, body, created_by, created_at, updated_at`

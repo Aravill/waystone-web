@@ -130,6 +130,11 @@ func CreatePageWith(p models.Page, body string, x models.NewPageExtras) error {
 	return GetStore().CreatePageWith(p, body, x)
 }
 
+// CheckNewPage tells whether a page could be created there (see the store method) without writing.
+func CheckNewPage(codexID, folderID, title string) error {
+	return GetStore().CheckNewPage(codexID, folderID, title)
+}
+
 func GetCodexTemplates(codexID string) ([]models.CodexTemplate, error) {
 	return GetStore().GetCodexTemplates(codexID)
 }
