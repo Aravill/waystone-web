@@ -475,3 +475,71 @@ test.describe('Codices tree drag and drop', () => {
     expect(await parentOf(inner)).toBe(outer);
   });
 });
+
+test.describe('Codices live lists', () => {
+  let editor;
+  let codex;
+  const ids = {};
+
+  async function make(title, body, tags) {
+    const res = await editor.post('/api/codices/pages', { data: { title, body, codex_id: codex.id } });
+    expect(res.status(), 'create ' + title).toBe(201);
+    const id = (await res.json()).page.id;
+    if (tags) expect((await editor.put(`/api/codices/pages/${id}/tags`, { data: { names: tags } })).ok()).toBeTruthy();
+    return id;
+  }
+
+  test.beforeEach(async () => {
+    editor = await apiAs('roy');
+    const home = await (await editor.get('/api/codices')).json();
+    codex = home.codices.find((c) => c.can_edit);
+    expect(codex, 'roy can edit a codex').toBeTruthy();
+    ids.bard = await make('E2E Bard', 'Lives in [[E2E Hub]].', ['e2e-npc']);
+    ids.alchemist = await make('E2E Alchemist', 'Sells potions.', ['e2e-npc']);
+    ids.cook = await make('E2E Cook', 'Cooks.', []);
+    ids.hub = await make('E2E Hub', '{{list tag:e2e-npc sort:title}}', []);
+  });
+
+  test.afterEach(async () => {
+    for (const id of Object.values(ids)) await editor.delete(`/api/codices/pages/${id}`);
+    const tags = await (await editor.get(`/api/codices/c/${codex.id}/tags`)).json();
+    for (const t of tags.filter((x) => x.name === 'e2e-npc')) await editor.delete(`/api/codices/tags/${t.id}`);
+    await editor.dispose();
+  });
+
+  test('a list shows the tagged pages in order, and a newly tagged page joins it', async ({ page }) => {
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/p/${ids.hub}/e2e-hub`);
+    const rows = page.locator('.codex-text .cx-live li a.wikilink');
+    await expect(rows).toHaveText(['E2E Alchemist', 'E2E Bard']);
+    await expect(page.locator('.cx-live-h')).toContainText('tag e2e-npc');
+    await expect(page.locator('.cx-live-h')).toContainText('2 pages');
+
+    expect((await editor.put(`/api/codices/pages/${ids.cook}/tags`, { data: { names: ['e2e-npc'] } })).ok()).toBeTruthy();
+    await page.reload();
+    await expect(rows).toHaveText(['E2E Alchemist', 'E2E Bard', 'E2E Cook']);
+  });
+
+  test('links:here lists only the pages that link to this one', async ({ page }) => {
+    const res = await editor.get(`/api/codices/pages/${ids.hub}`);
+    const { page: hub } = await res.json();
+    const save = await editor.put(`/api/codices/pages/${ids.hub}`, { data: { base_revision: hub.current_revision, body: '{{list tag:e2e-npc links:here}}'+String.fromCharCode(10,10)+'{{list tag:e2e-npc bogus:1}}', note: '' } });
+    expect(save.ok(), 'save hub').toBeTruthy();
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/p/${ids.hub}/e2e-hub`);
+    const first = page.locator('.codex-text .cx-live').first();
+    await expect(first.locator('li a.wikilink')).toHaveText(['E2E Bard']);
+    await expect(first.locator('.cx-live-h')).toContainText('linking here');
+    await expect(page.locator('.codex-text .cx-live').nth(1)).toContainText('Unknown list option: bogus:1');
+  });
+
+  test('a list adds nothing to Linked from', async ({ page }) => {
+    const backlinks = async (id) => (await (await editor.get(`/api/codices/pages/${id}`)).json()).backlinks;
+    expect(await backlinks(ids.hub)).toHaveLength(1); // the Bard's own [[E2E Hub]]
+    expect(await backlinks(ids.bard)).toEqual([]);
+    expect(await backlinks(ids.alchemist)).toEqual([]);
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/p/${ids.alchemist}/e2e-alchemist`);
+    await expect(page.locator('.cx-box', { hasText: 'Linked from' })).toContainText('No other page links here yet.');
+  });
+});
