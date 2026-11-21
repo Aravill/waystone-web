@@ -96,3 +96,74 @@ test.describe('Codices access rights', () => {
     await expect(moduleRow.getByRole('checkbox').first()).toBeChecked();
   });
 });
+
+// A 1x1 PNG.
+const TINY_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+
+test.describe('Codices pictures and tags', () => {
+  let editor;
+  let codex;
+  let pageId;
+  let pageUrl;
+
+  test.beforeEach(async () => {
+    editor = await apiAs('roy');
+    const home = await (await editor.get('/api/codices')).json();
+    codex = home.codices.find((c) => c.can_edit);
+    expect(codex, 'roy can edit a codex').toBeTruthy();
+    const res = await editor.post('/api/codices/pages', { data: { title: 'E2E pictures page', codex_id: codex.id } });
+    expect(res.status(), 'create page').toBe(201);
+    pageId = (await res.json()).page.id;
+    pageUrl = `/codices/p/${pageId}/e2e-pictures-page`;
+  });
+
+  test.afterEach(async () => {
+    await editor.delete(`/api/codices/pages/${pageId}`);
+    const tags = await (await editor.get(`/api/codices/c/${codex.id}/tags`)).json();
+    for (const t of tags.filter((x) => x.name === 'e2e-tag')) await editor.delete(`/api/codices/tags/${t.id}`);
+    await editor.dispose();
+  });
+
+  test('an uploaded picture goes into the text, shows as a figure and opens in the lightbox', async ({ page }) => {
+    await loginAs(page, 'roy');
+    await page.goto(`${pageUrl}/edit`);
+    await page.locator('input[type=file]').setInputFiles({ name: 'tiny.png', mimeType: 'image/png', buffer: TINY_PNG });
+    await expect(page.locator('.cm-content')).toContainText('![[tiny.png|]]');
+    await expect(page.locator('.cx-thumbs li')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Set tiny.png as the cover' }).click();
+    await expect(page.locator('.cx-flag')).toBeVisible();
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await page.waitForURL(/saved=/);
+
+    await expect(page.locator('.codex-text figure img')).toBeVisible();
+    await expect(page.locator('.cx-cover img')).toBeVisible();
+    await page.locator('.codex-text button.cx-img-btn').click();
+    await expect(page.locator('dialog.cx-lightbox')).toBeVisible();
+    await expect(page.locator('.cx-lightbox figcaption')).toContainText('tiny.png · 1×1');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('dialog.cx-lightbox')).toBeHidden();
+
+    // A see-only user can look at it but not change it.
+    const viewer = await apiAs('adam');
+    const list = await viewer.get(`/api/codices/pages/${pageId}/pictures`);
+    expect(list.ok()).toBeTruthy();
+    const [img] = await list.json();
+    expect((await viewer.get(img.url)).status()).toBe(200);
+    expect((await viewer.delete(`/api/codices/pages/${pageId}/pictures/${img.id}`)).status()).toBe(403);
+    await viewer.dispose();
+  });
+
+  test('tags: add them on a page, click one to list its pages', async ({ page }) => {
+    await loginAs(page, 'roy');
+    await page.goto(pageUrl);
+    await page.getByRole('button', { name: 'Edit tags' }).click();
+    await page.getByLabel('Add a tag').fill('e2e-tag');
+    await page.keyboard.press('Enter');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    const chip = page.locator('.cx-prop a.cx-chip--tag', { hasText: 'e2e-tag' });
+    await expect(chip).toBeVisible();
+    await chip.click();
+    await expect(page).toHaveURL(/\?tag=e2e-tag/);
+    await expect(page.locator('#tagged').getByRole('link', { name: 'E2E pictures page' })).toBeVisible();
+  });
+});
