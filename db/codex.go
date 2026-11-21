@@ -34,6 +34,9 @@ var (
 	ErrTemplateNotFound  = errors.New("template not found")
 	ErrTemplateNameTaken = errors.New("a template with that name already exists in this codex")
 	ErrRevisionNotFound  = errors.New("revision not found")
+	ErrNotTimeline       = errors.New("the page is not a timeline")
+	ErrEventNotFound     = errors.New("event not found")
+	ErrLinkNotInCodex    = errors.New("the linked page is not in this codex")
 )
 
 // NameConflict is another page in the same codex that already has a title or alias.
@@ -195,4 +198,30 @@ func UndoMapPinEvent(mapID, eventID, userID string) error {
 // GetCodexGraph returns a codex's pages and stored links, for the graph view.
 func GetCodexGraph(codexID string) ([]models.GraphPage, []models.GraphLink, error) {
 	return GetStore().GetCodexGraph(codexID)
+}
+
+// Timeline pages. Events link pages of the same codex; see sqlite_codex_timeline.go.
+func GetTimelineEvents(pageID string) ([]models.TimelineEvent, error) {
+	return GetStore().GetTimelineEvents(pageID)
+}
+func GetEventsLinkingTo(pageID string) ([]models.TimelineEvent, error) {
+	return GetStore().GetEventsLinkingTo(pageID)
+}
+func CreateTimelineEvent(e models.TimelineEvent) (models.TimelineEvent, error) {
+	return GetStore().CreateTimelineEvent(e)
+}
+
+// CreateTimelineEventWithPage creates the page (in the timeline's codex) and an event linking it, in one transaction.
+func CreateTimelineEventWithPage(e models.TimelineEvent, p models.Page, body string, x models.NewPageExtras) (models.TimelineEvent, error) {
+	return GetStore().CreateTimelineEventWithPage(e, p, body, x)
+}
+func UpdateTimelineEvent(e models.TimelineEvent) error { return GetStore().UpdateTimelineEvent(e) }
+func DeleteTimelineEvent(pageID, eventID string) error {
+	return GetStore().DeleteTimelineEvent(pageID, eventID)
+}
+func GetTimelineCalendar(pageID string) (models.TimelineCalendar, error) {
+	return GetStore().GetTimelineCalendar(pageID)
+}
+func SetTimelineCalendar(pageID string, c models.TimelineCalendar, userID string) error {
+	return GetStore().SetTimelineCalendar(pageID, c, userID)
 }

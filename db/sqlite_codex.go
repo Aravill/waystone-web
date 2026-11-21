@@ -188,7 +188,7 @@ func (s *SQLiteStore) GetPage(id string) (*models.Page, error) {
 func (s *SQLiteStore) GetCodexPages() ([]models.PageListItem, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	rows, err := s.db.Query(`SELECT id, COALESCE((SELECT file != '' FROM map_images i WHERE i.page_id = pages.id ORDER BY created_at DESC, rowid DESC LIMIT 1), 0), codex_id, folder_id, title FROM pages ORDER BY title COLLATE NOCASE, id`)
+	rows, err := s.db.Query(`SELECT id, kind, COALESCE((SELECT file != '' FROM map_images i WHERE i.page_id = pages.id ORDER BY created_at DESC, rowid DESC LIMIT 1), 0), codex_id, folder_id, title FROM pages ORDER BY title COLLATE NOCASE, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (s *SQLiteStore) GetCodexPages() ([]models.PageListItem, error) {
 	at := map[string]int{}
 	for rows.Next() {
 		var p models.PageListItem
-		if err := rows.Scan(&p.ID, &p.HasMap, &p.CodexID, &p.FolderID, &p.Title); err != nil {
+		if err := rows.Scan(&p.ID, &p.Kind, &p.HasMap, &p.CodexID, &p.FolderID, &p.Title); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -638,6 +638,14 @@ func (s *SQLiteStore) MovePage(id, codexID string) error {
 	if _, err := tx.Exec(`DELETE FROM page_tags WHERE page_id = ?`, id); err != nil {
 		return err
 	}
+	// Timeline events never link across codices: events elsewhere that link this page keep its
+	// title, and if this page is a timeline its own events keep their titles but lose their links.
+	if err := unlinkTimelineEventsTx(tx, id, title); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE timeline_events SET title = COALESCE((SELECT title FROM pages WHERE id = linked_page_id), title), linked_page_id = '', updated_at = ? WHERE page_id = ? AND linked_page_id <> ''`, nowUTC(), id); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`UPDATE pages SET codex_id = ?, folder_id = '', updated_at = ? WHERE id = ?`, codexID, nowUTC(), id); err != nil {
 		return err
 	}
@@ -657,8 +665,11 @@ func (s *SQLiteStore) DeletePage(id string) ([]string, error) {
 		return nil, err
 	}
 	defer tx.Rollback()
-	codex, _, err := pageCodex(tx, id)
+	codex, title, err := pageCodex(tx, id)
 	if err != nil {
+		return nil, err
+	}
+	if err := unlinkTimelineEventsTx(tx, id, title); err != nil {
 		return nil, err
 	}
 	var files []string
@@ -685,6 +696,8 @@ func (s *SQLiteStore) DeletePage(id string) ([]string, error) {
 		`DELETE FROM map_images WHERE page_id = ?`,
 		`DELETE FROM page_images WHERE page_id = ?`,
 		`DELETE FROM page_tags WHERE page_id = ?`,
+		`DELETE FROM timeline_events WHERE page_id = ?`,
+		`DELETE FROM timeline_calendars WHERE page_id = ?`,
 		`DELETE FROM pages WHERE id = ?`,
 	} {
 		if _, err := tx.Exec(q, id); err != nil {

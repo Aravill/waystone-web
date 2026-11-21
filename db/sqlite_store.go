@@ -388,6 +388,28 @@ func (s *SQLiteStore) initSchema() error {
 		tag_id TEXT NOT NULL,
 		PRIMARY KEY (template_id, tag_id)
 	);
+	CREATE TABLE IF NOT EXISTS timeline_events (
+		id TEXT PRIMARY KEY,
+		page_id TEXT NOT NULL,
+		title TEXT NOT NULL,
+		linked_page_id TEXT NOT NULL DEFAULT '',
+		year INTEGER NOT NULL,
+		month INTEGER NOT NULL DEFAULT 0,
+		day INTEGER NOT NULL DEFAULT 0,
+		created_by TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS timeline_calendars (
+		page_id TEXT PRIMARY KEY,
+		months TEXT NOT NULL DEFAULT '',
+		era TEXT NOT NULL DEFAULT '',
+		before_era TEXT NOT NULL DEFAULT '',
+		updated_by TEXT NOT NULL DEFAULT '',
+		updated_at TEXT NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_timeline_events_page ON timeline_events(page_id, year, month, day);
+	CREATE INDEX IF NOT EXISTS idx_timeline_events_linked ON timeline_events(linked_page_id);
 	CREATE INDEX IF NOT EXISTS idx_pages_codex ON pages(codex_id);
 	CREATE INDEX IF NOT EXISTS idx_codex_templates_codex ON codex_templates(codex_id);
 	CREATE INDEX IF NOT EXISTS idx_codex_template_tags_tag ON codex_template_tags(tag_id);
@@ -487,6 +509,7 @@ func (s *SQLiteStore) initSchema() error {
 		return err
 	}
 	// Maps are no longer a page kind: every page is 'lore' and may have a map (idempotent).
+	// Remove this when map becomes a page kind again.
 	if _, err := s.db.Exec(`UPDATE pages SET kind = 'lore' WHERE kind = 'map'`); err != nil {
 		return fmt.Errorf("failed to fold map pages into lore pages: %w", err)
 	}
