@@ -712,3 +712,150 @@ test.describe('Codices unlinked mentions', () => {
     }
   });
 });
+
+test.describe('Codices quick notes and the Inbox', () => {
+  let editor;
+  let codex;
+  const pages = []; // page ids to remove
+
+  test.beforeEach(async () => {
+    editor = await apiAs('roy');
+    const home = await (await editor.get('/api/codices')).json();
+    codex = home.codices.find((c) => c.can_edit);
+    expect(codex, 'roy can edit a codex').toBeTruthy();
+    // adam is the see-only viewer.
+    const admin = await apiAs(env.ADMIN_USERNAME);
+    const adam = (await access(admin)).users.find((u) => u.username === 'adam');
+    await setRight(admin, adam.id, 'codices.see', true);
+    await setLevel(admin, codex.id, adam.id, 'see');
+    await admin.dispose();
+  });
+
+  test.afterEach(async () => {
+    for (const id of pages.splice(0)) await editor.delete(`/api/codices/pages/${id}`);
+    for (const user of ['roy', 'testy']) {
+      const api = await apiAs(user);
+      const { notes } = await (await api.get(`/api/codices/c/${codex.id}/notes`)).json();
+      for (const n of notes) await api.delete(`/api/codices/notes/${n.id}`);
+      await api.dispose();
+    }
+    await editor.dispose();
+  });
+
+  async function addNote(api, body) {
+    const res = await api.post(`/api/codices/c/${codex.id}/notes`, { data: { body } });
+    expect(res.status(), 'add note').toBe(201);
+    return (await res.json()).note;
+  }
+
+  test('n opens the note box; saving puts it in the inbox with a count', async ({ page }) => {
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/c/${codex.id}`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(codex.name);
+    await expect(page.locator('.cx-nav-group .cx-badge')).toBeHidden();
+    await page.keyboard.press('n');
+    await expect(page.locator('#dNote')).toBeFocused();
+    await page.locator('#dNote').fill('E2E first note');
+    await page.locator('#dNote').press('Control+Enter');
+    await expect(page.getByRole('status')).toContainText('In your inbox.');
+    await expect(page.locator('.cx-nav-group .cx-badge')).toHaveText('1');
+    await page.getByRole('button', { name: 'Open inbox' }).click();
+    await expect(page).toHaveURL(new RegExp(`/codices/c/${codex.id}/inbox$`));
+    await expect(page.locator('.note-t')).toHaveText('E2E first note');
+    // The draft is gone once saved.
+    await page.keyboard.press('n');
+    await expect(page.locator('#dNote')).toHaveValue('');
+    // Typing an n in a field does not open the box.
+    await page.keyboard.press('Escape');
+    await page.getByRole('searchbox').click();
+    await page.keyboard.type('n');
+    await expect(page.locator('#dNote')).toBeHidden();
+  });
+
+  test('a note filed as a new page takes its first line as the title and leaves the inbox', async ({ page }) => {
+    await addNote(editor, 'E2E inbox idea [x]\nsecond line');
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/c/${codex.id}/inbox`);
+    await page.locator('.note').getByRole('button', { name: 'New page' }).click();
+    await expect(page.getByLabel('Title')).toHaveValue('E2E inbox idea x');
+    await expect(page.locator('.cx-np-note')).toHaveText('E2E inbox idea [x]\nsecond line');
+    await page.getByRole('button', { name: 'Create page' }).click();
+    await page.waitForURL(/\/edit$/);
+    const id = page.url().match(/\/p\/([^/]+)\//)[1];
+    pages.push(id);
+    const created = await (await editor.get(`/api/codices/pages/${id}`)).json();
+    expect(created.page.title).toBe('E2E inbox idea x');
+    expect(created.page.body).toBe('E2E inbox idea [x]\nsecond line');
+    expect((await (await editor.get(`/api/codices/c/${codex.id}/notes`)).json()).notes).toEqual([]);
+    // Deleting a note has an Undo that brings it back.
+    await addNote(editor, 'E2E to delete');
+    await page.goto(`/codices/c/${codex.id}/inbox`);
+    await page.getByRole('button', { name: 'Delete' }).click();
+    await expect(page.locator('.note')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.locator('.note-t')).toHaveText('E2E to delete');
+  });
+
+  test('a note added to an existing page is a new revision with a signed paragraph', async ({ page }) => {
+    const res = await editor.post('/api/codices/pages', { data: { title: 'E2E inbox target', codex_id: codex.id, body: 'Hello there.' } });
+    expect(res.status(), 'create page').toBe(201);
+    const id = (await res.json()).page.id;
+    pages.push(id);
+    await addNote(editor, 'E2E appended thought');
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/c/${codex.id}/inbox`);
+    await page.getByRole('button', { name: 'Add to page…' }).click();
+    await page.locator('#dApPick').fill('E2E inbox target');
+    await page.getByRole('option', { name: /E2E inbox target/ }).click();
+    await expect(page.locator('.cx-np-note')).toContainText('E2E appended thought');
+    await page.getByRole('button', { name: 'Add to page', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Added to E2E inbox target.');
+    await expect(page.locator('.note')).toHaveCount(0);
+
+    const after = await (await editor.get(`/api/codices/pages/${id}`)).json();
+    expect(after.page.current_revision).toBe(2);
+    expect(after.page.body).toMatch(/^Hello there\.\n\n_[A-Z][a-z]{2} \d{1,2}, \d{4} · .+_\nE2E appended thought$/);
+    const revs = await (await editor.get(`/api/codices/pages/${id}/revisions`)).json();
+    expect(revs.revisions[0].note).toBe('Added a quick note');
+    // Filing it again is a 404: the note is gone.
+    expect((await editor.post(`/api/codices/notes/none/append`, { data: { page_id: id } })).status()).toBe(404);
+  });
+
+  test('a see-only user gets no note box and a 403 on POST', async ({ page }) => {
+    await loginAs(page, 'adam');
+    await page.goto(`/codices/c/${codex.id}`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(codex.name);
+    await expect(page.locator('.cx-note')).toBeHidden();
+    await page.keyboard.press('n');
+    await expect(page.locator('#dNote')).toBeHidden();
+    const post = await page.request.post(`/api/codices/c/${codex.id}/notes`, { data: { body: 'nope' } });
+    expect(post.status()).toBe(403);
+    expect((await page.request.get(`/api/codices/c/${codex.id}/notes`)).status()).toBe(200);
+  });
+
+  test('notes are private: others do not see, change or delete them', async () => {
+    const note = await addNote(editor, 'E2E private note');
+    const other = await apiAs('testy');
+    expect((await (await other.get(`/api/codices/c/${codex.id}/notes`)).json()).notes).toEqual([]);
+    expect((await other.delete(`/api/codices/notes/${note.id}`)).status()).toBe(404);
+    expect((await other.put(`/api/codices/notes/${note.id}`, { data: { body: 'mine now' } })).status()).toBe(404);
+    expect((await other.post(`/api/codices/notes/${note.id}/append`, { data: { page_id: 'x' } })).status()).toBe(404);
+    await other.dispose();
+    const mine = (await (await editor.get(`/api/codices/c/${codex.id}/notes`)).json()).notes;
+    expect(mine.map((n) => n.body)).toEqual(['E2E private note']);
+    expect((await editor.post(`/api/codices/c/${codex.id}/notes`, { data: { body: '   ' } })).status()).toBe(400);
+  });
+
+  test('the game page offers the note box when its codex is editable', async ({ page }) => {
+    const gameId = await helpers.sojournId(editor);
+    await loginAs(page, 'roy');
+    await page.goto(`/games/${gameId}`);
+    await expect(page.getByRole('button', { name: 'Quick note' }).first()).toBeVisible();
+    await page.keyboard.press('n');
+    await page.locator('#noteText').fill('E2E from the game');
+    await page.locator('#noteText').press('Control+Enter');
+    await expect(page.getByRole('status')).toContainText('In your inbox.');
+    const { notes } = await (await editor.get(`/api/codices/c/${codex.id}/notes`)).json();
+    expect(notes.map((n) => n.body)).toContain('E2E from the game');
+  });
+});
