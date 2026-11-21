@@ -61,7 +61,7 @@
                                 <template x-if="campaign.system_logo_url">
                                     <img class="campaign-system-logo" :src="campaign.system_logo_url" :alt="campaign.system" :title="campaign.system">
                                 </template>
-                                <span class="game-kind" x-show="campaign.codex"><span>Codex: </span><a x-show="campaign.codex && campaign.codex.can_open" :href="campaign.codex ? '/codices/c/' + encodeURIComponent(campaign.codex.id) : '#'" x-text="campaign.codex ? campaign.codex.name : ''"></a><span x-show="!(campaign.codex && campaign.codex.can_open)" x-text="campaign.codex ? campaign.codex.name : ''"></span></span>
+                                <span class="game-kind" x-show="campaign.codex"><span>Codex: </span><a x-show="campaign.codex && campaign.codex.can_open" :href="campaign.codex ? '/codices/c/' + encodeURIComponent(campaign.codex.id) : '#'" x-text="campaign.codex ? campaign.codex.name : ''"></a><span x-show="!(campaign.codex && campaign.codex.can_open)" x-text="campaign.codex ? campaign.codex.name : ''"></span> <button type="button" class="text-link" x-show="canNote" aria-keyshortcuts="N" title="Quick note (N)" @click="openNote()">Quick note</button></span>
                                 <span class="campaign-status-badge" x-text="campaign.status"></span>
                             </div>
                             <h1 class="page-title game-title" x-text="campaign.title"></h1>
@@ -423,6 +423,31 @@
         </div>
     </div>
 
+    <!-- Quick note -->
+    <div id="noteModal" class="modal" :class="{ 'modal-open': noteDlg.open }" @click.self="closeNote()" @keydown.escape.window="noteDlg.open && closeNote()" role="dialog" aria-modal="true" aria-labelledby="noteModalTitle">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <p class="modal-eyebrow">Only you see it until you file it</p>
+                    <h2 id="noteModalTitle">Quick note</h2>
+                </div>
+                <button type="button" class="modal-close" @click="closeNote()" aria-label="Close">&times;</button>
+            </div>
+            <form class="modal-form" @submit.prevent="saveNote()" novalidate>
+                <div class="form-group">
+                    <label for="noteText">Note</label>
+                    <textarea id="noteText" rows="7" maxlength="5000" placeholder="Anything. A name, a rumour, the loot. Tidy it up later." x-model="noteDlg.text" x-ref="noteText" @input="saveNoteDraft()" @keydown.ctrl.enter.prevent="saveNote()" @keydown.meta.enter.prevent="saveNote()"></textarea>
+                    <p class="form-hint" x-text="'Goes to your inbox in ' + (campaign && campaign.codex ? campaign.codex.name : 'the codex') + '. Ctrl+Enter saves.'"></p>
+                </div>
+                <p class="game-form-error" role="alert" x-show="noteDlg.error" x-text="'✗ ' + noteDlg.error"></p>
+                <div class="modal-actions">
+                    <button type="submit" class="btn-create" :disabled="noteDlg.busy" x-text="noteDlg.busy ? 'Saving...' : 'Save to inbox'"></button>
+                    <button type="button" class="btn-cancel" @click="closeNote()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Character picker -->
     <div id="pickerModal" class="modal" :class="{ 'modal-open': picker.open }" @click.self="closePicker()" @keydown.escape.window="picker.open && closePicker()" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
         <div class="modal-content">
@@ -473,6 +498,6 @@
     <script src="/static/notifications.js?v=11"></script>
     <script src="/campaigns.js?v=63"></script>
     <script src="/static/characters.js?v=3"></script>
-    <script src="/static/game.js?v=14"></script>
+    <script src="/static/game.js?v=15"></script>
 </body>
 </html>

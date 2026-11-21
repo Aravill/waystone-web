@@ -19,6 +19,26 @@ func (s *SQLiteStore) CreatePageWith(p models.Page, body string, x models.NewPag
 		return err
 	}
 	defer tx.Rollback()
+	if err := createPageWithTx(tx, p, body, x); err != nil {
+		return err
+	}
+	if x.NoteID != "" { // filing a quick note: it must be the author's, from this codex
+		note, err := getCodexNote(tx, x.NoteID)
+		if err != nil {
+			return err
+		}
+		if note == nil || note.UserID != p.AuthorID || note.CodexID != p.CodexID {
+			return ErrNoteNotFound
+		}
+		if err := deleteCodexNoteTx(tx, x.NoteID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// createPageWithTx does CreatePageWith's work inside a caller's transaction.
+func createPageWithTx(tx *sql.Tx, p models.Page, body string, x models.NewPageExtras) error {
 	if err := createPageNoteTx(tx, p, body, x.Note); err != nil {
 		return err
 	}
@@ -49,7 +69,7 @@ func (s *SQLiteStore) CreatePageWith(p models.Page, body string, x models.NewPag
 			}
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 // CheckNewPage reports what creating a page with this title in the codex/folder would fail on

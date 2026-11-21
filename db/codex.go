@@ -36,6 +36,9 @@ var (
 	ErrRevisionNotFound  = errors.New("revision not found")
 	ErrNotTimeline       = errors.New("the page is not a timeline")
 	ErrEventNotFound     = errors.New("event not found")
+	ErrNoteNotFound      = errors.New("note not found")
+	ErrInboxFull         = errors.New("your inbox is full")
+	ErrNoteTooLong       = errors.New("the page would be too long")
 	ErrLinkNotInCodex    = errors.New("the linked page is not in this codex")
 )
 
@@ -230,4 +233,24 @@ func GetTimelineCalendar(pageID string) (models.TimelineCalendar, error) {
 }
 func SetTimelineCalendar(pageID string, c models.TimelineCalendar, userID string) error {
 	return GetStore().SetTimelineCalendar(pageID, c, userID)
+}
+
+// Quick notes: private to their author, one inbox per user per codex.
+const MaxInboxNotes = 200
+
+func GetCodexNotes(codexID, userID string) ([]models.CodexNote, error) {
+	return GetStore().GetCodexNotes(codexID, userID)
+}
+func CountCodexNotes(codexID, userID string) (int, error) {
+	return GetStore().CountCodexNotes(codexID, userID)
+}
+func CreateCodexNote(n models.CodexNote) error          { return GetStore().CreateCodexNote(n, MaxInboxNotes) }
+func GetCodexNote(id string) (*models.CodexNote, error) { return GetStore().GetCodexNote(id) }
+func UpdateCodexNote(id, body string) error             { return GetStore().UpdateCodexNote(id, body) }
+func DeleteCodexNote(id string) error                   { return GetStore().DeleteCodexNote(id) }
+
+// AppendNoteToPage adds the text to the end of the page (a revision noted "Added a quick note") and
+// deletes the note, in one transaction.
+func AppendNoteToPage(noteID, userID, pageID, addition string, maxRunes int) (models.PageRevision, error) {
+	return GetStore().AppendNoteToPage(noteID, userID, pageID, addition, maxRunes, PageKeepRevisions)
 }

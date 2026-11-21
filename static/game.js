@@ -33,6 +33,7 @@ window.gamePage = function () {
         messageType: '',
         confirmDialog: { open: false, title: '', message: '', confirmLabel: '', resolve: null },
         picker: { open: false, loading: false, busy: false, characters: [], selected: '', creating: false, form: { name: '' }, error: '' },
+        noteDlg: { open: false, text: '', error: '', busy: false }, // a quick note for the game's codex
 
         async init() {
             try {
@@ -52,6 +53,7 @@ window.gamePage = function () {
             }
             this.gameId = decodeURIComponent(location.pathname.split('/')[2] || '');
             window.addEventListener('resize', () => this.measureTale());
+            document.addEventListener('keydown', (event) => this.onNoteKey(event));
             await this.load();
             if (new URLSearchParams(location.search).get('updated') === '1') {
                 this.showMessage('Game updated', 'success');
@@ -719,6 +721,78 @@ window.gamePage = function () {
                 }
             } catch (error) {
                 this.showMessage('Logout failed: ' + error.message, 'error');
+            }
+        },
+
+        // Quick notes go to the viewer's private inbox in the game's codex (the Codices page files them).
+        get canNote() {
+            return !!(this.campaign && this.campaign.codex && this.campaign.codex.can_edit);
+        },
+        onNoteKey(event) {
+            if ((event.key !== 'n' && event.key !== 'N') || event.ctrlKey || event.metaKey || event.altKey || !this.canNote) return;
+            const t = event.target;
+            if (t && (t.isContentEditable || (t.closest && t.closest('input, textarea, select, [contenteditable]')))) return;
+            if (document.querySelector('.modal-open, dialog[open]')) return;
+            event.preventDefault();
+            this.openNote();
+        },
+        openNote() {
+            if (!this.canNote) return;
+            let text = '';
+            try {
+                text = localStorage.getItem('codex-quicknote:' + this.campaign.codex.id) || '';
+            } catch (error) {
+                text = '';
+            }
+            this.noteDlg = { open: true, text, error: '', busy: false };
+            this.$nextTick(() => requestAnimationFrame(() => this.$refs.noteText?.focus()));
+        },
+        closeNote() {
+            if (!this.noteDlg.busy) this.noteDlg.open = false;
+        },
+        saveNoteDraft() {
+            try {
+                if (this.noteDlg.text) localStorage.setItem('codex-quicknote:' + this.campaign.codex.id, this.noteDlg.text);
+                else localStorage.removeItem('codex-quicknote:' + this.campaign.codex.id);
+            } catch (error) {
+                // storage may be blocked; the draft just isn't kept
+            }
+        },
+        async saveNote() {
+            const d = this.noteDlg;
+            if (d.busy) return;
+            const body = d.text.trim();
+            if (!body) {
+                d.error = 'Write something first.';
+                return;
+            }
+            if (body.length > 5000) {
+                d.error = 'A note can be up to 5000 characters.';
+                return;
+            }
+            d.error = '';
+            d.busy = true;
+            try {
+                const id = this.campaign.codex.id;
+                const response = await fetch(`/api/codices/c/${encodeURIComponent(id)}/notes`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body })
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    d.error = data.code === 'inbox_full' ? 'Your inbox is full (200 notes). File or delete some in the codex first.' : (data.error || 'Could not save the note');
+                    return;
+                }
+                try {
+                    localStorage.removeItem('codex-quicknote:' + id);
+                } catch (error) {
+                    // nothing to clear
+                }
+                d.open = false;
+                this.showMessage('In your inbox.', 'success');
+            } catch (error) {
+                d.error = 'Could not save the note: ' + error.message;
+            } finally {
+                d.busy = false;
             }
         },
 

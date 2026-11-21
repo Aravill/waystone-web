@@ -301,6 +301,14 @@ func (s *SQLiteStore) initSchema() error {
 		created_at TEXT NOT NULL,
 		PRIMARY KEY (page_id, number)
 	);
+	CREATE TABLE IF NOT EXISTS codex_notes (
+		id TEXT PRIMARY KEY,
+		codex_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		body TEXT NOT NULL,
+		created_at TEXT NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_codex_notes_owner ON codex_notes(codex_id, user_id, created_at);
 	CREATE TABLE IF NOT EXISTS page_contributors (
 		page_id TEXT NOT NULL,
 		user_id TEXT NOT NULL,
@@ -1130,7 +1138,7 @@ func (s *SQLiteStore) AnonymizeUser(id string) error {
 		return ErrUserNotFound
 	}
 
-	for _, table := range []string{"campaign_signups", "campaign_follows", "calendar_tokens", "password_invites", "notifications", "user_rights", "codex_access"} {
+	for _, table := range []string{"campaign_signups", "campaign_follows", "calendar_tokens", "password_invites", "notifications", "user_rights", "codex_access", "codex_notes"} {
 		if _, err := tx.Exec(`DELETE FROM `+table+` WHERE user_id = ?`, id); err != nil {
 			return err
 		}
