@@ -55,6 +55,7 @@ function characterPageBase() {
     return {
         displayName: 'User',
         isAdmin: false,
+        codexAccess: false,
         currentUserId: '',
         messageTimer: null,
         messageVisible: false,
@@ -73,6 +74,7 @@ function characterPageBase() {
                 const user = await response.json();
                 this.displayName = user.display_name || user.username;
                 this.isAdmin = (user.roles || []).includes('admin');
+                this.codexAccess = !!user.codex_access;
                 this.currentUserId = user.user_id || user.id || '';
                 return true;
             } catch (error) {

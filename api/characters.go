@@ -34,9 +34,6 @@ func validCodexURL(raw, requestHost string) (string, bool) {
 	if raw == "" {
 		return "", true
 	}
-	if len(raw) > 500 {
-		return "", false
-	}
 	u, err := url.Parse(raw)
 	if err != nil || u.User != nil || u.Opaque != "" || u.Host == "" {
 		return "", false
@@ -48,12 +45,17 @@ func validCodexURL(raw, requestHost string) (string, bool) {
 	default:
 		return "", false
 	}
+	// Only a trailing slash may differ from the cleaned path (no "//" or dot segments).
 	p := path.Clean(u.Path)
-	if p != "/codices" && !strings.HasPrefix(p, "/codices/") {
+	if (u.Path != p && u.Path != p+"/") || (p != "/codices" && !strings.HasPrefix(p, "/codices/")) {
 		return "", false
 	}
 	u.Host = host
-	return u.String(), true
+	s := u.String()
+	if len(s) > 2000 { // percent-encoded non-ASCII slugs make this longer than the input
+		return "", false
+	}
+	return s, true
 }
 
 // isLocalHost reports whether a host[:port] is localhost, 127.0.0.1 or [::1].
