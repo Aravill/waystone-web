@@ -23,13 +23,15 @@ type Codex struct {
 // Folder organises the pages of one codex into a nested tree. It is for sorting only: links,
 // titles and aliases ignore it.
 type Folder struct {
-	ID        string `json:"id"`
-	CodexID   string `json:"-"`
-	ParentID  string `json:"parent_id"`
-	Name      string `json:"name"`
-	CreatedBy string `json:"-"`
-	CreatedAt string `json:"-"`
-	UpdatedAt string `json:"-"`
+	ID       string `json:"id"`
+	CodexID  string `json:"-"`
+	ParentID string `json:"parent_id"`
+	Name     string `json:"name"`
+	// DefaultTemplate: "" none, "builtin:<id>", or a template id of the same codex.
+	DefaultTemplate string `json:"default_template"`
+	CreatedBy       string `json:"-"`
+	CreatedAt       string `json:"-"`
+	UpdatedAt       string `json:"-"`
 }
 
 // PageContributor is one person's credit on a page. It outlives pruning of old revisions.

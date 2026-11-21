@@ -496,6 +496,15 @@ func (s *SQLiteStore) initSchema() error {
 			return fmt.Errorf("failed to add pages.cover_image_id column: %w", err)
 		}
 	}
+	var folderHasTemplate int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('codex_folders') WHERE name = 'default_template'`).Scan(&folderHasTemplate); err != nil {
+		return fmt.Errorf("failed to inspect codex_folders table: %w", err)
+	}
+	if folderHasTemplate == 0 {
+		if _, err := s.db.Exec(`ALTER TABLE codex_folders ADD COLUMN default_template TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("failed to add codex_folders.default_template column: %w", err)
+		}
+	}
 	var charHasCodexURL int
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('characters') WHERE name = 'codex_url'`).Scan(&charHasCodexURL); err != nil {
 		return fmt.Errorf("failed to inspect characters table: %w", err)

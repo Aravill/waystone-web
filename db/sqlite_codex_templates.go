@@ -242,6 +242,9 @@ func (s *SQLiteStore) DeleteCodexTemplate(id string) error {
 	if _, err := tx.Exec(`DELETE FROM codex_template_tags WHERE template_id = ?`, id); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`UPDATE codex_folders SET default_template = '' WHERE default_template = ?`, id); err != nil {
+		return err
+	}
 	res, err := tx.Exec(`DELETE FROM codex_templates WHERE id = ?`, id)
 	if err != nil {
 		return err

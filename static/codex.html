@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=78">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=31">
+    <link rel="stylesheet" href="/static/codex.css?v=32">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -639,7 +639,7 @@
                             </div>
                             <div class="form-group" x-show="dlg.folders && dlg.folders.length">
                                 <label for="dFolder">Folder</label>
-                                <select id="dFolder" x-model="dlg.folderId">
+                                <select id="dFolder" x-model="dlg.folderId" @change="onNpFolder()">
                                     <option value="">Top level</option>
                                     <template x-for="o in folderOptions(dlg.folders)" :key="o.id"><option :value="o.id" x-text="o.label" :selected="o.id === dlg.folderId"></option></template>
                                 </select>
@@ -663,7 +663,8 @@
                                             <p class="cx-tpl-grouplabel" x-text="g.label"></p>
                                             <div class="cx-tpl-cards">
                                                 <template x-for="t in g.items" :key="t.id">
-                                                    <button type="button" class="cx-tpl-card" role="radio" :aria-checked="t.id === tplSelected.id ? 'true' : 'false'" :tabindex="t.id === tplSelected.id ? 0 : -1" @click="dlg.tplId = t.id">
+                                                    <button type="button" class="cx-tpl-card" role="radio" :aria-checked="t.id === tplSelected.id ? 'true' : 'false'" :tabindex="t.id === tplSelected.id ? 0 : -1" @click="pickTpl(t.id)">
+                                                        <em class="cx-tpl-def" x-show="t.id === npDefault.id">Folder default</em>
                                                         <strong x-text="t.name"></strong>
                                                         <span x-text="t.description"></span>
                                                     </button>
@@ -672,6 +673,7 @@
                                         </div>
                                     </template>
                                 </div>
+                                <p class="hint" x-show="npDefaultHint" x-text="npDefaultHint"></p>
                                 <p class="hint"><button type="button" class="text-link" @click="openTemplates()">Manage templates</button></p>
                             </div>
                             <div class="cx-np-side">
@@ -836,6 +838,22 @@
                         </div>
                     </div>
                 </template>
+                <template x-if="dlg.type === 'folderTpl'">
+                    <div>
+                        <div class="form-group">
+                            <label for="dFolderTpl">New pages here start from</label>
+                            <select id="dFolderTpl" x-model="dlg.tpl" x-ref="dlgFocus">
+                                <option value="">No default (the last template you used)</option>
+                                <template x-for="g in tplGroups(dlg.templates)" :key="g.label">
+                                    <optgroup :label="g.label">
+                                        <template x-for="t in g.items" :key="t.id"><option :value="t.id" x-text="t.name" :selected="t.id === dlg.tpl"></option></template>
+                                    </optgroup>
+                                </template>
+                            </select>
+                            <p class="hint">Used by + New page in this folder and by missing links created into it. People can still pick another template. Sub-folders without their own default use this one.</p>
+                        </div>
+                    </div>
+                </template>
                 <template x-if="dlg.type === 'folderMove' || dlg.type === 'pageFolder'">
                     <div>
                         <div class="form-group">
@@ -956,6 +974,6 @@
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=3"></script>
     <script src="/static/codex-graph.js?v=3"></script>
-    <script src="/static/codex.js?v=27"></script>
+    <script src="/static/codex.js?v=28"></script>
 </body>
 </html>

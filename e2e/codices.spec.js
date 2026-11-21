@@ -263,6 +263,86 @@ test.describe('Codices templates and copying', () => {
   });
 });
 
+test.describe('Codices folder default templates', () => {
+  let editor;
+  let codex;
+  let folder;
+  const made = [];
+  const folderOf = async (id) => (await (await editor.get(`/api/codices/c/${codex.id}`)).json()).folders.find((f) => f.id === id);
+
+  test.beforeEach(async () => {
+    editor = await apiAs('roy');
+    codex = (await (await editor.get('/api/codices')).json()).codices.find((c) => c.can_edit);
+    expect(codex, 'roy can edit a codex').toBeTruthy();
+    const res = await editor.post(`/api/codices/c/${codex.id}/folders`, { data: { name: 'E2E Folder defaults' } });
+    expect(res.status(), 'create folder').toBe(201);
+    folder = (await res.json()).folder;
+  });
+
+  test.afterEach(async () => {
+    for (const id of made.splice(0)) await editor.delete(`/api/codices/pages/${id}`);
+    await editor.delete(`/api/codices/folders/${folder.id}`);
+    const templates = await (await editor.get(`/api/codices/c/${codex.id}/templates`)).json();
+    for (const t of templates.filter((x) => x.name.startsWith('E2E'))) await editor.delete(`/api/codices/templates/${t.id}`);
+    await editor.dispose();
+  });
+
+  test('a folder default is set from the folder menu and preselected by New page in it', async ({ page }) => {
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/c/${codex.id}`);
+    await page.getByRole('button', { name: 'Actions for folder E2E Folder defaults' }).click();
+    await page.getByRole('menuitem', { name: /New pages start from/ }).click();
+    await page.getByLabel('New pages here start from').selectOption({ label: 'Character' });
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('status')).toHaveText('Folder saved');
+    expect((await folderOf(folder.id)).default_template).toBe('builtin:character');
+
+    await page.getByRole('button', { name: 'Actions for folder E2E Folder defaults' }).click();
+    await page.getByRole('menuitem', { name: '+ Page in E2E Folder defaults' }).click();
+    const character = page.getByRole('radio', { name: /Character/ });
+    await expect(character).toHaveAttribute('aria-checked', 'true');
+    await expect(character.locator('.cx-tpl-def')).toHaveText('Folder default');
+    await expect(page.locator('.cx-np-pick')).toContainText('start from Character');
+
+    // Another folder brings its own choice along until a card is clicked.
+    await page.getByLabel('Folder', { exact: true }).selectOption('');
+    await expect(page.getByRole('radio', { name: /Blank/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('.cx-tpl-def:visible')).toHaveCount(0);
+    await page.getByLabel('Folder', { exact: true }).selectOption(folder.id);
+    await expect(character).toHaveAttribute('aria-checked', 'true');
+    await page.getByRole('radio', { name: /Session/ }).click();
+    await page.getByLabel('Folder', { exact: true }).selectOption('');
+    await page.getByLabel('Folder', { exact: true }).selectOption(folder.id);
+    await expect(page.getByRole('radio', { name: /Session/ })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  test('a missing link on a page in that folder starts from the folder default', async ({ page }) => {
+    expect((await editor.put(`/api/codices/folders/${folder.id}`, { data: { default_template: 'builtin:character' } })).ok()).toBeTruthy();
+    const res = await editor.post('/api/codices/pages', { data: { title: 'E2E Linker', codex_id: codex.id, folder_id: folder.id, body: 'Meet [[E2E Nobody Yet]].' } });
+    expect(res.status(), 'create page').toBe(201);
+    const created = (await res.json()).page;
+    made.push(created.id);
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/p/${created.id}/e2e-linker`);
+    await page.locator('a.wikilink--missing', { hasText: 'E2E Nobody Yet' }).click(); // the link in the text, not the Wanted pages button
+    await expect(page.getByLabel('Title')).toHaveValue('E2E Nobody Yet');
+    await expect(page.getByRole('radio', { name: /Character/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('.cx-tpl-def:visible')).toHaveText('Folder default');
+  });
+
+  test('a default must exist in the codex, and deleting its template clears it', async () => {
+    expect((await editor.put(`/api/codices/folders/${folder.id}`, { data: { default_template: 'nope' } })).status()).toBe(400);
+    const res = await editor.post(`/api/codices/c/${codex.id}/templates`, { data: { name: 'E2E default', description: '', body: '## A\n', tags: [] } });
+    expect(res.status(), 'create template').toBe(201);
+    const t = (await res.json()).template;
+    const set = await editor.put(`/api/codices/folders/${folder.id}`, { data: { default_template: t.id } });
+    expect(set.ok()).toBeTruthy();
+    expect((await folderOf(folder.id)).default_template).toBe(t.id);
+    expect((await editor.delete(`/api/codices/templates/${t.id}`)).ok()).toBeTruthy();
+    expect((await folderOf(folder.id)).default_template).toBe('');
+  });
+});
+
 test.describe('Codices graph', () => {
   test('the graph lists the codex pages; find, card and Open page work; no See means 404', async ({ page }) => {
     const admin = await apiAs(env.ADMIN_USERNAME);

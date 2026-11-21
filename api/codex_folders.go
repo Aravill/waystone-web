@@ -93,7 +93,7 @@ func handleCodexFolders(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	for _, f := range folders {
-		out = append(out, map[string]string{"id": f.ID, "parent_id": f.ParentID, "name": f.Name})
+		out = append(out, map[string]string{"id": f.ID, "parent_id": f.ParentID, "name": f.Name, "default_template": f.DefaultTemplate})
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"folders": out})
 }
@@ -144,21 +144,55 @@ func handleCodexFolderRoutes(w http.ResponseWriter, r *http.Request, parts []str
 		writeJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "moved_pages": pages, "moved_folders": folders})
 		return
 	}
-	// PUT renames ({name}) or moves ({parent_id}, "" = top level); one per request.
+	// PUT renames ({name}), moves ({parent_id}, "" = top level) or sets the default template
+	// ({default_template}, "" = none); one per request.
 	var req struct {
-		Name     *string `json:"name"`
-		ParentID *string `json:"parent_id"`
+		Name            *string `json:"name"`
+		ParentID        *string `json:"parent_id"`
+		DefaultTemplate *string `json:"default_template"`
 	}
 	if !codexDecode(w, r, 4<<10, &req) {
 		return
 	}
-	if req.Name == nil && req.ParentID == nil {
-		writeJSONError(w, http.StatusBadRequest, "name or parent_id is required")
+	given := 0
+	for _, set := range []bool{req.Name != nil, req.ParentID != nil, req.DefaultTemplate != nil} {
+		if set {
+			given++
+		}
+	}
+	if given == 0 {
+		writeJSONError(w, http.StatusBadRequest, "name, parent_id or default_template is required")
 		return
 	}
-	if req.Name != nil && req.ParentID != nil {
-		writeJSONError(w, http.StatusBadRequest, "send either name or parent_id, not both")
+	if given > 1 {
+		writeJSONError(w, http.StatusBadRequest, "send one of name, parent_id or default_template")
 		return
+	}
+	if req.DefaultTemplate != nil {
+		folder, err := db.GetFolder(parts[0])
+		if err != nil {
+			codexServerError(w, "retrieve folder")
+			return
+		}
+		if folder == nil {
+			codexFolderError(w, db.ErrFolderNotFound, "retrieve folder")
+			return
+		}
+		if t := *req.DefaultTemplate; t != "" && builtinTemplateByID(t) == nil {
+			ct, err := db.GetCodexTemplate(t)
+			if err != nil {
+				codexServerError(w, "retrieve template")
+				return
+			}
+			if ct == nil || ct.CodexID != folder.CodexID {
+				writeJSONError(w, http.StatusBadRequest, db.ErrTemplateNotFound.Error())
+				return
+			}
+		}
+		if err := db.SetFolderTemplate(parts[0], *req.DefaultTemplate); err != nil {
+			codexFolderError(w, err, "set folder template")
+			return
+		}
 	}
 	if req.Name != nil {
 		name, valid := codexFolderName(*req.Name)

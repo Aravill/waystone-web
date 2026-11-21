@@ -31,11 +31,11 @@ func folderHeight(all []models.Folder, id string) int {
 	return h + 1
 }
 
-const folderColumns = `id, codex_id, parent_id, name, created_by, created_at, updated_at`
+const folderColumns = `id, codex_id, parent_id, name, default_template, created_by, created_at, updated_at`
 
 func scanFolder(row rowScanner) (models.Folder, error) {
 	var f models.Folder
-	err := row.Scan(&f.ID, &f.CodexID, &f.ParentID, &f.Name, &f.CreatedBy, &f.CreatedAt, &f.UpdatedAt)
+	err := row.Scan(&f.ID, &f.CodexID, &f.ParentID, &f.Name, &f.DefaultTemplate, &f.CreatedBy, &f.CreatedAt, &f.UpdatedAt)
 	return f, err
 }
 
@@ -167,8 +167,8 @@ func (s *SQLiteStore) CreateFolder(f models.Folder) error {
 		return ErrFolderNameTaken
 	}
 	now := nowUTC()
-	if _, err := tx.Exec(`INSERT INTO codex_folders (`+folderColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		f.ID, f.CodexID, f.ParentID, f.Name, f.CreatedBy, now, now); err != nil {
+	if _, err := tx.Exec(`INSERT INTO codex_folders (`+folderColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		f.ID, f.CodexID, f.ParentID, f.Name, f.DefaultTemplate, f.CreatedBy, now, now); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -195,6 +195,22 @@ func (s *SQLiteStore) RenameFolder(id, name string) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+// SetFolderTemplate sets the folder's default template ("" = none); the API checks the value.
+func (s *SQLiteStore) SetFolderTemplate(id, templateID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	res, err := s.db.Exec(`UPDATE codex_folders SET default_template = ?, updated_at = ? WHERE id = ?`, templateID, nowUTC(), id)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return ErrFolderNotFound
+	}
+	return nil
 }
 
 // MoveFolder re-parents a folder inside its codex ("" = top level). It can't go inside itself
