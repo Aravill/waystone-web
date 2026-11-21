@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"image"
@@ -297,7 +298,8 @@ func receiveCodexImage(w http.ResponseWriter, r *http.Request) (string, image.Co
 		return "", image.Config{}, false
 	}
 	cfg, _, err := image.DecodeConfig(io.NewSectionReader(tmp, 0, size))
-	if err != nil || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > maxMapImageSide || cfg.Height > maxMapImageSide {
+	if err != nil || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > maxMapImageSide || cfg.Height > maxMapImageSide ||
+		(ext == ".gif" && !gifFramesFit(io.NewSectionReader(tmp, 0, size))) {
 		db.DiscardUpload(tmp)
 		writeJSONError(w, http.StatusBadRequest, "the image could not be read, or is larger than 16384 pixels on a side")
 		return "", image.Config{}, false
@@ -541,4 +543,72 @@ func handleUndoPinEvent(w http.ResponseWriter, r *http.Request, id, eventID stri
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+const maxGIFFrames = 1000
+
+// gifFramesFit walks the blocks of a GIF without decompressing anything and reports whether every
+// frame sits inside the logical screen, the screen is within the side limit and there are at most
+// maxGIFFrames frames. image.DecodeConfig only reads the screen size, so a frame could otherwise
+// declare a huge size that a browser would try to allocate. A truncated file doesn't fit.
+func gifFramesFit(src io.Reader) bool {
+	r := bufio.NewReader(src)
+	skip := func(n int) bool { _, err := r.Discard(n); return err == nil }
+	u16 := func(b []byte) int { return int(b[0]) | int(b[1])<<8 }
+	head := make([]byte, 13)
+	if _, err := io.ReadFull(r, head); err != nil {
+		return false
+	}
+	sw, sh := u16(head[6:]), u16(head[8:])
+	if sw < 1 || sh < 1 || sw > maxMapImageSide || sh > maxMapImageSide {
+		return false
+	}
+	if head[10]&0x80 != 0 && !skip(3<<((head[10]&7)+1)) {
+		return false
+	}
+	subBlocks := func() bool {
+		for {
+			n, err := r.ReadByte()
+			if err != nil {
+				return false
+			}
+			if n == 0 {
+				return true
+			}
+			if !skip(int(n)) {
+				return false
+			}
+		}
+	}
+	frames := 0
+	for {
+		b, err := r.ReadByte()
+		if err != nil {
+			return false
+		}
+		switch b {
+		case 0x3B:
+			return true
+		case 0x21:
+			if !skip(1) || !subBlocks() {
+				return false
+			}
+		case 0x2C:
+			d := make([]byte, 9)
+			if _, err := io.ReadFull(r, d); err != nil {
+				return false
+			}
+			if frames++; frames > maxGIFFrames || u16(d[0:])+u16(d[4:]) > sw || u16(d[2:])+u16(d[6:]) > sh {
+				return false
+			}
+			if d[8]&0x80 != 0 && !skip(3<<((d[8]&7)+1)) {
+				return false
+			}
+			if !skip(1) || !subBlocks() {
+				return false
+			}
+		default:
+			return false
+		}
+	}
 }

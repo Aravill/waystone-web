@@ -377,6 +377,8 @@ func (s *SQLiteStore) initSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_codex_tags_codex ON codex_tags(codex_id);
 	CREATE INDEX IF NOT EXISTS idx_page_tags_tag ON page_tags(tag_id);
 	CREATE INDEX IF NOT EXISTS idx_page_images_page ON page_images(page_id);
+	CREATE INDEX IF NOT EXISTS idx_page_images_file ON page_images(file);
+	CREATE INDEX IF NOT EXISTS idx_map_images_file ON map_images(file);
 	CREATE INDEX IF NOT EXISTS idx_codex_folders_parent ON codex_folders(codex_id, parent_id);
 	CREATE INDEX IF NOT EXISTS idx_page_links_to ON page_links(to_page_id);
 	CREATE INDEX IF NOT EXISTS idx_map_pins_map ON map_pins(map_page_id);

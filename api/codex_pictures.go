@@ -22,7 +22,7 @@ func pictureName(raw string) string {
 	}
 	var b strings.Builder
 	for _, r := range raw {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == ' ' || r == '-' || r == '_' || r == '.' {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsMark(r) || r == ' ' || r == '-' || r == '_' || r == '.' {
 			b.WriteRune(r)
 		}
 	}
