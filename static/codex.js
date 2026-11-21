@@ -221,6 +221,7 @@ window.codexPage = function () {
         tocHashDone: false,
         navPromise: null,
         codexChoices: [],
+        codicesLoaded: false, // codexChoices was read from the server (it may be legitimately empty)
         dlg: { type: '' },
         tplBuiltin: null, // the built-in templates and the day {{date}} stands for, from the server (once)
         // Tags and pictures
@@ -408,7 +409,7 @@ window.codexPage = function () {
                         return;
                     }
                     this.pageData = data;
-                    this.ensureCodices(); // the codices Copy page can go to
+                    this.ensureCodices(true); // the codices Copy page can go to
                     this.trackTab(data.page);
                     this.navPromise = this.loadNav(data.page);
                     document.title = 'Waystone - ' + data.page.title;
@@ -1053,13 +1054,15 @@ window.codexPage = function () {
                 : '') + "This page's own links are checked again in the new codex, and it goes to the top level of its folders." +
                 (this.pageData?.tags?.length ? ' Its tags stay behind, because tags belong to a codex.' : '');
         },
-        async ensureCodices() {
-            if (this.codexChoices.length) return;
+        // quiet: a background read for the menu, which says nothing if it fails (opening Copy page or Move asks again).
+        async ensureCodices(quiet = false) {
+            if (this.codicesLoaded && (quiet || this.codexChoices.length)) return;
             try {
                 const list = await this.loadCodexList();
                 this.codexChoices = list.filter((w) => w.can_edit).map((w) => ({ id: w.id, name: w.name }));
+                this.codicesLoaded = true;
             } catch (error) {
-                this.showMessage('Could not load the codices: ' + error.message, 'error');
+                if (!quiet) this.showMessage('Could not load the codices: ' + error.message, 'error');
             }
         },
         focusDlg() {
@@ -1072,6 +1075,7 @@ window.codexPage = function () {
         // changes and goes back to its list; everything else closes.
         async cancelDlg() {
             const d = this.dlg;
+            if (d.busy) return;
             if (d.type === 'template') {
                 if (JSON.stringify([d.name, d.description, d.tags, d.body]) !== d.snap) {
                     // After the key event has reached every handler, or the confirm's own Esc handler closes it at once.
@@ -1527,6 +1531,7 @@ window.codexPage = function () {
             } else if (response.ok) {
                 this.closeDlg();
                 this.codexChoices = [];
+                this.codicesLoaded = false;
                 this.allCodices = null;
                 await this.load();
                 this.showMessage('Codex saved', 'success');

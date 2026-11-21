@@ -2329,7 +2329,7 @@ html:has(dialog.cx-lightbox[open]) {
 
 .cx-tpl-body {
     min-height: 14rem;
-    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    font-family: inherit;
     font-size: 0.875rem;
 }
 

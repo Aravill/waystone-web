@@ -75,6 +75,20 @@ func codexExists(q querier, id string) error {
 	}
 }
 
+// checkNewPage is what a new page needs before it is written: the codex exists, none of the names
+// (title and aliases) is taken by another page in it, and the folder belongs to it.
+func checkNewPage(q querier, codexID, folderID, pageID string, names []string) error {
+	if err := codexExists(q, codexID); err != nil {
+		return err
+	}
+	if conflicts, err := nameConflicts(q, codexID, pageID, names); err != nil {
+		return err
+	} else if len(conflicts) > 0 {
+		return &NameTakenError{conflicts}
+	}
+	return folderInCodex(q, folderID, codexID)
+}
+
 // CreatePage adds a page (revision 1, body may be empty) and any aliases in p.Aliases.
 // A title or alias already used in the codex gives *NameTakenError.
 func (s *SQLiteStore) CreatePage(p models.Page, body string) error {
@@ -98,9 +112,6 @@ func createPageTx(tx *sql.Tx, p models.Page, body string) error {
 
 // createPageNoteTx is createPageTx with a note on revision 1.
 func createPageNoteTx(tx *sql.Tx, p models.Page, body, note string) error {
-	if err := codexExists(tx, p.CodexID); err != nil {
-		return err
-	}
 	// Aliases are unique by normalized name and never repeat the title.
 	aliases, seen := []string{}, map[string]bool{NormName(p.Title): true}
 	for _, a := range p.Aliases {
@@ -109,12 +120,7 @@ func createPageNoteTx(tx *sql.Tx, p models.Page, body, note string) error {
 			aliases = append(aliases, a)
 		}
 	}
-	if conflicts, err := nameConflicts(tx, p.CodexID, p.ID, append([]string{p.Title}, aliases...)); err != nil {
-		return err
-	} else if len(conflicts) > 0 {
-		return &NameTakenError{conflicts}
-	}
-	if err := folderInCodex(tx, p.FolderID, p.CodexID); err != nil {
+	if err := checkNewPage(tx, p.CodexID, p.FolderID, p.ID, append([]string{p.Title}, aliases...)); err != nil {
 		return err
 	}
 	now := nowUTC()

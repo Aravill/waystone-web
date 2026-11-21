@@ -44,15 +44,7 @@ func (s *SQLiteStore) CreatePageWith(p models.Page, body string, x models.NewPag
 func (s *SQLiteStore) CheckNewPage(codexID, folderID, title string) error {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	if err := codexExists(s.db, codexID); err != nil {
-		return err
-	}
-	if conflicts, err := nameConflicts(s.db, codexID, "", []string{title}); err != nil {
-		return err
-	} else if len(conflicts) > 0 {
-		return &NameTakenError{conflicts}
-	}
-	return folderInCodex(s.db, folderID, codexID)
+	return checkNewPage(s.db, codexID, folderID, "", []string{title})
 }
 
 const templateColumns = `id, codex_id, name, description, body, created_by, created_at, updated_at`
