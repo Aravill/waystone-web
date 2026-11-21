@@ -69,6 +69,25 @@ function codexMarkdown(body, lookup, canCreate = true, images = null) {
     });
 }
 
+// Save as template, "Headings only": the page's ## and ### lines (not the ones inside a code
+// fence), one blank line apart. "" when there are none.
+function codexHeadingsOnly(body) {
+    let fenced = false;
+    const out = [];
+    for (const line of String(body || '').split('\n')) {
+        if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
+        else if (!fenced && /^#{2,3} /.test(line)) out.push(line.trimEnd());
+    }
+    return out.length ? out.join('\n\n') + '\n\n' : '';
+}
+
+// Save as template, "All the text": pictures belong to their page, so lines that are only
+// ![[...]] embeds go, and so do embeds inside a line.
+function codexWithoutPictures(body) {
+    return String(body || '').split('\n').filter((l) => !/^\s*(!\[\[[^\[\]\n]*\]\]\s*)+$/.test(l)).join('\n')
+        .replace(CODEX_IMAGE_RE, '').replace(/\n{3,}/g, '\n\n');
+}
+
 // Folder tree. Folders only sort pages. Open/closed state is kept per codex in localStorage and
 // is deliberately not reactive, so toggling a folder never re-renders the tree.
 let codexOpenState = {};
@@ -207,6 +226,7 @@ window.codexPage = function () {
         navPromise: null,
         codexChoices: [],
         dlg: { type: '' },
+        tplBuiltin: null, // the built-in templates and the day {{date}} stands for, from the server (once)
         // Tags and pictures
         tagFilter: '', // ?tag=name on the codex screen: list only the pages with that tag
         lightbox: { url: '', caption: '', meta: '' },
@@ -327,6 +347,10 @@ window.codexPage = function () {
             if (this.screen === 'codex') return !!(this.codex && this.codex.can_edit);
             return !!(this.pageData && this.pageData.can_edit);
         },
+        // Copy page needs See on the page (it is on screen) and Edit on some codex to copy into.
+        get canCopy() {
+            return this.codexChoices.length > 0;
+        },
         get crumbs() {
             const s = this.screen;
             if (s === 'codex' && this.codex) return [{ label: this.codex.codex.name, href: '' }];
@@ -388,6 +412,7 @@ window.codexPage = function () {
                         return;
                     }
                     this.pageData = data;
+                    this.ensureCodices(); // the codices Copy page can go to
                     this.trackTab(data.page);
                     this.navPromise = this.loadNav(data.page);
                     document.title = 'Waystone - ' + data.page.title;
@@ -625,6 +650,7 @@ window.codexPage = function () {
                 unchanged: () => 'Nothing changed, so no revision was saved.',
                 renamed: () => `Renamed. Links were updated in ${this.countLabel(Number(q.get('renamed')), 'page')}.`,
                 moved: () => 'Page moved.',
+                copied: () => 'Copied.',
                 page_deleted: () => 'Page deleted.'
             };
             const key = Object.keys(texts).find((k) => q.has(k));
@@ -929,9 +955,12 @@ window.codexPage = function () {
             window.location.href = next ? this.pageUrl(next) : '/codices/c/' + encodeURIComponent(this.currentCodexId);
         },
         // More menu on the page screens
+        moreItems() {
+            return Array.from(this.$refs.moreMenu.querySelectorAll('button')).filter((b) => b.offsetParent !== null);
+        },
         toggleMore() {
             this.moreOpen = !this.moreOpen;
-            if (this.moreOpen) this.$nextTick(() => this.$refs.moreMenu?.querySelector('button')?.focus());
+            if (this.moreOpen) this.$nextTick(() => this.moreItems()[0]?.focus());
         },
         moreDo(action) {
             this.moreOpen = false;
@@ -945,7 +974,7 @@ window.codexPage = function () {
                 document.getElementById('cxMoreBtn')?.focus();
                 return;
             }
-            const items = Array.from(this.$refs.moreMenu.querySelectorAll('button'));
+            const items = this.moreItems();
             const i = items.indexOf(document.activeElement);
             if (event.key === 'ArrowDown') items[(i + 1) % items.length].focus();
             else if (event.key === 'ArrowUp') items[(i - 1 + items.length) % items.length].focus();
@@ -1003,16 +1032,21 @@ window.codexPage = function () {
 
         // ---- Dialogs ----
         get dlgEyebrow() {
-            return { createPage: 'Codex', codex: 'Codex', rename: 'Page', aliases: 'Page', move: 'Page', folder: 'Folder', folderMove: 'Folder', pageFolder: 'Page', tags: 'Page', tag: 'Tag' }[this.dlg.type] || '';
+            return { createPage: 'Codex', codex: 'Codex', templates: 'Codex', template: 'Template', rename: 'Page', aliases: 'Page', move: 'Page', copyPage: 'Page', saveTemplate: 'Page', folder: 'Folder', folderMove: 'Folder', pageFolder: 'Page', tags: 'Page', tag: 'Tag' }[this.dlg.type] || '';
         },
         get dlgTitle() {
             const d = this.dlg;
             if (d.type === 'createPage') return 'New page';
-            return { codex: d.codex ? 'Edit codex' : 'New codex', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another codex', folder: d.folder ? 'Rename folder' : 'New folder', folderMove: 'Move folder', pageFolder: 'Change folder', tags: 'Tags', tag: d.tag ? 'Rename tag' : 'New tag' }[d.type] || '';
+            return { codex: d.codex ? 'Edit codex' : 'New codex', templates: 'Templates', template: d.template ? 'Edit template' : 'New template', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another codex', copyPage: 'Copy page', saveTemplate: 'Save as template', folder: d.folder ? 'Rename folder' : 'New folder', folderMove: 'Move folder', pageFolder: 'Change folder', tags: 'Tags', tag: d.tag ? 'Rename tag' : 'New tag' }[d.type] || '';
+        },
+        get dlgWide() {
+            return ['createPage', 'templates', 'template'].includes(this.dlg.type);
         },
         get dlgSubmit() {
             const d = this.dlg;
-            if (d.type === 'createPage') return d.busy ? 'Creating...' : 'Create';
+            if (d.type === 'createPage') return d.busy ? 'Creating...' : 'Create page';
+            if (d.type === 'copyPage') return d.busy ? 'Copying...' : 'Copy page';
+            if (d.type === 'template' || d.type === 'saveTemplate') return d.busy ? 'Saving...' : 'Save template';
             return d.busy ? 'Saving...' : d.type === 'tag' && !d.tag ? 'Create tag' : d.type === 'move' ? 'Move page' : d.type === 'folderMove' ? 'Move folder' : (d.type === 'codex' && !d.codex) || (d.type === 'folder' && !d.folder) ? 'Create' + (d.type === 'codex' ? ' codex' : ' folder') : 'Save';
         },
         get moveWarning() {
@@ -1038,23 +1072,205 @@ window.codexPage = function () {
         closeDlg() {
             this.dlg = { type: '' };
         },
-        // folderId: the folder to prefill; a page's missing links start in its own folder.
-        async openCreatePage(title = '', folderId = null) {
+        // Cancel: the template editor goes back to the list it came from, everything else closes.
+        cancelDlg() {
+            if (this.dlg.type === 'template' && this.dlg.back) this.openTemplates();
+            else this.closeDlg();
+        },
+        // folderId: the folder to prefill (a page's missing links start in its own folder); tplId: the
+        // template to start from (the last one used in this codex when empty).
+        async openCreatePage(title = '', folderId = null, tplId = '') {
             if (!this.canEdit) {
                 this.showMessage("You can't add pages to this codex.", 'error');
                 return;
             }
-            await this.ensureCodices();
-            if (!this.codexChoices.length) {
-                this.showMessage('Make a codex first.', 'error');
+            const codexId = this.currentCodexId;
+            if (!codexId) return;
+            let templates;
+            try {
+                templates = await this.loadTemplates(codexId);
+            } catch (error) {
+                this.showMessage('Could not load the templates: ' + error.message, 'error');
                 return;
             }
-            const codexId = this.screen === 'codex' ? this.codex.codex.id : this.page ? this.page.codex.id : this.codexChoices[0].id;
             const folders = this.codex && this.codex.codex.id === codexId ? this.codex.folders || [] : (await this.fetchFolders(codexId)) || [];
             if (folderId === null) folderId = this.page ? this.page.folder_id || '' : '';
             if (!folders.some((f) => f.id === folderId)) folderId = '';
-            this.dlg = { type: 'createPage', title, codexId, folders, folderId, error: '', busy: false };
+            if (!tplId) {
+                try {
+                    tplId = localStorage.getItem('codex-last-template:' + codexId) || '';
+                } catch (error) {
+                    tplId = '';
+                }
+            }
+            if (!templates.some((t) => t.id === tplId)) tplId = 'builtin:blank';
+            this.dlg = { type: 'createPage', title, codexId, folders, folderId, templates, tplId, error: '', busy: false };
             this.focusDlg();
+        },
+
+        // ---- Templates ----
+        // The built-in templates (kept after the first load) then the codex's own, as one list.
+        async loadTemplates(codexId) {
+            if (!this.tplBuiltin) {
+                const { response, data } = await this.send('/api/codices/templates/builtin', 'GET');
+                if (!response.ok) throw new Error(data.error || 'request failed');
+                this.tplBuiltin = data;
+            }
+            const { response, data } = await this.send(`/api/codices/c/${encodeURIComponent(codexId)}/templates`, 'GET');
+            if (!response.ok) throw new Error(data.error || 'request failed');
+            return [
+                ...this.tplBuiltin.templates.map((t) => ({ id: t.id, name: t.name, description: t.description, tags: t.tags, body: t.body, by: '' })),
+                ...data.map((t) => ({ id: t.id, name: t.name, description: t.description, tags: t.tags, body: t.body, by: t.created_by_user.display_name }))
+            ];
+        },
+        tplGroups(list) {
+            return [
+                { label: 'Built-in', items: list.filter((t) => !t.by) },
+                { label: 'This codex', items: list.filter((t) => t.by) }
+            ].filter((g) => g.items.length);
+        },
+        // {{title}} and {{date}}, the same two the server fills in.
+        fillTpl(body, title) {
+            const today = this.tplBuiltin ? this.tplBuiltin.today : '';
+            return body.replace(/\{\{title\}\}|\{\{date\}\}/g, (m) => (m === '{{title}}' ? title : today));
+        },
+        get tplSelected() {
+            const d = this.dlg;
+            return (d.templates || []).find((t) => t.id === d.tplId) || (d.templates || [])[0] || { name: '', tags: [], body: '' };
+        },
+        get tplPreviewHtml() {
+            const t = this.tplSelected;
+            if (!t.body) return '<p class="cx-tpl-empty">An empty page.</p>';
+            // An empty [[ ]] shows as a dotted "…" so it reads as a blank to fill in.
+            const text = this.fillTpl(t.body, this.dlg.title.trim() || 'Untitled').replace(/\[\[\s*\]\]/g, '[[…]]');
+            return codexMarkdown(text, null, false, null);
+        },
+        // Arrow keys move through the template cards like a radio group.
+        onTplKey(event) {
+            const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+            const list = this.dlg.templates;
+            if (!step || !list.length) return;
+            event.preventDefault();
+            const i = list.findIndex((t) => t.id === this.dlg.tplId);
+            this.dlg.tplId = list[(i + step + list.length) % list.length].id;
+            this.$nextTick(() => document.querySelector('.cx-tpl-card[aria-checked="true"]')?.focus());
+        },
+        async openTemplates() {
+            const codexId = this.currentCodexId;
+            if (!codexId) return;
+            try {
+                const templates = await this.loadTemplates(codexId);
+                this.dlg = { type: 'templates', codexId, templates, canEdit: this.canEdit, error: '', busy: false };
+            } catch (error) {
+                this.showMessage('Could not load the templates: ' + error.message, 'error');
+            }
+        },
+        // t: the template to edit, or null for a new one; from: a template whose fields start a new one.
+        openTemplateEditor(t, from = null) {
+            const s = t || from;
+            this.dlg = {
+                type: 'template', template: t, codexId: this.dlg.codexId, back: true,
+                name: s ? s.name : '', description: s ? s.description : '', tags: s ? s.tags.join(', ') : '', body: s ? s.body : '## \n\n',
+                error: '', busy: false
+            };
+            this.focusDlg();
+        },
+        copyTemplate(t) {
+            const name = Array.from(t.name + ' (copy)').length > 80 ? Array.from(t.name).slice(0, 72).join('') + ' (copy)' : t.name + ' (copy)';
+            this.openTemplateEditor(null, { ...t, name });
+        },
+        async deleteTemplate(t) {
+            const d = this.dlg;
+            const ok = await this.askConfirm({
+                eyebrow: 'Template',
+                title: `Delete the “${t.name}” template?`,
+                message: 'Pages already made from it stay as they are.',
+                confirmLabel: 'Delete template'
+            });
+            if (!ok) return;
+            try {
+                const { response, data } = await this.send(`/api/codices/templates/${encodeURIComponent(t.id)}`, 'DELETE');
+                if (!response.ok && response.status !== 404) {
+                    this.showMessage(this.sentence(data.error || 'Could not delete the template'), 'error');
+                    return;
+                }
+                if (this.dlg === d) d.templates = await this.loadTemplates(d.codexId);
+                this.showMessage('Template deleted', 'success');
+            } catch (error) {
+                this.showMessage('Could not delete the template: ' + error.message, 'error');
+            }
+        },
+        async submitTemplate(d) {
+            const name = d.name.trim();
+            if (!name) {
+                d.error = 'Give the template a name.';
+                return;
+            }
+            const tags = d.tags.split(',').map((s) => s.trim().split(/\s+/).join(' ')).filter(Boolean);
+            const body = { name, description: d.description, body: d.body, tags };
+            const { response, data } = d.template
+                ? await this.send(`/api/codices/templates/${encodeURIComponent(d.template.id)}`, 'PUT', body)
+                : await this.send(`/api/codices/c/${encodeURIComponent(d.codexId)}/templates`, 'POST', body);
+            if (!response.ok) {
+                this.failDlg(d, response, data);
+                return;
+            }
+            await this.openTemplates();
+            this.showMessage('Template saved', 'success');
+        },
+        // More > Save as template: the page's headings (or all its text, without pictures) become a template of this codex.
+        openSaveTemplate() {
+            this.dlg = { type: 'saveTemplate', name: Array.from(this.page.title).slice(0, 80).join(''), description: '', keep: 'headings', tags: true, error: '', busy: false };
+            this.focusDlg();
+        },
+        async submitSaveTemplate(d) {
+            const name = d.name.trim();
+            if (!name) {
+                d.error = 'Give the template a name.';
+                return;
+            }
+            const body = d.keep === 'all' ? codexWithoutPictures(this.page.body) : codexHeadingsOnly(this.page.body);
+            if (!body) {
+                d.error = 'This page has no ## or ### headings to keep. Choose “All the text” instead.';
+                return;
+            }
+            const tags = d.tags ? this.pageData.tags.map((t) => t.name) : [];
+            const { response, data } = await this.send(`/api/codices/c/${encodeURIComponent(this.page.codex.id)}/templates`, 'POST', { name, description: d.description, body, tags });
+            if (!response.ok) {
+                this.failDlg(d, response, data);
+                return;
+            }
+            this.closeDlg();
+            this.showMessage(`Saved “${name}” as a template. It is in the New page list now.`, 'success');
+        },
+        // More > Copy page: into any codex the viewer can edit (the codex list is already loaded for the menu).
+        async openCopyPage() {
+            await this.ensureCodices();
+            if (!this.codexChoices.length) {
+                this.showMessage("There's no codex you can copy it to.", 'error');
+                return;
+            }
+            const codexId = this.codexChoices.some((c) => c.id === this.page.codex.id) ? this.page.codex.id : this.codexChoices[0].id;
+            const folders = this.codex && this.codex.codex.id === codexId ? this.codex.folders || [] : (await this.fetchFolders(codexId)) || [];
+            const base = Array.from(this.page.title).slice(0, 120 - ' (copy)'.length).join('');
+            const title = this.page.title.length + ' (copy)'.length <= 120 ? this.page.title + ' (copy)' : base + ' (copy)';
+            this.dlg = { type: 'copyPage', title, codexId, folders, folderId: '', copyTags: true, copyImages: true, error: '', busy: false };
+            this.focusDlg();
+        },
+        async submitCopyPage(d) {
+            const title = d.title.trim().split(/\s+/).join(' ');
+            if (!title) {
+                d.error = 'Give the copy a title.';
+                return;
+            }
+            const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/copy`, 'POST',
+                { title, codex_id: d.codexId, folder_id: d.folderId || '', copy_tags: d.copyTags, copy_images: d.copyImages });
+            if (response.status === 201) {
+                this.saved = true;
+                window.location.href = codexPageUrl({ id: data.page.id, title }) + '?copied=1';
+                return;
+            }
+            this.failDlg(d, response, data);
         },
         // The codex's folders, or null (after an error message) when the load failed.
         async fetchFolders(codexId) {
@@ -1171,6 +1387,9 @@ window.codexPage = function () {
             d.busy = true;
             try {
                 if (d.type === 'createPage') await this.submitCreatePage(d);
+                else if (d.type === 'template') await this.submitTemplate(d);
+                else if (d.type === 'saveTemplate') await this.submitSaveTemplate(d);
+                else if (d.type === 'copyPage') await this.submitCopyPage(d);
                 else if (d.type === 'codex') await this.submitCodex(d);
                 else if (d.type === 'rename') await this.submitRename(d);
                 else if (d.type === 'aliases') await this.submitAliases(d);
@@ -1192,6 +1411,7 @@ window.codexPage = function () {
             else if (response.status === 404) d.error = this.sentence(data.error || 'That no longer exists');
             else if (data.code === 'name_taken') d.error = this.conflictText(data);
             else if (data.code === 'folder_name_taken') d.error = 'A folder with that name already exists there.';
+            else if (data.code === 'template_name_taken') d.error = 'A template with that name already exists in this codex.';
             else d.error = this.sentence(data.error || 'Request failed');
         },
         async submitCreatePage(d) {
@@ -1200,8 +1420,13 @@ window.codexPage = function () {
                 d.error = 'Give the page a title.';
                 return;
             }
-            const { response, data } = await this.send('/api/codices/pages', 'POST', { title, codex_id: d.codexId, folder_id: d.folderId || '' });
+            const { response, data } = await this.send('/api/codices/pages', 'POST', { title, codex_id: d.codexId, folder_id: d.folderId || '', template_id: d.tplId });
             if (response.status === 201) {
+                try {
+                    localStorage.setItem('codex-last-template:' + d.codexId, d.tplId);
+                } catch (error) {
+                    // storage may be blocked; the template just isn't remembered
+                }
                 this.saved = true;
                 window.location.href = codexPageUrl({ id: data.page.id, title }, '/edit');
                 return;

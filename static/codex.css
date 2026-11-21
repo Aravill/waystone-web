@@ -2150,3 +2150,246 @@ html:has(dialog.cx-lightbox[open]) {
         transition: none;
     }
 }
+
+/* Templates: the New page dialog (template cards and preview), the Templates list and editor,
+   Save as template and Copy page */
+.modal-content.cx-dlg--wide {
+    max-width: 56rem;
+}
+
+.cx-np {
+    display: grid;
+    gap: 1rem;
+}
+
+.cx-np-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.cx-np-fields .form-group:first-child {
+    flex: 3 1 14rem;
+}
+
+.cx-np-fields .form-group:last-child:not(:first-child) {
+    flex: 2 1 12rem;
+}
+
+.cx-np-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 1.5rem;
+}
+
+.cx-np-label,
+.cx-tpl-grouplabel {
+    margin: 0 0 0.375rem;
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.cx-tpl-grouplabel {
+    margin-top: 0.75rem;
+}
+
+.cx-tpl-group:first-child .cx-tpl-grouplabel {
+    margin-top: 0;
+}
+
+.cx-tpl-cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.cx-tpl-card {
+    min-height: 3.5rem;
+    padding: 0.5rem 0.625rem;
+    background: var(--folio);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font: inherit;
+    line-height: 1.35;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cx-tpl-card strong {
+    display: block;
+    font-size: 0.9375rem;
+}
+
+.cx-tpl-card span {
+    display: block;
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+.cx-tpl-card:hover {
+    background: var(--cx-hover);
+    border-color: var(--ink);
+}
+
+.cx-tpl-card[aria-checked="true"] {
+    background: var(--bg);
+    border-color: var(--rubric);
+    box-shadow: inset 0 0 0 1px var(--rubric);
+}
+
+.cx-tpl-card:focus-visible,
+.cx-tpl-preview:focus-visible {
+    outline: 2px solid var(--rubric);
+    outline-offset: 2px;
+}
+
+.cx-tpl-preview {
+    min-height: 18rem;
+    max-height: 50vh;
+    overflow: auto;
+    padding: 0.75rem 1rem;
+    background: var(--folio);
+    border: 1px solid var(--line);
+}
+
+.cx-tpl-preview > :last-child {
+    margin-bottom: 0;
+}
+
+.cx-tpl-empty {
+    margin: 0;
+    color: var(--muted);
+}
+
+.cx-np-tags {
+    margin: 0.5rem 0 0;
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.cx-tpl-list {
+    margin: 0 0 1rem;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+}
+
+.cx-tpl-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.cx-tpl-info {
+    flex: 1 1 16rem;
+    min-width: 0;
+}
+
+.cx-tpl-info small {
+    display: block;
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.cx-tpl-badge {
+    margin-left: 0.5rem;
+    padding: 0 0.4rem;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.cx-tpl-tags {
+    display: block;
+    margin-top: 0.25rem;
+}
+
+.cx-tpl-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.75rem;
+    align-items: flex-start;
+}
+
+.cx-tpl-acts .text-link {
+    min-height: 2rem;
+    font-size: 0.9375rem;
+}
+
+.cx-tpl-del {
+    color: var(--muted);
+}
+
+.cx-tpl-body {
+    min-height: 14rem;
+    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    font-size: 0.875rem;
+}
+
+.cx-fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.cx-fieldset legend {
+    margin-bottom: 0.25rem;
+    padding: 0;
+    font-weight: 600;
+}
+
+.cx-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    margin: 0.25rem 0;
+    cursor: pointer;
+}
+
+.cx-check input {
+    flex: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0.2rem 0 0;
+    padding: 0;
+    border: 0;
+    accent-color: var(--ink);
+}
+
+.cx-check input:focus-visible {
+    outline: 2px solid var(--rubric);
+    outline-offset: 2px;
+}
+
+.cx-check small {
+    display: block;
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+@media (max-width: 760px) {
+    .cx-np-cols {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1rem;
+    }
+
+    .cx-tpl-preview {
+        min-height: 8rem;
+        max-height: 30vh;
+    }
+
+    .modal-content.cx-dlg--wide .modal-form {
+        padding: 1rem;
+    }
+
+    .modal-content.cx-dlg--wide .modal-header {
+        padding: 1rem;
+    }
+}
