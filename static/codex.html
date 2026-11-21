@@ -447,6 +447,9 @@
                                             <label for="fBody">The page</label>
                                             <span class="cx-edtools-note" role="status" x-text="uploading"></span>
                                             <span class="cx-edtools-note" role="status" x-text="draftStatus"></span>
+                                            <button type="button" class="cx-act" x-show="editorReady" title="Link the selected words (Ctrl+K)" @click="editor.linkSelection()">
+                                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Link
+                                            </button>
                                             <button type="button" class="cx-act" @click="$refs.imgInput.click()">
                                                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16"/><circle cx="9" cy="10" r="2"/><path d="M3 18l6-5 4 3 3-2 5 4"/></svg>Add image
                                             </button>
@@ -759,6 +762,28 @@
                         </div>
                     </div>
                 </template>
+                <template x-if="dlg.type === 'createMissing'">
+                    <div>
+                        <p class="hint">Your text links to pages that aren't written yet. Tick the ones to create now; the rest stay as wanted pages.</p>
+                        <ul class="cx-cm-list">
+                            <template x-for="r in dlg.rows" :key="r.title">
+                                <li>
+                                    <input type="checkbox" x-model="r.on" :disabled="r.done" :aria-label="'Create ' + r.title">
+                                    <span class="cx-cm-title" x-text="r.title"></span>
+                                    <select :aria-label="'Folder for ' + r.title" x-model="r.folderId" :disabled="r.done" @change="onCmFolder(r)">
+                                        <option value="">Top level</option>
+                                        <template x-for="o in folderOptions(dlg.folders)" :key="o.id"><option :value="o.id" x-text="o.label" :selected="o.id === r.folderId"></option></template>
+                                    </select>
+                                    <select :aria-label="'Template for ' + r.title" x-model="r.tplId" :disabled="r.done" @change="r.tplTouched = true">
+                                        <template x-for="t in dlg.templates" :key="t.id"><option :value="t.id" x-text="t.name" :selected="t.id === r.tplId"></option></template>
+                                    </select>
+                                    <p class="cx-cm-note" x-show="r.done">Created.</p>
+                                    <p class="cx-cm-note cx-cm-note--error" role="alert" x-show="r.error" x-text="r.error"></p>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                </template>
                 <template x-if="dlg.type === 'event'">
                     <div>
                         <div class="form-group">
@@ -1009,7 +1034,7 @@
                 <div class="modal-actions">
                     <button type="button" class="text-link" x-show="dlg.type === 'event' && dlg.eventId" :disabled="dlg.busy" @click="deleteEvent()">Delete event</button>
                     <button type="submit" class="submit-btn" x-show="dlg.type !== 'templates'" :disabled="dlg.busy" x-text="dlgSubmit"></button>
-                    <button type="button" class="btn-cancel" @click="cancelDlg()" x-text="dlg.type === 'templates' ? 'Close' : dlg.type === 'template' && dlg.back ? 'Back' : 'Cancel'"></button>
+                    <button type="button" class="btn-cancel" @click="cancelDlg()" x-text="dlg.type === 'templates' ? 'Close' : dlg.type === 'template' && dlg.back ? 'Back' : dlg.type === 'createMissing' ? 'Just save' : 'Cancel'"></button>
                 </div>
             </form>
         </div>
@@ -1047,8 +1072,8 @@
     <script src="/static/notifications.js?v=11"></script>
     <script src="/campaigns.js?v=63"></script>
     <script src="/static/journal.js?v=1"></script>
-    <script src="/static/codex-editor.js?v=3"></script>
+    <script src="/static/codex-editor.js?v=4"></script>
     <script src="/static/codex-graph.js?v=3"></script>
-    <script src="/static/codex.js?v=29"></script>
+    <script src="/static/codex.js?v=30"></script>
 </body>
 </html>

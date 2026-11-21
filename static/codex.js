@@ -12,6 +12,21 @@ const CODEX_LINK_RE = /\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{1,200}))?\]\]/g;
 const CODEX_IMAGE_RE = /!\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{0,200}))?\]\]/g;
 
 const codexNorm = (s) => String(s || '').trim().split(/\s+/).join(' ').toLowerCase();
+// Link targets in savedBody that name no page (lookup(title) is falsy) and were no targets in initialBody;
+// ![[picture]] embeds are not links. Deduped by name, at most 20.
+function codexNewMissing(initialBody, savedBody, lookup) {
+    const targets = (body) => [...String(body).matchAll(CODEX_LINK_RE)].filter((m) => body[m.index - 1] !== '!').map((m) => m[1].trim());
+    const before = new Set(targets(initialBody).map(codexNorm));
+    const seen = new Set();
+    const out = [];
+    for (const t of targets(savedBody)) {
+        const k = codexNorm(t);
+        if (!k || seen.has(k) || before.has(k) || lookup(t)) continue;
+        seen.add(k);
+        out.push(t.split(/\s+/).join(' '));
+    }
+    return out.slice(0, 20);
+}
 
 function codexSlug(title) {
     const s = Array.from(String(title || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '')).slice(0, 60).join('').replace(/-+$/, '');
@@ -1107,7 +1122,7 @@ window.codexPage = function () {
         showArrivalMessage() {
             const q = new URLSearchParams(location.search);
             const texts = {
-                saved: () => (Number(q.get('saved')) === 1 ? 'Page saved' : `Saved as revision ${q.get('saved')}`),
+                saved: () => (Number(q.get('saved')) === 1 ? 'Page saved' : `Saved as revision ${q.get('saved')}`) + (Number(q.get('created')) > 0 ? `, and created ${this.countLabel(Number(q.get('created')), 'page')}` : ''),
                 unchanged: () => 'Nothing changed, so no revision was saved.',
                 renamed: () => `Renamed. Links were updated in ${this.countLabel(Number(q.get('renamed')), 'page')}.`,
                 moved: () => 'Page moved.',
@@ -2074,25 +2089,27 @@ window.codexPage = function () {
         // ---- Dialogs ----
         get dlgEyebrow() {
             if (this.dlg.type === 'event' || this.dlg.type === 'calendar') return this.page ? this.page.title : 'Timeline';
-            return { quickNote: 'Only you see it until you file it', addToPage: 'Filing a note', createPage: this.dlg.note ? 'Filing a note' : 'Codex', codex: 'Codex', templates: 'Codex', template: 'Template', rename: 'Page', aliases: 'Page', move: 'Page', copyPage: 'Page', saveTemplate: 'Page', folder: 'Folder', folderTpl: 'Folder', folderMove: 'Folder', pageFolder: 'Page', tags: 'Page', tag: 'Tag' }[this.dlg.type] || '';
+            return { quickNote: 'Only you see it until you file it', addToPage: 'Filing a note', createPage: this.dlg.note ? 'Filing a note' : 'Codex', codex: 'Codex', templates: 'Codex', template: 'Template', rename: 'Page', aliases: 'Page', move: 'Page', copyPage: 'Page', saveTemplate: 'Page', folder: 'Folder', folderTpl: 'Folder', folderMove: 'Folder', pageFolder: 'Page', tags: 'Page', tag: 'Tag', createMissing: 'Page saved' }[this.dlg.type] || '';
         },
         get dlgTitle() {
             const d = this.dlg;
             if (d.type === 'createPage') return 'New page';
             if (d.type === 'quickNote') return d.noteId ? 'Edit note' : 'Quick note';
             if (d.type === 'addToPage') return 'Add to page';
+            if (d.type === 'createMissing') return d.rows.length === 1 ? 'Create this page?' : `Create these ${d.rows.length} pages?`;
             if (d.type === 'event') return d.eventId ? 'Edit event' : 'Add event';
             if (d.type === 'calendar') return 'Calendar';
             return { codex: d.codex ? 'Edit codex' : 'New codex', templates: 'Templates', template: d.template ? 'Edit template' : 'New template', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another codex', copyPage: 'Copy page', saveTemplate: 'Save as template', folder: d.folder ? 'Rename folder' : 'New folder', folderMove: 'Move folder', folderTpl: 'New pages start from', pageFolder: 'Change folder', tags: 'Tags', tag: d.tag ? 'Rename tag' : 'New tag' }[d.type] || '';
         },
         get dlgWide() {
-            return ['createPage', 'templates', 'template'].includes(this.dlg.type);
+            return ['createPage', 'createMissing', 'templates', 'template'].includes(this.dlg.type);
         },
         get dlgSubmit() {
             const d = this.dlg;
             if (d.type === 'createPage') return d.busy ? 'Creating...' : 'Create page';
             if (d.type === 'quickNote') return d.busy ? 'Saving...' : d.noteId ? 'Save' : 'Save to inbox';
             if (d.type === 'addToPage') return d.busy ? 'Adding...' : 'Add to page';
+            if (d.type === 'createMissing') return d.busy ? 'Creating...' : 'Save and create';
             if (d.type === 'copyPage') return d.busy ? 'Copying...' : 'Copy page';
             if (d.type === 'event') return d.busy ? 'Saving...' : d.eventId ? 'Save event' : 'Add event';
             if (d.type === 'calendar') return d.busy ? 'Saving...' : 'Save calendar';
@@ -2131,6 +2148,10 @@ window.codexPage = function () {
         async cancelDlg() {
             const d = this.dlg;
             if (d.busy) return;
+            if (d.type === 'createMissing') {
+                this.finishSave(d);
+                return;
+            }
             if (d.type === 'template') {
                 if (JSON.stringify([d.name, d.description, d.tags, d.body]) !== d.snap) {
                     // After the key event has reached every handler, or the confirm's own Esc handler closes it at once.
@@ -2516,6 +2537,7 @@ window.codexPage = function () {
                 if (d.type === 'createPage') await this.submitCreatePage(d);
                 else if (d.type === 'quickNote') await this.submitQuickNote(d);
                 else if (d.type === 'addToPage') await this.submitAddToPage(d);
+                else if (d.type === 'createMissing') await this.submitCreateMissing(d);
                 else if (d.type === 'event') await this.submitEvent(d);
                 else if (d.type === 'calendar') await this.submitCalendar(d);
                 else if (d.type === 'template') await this.submitTemplate(d);
@@ -2579,6 +2601,58 @@ window.codexPage = function () {
                 return;
             }
             this.failDlg(d, response, data);
+        },
+        // After a save that added links to missing pages: one row each (folder and template default to
+        // the saved page's folder and its default). The page is already saved, so Just save only leaves.
+        async openCreateMissing(titles, after) {
+            const codexId = this.page.codex.id;
+            try {
+                const templates = await this.loadTemplates(codexId);
+                const folders = this.codex && this.codex.codex.id === codexId ? this.codex.folders || [] : await this.fetchFolders(codexId);
+                if (!folders) return false;
+                const folderId = folders.some((f) => f.id === this.page.folder_id) ? this.page.folder_id : '';
+                const tplId = this.cmTemplate(templates, folders, folderId);
+                this.dlg = {
+                    type: 'createMissing', codexId, folders, templates, after, created: 0, error: '', busy: false,
+                    rows: titles.map((title) => ({ title, on: true, folderId, tplId, tplTouched: false, done: false, error: '' }))
+                };
+                return true;
+            } catch (error) {
+                return false;
+            }
+        },
+        cmTemplate(templates, folders, folderId) {
+            const def = codexFolderDefault(folders, folderId);
+            return def && templates.some((t) => t.id === def) ? def : 'builtin:blank';
+        },
+        onCmFolder(r) {
+            if (!r.tplTouched) r.tplId = this.cmTemplate(this.dlg.templates, this.dlg.folders, r.folderId);
+        },
+        finishSave(d) {
+            window.location.href = d.after + (d.created ? (d.after.includes('?') ? '&' : '?') + 'created=' + d.created : '');
+        },
+        async submitCreateMissing(d) {
+            let failed = 0;
+            for (const r of d.rows) {
+                if (!r.on || r.done) continue;
+                r.error = '';
+                try {
+                    const { response, data } = await this.send('/api/codices/pages', 'POST', { title: r.title, codex_id: d.codexId, folder_id: r.folderId || '', kind: 'lore', template_id: r.tplId });
+                    if (response.status === 201) {
+                        r.done = true;
+                        d.created++;
+                    } else {
+                        const tmp = {};
+                        this.failDlg(tmp, response, data);
+                        r.error = tmp.error;
+                        failed++;
+                    }
+                } catch (error) {
+                    r.error = 'Something went wrong: ' + error.message;
+                    failed++;
+                }
+            }
+            if (!failed) this.finishSave(d);
         },
         async submitFolder(d) {
             const name = d.name.trim();
@@ -3065,7 +3139,8 @@ window.codexPage = function () {
                 this.editor = await window.createCodexEditor(this.$refs.editorHost, {
                     doc: () => this.draft.body,
                     titles: () => this.titles,
-                    onChange: (value) => { this.draft.body = value; this.queueDraft(); }
+                    onChange: (value) => { this.draft.body = value; this.queueDraft(); },
+                    onNotice: (text) => this.showMessage(text, 'info')
                 });
                 this.editorReady = !!this.editor;
             } catch (error) {
@@ -3141,7 +3216,10 @@ window.codexPage = function () {
                 if (response.ok) {
                     this.saved = true;
                     this.clearDraft();
-                    window.location.href = this.pageUrl(this.page) + (response.status === 201 ? `?saved=${data.revision.number}` : '?unchanged=1');
+                    const after = this.pageUrl(this.page) + (response.status === 201 ? `?saved=${data.revision.number}` : '?unchanged=1');
+                    const missing = response.status === 201 ? codexNewMissing(d.initial.body, d.body, this.titleLookup) : [];
+                    if (missing.length && this.canEdit && await this.openCreateMissing(missing, after)) return;
+                    window.location.href = after;
                 } else if (response.status === 409 && data.code === 'stale_base') {
                     const diff = diffWords(d.initial.body, data.latest.body);
                     this.conflict = { latest: data.latest, html: diff.added || diff.removed ? diffHtml(diff.segs) : '' };

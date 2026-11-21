@@ -22,9 +22,10 @@
     const norm = (s) => String(s || '').trim().split(/\s+/).join(' ').toLowerCase();
 
     // createCodexEditor(el, { doc, titles, onChange }) mounts the editor in el and resolves to
-    // { view }. doc is the text, or a function returning it (read after the library has loaded, so
-    // text typed meanwhile in the fallback box is kept). titles() returns [{ title, aliases }] for this codex; onChange(text) gets every edit.
-    window.createCodexEditor = async function (el, { doc, titles, onChange }) {
+    // { view, linkSelection }. doc is the text, or a function returning it (read after the library has loaded, so
+    // text typed meanwhile in the fallback box is kept). titles() returns [{ title, aliases }] for this codex; onChange(text) gets every edit;
+    // onNotice(text) hears why Ctrl+K did nothing.
+    window.createCodexEditor = async function (el, { doc, titles, onChange, onNotice }) {
         await loadScriptOnce('/static/vendor/codemirror.bundle.js?v=1');
         const { EditorView, EditorState, keymap, Decoration, ViewPlugin, MatchDecorator, placeholder, drawSelection,
             history, defaultKeymap, historyKeymap, markdown, autocompletion, completionKeymap,
@@ -73,6 +74,31 @@
             return { from: m.from + 2, options, validFor: /^[^\[\]\n|]*$/ };
         };
 
+        // Ctrl/Cmd+K and the Link button: the selected words become [[Title]], [[Title|as selected]]
+        // (another case, or an alias) or [[as selected]] (a page not written yet). Always true, so the
+        // browser's own Ctrl+K stays out of it.
+        const linkSelection = (v) => {
+            const sel = v.state.selection.main;
+            const raw = v.state.doc.sliceString(sel.from, sel.to);
+            const text = raw.trim();
+            if (!text) {
+                if (onNotice) onNotice('Select the words to link first.');
+                return true;
+            }
+            if (/[\n\[\]|]/.test(text) || text.length > 120) {
+                if (onNotice) onNotice('Select up to 120 characters on one line, without [ ] or |.');
+                return true;
+            }
+            const from = sel.from + raw.indexOf(text);
+            const key = norm(text);
+            const all = titles();
+            const hit = all.find((p) => norm(p.title) === key) || all.find((p) => (p.aliases || []).some((a) => norm(a) === key));
+            const link = !hit ? `[[${text}]]` : hit.title === text ? `[[${hit.title}]]` : `[[${hit.title}|${text}]]`;
+            v.dispatch({ changes: { from, to: from + text.length, insert: link }, selection: { anchor: from + link.length }, scrollIntoView: true });
+            v.focus();
+            return true;
+        };
+
         const view = new EditorView({
             parent: el,
             state: EditorState.create({
@@ -87,11 +113,11 @@
                     placeholder('Write about it. Link other pages with [[Title]].'),
                     EditorView.lineWrapping,
                     EditorView.contentAttributes.of({ 'aria-label': 'The page', 'aria-multiline': 'true' }),
-                    keymap.of([...completionKeymap, ...historyKeymap, ...defaultKeymap]),
+                    keymap.of([{ key: 'Mod-k', run: (v) => linkSelection(v) }, ...completionKeymap, ...historyKeymap, ...defaultKeymap]),
                     EditorView.updateListener.of((u) => { if (u.docChanged) onChange(u.state.doc.toString()); })
                 ]
             })
         });
-        return { view };
+        return { view, linkSelection: () => linkSelection(view) };
     };
 })();
