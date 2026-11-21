@@ -191,3 +191,8 @@ func GetMapPinEvents(mapID string, limit int) ([]models.MapPinEvent, error) {
 func UndoMapPinEvent(mapID, eventID, userID string) error {
 	return GetStore().UndoMapPinEvent(mapID, eventID, userID)
 }
+
+// GetCodexGraph returns a codex's pages and stored links, for the graph view.
+func GetCodexGraph(codexID string) ([]models.GraphPage, []models.GraphLink, error) {
+	return GetStore().GetCodexGraph(codexID)
+}
