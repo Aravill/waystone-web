@@ -105,6 +105,8 @@ Three families, vendored as woff2 under `static/vendor/fonts/` (SIL Open Font Li
 | Display | `'IM Fell English SC', serif` | Page titles (h1), card titles, modal titles, section headings, the month name, navigation |
 | Blackletter | `'UnifrakturMaguntia', serif` | The "Waystone" wordmark and the drop cap on fixed page titles. Never for a whole word other than the brand, never below 32px |
 
+**The Codices use their own pair** (the chosen mock-up, D in `docs/design/mockups/codex-wiki.html`): **Inter** (400, 400 italic, 500, 600) for text and **Barlow Condensed** (600) for headings, so the wiki reads as a reference work. They are vendored like the others but declared in `codex.css`, which overrides `--font-text` and `--font-display` on `.cx-top`, `.cx-shell` and the Codices dialogs only: the site header keeps the Waystone faces, and the Markdown editor and template text stay in IBM Plex Mono.
+
 The drop cap goes only on fixed page titles (the Home greeting, Games, Profile, User Management, Change Password and similar). Never on anything that shows user content or a date: game and journal titles, the calendar's title, selected-day and session panel headings, "The company".
 
 ### Scale
