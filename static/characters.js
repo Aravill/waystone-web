@@ -34,11 +34,28 @@ function characterSystemHtml(system) {
     return `<span class="char-system">${logo}<span>${escapeHtml(system.name)}</span></span>`;
 }
 
+// The one client-side Codex link check (mirrors validCodexURL in api/characters.go): https on
+// waystone.aravill.org, or this local host, with a /codices path. Returns the URL, or '' if not allowed.
+const CODEX_URL_ERROR = 'Only links to a Codices page on waystone.aravill.org are allowed.';
+function safeCodexUrl(raw) {
+    if (!raw) return '';
+    try {
+        const u = new URL(raw);
+        const local = ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname) && u.host === location.host;
+        const hostOk = (u.protocol === 'https:' && u.host === 'waystone.aravill.org') || (local && /^https?:$/.test(u.protocol));
+        const pathOk = u.pathname === '/codices' || u.pathname.startsWith('/codices/');
+        return hostOk && pathOk && !u.username && !u.password ? u.href : '';
+    } catch (e) {
+        return '';
+    }
+}
+
 // Shared by both pages: the signed-in user, the toast and logout.
 function characterPageBase() {
     return {
         displayName: 'User',
         isAdmin: false,
+        codexAccess: false,
         currentUserId: '',
         messageTimer: null,
         messageVisible: false,
@@ -57,6 +74,7 @@ function characterPageBase() {
                 const user = await response.json();
                 this.displayName = user.display_name || user.username;
                 this.isAdmin = (user.roles || []).includes('admin');
+                this.codexAccess = !!user.codex_access;
                 this.currentUserId = user.user_id || user.id || '';
                 return true;
             } catch (error) {
@@ -76,6 +94,7 @@ function characterPageBase() {
             }
         },
 
+        safeCodexUrl,
         statusHtml: characterStatusHtml,
         gameBadgesHtml: characterGameBadgesHtml,
         systemHtml: characterSystemHtml,
@@ -101,7 +120,7 @@ function characterPageBase() {
 }
 
 function emptyCharacterForm(systemId = '') {
-    return { name: '', system_id: systemId, status: 'alive', description: '', background: '' };
+    return { name: '', system_id: systemId, status: 'alive', description: '', background: '', codex_url: '' };
 }
 
 window.charactersPage = function () {
@@ -148,6 +167,10 @@ window.charactersPage = function () {
             }
             if (!this.form.system_id) {
                 this.formError = 'Choose a system.';
+                return;
+            }
+            if (this.form.codex_url.trim() && !safeCodexUrl(this.form.codex_url.trim())) {
+                this.formError = CODEX_URL_ERROR;
                 return;
             }
             this.busy = true;
@@ -247,7 +270,7 @@ window.characterPage = function () {
 
         startEdit() {
             const c = this.character;
-            this.form = { name: c.name, system_id: c.system_id, status: c.status, description: c.description, background: c.background };
+            this.form = { name: c.name, system_id: c.system_id, status: c.status, description: c.description, background: c.background, codex_url: c.codex_url || '' };
             this.formError = '';
             this.editing = true;
         },
@@ -261,6 +284,10 @@ window.characterPage = function () {
             this.formError = '';
             if (!this.form.name.trim()) {
                 this.formError = 'Give your character a name.';
+                return;
+            }
+            if (this.form.codex_url.trim() && !safeCodexUrl(this.form.codex_url.trim())) {
+                this.formError = CODEX_URL_ERROR;
                 return;
             }
             this.busy = true;
