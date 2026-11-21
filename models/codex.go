@@ -236,6 +236,16 @@ type NewPageExtras struct {
 	CoverImageID string
 	Calendar     *TimelineCalendar // timeline pages: the copied calendar
 	Events       []TimelineEvent   // timeline pages: the copied events (ids are replaced)
+	NoteID       string            // a quick note filed as this page: deleted in the same transaction
+}
+
+// CodexNote is a private quick note in one user's inbox of a codex.
+type CodexNote struct {
+	ID        string `json:"id"`
+	CodexID   string `json:"codex_id"`
+	UserID    string `json:"user_id"`
+	Body      string `json:"body"`
+	CreatedAt string `json:"created_at"`
 }
 
 // TimelineEvent is one dated entry on a timeline page. Month and Day are 0 when unknown. A linked

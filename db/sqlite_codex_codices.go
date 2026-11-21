@@ -133,6 +133,9 @@ func (s *SQLiteStore) DeleteCodex(id string) error {
 	if _, err := tx.Exec(`DELETE FROM codex_access WHERE codex_id = ?`, id); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`DELETE FROM codex_notes WHERE codex_id = ?`, id); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`UPDATE campaigns SET codex_id = '' WHERE codex_id = ?`, id); err != nil {
 		return err
 	}

@@ -236,6 +236,10 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 					handleCreateFolder(w, r, parts[1])
 				}
 			}
+		case len(parts) == 3 && parts[2] == "notes":
+			if method(http.MethodGet, http.MethodPost) {
+				handleCodexNotes(w, r, parts[1])
+			}
 		case len(parts) == 3 && parts[2] == "tags":
 			if method(http.MethodGet, http.MethodPost) {
 				handleCodexTags(w, r, parts[1])
@@ -251,6 +255,8 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 		case len(parts) != 2:
 			writeJSONError(w, http.StatusNotFound, "not found")
 		}
+	case "notes":
+		handleCodexNoteRoutes(w, r, parts[1:], method)
 	case "tags":
 		if len(parts) == 2 && method(http.MethodPut, http.MethodDelete) {
 			handleCodexTag(w, r, parts[1])
@@ -409,7 +415,7 @@ func codexPageCount(id string) int {
 }
 
 func handleGetCodex(w http.ResponseWriter, r *http.Request, id string) {
-	_, rt, ok := codexRightsFor(w, r)
+	userID, rt, ok := codexRightsFor(w, r)
 	if !ok || !rt.checkCodex(w, id, false) {
 		return
 	}
@@ -463,8 +469,16 @@ func handleGetCodex(w http.ResponseWriter, r *http.Request, id string) {
 		codexServerError(w, "retrieve recent changes")
 		return
 	}
+	noteCount := 0
+	if rt.canEdit(id) { // the inbox badge: only editors can add or file notes
+		if noteCount, err = db.CountCodexNotes(id, userID); err != nil {
+			codexServerError(w, "retrieve notes")
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"codex":      map[string]interface{}{"id": id, "name": codex.Name, "description": codex.Description},
+		"note_count": noteCount,
 		"pages":      list,
 		"folders":    folders,
 		"tags":       codexTagObjects(tags, true),
@@ -485,6 +499,9 @@ type pageCreateRequest struct {
 	// TemplateID (builtin:name, or a template of the same codex) makes the server fill the body and
 	// tags from the template, ignoring Body.
 	TemplateID string `json:"template_id"`
+	// NoteID files one of the caller's quick notes as the page: the body is the filled template
+	// (if any), a blank line and the note, and the note is deleted with the page's creation.
+	NoteID string `json:"note_id"`
 }
 
 func handleCreatePage(w http.ResponseWriter, r *http.Request) {
@@ -529,13 +546,32 @@ func handleCreatePage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if req.NoteID != "" {
+		note, err := db.GetCodexNote(req.NoteID)
+		if err != nil {
+			codexServerError(w, "retrieve note")
+			return
+		}
+		if note == nil || note.UserID != userID || note.CodexID != req.CodexID {
+			noteNotFound(w)
+			return
+		}
+		if kind != models.PageLore {
+			writeJSONError(w, http.StatusBadRequest, "a note can only start an article")
+			return
+		}
+		if body != "" {
+			body += "\n\n"
+		}
+		body += note.Body
+	}
 	if utf8.RuneCountInString(body) > maxPageBodyRunes {
 		writeJSONError(w, http.StatusBadRequest, "body is too long")
 		return
 	}
 	page := models.Page{ID: db.GenerateUUID(), Kind: kind, CodexID: req.CodexID, FolderID: req.FolderID, Title: title, AuthorID: userID}
-	if err := db.CreatePageWith(page, body, models.NewPageExtras{TagNames: tagNames}); err != nil {
-		codexStoreError(w, err, "create page")
+	if err := db.CreatePageWith(page, body, models.NewPageExtras{TagNames: tagNames, NoteID: req.NoteID}); err != nil {
+		codexNoteError(w, err, "create page")
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"page": map[string]interface{}{

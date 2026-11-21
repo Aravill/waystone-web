@@ -1,4 +1,4 @@
-// Codices page: /codices (home), /codices/c/{id} (codex), /codices/c/{id}/graph (graph),
+// Codices page: /codices (home), /codices/c/{id} (codex), /codices/c/{id}/graph (graph), /codices/c/{id}/inbox (inbox),
 // /codices/p/{id}/{slug}[/edit|/history] (page).
 // Relies on campaigns.js (escapeHtml, renderMarkdown, journalByline, userAvatarHtml), journal.js
 // (diffWords, diffHtml) and codex-editor.js (createCodexEditor). One component picks the screen
@@ -493,6 +493,9 @@ window.codexPage = function () {
         treeDrag: null, // { kind: 'page' | 'folder', id } being dragged
         springId: '',
         springTimer: null,
+        notes: [], // the inbox: the viewer's own quick notes of this codex, newest first
+        notesLoading: false,
+        notesError: '',
         confirmDialog: { open: false, eyebrow: '', title: '', message: '', confirmLabel: '', danger: true, resolve: null },
         home: null,
         codex: null,
@@ -626,9 +629,9 @@ window.codexPage = function () {
             this.showArrivalMessage();
         },
 
-        // /codices, /codices/c/{id}[/slug], /codices/c/{id}/graph, /codices/p/{id}/{slug}[/edit|/history]
-        // A last segment "graph" straight after the codex id is always the graph screen, so the
-        // codex's own links never carry a slug.
+        // /codices, /codices/c/{id}[/slug], /codices/c/{id}/graph, /codices/c/{id}/inbox, /codices/p/{id}/{slug}[/edit|/history]
+        // A last segment "graph" or "inbox" straight after the codex id is always that screen, so
+        // the codex's own links never carry a slug.
         // Returns null for a malformed URL.
         parseRoute() {
             let parts;
@@ -637,7 +640,10 @@ window.codexPage = function () {
             } catch (error) {
                 return null;
             }
-            if (parts[1] === 'c' && parts[2]) return { screen: parts.length === 4 && parts[3] === 'graph' ? 'graph' : 'codex', id: parts[2] };
+            if (parts[1] === 'c' && parts[2]) {
+                const tail = parts.length === 4 ? parts[3] : '';
+                return { screen: tail === 'graph' || tail === 'inbox' ? tail : 'codex', id: parts[2] };
+            }
             if (parts[1] === 'p' && parts[2]) {
                 const tail = parts[4] || '';
                 return { screen: tail === 'edit' || tail === 'history' ? tail : 'page', id: parts[2] };
@@ -650,7 +656,10 @@ window.codexPage = function () {
         },
         // The screens that show the codex itself rather than a page.
         get onCodexScreen() {
-            return this.screen === 'codex' || this.screen === 'graph';
+            return this.screen === 'codex' || this.screen === 'graph' || this.screen === 'inbox';
+        },
+        inboxUrl() {
+            return '/codices/c/' + encodeURIComponent(this.currentCodexId) + '/inbox';
         },
         graphUrl(fromId = '') {
             const id = this.currentCodexId || (this.page && this.page.codex.id) || '';
@@ -672,6 +681,7 @@ window.codexPage = function () {
             const s = this.screen;
             if (s === 'codex' && this.codex) return [{ label: this.codex.codex.name, href: '' }];
             if (s === 'graph' && this.codex) return [{ label: this.codex.codex.name, href: '/codices/c/' + encodeURIComponent(this.codex.codex.id) }, { label: 'Graph', href: '' }];
+            if (s === 'inbox' && this.codex) return [{ label: this.codex.codex.name, href: '/codices/c/' + encodeURIComponent(this.codex.codex.id) }, { label: 'Inbox', href: '' }];
             if (!this.page) return [];
             const codexHref = '/codices/c/' + encodeURIComponent(this.page.codex.id);
             const list = [{ label: this.page.codex.name, href: '/codices/c/' + encodeURIComponent(this.page.codex.id) }];
@@ -691,7 +701,7 @@ window.codexPage = function () {
             try {
                 const r = this.route;
                 const url = r.screen === 'home' ? '/api/codices'
-                    : r.screen === 'codex' || r.screen === 'graph' ? `/api/codices/c/${encodeURIComponent(r.id)}`
+                    : r.screen === 'codex' || r.screen === 'graph' || r.screen === 'inbox' ? `/api/codices/c/${encodeURIComponent(r.id)}`
                     : `/api/codices/pages/${encodeURIComponent(r.id)}`;
                 const { response, data } = await this.send(url, 'GET');
                 if (response.status === 401) {
@@ -714,7 +724,7 @@ window.codexPage = function () {
                     this.home = data;
                     this.allCodices = data.codices;
                     document.title = 'Waystone - Codices';
-                } else if (r.screen === 'codex' || r.screen === 'graph') {
+                } else if (r.screen === 'codex' || r.screen === 'graph' || r.screen === 'inbox') {
                     codexLoadOpenState(data.codex.id);
                     if (!this.folderRevealed) {
                         this.folderRevealed = true;
@@ -722,8 +732,9 @@ window.codexPage = function () {
                     }
                     this.codex = data;
                     this.syncTabs(data);
-                    document.title = 'Waystone - ' + data.codex.name + (r.screen === 'graph' ? ' graph' : '');
+                    document.title = 'Waystone - ' + data.codex.name + (r.screen === 'graph' ? ' graph' : r.screen === 'inbox' ? ' inbox' : '');
                     if (r.screen === 'graph') await this.loadGraph();
+                    else if (r.screen === 'inbox') await this.loadInbox();
                     else this.$nextTick(() => this.scrollToFolder());
                 } else {
                     if (r.screen === 'edit' && !data.can_edit) {
@@ -1416,14 +1427,180 @@ window.codexPage = function () {
                 this.showMessage('Could not load the codices: ' + error.message, 'error');
             }
         },
-        // "/" jumps to the search box unless the user is typing somewhere.
+        // "/" jumps to the search box and "n" opens a quick note, unless the user is typing somewhere.
         onGlobalKey(event) {
-            if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+            const note = event.key === 'n' || event.key === 'N';
+            if ((event.key !== '/' && !note) || event.ctrlKey || event.metaKey || event.altKey) return;
             const t = event.target;
             if (t && (t.isContentEditable || (t.closest && t.closest('input, textarea, select, [contenteditable]')))) return;
-            if (this.dlg.type || this.confirmDialog.open) return;
+            if (this.dlg.type || this.confirmDialog.open || document.querySelector('dialog[open]')) return;
+            if (note) {
+                if (!this.canNote) return;
+                event.preventDefault();
+                this.openQuickNote();
+                return;
+            }
             event.preventDefault();
             this.$refs.search?.focus();
+        },
+
+        // ---- Quick notes and the Inbox: private to their author, one inbox per codex ----
+        // The Note button and the n key: anywhere in a codex the viewer can edit.
+        get canNote() {
+            return this.screen !== 'home' && this.canEdit && !!this.currentCodexId;
+        },
+        get noteCount() {
+            return (this.codex && this.codex.codex.id === this.currentCodexId && this.codex.note_count) || 0;
+        },
+        setNoteCount(n) {
+            if (this.codex && this.codex.codex.id === this.currentCodexId) this.codex.note_count = Math.max(0, n);
+        },
+        // The note to edit when given (from the inbox); otherwise a new one that keeps its own local draft.
+        openQuickNote(note = null) {
+            const codexId = this.currentCodexId;
+            if (!codexId || !this.canEdit) return;
+            let text = note ? note.body : '';
+            if (!note) {
+                try {
+                    text = localStorage.getItem('codex-quicknote:' + codexId) || '';
+                } catch (error) {
+                    text = '';
+                }
+            }
+            this.dlg = { type: 'quickNote', codexId, codexName: this.currentCodexName, noteId: note ? note.id : '', text, error: '', busy: false };
+            this.focusDlg();
+        },
+        saveNoteDraft() {
+            const d = this.dlg;
+            if (d.type !== 'quickNote' || d.noteId) return;
+            try {
+                if (d.text) localStorage.setItem('codex-quicknote:' + d.codexId, d.text);
+                else localStorage.removeItem('codex-quicknote:' + d.codexId);
+            } catch (error) {
+                // storage may be blocked; the draft just isn't kept
+            }
+        },
+        async submitQuickNote(d) {
+            const body = d.text.trim();
+            if (!body) {
+                d.error = 'Write something first.';
+                return;
+            }
+            if (body.length > 5000) {
+                d.error = 'A note can be up to 5000 characters.';
+                return;
+            }
+            const base = `/api/codices/c/${encodeURIComponent(d.codexId)}/notes`;
+            const { response, data } = d.noteId
+                ? await this.send(`/api/codices/notes/${encodeURIComponent(d.noteId)}`, 'PUT', { body })
+                : await this.send(base, 'POST', { body });
+            if (!response.ok) {
+                this.failDlg(d, response, data);
+                return;
+            }
+            this.closeDlg();
+            if (d.noteId) {
+                const n = this.notes.find((x) => x.id === d.noteId);
+                if (n) n.body = body;
+                this.showMessage('Note saved.', 'success');
+                return;
+            }
+            try {
+                localStorage.removeItem('codex-quicknote:' + d.codexId);
+            } catch (error) {
+                // nothing to clear
+            }
+            this.setNoteCount(this.noteCount + 1);
+            if (this.screen === 'inbox') {
+                this.notes.unshift(data.note);
+                this.showMessage('In your inbox.', 'success');
+            } else {
+                this.showMessage('In your inbox.', 'success', { label: 'Open inbox', run: () => { window.location.href = this.inboxUrl(); } });
+            }
+        },
+        async loadInbox() {
+            this.notesLoading = true;
+            this.notesError = '';
+            try {
+                const { response, data } = await this.send(`/api/codices/c/${encodeURIComponent(this.route.id)}/notes`, 'GET');
+                if (!response.ok) {
+                    this.notesError = response.status === 401 ? 'Your login has expired. Log in again, then reload.' : this.sentence(data.error || 'Could not load your inbox');
+                    return;
+                }
+                this.notes = data.notes;
+                this.setNoteCount(this.canEdit ? data.notes.length : 0);
+            } catch (error) {
+                this.notesError = 'Could not load your inbox: ' + error.message;
+            } finally {
+                this.notesLoading = false;
+            }
+        },
+        noteWhen(n) {
+            return this.formatStamp(n.created_at);
+        },
+        // The first line of a note as a page title: no [ ] or |, up to 120 characters.
+        noteTitle(body) {
+            const line = (body.split('\n').find((l) => l.trim()) || '').replace(/[\[\]|]/g, '');
+            return line.split(/\s+/).filter(Boolean).join(' ').slice(0, 120);
+        },
+        fileNoteAsPage(n) {
+            this.openCreatePage(this.noteTitle(n.body), null, '', n);
+        },
+        async deleteNote(n) {
+            try {
+                const { response, data } = await this.send(`/api/codices/notes/${encodeURIComponent(n.id)}`, 'DELETE');
+                if (!response.ok && response.status !== 404) {
+                    this.showMessage(response.status === 401 ? 'Your login has expired. Log in again, then try once more.' : this.sentence(data.error || 'Could not delete the note'), 'error');
+                    return;
+                }
+                this.notes = this.notes.filter((x) => x.id !== n.id);
+                this.setNoteCount(this.noteCount - 1);
+                this.showMessage('Note deleted.', 'success', { label: 'Undo', run: () => this.undoDeleteNote(n) });
+            } catch (error) {
+                this.showMessage('Could not delete the note: ' + error.message, 'error');
+            }
+        },
+        // Undo posts the same text again (a new note, at the top).
+        async undoDeleteNote(n) {
+            try {
+                const { response, data } = await this.send(`/api/codices/c/${encodeURIComponent(n.codex_id)}/notes`, 'POST', { body: n.body });
+                if (!response.ok) {
+                    this.showMessage(data.code === 'inbox_full' ? 'Your inbox is full, so the note could not come back.' : this.sentence(data.error || 'Could not bring the note back'), 'error');
+                    return;
+                }
+                this.notes.unshift(data.note);
+                this.setNoteCount(this.noteCount + 1);
+                this.showMessage('Note back in your inbox.', 'success');
+            } catch (error) {
+                this.showMessage('Could not bring the note back: ' + error.message, 'error');
+            }
+        },
+        openAddToPage(n) {
+            this.dlg = { type: 'addToPage', note: n, pickQ: '', pickOpen: false, pickIdx: 0, linked: null, error: '', busy: false };
+            this.$nextTick(() => requestAnimationFrame(() => document.getElementById('dApPick')?.focus()));
+        },
+        // What Add to page appends: a signed, dated line, then the note (the server writes the same).
+        get addNotePreview() {
+            const d = this.dlg;
+            if (d.type !== 'addToPage') return '';
+            const day = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            return `_${day} · ${this.displayName}_\n${d.note.body}`;
+        },
+        async submitAddToPage(d) {
+            if (!d.linked) {
+                d.error = 'Choose a page.';
+                return;
+            }
+            const { response, data } = await this.send(`/api/codices/notes/${encodeURIComponent(d.note.id)}/append`, 'POST', { page_id: d.linked.id });
+            if (!response.ok) {
+                this.failDlg(d, response, data);
+                return;
+            }
+            const target = d.linked;
+            this.closeDlg();
+            this.notes = this.notes.filter((x) => x.id !== d.note.id);
+            this.setNoteCount(this.noteCount - 1);
+            this.showMessage(`Added to ${target.title}.`, 'success', { label: 'Open page', run: () => { window.location.href = this.pageUrl({ id: target.id, title: target.title }); } });
         },
         // On phones the results are full width right under the top bar (CSS reads this).
         placeResults() {
@@ -1662,10 +1839,10 @@ window.codexPage = function () {
         // Pages of this codex that match the picker's text (title or alias), at most 8.
         get tlPickResults() {
             const d = this.dlg;
-            if (d.type !== 'event' || !this.codex) return [];
+            if ((d.type !== 'event' && d.type !== 'addToPage') || !this.codex) return [];
             const q = codexNorm(d.pickQ);
             return this.codex.pages
-                .filter((p) => p.id !== this.page.id && (!q || codexNorm(p.title).includes(q) || p.aliases.some((a) => codexNorm(a).includes(q))))
+                .filter((p) => p.id !== (d.type === 'event' ? this.page.id : '') && (!q || codexNorm(p.title).includes(q) || p.aliases.some((a) => codexNorm(a).includes(q))))
                 .slice(0, 8)
                 .map((p) => this.tlPickItem(p));
         },
@@ -1763,6 +1940,11 @@ window.codexPage = function () {
         pickPage(p) {
             const d = this.dlg;
             d.linked = { id: p.id, title: p.title, folder: p.folder, tags: p.tags };
+            if (d.type === 'addToPage') {
+                d.pickQ = '';
+                d.pickOpen = false;
+                return;
+            }
             d.title = p.title;
             d.pickQ = '';
             d.pickOpen = false;
@@ -1892,11 +2074,13 @@ window.codexPage = function () {
         // ---- Dialogs ----
         get dlgEyebrow() {
             if (this.dlg.type === 'event' || this.dlg.type === 'calendar') return this.page ? this.page.title : 'Timeline';
-            return { createPage: 'Codex', codex: 'Codex', templates: 'Codex', template: 'Template', rename: 'Page', aliases: 'Page', move: 'Page', copyPage: 'Page', saveTemplate: 'Page', folder: 'Folder', folderTpl: 'Folder', folderMove: 'Folder', pageFolder: 'Page', tags: 'Page', tag: 'Tag' }[this.dlg.type] || '';
+            return { quickNote: 'Only you see it until you file it', addToPage: 'Filing a note', createPage: this.dlg.note ? 'Filing a note' : 'Codex', codex: 'Codex', templates: 'Codex', template: 'Template', rename: 'Page', aliases: 'Page', move: 'Page', copyPage: 'Page', saveTemplate: 'Page', folder: 'Folder', folderTpl: 'Folder', folderMove: 'Folder', pageFolder: 'Page', tags: 'Page', tag: 'Tag' }[this.dlg.type] || '';
         },
         get dlgTitle() {
             const d = this.dlg;
             if (d.type === 'createPage') return 'New page';
+            if (d.type === 'quickNote') return d.noteId ? 'Edit note' : 'Quick note';
+            if (d.type === 'addToPage') return 'Add to page';
             if (d.type === 'event') return d.eventId ? 'Edit event' : 'Add event';
             if (d.type === 'calendar') return 'Calendar';
             return { codex: d.codex ? 'Edit codex' : 'New codex', templates: 'Templates', template: d.template ? 'Edit template' : 'New template', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another codex', copyPage: 'Copy page', saveTemplate: 'Save as template', folder: d.folder ? 'Rename folder' : 'New folder', folderMove: 'Move folder', folderTpl: 'New pages start from', pageFolder: 'Change folder', tags: 'Tags', tag: d.tag ? 'Rename tag' : 'New tag' }[d.type] || '';
@@ -1907,6 +2091,8 @@ window.codexPage = function () {
         get dlgSubmit() {
             const d = this.dlg;
             if (d.type === 'createPage') return d.busy ? 'Creating...' : 'Create page';
+            if (d.type === 'quickNote') return d.busy ? 'Saving...' : d.noteId ? 'Save' : 'Save to inbox';
+            if (d.type === 'addToPage') return d.busy ? 'Adding...' : 'Add to page';
             if (d.type === 'copyPage') return d.busy ? 'Copying...' : 'Copy page';
             if (d.type === 'event') return d.busy ? 'Saving...' : d.eventId ? 'Save event' : 'Add event';
             if (d.type === 'calendar') return d.busy ? 'Saving...' : 'Save calendar';
@@ -1963,7 +2149,8 @@ window.codexPage = function () {
         },
         // folderId: the folder to prefill (a page's missing links start in its own folder); tplId: the
         // template to start from (the last one used in this codex when empty).
-        async openCreatePage(title = '', folderId = null, tplId = '') {
+        // note: an inbox note to file as this page (its text goes under the template's).
+        async openCreatePage(title = '', folderId = null, tplId = '', note = null) {
             if (!this.canEdit) {
                 this.showMessage("You can't add pages to this codex.", 'error');
                 return;
@@ -1986,7 +2173,7 @@ window.codexPage = function () {
             const tplTouched = !!tplId;
             if (!tplId) tplId = this.startTemplate(templates, folders, folderId, codexId);
             if (!templates.some((t) => t.id === tplId)) tplId = 'builtin:blank';
-            this.dlg = { type: 'createPage', title, codexId, folders, folderId, templates, tplId, tplTouched, kind: 'lore', error: '', busy: false };
+            this.dlg = { type: 'createPage', title, codexId, folders, folderId, templates, tplId, tplTouched, kind: 'lore', note, error: '', busy: false };
             this.focusDlg();
         },
         // The folder's default template (own or inherited) when it still exists, else the last one used in this codex.
@@ -2327,6 +2514,8 @@ window.codexPage = function () {
             d.busy = true;
             try {
                 if (d.type === 'createPage') await this.submitCreatePage(d);
+                else if (d.type === 'quickNote') await this.submitQuickNote(d);
+                else if (d.type === 'addToPage') await this.submitAddToPage(d);
                 else if (d.type === 'event') await this.submitEvent(d);
                 else if (d.type === 'calendar') await this.submitCalendar(d);
                 else if (d.type === 'template') await this.submitTemplate(d);
@@ -2351,6 +2540,9 @@ window.codexPage = function () {
         // Shared error text for a failed dialog request; true when handled.
         failDlg(d, response, data) {
             if (response.status === 401) d.error = 'Your login has expired. Log in again, then try once more.';
+            else if (data.code === 'inbox_full') d.error = 'Your inbox is full (200 notes). File or delete some first.';
+            else if (data.code === 'note_not_found') d.error = 'That note is gone: it was filed or deleted somewhere else.';
+            else if (data.code === 'page_deleted') d.error = 'That page was deleted. Choose another.';
             else if (data.code === 'event_deleted') d.error = 'Someone deleted that event while you were editing it.';
             else if (data.code === 'not_a_timeline') d.error = 'This page is not a timeline.';
             else if (data.code === 'page_not_in_codex') d.error = 'That page is no longer in this codex. Pick another, or leave the event unlinked.';
@@ -2373,7 +2565,7 @@ window.codexPage = function () {
             const timeline = d.kind === 'timeline';
             const { response, data } = await this.send('/api/codices/pages', 'POST', timeline
                 ? { title, codex_id: d.codexId, folder_id: d.folderId || '', kind: 'timeline' }
-                : { title, codex_id: d.codexId, folder_id: d.folderId || '', kind: 'lore', template_id: d.tplId });
+                : { title, codex_id: d.codexId, folder_id: d.folderId || '', kind: 'lore', template_id: d.tplId, note_id: d.note ? d.note.id : '' });
             if (response.status === 201) {
                 if (!timeline) {
                     try {
@@ -3112,7 +3304,7 @@ window.codexPage = function () {
                 this.showMessage('Logout failed: ' + error.message, 'error');
             }
         },
-        // A toast; action is an optional { label, run } text button ("Undo").
+        // action: an optional {label, run} button in the toast (Undo, Open inbox, ...).
         showMessage(text, type, action = null) {
             this.messageText = text;
             this.messageType = type;

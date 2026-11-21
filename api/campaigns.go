@@ -176,7 +176,7 @@ func loadCampaignViewer(r *http.Request, campaigns []models.Campaign) (*campaign
 // codexRef is the game's codex label ({id, name}), or nil when it has none.
 func (v *campaignViewer) codexRef(id string) interface{} {
 	if name, ok := v.codices[id]; ok && id != "" {
-		return map[string]interface{}{"id": id, "name": name, "can_open": v.codexRights.canSee(id)}
+		return map[string]interface{}{"id": id, "name": name, "can_open": v.codexRights.canSee(id), "can_edit": v.codexRights.canEdit(id)}
 	}
 	return nil
 }

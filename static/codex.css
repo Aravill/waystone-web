@@ -792,6 +792,7 @@ button.wikilink {
 
 .cx-shell--edit,
 .cx-shell--history,
+.cx-shell--inbox,
 .cx-shell--graph {
     grid-template-columns: 17rem minmax(0, 1fr);
     grid-template-areas: "nav main";
@@ -891,6 +892,119 @@ button.wikilink {
 .cx-count {
     color: var(--muted);
     font-size: 0.8125rem;
+}
+
+.cx-badge {
+    min-width: 1.4rem;
+    padding: 0 0.375rem;
+    background: var(--rubric);
+    color: var(--bg);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.4rem;
+    text-align: center;
+}
+
+/* Quick note: the top bar button, the inbox and the filing dialogs */
+.cx-note {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    padding: 0 0.75rem;
+    background: none;
+    border: 1px solid var(--cx-bar-line);
+    color: var(--cx-bar-text);
+    font: inherit;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.cx-note:hover {
+    border-color: var(--cx-bar-text);
+}
+
+.cx-note svg {
+    width: 1.125rem;
+    height: 1.125rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.cx-note kbd {
+    padding: 0 0.375rem;
+    border: 1px solid var(--cx-bar-line);
+    font: inherit;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    opacity: 0.7;
+}
+
+.notes {
+    display: grid;
+    gap: 0.75rem;
+    margin: 1.25rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.note {
+    background: var(--bg);
+    border: 1px solid var(--line);
+}
+
+.note-t {
+    margin: 0;
+    padding: 0.75rem 0.875rem 0.5rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.note-m {
+    padding: 0 0.875rem 0.5rem;
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+.note-a {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.875rem;
+    background: var(--folio);
+    border-top: 1px solid var(--line);
+}
+
+.note-a .cx-act {
+    min-height: 2rem;
+    font-size: 0.8125rem;
+}
+
+.note-a .text-link {
+    margin-left: auto;
+}
+
+.inbox-empty {
+    margin: 1.25rem 0 0;
+    padding: 2rem 1rem;
+    border: 1px dashed var(--line);
+    color: var(--muted);
+    text-align: center;
+}
+
+.cx-np-note {
+    margin: 0 0 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--folio);
+    border-left: 3px solid var(--rubric);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 /* Folder tree (native <details>; open state is kept per codex in localStorage). Each level indents
@@ -1968,6 +2082,7 @@ html:has(dialog.cx-lightbox[open]) {
 
     .cx-shell--edit,
     .cx-shell--history,
+    .cx-shell--inbox,
     .cx-shell--graph {
         grid-template-columns: 15.5rem minmax(0, 1fr);
     }
@@ -2017,7 +2132,9 @@ html:has(dialog.cx-lightbox[open]) {
     }
 
     .cx-brand,
-    .cx-search kbd {
+    .cx-search kbd,
+    .cx-note span,
+    .cx-note kbd {
         display: none;
     }
 
