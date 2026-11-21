@@ -106,6 +106,9 @@ func GetFolder(id string) (*models.Folder, error)        { return GetStore().Get
 func CreateFolder(f models.Folder) error                 { return GetStore().CreateFolder(f) }
 func RenameFolder(id, name string) error                 { return GetStore().RenameFolder(id, name) }
 func MoveFolder(id, newParentID string) error            { return GetStore().MoveFolder(id, newParentID) }
+func SetFolderTemplate(id, templateID string) error {
+	return GetStore().SetFolderTemplate(id, templateID)
+}
 
 // DeleteFolder re-parents the folder's sub-folders and pages one level up and returns how many moved.
 func DeleteFolder(id string) (pages, folders int, err error) { return GetStore().DeleteFolder(id) }

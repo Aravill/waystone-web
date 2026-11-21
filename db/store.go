@@ -127,6 +127,7 @@ type Store interface {
 	CreateFolder(f models.Folder) error
 	RenameFolder(id, name string) error
 	MoveFolder(id, newParentID string) error
+	SetFolderTemplate(id, templateID string) error
 	DeleteFolder(id string) (pages, folders int, err error)
 	SetPageFolder(pageID, folderID string) error
 	DeletePage(id string) ([]string, error)

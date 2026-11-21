@@ -460,7 +460,16 @@ function codexFolderMenuHtml(f) {
     const name = escapeHtml(f.name);
     const item = (act, label, aria, cls = '') => `<button type="button" role="menuitem" class="codex-menu-item${cls}" data-act="${act}" data-id="${id}" aria-label="${aria} ${name}">${label}</button>`;
     return item('newPage', '+ Page', '+ Page in') + item('newFolder', '+ Folder', '+ Folder in') + item('rename', 'Rename', 'Rename') +
-        item('move', 'Move', 'Move') + item('delete', 'Delete', 'Delete', ' codex-menu-item--danger');
+        item('folderTpl', 'New pages start from…', 'New pages start from, for') + item('move', 'Move', 'Move') + item('delete', 'Delete', 'Delete', ' codex-menu-item--danger');
+}
+
+// The template new pages in a folder start from: its own default, else the nearest ancestor's ('' = none).
+function codexFolderDefault(folders, folderId) {
+    const byId = new Map((folders || []).map((f) => [f.id, f]));
+    for (let cur = byId.get(folderId), hops = 0; cur && hops <= byId.size; hops++, cur = byId.get(cur.parent_id)) {
+        if (cur.default_template) return cur.default_template;
+    }
+    return '';
 }
 
 window.codexPage = function () {
@@ -1038,6 +1047,7 @@ window.codexPage = function () {
             if (act === 'newPage') this.openCreatePage('', id);
             else if (act === 'newFolder') this.openNewFolder(id);
             else if (act === 'rename') this.openRenameFolder(id);
+            else if (act === 'folderTpl') this.openFolderTemplate(id);
             else if (act === 'move') this.openMoveFolder(id);
             else if (act === 'delete') this.deleteFolder(id);
         },
@@ -1882,14 +1892,14 @@ window.codexPage = function () {
         // ---- Dialogs ----
         get dlgEyebrow() {
             if (this.dlg.type === 'event' || this.dlg.type === 'calendar') return this.page ? this.page.title : 'Timeline';
-            return { createPage: 'Codex', codex: 'Codex', templates: 'Codex', template: 'Template', rename: 'Page', aliases: 'Page', move: 'Page', copyPage: 'Page', saveTemplate: 'Page', folder: 'Folder', folderMove: 'Folder', pageFolder: 'Page', tags: 'Page', tag: 'Tag' }[this.dlg.type] || '';
+            return { createPage: 'Codex', codex: 'Codex', templates: 'Codex', template: 'Template', rename: 'Page', aliases: 'Page', move: 'Page', copyPage: 'Page', saveTemplate: 'Page', folder: 'Folder', folderTpl: 'Folder', folderMove: 'Folder', pageFolder: 'Page', tags: 'Page', tag: 'Tag' }[this.dlg.type] || '';
         },
         get dlgTitle() {
             const d = this.dlg;
             if (d.type === 'createPage') return 'New page';
             if (d.type === 'event') return d.eventId ? 'Edit event' : 'Add event';
             if (d.type === 'calendar') return 'Calendar';
-            return { codex: d.codex ? 'Edit codex' : 'New codex', templates: 'Templates', template: d.template ? 'Edit template' : 'New template', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another codex', copyPage: 'Copy page', saveTemplate: 'Save as template', folder: d.folder ? 'Rename folder' : 'New folder', folderMove: 'Move folder', pageFolder: 'Change folder', tags: 'Tags', tag: d.tag ? 'Rename tag' : 'New tag' }[d.type] || '';
+            return { codex: d.codex ? 'Edit codex' : 'New codex', templates: 'Templates', template: d.template ? 'Edit template' : 'New template', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another codex', copyPage: 'Copy page', saveTemplate: 'Save as template', folder: d.folder ? 'Rename folder' : 'New folder', folderMove: 'Move folder', folderTpl: 'New pages start from', pageFolder: 'Change folder', tags: 'Tags', tag: d.tag ? 'Rename tag' : 'New tag' }[d.type] || '';
         },
         get dlgWide() {
             return ['createPage', 'templates', 'template'].includes(this.dlg.type);
@@ -1973,16 +1983,57 @@ window.codexPage = function () {
             const folders = this.codex && this.codex.codex.id === codexId ? this.codex.folders || [] : (await this.fetchFolders(codexId)) || [];
             if (folderId === null) folderId = this.page ? this.page.folder_id || '' : '';
             if (!folders.some((f) => f.id === folderId)) folderId = '';
-            if (!tplId) {
-                try {
-                    tplId = localStorage.getItem('codex-last-template:' + codexId) || '';
-                } catch (error) {
-                    tplId = '';
-                }
-            }
+            const tplTouched = !!tplId;
+            if (!tplId) tplId = this.startTemplate(templates, folders, folderId, codexId);
             if (!templates.some((t) => t.id === tplId)) tplId = 'builtin:blank';
-            this.dlg = { type: 'createPage', title, codexId, folders, folderId, templates, tplId, kind: 'lore', error: '', busy: false };
+            this.dlg = { type: 'createPage', title, codexId, folders, folderId, templates, tplId, tplTouched, kind: 'lore', error: '', busy: false };
             this.focusDlg();
+        },
+        // The folder's default template (own or inherited) when it still exists, else the last one used in this codex.
+        startTemplate(templates, folders, folderId, codexId) {
+            const def = codexFolderDefault(folders, folderId);
+            if (def && templates.some((t) => t.id === def)) return def;
+            try {
+                return localStorage.getItem('codex-last-template:' + codexId) || '';
+            } catch (error) {
+                return '';
+            }
+        },
+        // New page: another folder brings its default along, unless a card was already picked.
+        onNpFolder() {
+            const d = this.dlg;
+            if (d.tplTouched) return;
+            const id = this.startTemplate(d.templates, d.folders, d.folderId, d.codexId);
+            d.tplId = d.templates.some((t) => t.id === id) ? id : 'builtin:blank';
+        },
+        pickTpl(id) {
+            this.dlg.tplId = id;
+            this.dlg.tplTouched = true;
+        },
+        // The default of the New page dialog's folder, as a template of the list ({} when none).
+        get npDefault() {
+            const d = this.dlg;
+            if (!d.folderId) return {};
+            const id = codexFolderDefault(d.folders, d.folderId);
+            return (d.templates || []).find((t) => t.id === id) || {};
+        },
+        get npDefaultHint() {
+            const d = this.dlg;
+            const f = (d.folders || []).find((x) => x.id === d.folderId);
+            if (!f || !this.npDefault.id) return '';
+            return `New pages in ${f.name} start from ${this.npDefault.name}. Change it in the folder's menu.`;
+        },
+        async openFolderTemplate(id) {
+            const f = this.folderById(id);
+            if (!f) return;
+            try {
+                const templates = await this.loadTemplates(this.codex.codex.id);
+                const tpl = templates.some((t) => t.id === f.default_template) ? f.default_template : '';
+                this.dlg = { type: 'folderTpl', folder: f, templates, tpl, error: '', busy: false };
+                this.focusDlg();
+            } catch (error) {
+                this.showMessage('Could not load the templates: ' + error.message, 'error');
+            }
         },
 
         // ---- Templates ----
@@ -2029,7 +2080,7 @@ window.codexPage = function () {
             if (!step || !list.length) return;
             event.preventDefault();
             const i = list.findIndex((t) => t.id === this.dlg.tplId);
-            this.dlg.tplId = list[(i + step + list.length) % list.length].id;
+            this.pickTpl(list[(i + step + list.length) % list.length].id);
             this.$nextTick(() => document.querySelector('.cx-tpl-card[aria-checked="true"]')?.focus());
         },
         async openTemplates() {
@@ -2287,6 +2338,7 @@ window.codexPage = function () {
                 else if (d.type === 'move') await this.submitMove(d);
                 else if (d.type === 'folder') await this.submitFolder(d);
                 else if (d.type === 'folderMove') await this.submitFolderMove(d);
+                else if (d.type === 'folderTpl') await this.submitFolderTemplate(d);
                 else if (d.type === 'pageFolder') await this.submitPageFolder(d);
                 else if (d.type === 'tags') await this.submitTags(d);
                 else if (d.type === 'tag') await this.submitTag(d);
@@ -2358,6 +2410,17 @@ window.codexPage = function () {
             await this.load();
             this.focusFolder(d.folder ? d.folder.id : data.folder.id);
             this.showMessage(d.folder ? 'Folder renamed' : 'Folder created', 'success');
+        },
+        async submitFolderTemplate(d) {
+            const { response, data } = await this.send(`/api/codices/folders/${encodeURIComponent(d.folder.id)}`, 'PUT', { default_template: d.tpl });
+            if (!response.ok) {
+                this.failDlg(d, response, data);
+                return;
+            }
+            this.closeDlg();
+            await this.load();
+            this.focusFolder(d.folder.id);
+            this.showMessage('Folder saved', 'success');
         },
         async submitFolderMove(d) {
             if ((d.folderId || '') === (d.folder.parent_id || '')) {
