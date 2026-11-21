@@ -205,6 +205,8 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 .3em; border: 1px soli
 .prose h2 { margin: 1.75rem 0 .5rem; font-family: var(--font-display); font-weight: 600; font-size: 1.35rem; letter-spacing: .03em; }
 .prose p { margin: 0 0 .875rem; }
 .prose ul { margin: 0 0 .875rem; padding-left: 1.25rem; }
+.prose blockquote { margin: 0 0 .875rem; padding: .5rem .875rem; border-left: 3px solid var(--rubric); background: var(--folio); }
+.prose hr { margin: 1.5rem 0; border: 0; border-top: 1px solid var(--line); }
 .prose a.missing { color: var(--muted); text-decoration-style: dashed; }
 .prose em.prompt { color: var(--muted); }
 /* NEW: live list. A ruled box with its query in small caps, the rows below. Viewers see the same */
@@ -444,7 +446,7 @@ const folder = id => FOLDERS.find(f => f.id === id);
 
 let PAGES = [
     { id: 'karrow', title: 'Karrow Ford', folder: 'fpl', tags: ['settlement'], updated: 6,
-      md: "*A river crossing and a market of about forty families, at the foot of the pass.*\n\nThe ford can be waded most of the summer. When the river is high the [[Ferrymen of the Ford]] run the boats, and everyone pays the [[The Toll House|toll house]] on the road north.\n\n## People of note\n\n{{list tag:npc links:here}}\n\n## Sessions here\n\n{{list folder:journal links:here sort:newest}}\n\n## Rumours\n\n- Lights are seen on the river some nights.\n- Nobody will say who raised the third waystone." },
+      md: "*A river crossing and a market of about forty families, at the foot of the pass.*\n\nThe ford can be waded most of the summer. When the river is high the [[Ferrymen of the Ford]] run the boats, and everyone pays the [[The Toll House|toll house]] on the road north.\n\n## People of note\n\n{{list tag:npc links:here}}\n\n## Sessions here\n\n{{list folder:\"Ashes of the Karrow: Campaign Journal\" links:here sort:updated}}\n\n## Rumours\n\n- Lights are seen on the river some nights.\n- Nobody will say who raised the third waystone." },
     { id: 'hesk', title: 'Old Hesk', folder: 'fpe', tags: ['npc'], updated: 5,
       md: "*Former ferryman. Keeps the toll house now.*\n\nLives in [[Karrow Ford]]. Belongs to [[Ferrymen of the Ford]].\n\n## Personality\n\nGruff, owes the party a favour since the flood. Took the boat across one last time and never said what he saw in the water." },
     { id: 'wenna', title: 'Wenna', folder: 'fpe', tags: ['npc'], updated: 3,
@@ -455,9 +457,9 @@ let PAGES = [
     { id: 'toll', title: 'The Toll House', folder: 'fpl', tags: ['landmark'], updated: 1, md: "*A squat stone house on the road north of [[Karrow Ford]].*" },
     { id: 'gull', title: 'The Drowned Gull', folder: 'fin', tags: ['tavern'], updated: 1, md: "*The only inn at the ford. Fish stew, always.*" },
     { id: 'ferry', title: 'Ferrymen of the Ford', folder: 'ffa', tags: ['faction'], updated: 2, md: "*Run the boats when the water is too high to wade.*" },
-    { id: 's11', title: GAME + ': Session 11', folder: 'fj', tags: ['session'], session: { n: 11, date: 'Sat 7 Nov 2026', who: 'Testy, Roy, Adam' }, updated: 7,
+    { id: 's11', title: GAME + ': 2026-11-07', folder: 'fj', tags: ['session'], session: { n: 11, date: 'Sat 7 Nov 2026', who: 'Testy, Roy, Adam' }, updated: 7,
       md: "## Summary\n\nThe party came down the pass and reached Karrow Ford in the rain. The ferry was tied up and the ferrymen gone.\n\n## People met\n\n- [[Old Hesk]], who wanted nothing to do with us." },
-    { id: 's12', title: GAME + ': Session 12', folder: 'fj', tags: ['session'], session: { n: 12, date: 'Sat 14 Nov 2026', who: 'Testy, Roy, Adam, Simon (DM)' }, updated: 8,
+    { id: 's12', title: GAME + ': 2026-11-14', folder: 'fj', tags: ['session'], session: { n: 12, date: 'Sat 14 Nov 2026', who: 'Testy, Roy, Adam, Simon (DM)' }, updated: 8,
       md: "## Summary\n\nWe crossed at night with Wenna at the oars and found the third waystone pointing at the toll house.\n\n## What happened\n\nBack at [[Karrow Ford]] we asked around. [[Mother Agathe]] came down from the shrine to warn us off.\n\n## Loot and rewards\n\n- 40 silver\n- A brass key with a fish on it\n\n## Loose ends\n\n- Who raised the third waystone?" },
     { id: 'lore', title: 'The Three Waystones', folder: '', tags: ['lore'], updated: 2, md: "*Three standing stones on the road through the Marches. The third points the wrong way.*" },
 ];
@@ -486,7 +488,9 @@ const folderPath = id => { const out = []; for (let f = folder(id); f; f = folde
 const LINK = /\[\[([^\[\]|\n]*)(?:\|([^\[\]\n]*))?\]\]/g;
 function inline(s) {
     return esc(s)
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
         .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+        .replace(/(^|\s)_([^_\n]+)_(?=\s|$)/g, '$1<em>$2</em>')
         .replace(LINK, (m, t, label) => {
             const target = t.trim();
             if (!target) return '<a class="missing" href="#" title="Empty link">…</a>';
@@ -503,6 +507,8 @@ function renderMd(md, cur) {
         for (const line of lines) {
             if (/^\{\{list\b.*\}\}$/.test(line.trim())) { flush(); out.push(liveList(line.trim(), cur)); continue; }
             if (/^## /.test(line)) { flush(); out.push(`<h2>${inline(line.slice(3))}</h2>`); continue; }
+            if (line.trim() === '---') { flush(); out.push('<hr>'); continue; }
+            if (/^> /.test(line)) { flush(); out.push(`<blockquote>${inline(line.slice(2))}</blockquote>`); continue; }
             if (/^- /.test(line)) { (list = list || []).push(`<li>${inline(line.slice(2))}</li>`); continue; }
             flush();
             if (line.trim()) out.push(`<p>${inline(line)}</p>`);
@@ -513,8 +519,8 @@ function renderMd(md, cur) {
 }
 
 // ---------- live lists ----------
-// {{list tag:npc folder:People links:here sort:title|newest limit:10}}. Quotes allow spaces in values.
-// "folder:journal" is the game's journal folder. The rows are not links for backlinks or the graph.
+// {{list tag:npc folder:People links:here sort:title|updated|created limit:10}}. Quotes allow spaces in values.
+// links:here keeps pages that link to this one. The rows are not links for backlinks or the graph.
 function parseList(src) {
     const q = { sort: 'title' };
     for (const m of src.slice(6, -2).matchAll(/(\w+):("([^"]*)"|\S+)/g)) q[m[1]] = m[3] ?? m[2];
@@ -527,15 +533,15 @@ function liveList(src, cur) {
     const label = [];
     if (q.tag) { rows = rows.filter(p => p.tags.includes(q.tag)); label.push('tag ' + q.tag); }
     if (q.folder) {
-        const f = q.folder === 'journal' ? folder('fj') : FOLDERS.find(f => f.name.toLowerCase() === q.folder.toLowerCase());
+        const f = FOLDERS.find(f => f.name.toLowerCase() === q.folder.toLowerCase());
         rows = rows.filter(p => f && p.folder === f.id);
-        label.push('in ' + (q.folder === 'journal' ? 'the campaign journal' : q.folder));
+        label.push('in ' + q.folder);
     }
     if (q.links === 'here') { rows = rows.filter(p => linksTo(p, curPage)); label.push('linking here'); }
-    rows.sort(q.sort === 'newest' ? (a, b) => b.updated - a.updated : (a, b) => a.title.localeCompare(b.title));
+    rows.sort(q.sort === 'updated' ? (a, b) => b.updated - a.updated : (a, b) => a.title.localeCompare(b.title));
     if (q.limit) rows = rows.slice(0, +q.limit);
     const body = rows.length
-        ? '<ul>' + rows.map(p => `<li><a href="#" data-page="${p.id}">${esc(shortTitle(p))}</a><small>${esc(p.session ? p.session.date : folderPath(p.folder).join(' › ') || 'Top level')}</small><span class="ex">${esc(excerpt(p))}</span></li>`).join('') + '</ul>'
+        ? '<ul>' + rows.map(p => `<li><a href="#" data-page="${p.id}">${esc(shortTitle(p))}</a>${p.session ? '' : `<small>${esc(folderPath(p.folder).join(' › ') || 'Top level')}</small>`}<span class="ex">${esc(excerpt(p))}</span></li>`).join('') + '</ul>'
         : '<p class="none">No pages match yet. They appear here as soon as they do.</p>';
     return `<div class="live" title="${esc(src)}"><div class="live-h"><span><b>Live list</b> · ${esc(label.join(' · '))}</span><span>${rows.length} ${rows.length === 1 ? 'page' : 'pages'}</span></div>${body}</div>`;
 }
@@ -550,7 +556,7 @@ function mentionRanges(md, title) {
     return [...masked.matchAll(re)].map(m => [m.index, m.index + m[0].length]);
 }
 function mentionsOf(target) {
-    return PAGES.filter(p => p.id !== target.id).map(p => ({ p, r: mentionRanges(p.md, target.title) })).filter(x => x.r.length);
+    return PAGES.filter(p => p.id !== target.id && !linksTo(p, target)).map(p => ({ p, r: mentionRanges(p.md, target.title) })).filter(x => x.r.length);
 }
 function linkMentions(pid, target) {
     const p = page(pid);
@@ -567,7 +573,7 @@ function linkMentions(pid, target) {
 let closed = new Set();
 function treeHtml(parent) {
     const fs = FOLDERS.filter(f => f.parent === parent).sort((a, b) => (b.journal - a.journal) || a.name.localeCompare(b.name));
-    const ps = PAGES.filter(p => p.folder === parent).sort((a, b) => a.session && b.session ? a.session.n - b.session.n : a.title.localeCompare(b.title));
+    const ps = PAGES.filter(p => p.folder === parent).sort((a, b) => a.title.localeCompare(b.title));
     const cur = view.screen !== 'inbox' ? view.page : '';
     return fs.map(f => {
         const kids = closed.has(f.id) ? '' : `<ul>${treeHtml(f.id)}</ul>`;
@@ -576,10 +582,7 @@ function treeHtml(parent) {
             `<button type="button" class="f ${closed.has(f.id) ? 'closed' : ''}" data-toggle="${f.id}">${name}</button>` +
             `<button type="button" class="fset editor-only" data-fset="${f.id}" aria-label="Folder settings for ${esc(f.name)}" title="Folder settings">${icon('gear')}</button></div>${kids}</li>`;
     }).join('') + ps.map(p => {
-        // journal pages stay in their folder: not draggable
-        const drag = canEdit() && p.folder !== 'fj';
-        const date = p.session ? `<small>${esc(p.session.date.replace(/^\w+ /, '').replace(/ 2026$/, ''))}</small>` : '';
-        return `<li><a href="#" data-page="${p.id}" ${p.id === cur ? 'aria-current="page"' : ''} draggable="${drag}" data-drag="p:${p.id}">${esc(shortTitle(p))}${date}</a></li>`;
+        return `<li><a href="#" data-page="${p.id}" ${p.id === cur ? 'aria-current="page"' : ''} draggable="${canEdit()}" data-drag="p:${p.id}">${esc(shortTitle(p))}</a></li>`;
     }).join('');
 }
 function renderTree() {
@@ -612,7 +615,6 @@ nav.addEventListener('dragend', () => {
 function dropAllowed(targetFolder) {
     if (!dragging) return false;
     const [kind, id] = dragging.split(':');
-    if (targetFolder === 'fj') return false; // only journal pages live in the journal folder
     if (kind === 'p') return page(id).folder !== targetFolder;
     if (folder(id).parent === targetFolder) return false;
     for (let f = folder(targetFolder); f; f = folder(f.parent)) if (f.id === id) return false; // no cycles
@@ -782,9 +784,10 @@ function saveEdit(p, text) {
 // ---------- the / menu ----------
 const SNIPPETS = [
     { k: 'date', n: "Today's date", d: TODAY, ic: '◷', text: () => TODAY },
-    { k: 'npc', n: 'Person, one line', d: '**Name**: who they are, where they live', ic: '☺', text: () => '**[[ ]]**: who they are. Lives in [[ ]].' },
+    { k: 'npc', n: 'Person', d: 'Name, role, wants, lives in', ic: '☺', text: () => '**Name:** \n**Role:** \n**Wants:** \n**Lives in:** [[ ]]' },
+    { k: 'callout', n: 'Callout', d: 'A quoted note that stands out', ic: '❝', text: () => '> **Note:** ' },
     { k: 'loot', n: 'Loot list', d: 'Coin, items, who took what', ic: '¤', text: () => '## Loot and rewards\n\n- Coin: \n- Items: \n- Who took what: ' },
-    { k: 'list', n: 'Live list', d: 'Pages that link here, by tag', ic: '≡', text: () => '{{list tag:npc links:here}}' },
+    { k: 'list', n: 'Live list', d: 'Pages by tag or folder, kept up to date', ic: '≡', text: () => '{{list tag: links:here}}' },
     { k: 'divider', n: 'Divider', d: 'A rule across the page', ic: '—', text: () => '---' },
 ];
 let slash = null; // { start, items, i }
@@ -854,7 +857,7 @@ function sheet(eyebrow, title, body, foot, wide) {
     setTimeout(() => dlg.querySelector('[autofocus]')?.focus(), 0);
 }
 const closeDlg = () => { dlg.innerHTML = ''; };
-const folderOptions = (sel, skipJournal = true) => [['', 'Top level'], ...FOLDERS.filter(f => !(skipJournal && f.journal)).map(f => [f.id, folderPath(f.id).join(' › ')])]
+const folderOptions = sel => [['', 'Top level'], ...FOLDERS.map(f => [f.id, folderPath(f.id).join(' › ')])]
     .map(([v, n]) => `<option value="${v}" ${v === sel ? 'selected' : ''}>${esc(n)}</option>`).join('');
 const tplOptions = sel => TEMPLATES.map(t => `<option value="${t.id}" ${t.id === sel ? 'selected' : ''}>${esc(t.name)}${t.codex ? ' (this codex)' : ''}</option>`).join('');
 
@@ -880,7 +883,6 @@ function openNote(prefill, editId) {
 // New page (folder default template preselected)
 function openNewPage(opts = {}) {
     let folderId = opts.folder ?? (view.screen === 'page' || view.screen === 'edit' ? page(view.page).folder : '');
-    if (folderId === 'fj') folderId = '';
     let picked = null; // a template the user chose themselves wins over the folder default
     const draw = () => {
         const def = folder(folderId)?.tpl || 'blank';
@@ -919,9 +921,9 @@ function openAddToPage(n) {
     sheet('Filing a note', 'Add to page',
         `<div class="fld"><label for="apP">Page</label><select class="cell" id="apP" autofocus>${PAGES.filter(p => !p.session || true).sort((a, b) => a.title.localeCompare(b.title)).map(p => `<option value="${p.id}">${esc(shortTitle(p))}${p.session ? ' · journal' : ''}</option>`).join('')}</select></div>
          <div class="fld"><span class="lbl">Added to the end of the page</span><blockquote class="quote" id="apPrev"></blockquote>
-         <p class="hint">Saved as a new revision with the note "Added from inbox". The editor doesn't open.</p></div>`,
+         <p class="hint">Saved as a new revision with the note "Added a quick note". The editor doesn't open.</p></div>`,
         `<button class="btn btn--sec" type="button" data-close>Cancel</button><button class="btn btn--pri" type="button" id="apGo">Add to page</button>`);
-    const added = () => `*${ME}, ${TODAY}:* ${n.text}`;
+    const added = () => `_${TODAY} · ${ME}_\n${n.text}`;
     document.getElementById('apPrev').textContent = added();
     document.getElementById('apGo').onclick = () => {
         const p = page(document.getElementById('apP').value);
@@ -936,15 +938,14 @@ function openAddToPage(n) {
 // Folder settings (default template)
 function openFolder(fid) {
     const f = folder(fid);
-    const locked = f.journal;
     sheet('Folder settings', f.name,
-        (locked ? `<p class="hint">This folder belongs to the game <b>${esc(GAME)}</b>. Its name follows the game's name, and each played session gets one page in it, made from the game page or here with + New page.</p>` :
-        `<div class="fld"><label for="fsN">Name</label><input class="cell" id="fsN" value="${esc(f.name)}"></div>`) +
-        `<div class="fld"><label for="fsT">New pages here start from</label><select class="cell" id="fsT" ${locked ? 'disabled' : ''}><option value="">No default (the last template you used)</option>${tplOptions(f.tpl)}</select>
+        (f.journal ? `<p class="hint">The campaign journal of <b>${esc(GAME)}</b>. Pages for new sessions come here wherever you move it, and its name follows the game's name until you rename it. Delete it and the next session's page makes a new one.</p>` : '') +
+        `<div class="fld"><label for="fsN">Name</label><input class="cell" id="fsN" value="${esc(f.name)}"></div>` +
+        `<div class="fld"><label for="fsT">New pages here start from</label><select class="cell" id="fsT"><option value="">No default (the last template you used)</option>${tplOptions(f.tpl)}</select>
          <p class="hint">Used by + New page in this folder, by missing links created into it, and by "Create these pages?" after saving. People can still pick another template. Sub-folders without their own default use this one.</p></div>`,
         `<button class="btn btn--sec" type="button" data-close>Cancel</button><button class="btn btn--pri" type="button" id="fsGo">Save</button>`);
     document.getElementById('fsGo').onclick = () => {
-        if (!locked) { f.name = document.getElementById('fsN').value.trim() || f.name; f.tpl = document.getElementById('fsT').value; }
+        f.name = document.getElementById('fsN').value.trim() || f.name; f.tpl = document.getElementById('fsT').value;
         closeDlg(); render(); toast('Folder saved.');
     };
 }
