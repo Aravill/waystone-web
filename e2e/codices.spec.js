@@ -167,3 +167,90 @@ test.describe('Codices pictures and tags', () => {
     await expect(page.locator('#tagged').getByRole('link', { name: 'E2E pictures page' })).toBeVisible();
   });
 });
+
+test.describe('Codices templates and copying', () => {
+  let editor;
+  let codex;
+  const made = []; // page ids to remove
+
+  test.beforeEach(async () => {
+    editor = await apiAs('roy');
+    const home = await (await editor.get('/api/codices')).json();
+    codex = home.codices.find((c) => c.can_edit);
+    expect(codex, 'roy can edit a codex').toBeTruthy();
+  });
+
+  test.afterEach(async () => {
+    for (const id of made.splice(0)) await editor.delete(`/api/codices/pages/${id}`);
+    const templates = await (await editor.get(`/api/codices/c/${codex.id}/templates`)).json();
+    for (const t of templates.filter((x) => x.name.startsWith('E2E'))) await editor.delete(`/api/codices/templates/${t.id}`);
+    const tags = await (await editor.get(`/api/codices/c/${codex.id}/tags`)).json();
+    for (const t of tags.filter((x) => x.name === 'session' || x.name === 'e2e-tpl-tag')) await editor.delete(`/api/codices/tags/${t.id}`);
+    await editor.dispose();
+  });
+
+  test('a page made from the Session template is copied with a new history', async ({ page }) => {
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/c/${codex.id}`);
+    await page.getByRole('button', { name: '+ New page' }).click();
+    await page.getByRole('radio', { name: /Session/ }).click();
+    await expect(page.locator('.cx-tpl-preview')).toContainText('Summary');
+    await expect(page.locator('.cx-np-tags')).toHaveText('Adds tags: session');
+    await page.getByLabel('Title').fill('E2E session notes');
+    await page.getByLabel('Title').press('Enter');
+    await page.waitForURL(/\/edit$/);
+    const id = page.url().match(/\/p\/([^/]+)\//)[1];
+    made.push(id);
+
+    // The editor opens on the template's text; the tag is already on the page.
+    await expect(page.locator('.cm-content')).toContainText('## What happened');
+    const created = await (await editor.get(`/api/codices/pages/${id}`)).json();
+    expect(created.page.body).toContain('**Date:** ');
+    expect(created.page.body).not.toContain('{{date}}');
+    expect(created.tags.map((t) => t.name)).toEqual(['session']);
+
+    // More > Copy page… into the same codex under a new title.
+    await page.goto(`/codices/p/${id}/e2e-session-notes`);
+    await page.getByRole('button', { name: /More/ }).click();
+    await page.getByRole('menuitem', { name: 'Copy page…' }).click();
+    await expect(page.getByLabel('Title')).toHaveValue('E2E session notes (copy)');
+    await page.getByLabel('Title').fill('E2E session notes, take two');
+    await page.getByRole('button', { name: 'Copy page', exact: true }).click();
+    await page.waitForURL(/\/p\/[^/]+\/e2e-session-notes-take-two/);
+    await expect(page.getByRole('status')).toHaveText('Copied.');
+    const copyId = page.url().match(/\/p\/([^/]+)\//)[1];
+    made.push(copyId);
+
+    const copy = await (await editor.get(`/api/codices/pages/${copyId}`)).json();
+    expect(copy.page.body).toBe(created.page.body);
+    expect(copy.page.current_revision).toBe(1);
+    expect(copy.tags.map((t) => t.name)).toEqual(['session']);
+    const revs = await (await editor.get(`/api/codices/pages/${copyId}/revisions`)).json();
+    expect(revs.revisions).toHaveLength(1);
+    expect(revs.revisions[0].note).toBe('Copied from E2E session notes');
+  });
+
+  test('a codex template is used by the New page dialog; a see-only user cannot change it', async ({ page }) => {
+    const res = await editor.post(`/api/codices/c/${codex.id}/templates`, {
+      data: { name: 'E2E tavern', description: 'An inn', body: '_About {{title}}._\n\n## Rooms\n', tags: ['e2e-tpl-tag'] },
+    });
+    expect(res.status(), 'create template').toBe(201);
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/c/${codex.id}`);
+    await page.getByRole('button', { name: '+ New page' }).click();
+    await page.getByRole('radio', { name: /E2E tavern/ }).click();
+    await page.getByLabel('Title').fill('E2E Prancing Pony');
+    await expect(page.locator('.cx-tpl-preview')).toContainText('About E2E Prancing Pony.');
+    await page.getByRole('button', { name: 'Create page' }).click();
+    await page.waitForURL(/\/edit$/);
+    made.push(page.url().match(/\/p\/([^/]+)\//)[1]);
+    await expect(page.locator('.cm-content')).toContainText('## Rooms');
+
+    const viewer = await apiAs('adam');
+    expect((await viewer.get(`/api/codices/c/${codex.id}/templates`)).ok()).toBeTruthy();
+    const t = (await (await editor.get(`/api/codices/c/${codex.id}/templates`)).json()).find((x) => x.name === 'E2E tavern');
+    expect((await viewer.put(`/api/codices/templates/${t.id}`, { data: { name: 'Hijacked' } })).status()).toBe(403);
+    expect((await viewer.delete(`/api/codices/templates/${t.id}`)).status()).toBe(403);
+    await viewer.dispose();
+  });
+});
