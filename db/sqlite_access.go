@@ -118,12 +118,13 @@ func (s *SQLiteStore) GetPageCodexID(pageID string) (string, error) {
 	return id, err
 }
 
-// GetImageCodexID returns the codex of the page that owns an uploaded map image file, or "" if none does.
+// GetImageCodexID returns the codex of the page that owns an uploaded image file (a map image or a page picture), or "" if none does.
 func (s *SQLiteStore) GetImageCodexID(file string) (string, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	var id string
-	err := s.db.QueryRow(`SELECT p.codex_id FROM map_images i JOIN pages p ON p.id = i.page_id WHERE i.file = ? LIMIT 1`, file).Scan(&id)
+	err := s.db.QueryRow(`SELECT p.codex_id FROM map_images i JOIN pages p ON p.id = i.page_id WHERE i.file = ?
+		UNION ALL SELECT p.codex_id FROM page_images i JOIN pages p ON p.id = i.page_id WHERE i.file = ? LIMIT 1`, file, file).Scan(&id)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}

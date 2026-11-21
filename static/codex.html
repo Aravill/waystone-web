@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=74">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=15">
+    <link rel="stylesheet" href="/static/codex.css?v=17">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -92,6 +92,7 @@
                         <div class="cx-nav-group">
                             <p class="cx-nav-title">This codex</p>
                             <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id)" :aria-current="screen === 'codex' ? 'page' : null">Codex home</a>
+                            <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#tags'">Tags <span class="cx-count" x-text="codex.tags.length"></span></a>
                             <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#wanted'">Wanted pages <span class="cx-count" x-text="codex.wanted.length"></span></a>
                             <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#recent'">Recent changes</a>
                         </div>
@@ -180,7 +181,18 @@
                             </div>
                         </header>
                         <div class="game-text codex-text cx-article cx-article--desc" x-show="codex.codex.description" x-html="renderMarkdown(codex.codex.description)"></div>
-                        <section class="codex-section">
+                        <section class="codex-section" id="tagged" x-show="tagFilter" aria-label="Pages with a tag">
+                            <h2 class="section-header">Tagged <span class="cx-chip" x-text="filterTag ? filterTag.name : tagFilter"></span></h2>
+                            <p class="same" x-show="!filterTag">This codex has no tag called “<span x-text="tagFilter"></span>”. <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#tags'">All tags</a></p>
+                            <p class="same" x-show="filterTag && taggedPages.length === 0">No page has this tag.</p>
+                            <ul class="page-list" x-show="filterTag && taggedPages.length">
+                                <template x-for="p in taggedPages" :key="p.id">
+                                    <li><a :href="pageUrl(p)" x-text="p.title"></a><span class="muted" x-show="p.aliases.length" x-text="' · also ' + p.aliases.join(', ')"></span></li>
+                                </template>
+                            </ul>
+                            <p><a :href="'/codices/c/' + encodeURIComponent(codex.codex.id)">Show all pages</a></p>
+                        </section>
+                        <section class="codex-section" x-show="!tagFilter">
                             <h2 class="section-header">Pages</h2>
                             <div class="field" x-show="codex.pages.length > 8">
                                 <label for="pageFilter" class="label">Find a page</label>
@@ -204,6 +216,23 @@
                                     <li><a :href="pageUrl(p)" x-text="p.title"></a><span class="muted" x-show="p.aliases.length" x-text="' · also ' + p.aliases.join(', ')"></span></li>
                                 </template>
                             </ul>
+                        </section>
+                        <section class="codex-section" id="tags" aria-label="Tags">
+                            <h2 class="section-header">Tags</h2>
+                            <p class="same" x-show="codex.tags.length === 0" x-text="codex.can_edit ? 'No tags yet. Add them to a page with Edit tags, or start one here.' : 'No tags yet.'"></p>
+                            <ul class="cx-taglist" x-show="codex.tags.length">
+                                <template x-for="t in codex.tags" :key="t.id">
+                                    <li>
+                                        <a class="cx-chip cx-chip--tag" :href="tagUrl(t.name)" :aria-current="filterTag && filterTag.id === t.id ? 'true' : null" x-text="t.name"></a>
+                                        <span class="cx-count" x-text="countLabel(t.page_count, 'page')"></span>
+                                        <span class="cx-taglist-acts" x-show="codex.can_edit">
+                                            <button type="button" class="text-link" :aria-label="'Rename the tag ' + t.name" @click="openRenameTag(t)">Rename</button>
+                                            <button type="button" class="text-link" :aria-label="'Delete the tag ' + t.name" @click="deleteTag(t)">Delete</button>
+                                        </span>
+                                    </li>
+                                </template>
+                            </ul>
+                            <p x-show="codex.can_edit"><button type="button" class="text-link" @click="openNewTag()">+ New tag</button></p>
                         </section>
                     </div>
                 </template>
@@ -251,9 +280,15 @@
                     <div @scroll.window.passive="updateToc()">
                         <section class="cx-props" aria-label="Properties">
                             <h2 class="cx-props-label">Properties</h2>
+                            <figure class="cx-cover" x-show="pageData.cover">
+                                <button type="button" class="cx-img-btn" @click="openLightbox(coverPic())" :aria-label="pageData.cover ? 'View the cover larger: ' + pageData.cover.name : ''">
+                                    <img :src="pageData.cover ? pageData.cover.url : ''" :alt="pageData.cover ? pageData.cover.name : ''">
+                                </button>
+                            </figure>
                             <dl>
                                 <div class="cx-prop"><dt>Codex</dt><dd><a :href="'/codices/c/' + encodeURIComponent(page.codex.id)" x-text="page.codex.name"></a></dd></div>
                                 <div class="cx-prop"><dt>Folder</dt><dd><span x-text="page.folder_path.length ? page.folder_path.map((f) => f.name).join(' › ') : 'Top level'"></span> <button type="button" class="text-link" x-show="canEdit" @click="openPageFolder()">Change</button></dd></div>
+                                <div class="cx-prop" x-show="pageData.tags.length || canEdit"><dt>Tags</dt><dd><template x-for="t in pageData.tags" :key="t.id"><a class="cx-chip cx-chip--tag" :href="tagUrl(t.name)" x-text="t.name"></a></template><span class="muted" x-show="!pageData.tags.length">None</span> <button type="button" class="text-link" x-show="canEdit" @click="openTags()">Edit tags</button></dd></div>
                                 <div class="cx-prop" x-show="page.aliases.length"><dt>Also known as</dt><dd><template x-for="a in page.aliases" :key="a"><span class="cx-chip" x-text="a"></span></template></dd></div>
                                 <div class="cx-prop"><dt>Started</dt><dd x-text="page.author_user.display_name + ', ' + shortDate(page.created_at)"></dd></div>
                                 <div class="cx-prop"><dt>Scribes</dt><dd x-text="scribes"></dd></div>
@@ -296,8 +331,14 @@
                                     <button type="button" class="tab" :aria-pressed="draft.tab === 'preview'" @click="draft.tab = 'preview'">Preview</button>
                                 </div>
                                 <div class="editor" :data-tab="draft.tab">
-                                    <div class="pane pane--write">
-                                        <label for="fBody">The page</label>
+                                    <div class="pane pane--write" :class="{ 'cx-drag': dragOver }" @dragover="onDragOver($event)" @dragleave="dragOver = false" @drop.capture="onDrop($event)" @paste.capture="onPaste($event)">
+                                        <div class="cx-pane-head">
+                                            <label for="fBody">The page</label>
+                                            <span class="cx-edtools-note" role="status" x-text="uploading"></span>
+                                            <button type="button" class="cx-act" @click="$refs.imgInput.click()">
+                                                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16"/><circle cx="9" cy="10" r="2"/><path d="M3 18l6-5 4 3 3-2 5 4"/></svg>Add image
+                                            </button>
+                                        </div>
                                         <div class="cm-host" x-ref="editorHost"></div>
                                         <textarea id="fBody" x-ref="bodyArea" placeholder="Write about it. Link other pages with [[Title]]." x-model="draft.body" x-show="!editorReady"></textarea>
                                     </div>
@@ -308,7 +349,29 @@
                                         </div>
                                     </div>
                                 </div>
-                                <p class="hint hint--formatting">Formatting: **bold** · *italic* · # heading · - list · 1. list · &gt; quote · [link](https://…) · [[Page title]] or [[Page title|shown text]] to link a page in this codex</p>
+                                <div class="cx-dropzone" :class="{ 'cx-drag': dragOver }" @dragover="onDragOver($event)" @dragleave="dragOver = false" @drop="onDrop($event)">
+                                    <p><strong>Drop images here</strong>, paste them into the text, or <button type="button" class="text-link" @click="$refs.imgInput.click()">choose files</button>.</p>
+                                    <p class="hint">PNG, JPEG, WebP or GIF, up to 25 MB each. Each one goes in at the cursor as <code>![[name|caption]]</code>. Images are saved as soon as they are added, the text with Save changes.</p>
+                                    <input type="file" hidden x-ref="imgInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple @change="onPickFiles($event)">
+                                </div>
+                                <div class="cx-thumbs-wrap" x-show="pageData.images.length">
+                                    <h3 class="cx-props-label">Images on this page · <span x-text="pageData.images.length"></span></h3>
+                                    <ul class="cx-thumbs">
+                                        <template x-for="img in pageData.images" :key="img.id">
+                                            <li>
+                                                <button type="button" class="cx-img-btn" @click="openLightbox(thumbPic(img))" :aria-label="'View ' + img.name + ' larger'"><img :src="img.url" :alt="img.name" loading="lazy"></button>
+                                                <span class="cx-thumb-name"><span x-text="img.name"></span> <span class="cx-flag" x-show="pageData.cover && pageData.cover.id === img.id">Cover</span></span>
+                                                <span class="cx-thumb-acts">
+                                                    <button type="button" class="text-link" :aria-label="'Insert ' + img.name + ' at the cursor'" @click="insertPicture(img)">Insert</button>
+                                                    <button type="button" class="text-link" x-show="!(pageData.cover && pageData.cover.id === img.id)" :aria-label="'Set ' + img.name + ' as the cover'" @click="setCover(img)">Set as cover</button>
+                                                    <button type="button" class="text-link" x-show="pageData.cover && pageData.cover.id === img.id" @click="setCover(null)">Remove cover</button>
+                                                    <button type="button" class="text-link" :aria-label="'Remove ' + img.name" @click="removePicture(img)">Remove</button>
+                                                </span>
+                                            </li>
+                                        </template>
+                                    </ul>
+                                </div>
+                                <p class="hint hint--formatting">Formatting: **bold** · *italic* · # heading · - list · 1. list · &gt; quote · [link](https://…) · [[Page title]] or [[Page title|shown text]] to link a page in this codex · ![[image.png|caption]] to show an image</p>
                             </div>
                             <div class="field field--note">
                                 <label for="fNote">What changed (optional)</label>
@@ -316,7 +379,7 @@
                             </div>
                             <div class="notice" role="alert" x-show="draft.error"><p x-text="draft.error"></p></div>
                             <div class="form-foot">
-                                <button type="submit" class="submit-btn" :disabled="busy || draft.locked">Save changes</button>
+                                <button type="submit" class="submit-btn" :disabled="busy || draft.locked || !!uploading">Save changes</button>
                                 <a class="campaign-action-btn" :href="pageUrl(page)">Cancel</a>
                             </div>
                         </form>
@@ -358,11 +421,11 @@
                                 </div>
                                 <p class="same" x-show="bodyLoading">Loading this revision...</p>
                                 <div x-show="historyMode === 'full'">
-                                    <div class="game-text" x-html="codexMarkdown(selectedBody, null)"></div>
+                                    <div class="game-text codex-text" x-html="codexMarkdown(selectedBody, null)"></div>
                                 </div>
                                 <div x-show="historyMode === 'changes'">
                                     <p class="same" x-show="!previousRevision" x-text="pruned && selected > 1 ? 'This is the oldest revision still kept, so there is nothing to compare it with.' : 'This is the first version of the page, so there is nothing to compare it with.'"></p>
-                                    <div class="game-text" x-show="!previousRevision" x-html="codexMarkdown(selectedBody, null)"></div>
+                                    <div class="game-text codex-text" x-show="!previousRevision" x-html="codexMarkdown(selectedBody, null)"></div>
                                     <template x-if="previousRevision && selectedDiff">
                                         <div class="detail-changes">
                                             <div class="diff" x-show="selectedDiff.added || selectedDiff.removed" x-html="selectedDiff.html"></div>
@@ -519,6 +582,29 @@
                         </div>
                     </div>
                 </template>
+                <template x-if="dlg.type === 'tags'">
+                    <div>
+                        <div class="form-group">
+                            <label for="dTagInput">Add a tag</label>
+                            <input type="text" id="dTagInput" maxlength="120" list="dTagList" autocomplete="off" x-model="dlg.input" x-ref="dlgFocus" @keydown.enter.prevent="addTagInput(dlg)" @keydown.comma.prevent="addTagInput(dlg)">
+                            <datalist id="dTagList"><template x-for="t in tagSuggestions" :key="t.id"><option :value="t.name"></option></template></datalist>
+                            <p class="hint">Press Enter to add it. Pick one this codex already has, or type a new one. Tags are only labels; click one on a page to list the pages that have it.</p>
+                        </div>
+                        <ul class="cx-tagpick" aria-label="Tags on this page">
+                            <template x-for="n in dlg.names" :key="n"><li><span class="cx-chip cx-chip--tag"><span x-text="n"></span><button type="button" class="cx-chip-x" :aria-label="'Remove the tag ' + n" @click="removeTagName(dlg, n)">&times;</button></span></li></template>
+                        </ul>
+                        <p class="hint" x-show="dlg.names.length === 0">No tags on this page.</p>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'tag'">
+                    <div>
+                        <div class="form-group">
+                            <label for="dTagName">Tag name</label>
+                            <input type="text" id="dTagName" maxlength="40" x-model="dlg.name" x-ref="dlgFocus">
+                            <p class="hint" x-text="dlg.tag ? 'Renaming changes it on every page that has it.' : 'Up to 40 characters. Each name is unique within the codex.'"></p>
+                        </div>
+                    </div>
+                </template>
                 <template x-if="dlg.type === 'move'">
                     <div>
                         <div class="form-group">
@@ -538,6 +624,15 @@
             </form>
         </div>
     </div>
+
+    <!-- Picture lightbox: Esc, the close button or a click on the backdrop closes it; focus goes back to what opened it -->
+    <dialog class="cx-lightbox" x-ref="lightbox" aria-labelledby="lbCaption" @click="onLightboxClick($event)">
+        <figure>
+            <img :src="lightbox.url" :alt="lightbox.caption">
+            <figcaption><strong id="lbCaption" x-text="lightbox.caption"></strong><span x-text="lightbox.meta"></span></figcaption>
+        </figure>
+        <button type="button" class="cx-lightbox-close" aria-label="Close" @click="$refs.lightbox.close()">&times;</button>
+    </dialog>
 
     <!-- Confirm Modal -->
     <div id="confirmModal" class="modal confirm-modal" :class="{ 'modal-open': confirmDialog.open }" @click.self="closeConfirm(false)" @keydown.escape.window="confirmDialog.open && closeConfirm(false)" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
@@ -562,7 +657,7 @@
     <script src="/static/notifications.js?v=11"></script>
     <script src="/campaigns.js?v=63"></script>
     <script src="/static/journal.js?v=1"></script>
-    <script src="/static/codex-editor.js?v=2"></script>
-    <script src="/static/codex.js?v=14"></script>
+    <script src="/static/codex-editor.js?v=3"></script>
+    <script src="/static/codex.js?v=17"></script>
 </body>
 </html>

@@ -1,9 +1,11 @@
 package api
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"image"
+	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
@@ -25,7 +27,7 @@ const (
 	maxMapImageSide  = 16384
 )
 
-var codexImageTypes = map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
+var codexImageTypes = map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif"}
 
 func codexImageURL(file string) string { return "/api/codices/files/" + file }
 
@@ -228,16 +230,12 @@ func handleListMapImages(w http.ResponseWriter, r *http.Request, id string) {
 // uploadTimeout is how long the slowest accepted upload (25 MB) may take to arrive and be answered.
 const uploadTimeout = 150 * time.Second
 
-// handleUploadMapImage takes the raw image as the request body (PNG, JPEG or WebP, 25 MB at most).
+// handleUploadMapImage takes the raw image as the request body (PNG, JPEG, WebP or GIF, 25 MB at most).
 func handleUploadMapImage(w http.ResponseWriter, r *http.Request, id string) {
 	userID, rt, ok := codexRightsFor(w, r)
 	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
-	// The server-wide timeouts suit small bodies; give this one room (unsupported writers ignore it).
-	rc := http.NewResponseController(w)
-	_ = rc.SetReadDeadline(time.Now().Add(uploadTimeout))
-	_ = rc.SetWriteDeadline(time.Now().Add(uploadTimeout))
 	// Check the page before reading the body.
 	page, err := db.GetPage(id)
 	if err != nil {
@@ -248,41 +246,8 @@ func handleUploadMapImage(w http.ResponseWriter, r *http.Request, id string) {
 		codexStoreError(w, db.ErrPageNotFound, "")
 		return
 	}
-	tmp, err := db.CreateUploadTemp()
-	if err != nil {
-		log.Printf("failed to store map image: %v", err)
-		codexServerError(w, "store the image")
-		return
-	}
-	size, err := io.Copy(tmp, http.MaxBytesReader(w, r.Body, maxMapImageBytes))
-	if err != nil {
-		db.DiscardUpload(tmp)
-		var tooBig *http.MaxBytesError
-		if errors.As(err, &tooBig) {
-			writeJSONError(w, http.StatusRequestEntityTooLarge, "the image must be 25 MB or smaller")
-			return
-		}
-		writeJSONError(w, http.StatusBadRequest, "failed to read the image")
-		return
-	}
-	head := make([]byte, 512)
-	n, _ := tmp.ReadAt(head, 0)
-	ext, known := codexImageTypes[http.DetectContentType(head[:n])]
-	if !known {
-		db.DiscardUpload(tmp)
-		writeJSONError(w, http.StatusBadRequest, "the image must be a PNG, JPEG or WebP file")
-		return
-	}
-	cfg, _, err := image.DecodeConfig(io.NewSectionReader(tmp, 0, size))
-	if err != nil || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > maxMapImageSide || cfg.Height > maxMapImageSide {
-		db.DiscardUpload(tmp)
-		writeJSONError(w, http.StatusBadRequest, "the image could not be read, or is larger than 16384 pixels on a side")
-		return
-	}
-	file := db.GenerateUUID() + ext
-	if err := db.CommitUpload(tmp, file); err != nil {
-		log.Printf("failed to store map image: %v", err)
-		codexServerError(w, "store the image")
+	file, cfg, ok := receiveCodexImage(w, r)
+	if !ok {
 		return
 	}
 	img := models.MapImage{ID: db.GenerateUUID(), PageID: id, File: file, Width: cfg.Width, Height: cfg.Height, UploadedBy: userID, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
@@ -299,11 +264,64 @@ func handleUploadMapImage(w http.ResponseWriter, r *http.Request, id string) {
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"image": codexImageObject(users, img, true)})
 }
 
-// removeCodexFiles deletes stored map images after their page is gone; failures are only logged.
+// receiveCodexImage stores the request body as an image in the upload directory (PNG, JPEG, WebP
+// or GIF, 25 MB at most, sniffed rather than trusted) and returns its stored file name and size.
+// On failure it has already written the error response.
+func receiveCodexImage(w http.ResponseWriter, r *http.Request) (string, image.Config, bool) {
+	// The server-wide timeouts suit small bodies; give this one room (unsupported writers ignore it).
+	rc := http.NewResponseController(w)
+	_ = rc.SetReadDeadline(time.Now().Add(uploadTimeout))
+	_ = rc.SetWriteDeadline(time.Now().Add(uploadTimeout))
+	tmp, err := db.CreateUploadTemp()
+	if err != nil {
+		log.Printf("failed to store image: %v", err)
+		codexServerError(w, "store the image")
+		return "", image.Config{}, false
+	}
+	size, err := io.Copy(tmp, http.MaxBytesReader(w, r.Body, maxMapImageBytes))
+	if err != nil {
+		db.DiscardUpload(tmp)
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeJSONError(w, http.StatusRequestEntityTooLarge, "the image must be 25 MB or smaller")
+			return "", image.Config{}, false
+		}
+		writeJSONError(w, http.StatusBadRequest, "failed to read the image")
+		return "", image.Config{}, false
+	}
+	head := make([]byte, 512)
+	n, _ := tmp.ReadAt(head, 0)
+	ext, known := codexImageTypes[http.DetectContentType(head[:n])]
+	if !known {
+		db.DiscardUpload(tmp)
+		writeJSONError(w, http.StatusBadRequest, "the image must be a PNG, JPEG, WebP or GIF file")
+		return "", image.Config{}, false
+	}
+	cfg, _, err := image.DecodeConfig(io.NewSectionReader(tmp, 0, size))
+	if err != nil || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > maxMapImageSide || cfg.Height > maxMapImageSide {
+		db.DiscardUpload(tmp)
+		writeJSONError(w, http.StatusBadRequest, "the image could not be read, or is larger than 16384 pixels on a side")
+		return "", image.Config{}, false
+	}
+	if ext == ".gif" && !gifFramesFit(io.NewSectionReader(tmp, 0, size)) {
+		db.DiscardUpload(tmp)
+		writeJSONError(w, http.StatusBadRequest, "this GIF is damaged, has more than 1000 frames, or has a frame larger than the image")
+		return "", image.Config{}, false
+	}
+	file := db.GenerateUUID() + ext
+	if err := db.CommitUpload(tmp, file); err != nil {
+		log.Printf("failed to store image: %v", err)
+		codexServerError(w, "store the image")
+		return "", image.Config{}, false
+	}
+	return file, cfg, true
+}
+
+// removeCodexFiles deletes stored map images and pictures after their page is gone; failures are only logged.
 func removeCodexFiles(files []string) {
 	dir, err := db.UploadDir()
 	if err != nil {
-		log.Printf("cannot remove map images: %v", err)
+		log.Printf("cannot remove images: %v", err)
 		return
 	}
 	for _, f := range files {
@@ -311,7 +329,7 @@ func removeCodexFiles(files []string) {
 			continue
 		}
 		if err := os.Remove(filepath.Join(dir, f)); err != nil && !os.IsNotExist(err) {
-			log.Printf("failed to remove map image %s: %v", f, err)
+			log.Printf("failed to remove image %s: %v", f, err)
 		}
 	}
 }
@@ -342,7 +360,7 @@ func handleCodexFile(w http.ResponseWriter, r *http.Request, name string) {
 		codexServerError(w, "read the image")
 		return
 	}
-	ctype := map[string]string{".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp"}[filepath.Ext(name)]
+	ctype := map[string]string{".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif"}[filepath.Ext(name)]
 	h := w.Header()
 	h.Set("Content-Type", ctype)
 	h.Set("Cache-Control", "private, max-age=31536000, immutable")
@@ -529,4 +547,72 @@ func handleUndoPinEvent(w http.ResponseWriter, r *http.Request, id, eventID stri
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+const maxGIFFrames = 1000
+
+// gifFramesFit walks the blocks of a GIF without decompressing anything and reports whether every
+// frame sits inside the logical screen, the screen is within the side limit and there are at most
+// maxGIFFrames frames. image.DecodeConfig only reads the screen size, so a frame could otherwise
+// declare a huge size that a browser would try to allocate. A truncated file doesn't fit.
+func gifFramesFit(src io.Reader) bool {
+	r := bufio.NewReader(src)
+	skip := func(n int) bool { _, err := r.Discard(n); return err == nil }
+	u16 := func(b []byte) int { return int(b[0]) | int(b[1])<<8 }
+	head := make([]byte, 13)
+	if _, err := io.ReadFull(r, head); err != nil {
+		return false
+	}
+	sw, sh := u16(head[6:]), u16(head[8:])
+	if sw < 1 || sh < 1 || sw > maxMapImageSide || sh > maxMapImageSide {
+		return false
+	}
+	if head[10]&0x80 != 0 && !skip(3<<((head[10]&7)+1)) {
+		return false
+	}
+	subBlocks := func() bool {
+		for {
+			n, err := r.ReadByte()
+			if err != nil {
+				return false
+			}
+			if n == 0 {
+				return true
+			}
+			if !skip(int(n)) {
+				return false
+			}
+		}
+	}
+	frames := 0
+	for {
+		b, err := r.ReadByte()
+		if err != nil {
+			return false
+		}
+		switch b {
+		case 0x3B:
+			return true
+		case 0x21:
+			if !skip(1) || !subBlocks() {
+				return false
+			}
+		case 0x2C:
+			d := make([]byte, 9)
+			if _, err := io.ReadFull(r, d); err != nil {
+				return false
+			}
+			if frames++; frames > maxGIFFrames || u16(d[0:])+u16(d[4:]) > sw || u16(d[2:])+u16(d[6:]) > sh {
+				return false
+			}
+			if d[8]&0x80 != 0 && !skip(3<<((d[8]&7)+1)) {
+				return false
+			}
+			if !skip(1) || !subBlocks() {
+				return false
+			}
+		default:
+			return false
+		}
+	}
 }

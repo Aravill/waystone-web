@@ -16,8 +16,9 @@
         return loading[src];
     }
 
-    // Mirrors wikiLinkRe in db/codex_links.go.
-    const LINK_RE = /\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{1,200}))?\]\]/g;
+    // [[Title]] and [[Title|label]] (mirrors wikiLinkRe in db/codex_links.go) and ![[picture]] or
+    // ![[picture|caption]], where the caption may be empty.
+    const LINK_RE = /!?\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{0,200}))?\]\]/g;
     const norm = (s) => String(s || '').trim().split(/\s+/).join(' ').toLowerCase();
 
     // createCodexEditor(el, { doc, titles, onChange }) mounts the editor in el and resolves to
@@ -49,9 +50,11 @@
         };
         const decorator = new MatchDecorator({
             regexp: LINK_RE,
-            decoration: (m) => Decoration.mark({
-                class: 'cm-wikilink' + (known().has(norm(m[1])) ? '' : ' cm-wikilink--missing')
-            })
+            decoration: (m) => {
+                if (m[0][0] === '!') return Decoration.mark({ class: 'cm-imgref' });
+                if (m[2] === '') return null; // [[Title|]] has no label, so it is no link
+                return Decoration.mark({ class: 'cm-wikilink' + (known().has(norm(m[1])) ? '' : ' cm-wikilink--missing') });
+            }
         });
         const wikilinks = ViewPlugin.fromClass(class {
             constructor(view) { this.decorations = decorator.createDeco(view); }
@@ -61,7 +64,7 @@
         // After "[[": titles insert "Title]]", aliases insert "Title|alias]]".
         const complete = (ctx) => {
             const m = ctx.matchBefore(/\[\[[^\[\]\n|]*/);
-            if (!m) return null;
+            if (!m || (m.from > 0 && ctx.state.doc.sliceString(m.from - 1, m.from) === '!')) return null;
             const options = [];
             for (const p of titles()) {
                 options.push({ label: p.title, detail: p.kind === 'map' ? 'map' : '', apply: p.title + ']]' });

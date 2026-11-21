@@ -350,7 +350,35 @@ func (s *SQLiteStore) initSchema() error {
 		undone_by TEXT NOT NULL DEFAULT '',
 		created_at TEXT NOT NULL
 	);
+	CREATE TABLE IF NOT EXISTS codex_tags (
+		id TEXT PRIMARY KEY,
+		codex_id TEXT NOT NULL,
+		name TEXT NOT NULL,
+		created_by TEXT NOT NULL,
+		created_at TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS page_tags (
+		page_id TEXT NOT NULL,
+		tag_id TEXT NOT NULL,
+		PRIMARY KEY (page_id, tag_id)
+	);
+	CREATE TABLE IF NOT EXISTS page_images (
+		id TEXT PRIMARY KEY,
+		page_id TEXT NOT NULL,
+		name TEXT NOT NULL,
+		file TEXT NOT NULL,
+		width INTEGER NOT NULL,
+		height INTEGER NOT NULL,
+		uploaded_by TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		removed_at TEXT NOT NULL DEFAULT ''
+	);
 	CREATE INDEX IF NOT EXISTS idx_pages_codex ON pages(codex_id);
+	CREATE INDEX IF NOT EXISTS idx_codex_tags_codex ON codex_tags(codex_id);
+	CREATE INDEX IF NOT EXISTS idx_page_tags_tag ON page_tags(tag_id);
+	CREATE INDEX IF NOT EXISTS idx_page_images_page ON page_images(page_id);
+	CREATE INDEX IF NOT EXISTS idx_page_images_file ON page_images(file);
+	CREATE INDEX IF NOT EXISTS idx_map_images_file ON map_images(file);
 	CREATE INDEX IF NOT EXISTS idx_codex_folders_parent ON codex_folders(codex_id, parent_id);
 	CREATE INDEX IF NOT EXISTS idx_page_links_to ON page_links(to_page_id);
 	CREATE INDEX IF NOT EXISTS idx_map_pins_map ON map_pins(map_page_id);
@@ -402,7 +430,7 @@ func (s *SQLiteStore) initSchema() error {
 	if err != nil {
 		return fmt.Errorf("failed to inspect pages table: %w", err)
 	}
-	pageHasFolder := false
+	pageHasFolder, pageHasCover := false, false
 	for rows.Next() {
 		var cid, notnull, pk int
 		var name, ctype string
@@ -411,14 +439,22 @@ func (s *SQLiteStore) initSchema() error {
 			rows.Close()
 			return fmt.Errorf("failed to inspect pages table: %w", err)
 		}
-		if name == "folder_id" {
+		switch name {
+		case "folder_id":
 			pageHasFolder = true
+		case "cover_image_id":
+			pageHasCover = true
 		}
 	}
 	rows.Close()
 	if !pageHasFolder {
 		if _, err := s.db.Exec(`ALTER TABLE pages ADD COLUMN folder_id TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("failed to add pages.folder_id column: %w", err)
+		}
+	}
+	if !pageHasCover {
+		if _, err := s.db.Exec(`ALTER TABLE pages ADD COLUMN cover_image_id TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("failed to add pages.cover_image_id column: %w", err)
 		}
 	}
 	if err := s.rescueUnsortedPages(); err != nil {

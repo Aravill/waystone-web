@@ -129,6 +129,18 @@ type Store interface {
 	DeleteFolder(id string) (pages, folders int, err error)
 	SetPageFolder(pageID, folderID string) error
 	DeletePage(id string) ([]string, error)
+	GetCodexTags(codexID string) ([]models.CodexTag, error)
+	GetCodexPageTags(codexID string) (map[string][]string, error)
+	GetPageTags(pageID string) ([]models.CodexTag, error)
+	GetTagCodexID(tagID string) (string, error)
+	CreateCodexTag(codexID, name, userID string) (models.CodexTag, error)
+	RenameCodexTag(id, name string) error
+	DeleteCodexTag(id string) (int, error)
+	SetPageTags(pageID string, names []string, userID string) ([]models.CodexTag, error)
+	GetPageImages(pageID string) ([]models.PageImage, string, error)
+	AddPageImage(img models.PageImage) (models.PageImage, error)
+	RemovePageImage(pageID, imageID string) error
+	SetPageCover(pageID, imageID string) error
 	GetMapImages(pageID string) ([]models.MapImage, error)
 	AddMapImage(img models.MapImage) error
 	RestoreMapImage(pageID, imageID, userID string) (models.MapImage, error)

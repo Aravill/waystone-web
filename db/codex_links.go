@@ -16,9 +16,13 @@ type ParsedLink struct {
 	TextStart, TextEnd int
 }
 
+// ParseWikiLinks lists the [[links]] in a body; ![[...]] image embeds are not links.
 func ParseWikiLinks(body string) []ParsedLink {
 	var out []ParsedLink
 	for _, m := range wikiLinkRe.FindAllStringSubmatchIndex(body, -1) {
+		if m[0] > 0 && body[m[0]-1] == '!' {
+			continue // ![[picture|caption]] is an image, not a link
+		}
 		l := ParsedLink{Start: m[0], End: m[1], TextStart: m[2], TextEnd: m[3], Text: strings.TrimSpace(body[m[2]:m[3]])}
 		if m[4] >= 0 {
 			l.Label = body[m[4]:m[5]]

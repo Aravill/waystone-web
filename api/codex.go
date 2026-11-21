@@ -177,7 +177,7 @@ func codexRecent(codexIDs []string, codices map[string]models.Codex) ([]map[stri
 	return out, nil
 }
 
-// HandleCodexRoutes dispatches /api/codices/{c|pages|folders|titles|files}/... and POST /api/codices.
+// HandleCodexRoutes dispatches /api/codices/{c|pages|folders|tags|titles|files}/... and POST /api/codices.
 func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/codices"), "/"), "/")
 	method := func(allowed ...string) bool {
@@ -223,7 +223,17 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 					handleCreateFolder(w, r, parts[1])
 				}
 			}
+		case len(parts) == 3 && parts[2] == "tags":
+			if method(http.MethodGet, http.MethodPost) {
+				handleCodexTags(w, r, parts[1])
+			}
 		case len(parts) != 2:
+			writeJSONError(w, http.StatusNotFound, "not found")
+		}
+	case "tags":
+		if len(parts) == 2 && method(http.MethodPut, http.MethodDelete) {
+			handleCodexTag(w, r, parts[1])
+		} else if len(parts) != 2 {
 			writeJSONError(w, http.StatusNotFound, "not found")
 		}
 	case "pages":
@@ -397,10 +407,24 @@ func handleGetCodex(w http.ResponseWriter, r *http.Request, id string) {
 		codexServerError(w, "retrieve pages")
 		return
 	}
+	pageTags, err := db.GetCodexPageTags(id)
+	if err != nil {
+		codexServerError(w, "retrieve tags")
+		return
+	}
+	tags, err := db.GetCodexTags(id)
+	if err != nil {
+		codexServerError(w, "retrieve tags")
+		return
+	}
 	list := []map[string]interface{}{}
 	for _, p := range pages {
 		if p.CodexID == id {
-			list = append(list, map[string]interface{}{"id": p.ID, "title": p.Title, "has_map": p.HasMap, "aliases": p.Aliases, "folder_id": p.FolderID})
+			tagIDs := pageTags[p.ID]
+			if tagIDs == nil {
+				tagIDs = []string{}
+			}
+			list = append(list, map[string]interface{}{"id": p.ID, "title": p.Title, "has_map": p.HasMap, "aliases": p.Aliases, "folder_id": p.FolderID, "tag_ids": tagIDs})
 		}
 	}
 	folders, err := db.GetFolders(id)
@@ -422,6 +446,7 @@ func handleGetCodex(w http.ResponseWriter, r *http.Request, id string) {
 		"codex":      map[string]interface{}{"id": id, "name": codex.Name, "description": codex.Description},
 		"pages":      list,
 		"folders":    folders,
+		"tags":       codexTagObjects(tags, true),
 		"wanted":     wanted,
 		"recent":     recent,
 		"can_edit":   rt.canEdit(id),
@@ -549,8 +574,12 @@ func handleCodexPageRoutes(w http.ResponseWriter, r *http.Request, parts []strin
 		if method(http.MethodPut) {
 			handleMovePage(w, r, id)
 		}
+	case rest[0] == "tags" && len(rest) == 1:
+		if method(http.MethodPut) {
+			handleSetPageTags(w, r, id)
+		}
 	default:
-		if !handleCodexMapRoutes(w, r, id, rest, method) {
+		if !handleCodexMapRoutes(w, r, id, rest, method) && !handleCodexPictureRoutes(w, r, id, rest, method) {
 			writeJSONError(w, http.StatusNotFound, "not found")
 		}
 	}
@@ -667,6 +696,14 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 		"backlinks":      backList,
 		"incoming_count": incoming,
 		"on_maps":        []interface{}{},
+	}
+	tags, err := db.GetPageTags(id)
+	if err != nil {
+		return nil, http.StatusInternalServerError, "failed to retrieve tags"
+	}
+	payload["tags"] = codexTagObjects(tags, false)
+	if err := codexAddPicturePayload(payload, id); err != nil {
+		return nil, http.StatusInternalServerError, "failed to retrieve images"
 	}
 	if err := codexAddMapPayload(payload, page); err != nil {
 		return nil, http.StatusInternalServerError, "failed to retrieve map"

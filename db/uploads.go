@@ -13,7 +13,7 @@ var dbPath string
 
 // UploadFileRe is the only shape of file name stored in, served from, removed from and mirrored
 // out of the upload directory.
-var UploadFileRe = regexp.MustCompile(`^[0-9a-f-]{36}\.(png|jpg|webp)$`)
+var UploadFileRe = regexp.MustCompile(`^[0-9a-f-]{36}\.(png|jpg|webp|gif)$`)
 
 var (
 	uploadDirOnce sync.Once
@@ -21,7 +21,7 @@ var (
 	uploadDirErr  error
 )
 
-// UploadDir is where Codex map images are stored: UPLOAD_DIR if set, otherwise an "uploads"
+// UploadDir is where Codex images (maps and page pictures) are stored: UPLOAD_DIR if set, otherwise an "uploads"
 // folder next to the database file (so it lives on the same Docker volume). It is created on first use.
 func UploadDir() (string, error) {
 	uploadDirOnce.Do(func() {
