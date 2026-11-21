@@ -3471,3 +3471,28 @@ a.tl-title:hover {
         grid-template-columns: 1fr 1fr;
     }
 }
+
+/* Restore banner: a local draft differs from the page */
+.restore {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin: 1rem 0;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--ochre);
+    border-left: 4px solid var(--ochre);
+    background: color-mix(in srgb, var(--ochre) 10%, var(--bg));
+    font-size: 0.9rem;
+}
+
+.restore p {
+    margin: 0;
+    flex: 1 1 16rem;
+}
+
+.restore button {
+    flex: none;
+    width: auto;
+    margin: 0;
+}

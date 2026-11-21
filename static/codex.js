@@ -108,6 +108,86 @@ function codexSaveOpenState(codexId) {
     }
 }
 
+// Local drafts of an open editor: `codex-draft:{pageId}:{base}` -> {body, note, initial, at}, where base is
+// the revision the edit started from and initial the body at that base (for the conflict diff).
+// Storage may be blocked or full; every access swallows its errors and the editor works without drafts.
+const CODEX_DRAFT_PREFIX = 'codex-draft:';
+
+function codexDraftKeys(pageId) {
+    const keys = [];
+    const prefix = CODEX_DRAFT_PREFIX + pageId + ':';
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith(prefix)) keys.push(k);
+        }
+    } catch (error) {
+        // no storage
+    }
+    return keys;
+}
+
+function codexDraftWrite(pageId, base, data) {
+    try {
+        localStorage.setItem(CODEX_DRAFT_PREFIX + pageId + ':' + base, JSON.stringify(data));
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+// The newest draft of the page as { base, body, note, initial, at }, or null.
+function codexDraftFind(pageId) {
+    let best = null;
+    for (const k of codexDraftKeys(pageId)) {
+        try {
+            const d = JSON.parse(localStorage.getItem(k));
+            if (!d || typeof d.body !== 'string' || typeof d.at !== 'string') continue;
+            if (!best || d.at > best.at) {
+                best = { ...d, note: d.note || '', initial: typeof d.initial === 'string' ? d.initial : '', base: Number(k.slice(k.lastIndexOf(':') + 1)) };
+            }
+        } catch (error) {
+            // a broken entry is ignored
+        }
+    }
+    return best;
+}
+
+function codexDraftClear(pageId) {
+    for (const k of codexDraftKeys(pageId)) {
+        try {
+            localStorage.removeItem(k);
+        } catch (error) {
+            // no storage
+        }
+    }
+}
+
+// Drops drafts older than 30 days and keeps the 20 newest.
+function codexDraftPrune() {
+    try {
+        const items = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (!k || !k.startsWith(CODEX_DRAFT_PREFIX)) continue;
+            let at = 0;
+            try {
+                at = Date.parse(JSON.parse(localStorage.getItem(k)).at) || 0;
+            } catch (error) {
+                // unreadable: counts as oldest
+            }
+            items.push({ k, at });
+        }
+        items.sort((a, b) => b.at - a.at);
+        const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+        items.forEach((it, i) => {
+            if (i >= 20 || it.at < cutoff) localStorage.removeItem(it.k);
+        });
+    } catch (error) {
+        // no storage
+    }
+}
+
 // Builds { roots, pages } from the flat folder and page lists. A folder whose parent is missing
 // is shown at the top, and a cycle can't loop: only reachable folders are walked.
 function codexFolderTree(folders, pages) {
@@ -341,6 +421,10 @@ window.codexPage = function () {
         dragOver: false,
         // Editor
         draft: null,
+        draftStart: '', // the body as the page loaded, to tell whether a draft is worth keeping
+        draftTimer: null,
+        draftOffer: null, // a stored draft waiting for Restore or Discard
+        draftStatus: '',
         conflict: null,
         editor: null,
         editorReady: false,
@@ -433,6 +517,11 @@ window.codexPage = function () {
                     event.returnValue = '';
                 }
             });
+            // A tab closed within the 800 ms wait still keeps the last keystrokes.
+            window.addEventListener('pagehide', () => {
+                if (this.draftTimer) this.writeDraft();
+            });
+            codexDraftPrune();
             await this.load();
             this.showArrivalMessage();
         },
@@ -2409,6 +2498,12 @@ window.codexPage = function () {
         async initDraft() {
             const p = this.page;
             this.draft = { body: p.body, note: '', base: p.current_revision, tab: 'write', error: '', locked: false, initial: { body: p.body } };
+            this.draftStart = p.body;
+            this.draftStatus = '';
+            const stored = codexDraftFind(p.id);
+            this.draftOffer = stored && (stored.body !== p.body || stored.note !== '')
+                ? { ...stored, time: new Date(stored.at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }
+                : null;
             await this.navPromise;
             if (!window.createCodexEditor) return;
             await this.$nextTick();
@@ -2416,12 +2511,71 @@ window.codexPage = function () {
                 this.editor = await window.createCodexEditor(this.$refs.editorHost, {
                     doc: () => this.draft.body,
                     titles: () => this.titles,
-                    onChange: (value) => { this.draft.body = value; }
+                    onChange: (value) => { this.draft.body = value; this.queueDraft(); }
                 });
                 this.editorReady = !!this.editor;
             } catch (error) {
                 console.error('Editor failed to load, using the plain text box:', error);
             }
+        },
+        // Keeps the text on this device 800 ms after the last change (not while a stored draft awaits an answer).
+        queueDraft() {
+            clearTimeout(this.draftTimer);
+            this.draftTimer = null;
+            if (this.saved || !this.draft || this.draftOffer) return;
+            this.draftTimer = setTimeout(() => this.writeDraft(), 800);
+        },
+        writeDraft() {
+            clearTimeout(this.draftTimer);
+            this.draftTimer = null;
+            const d = this.draft;
+            if (this.saved || !d || this.draftOffer) return;
+            if (d.body === this.draftStart && d.note === '') {
+                codexDraftClear(this.page.id);
+                this.draftStatus = '';
+                return;
+            }
+            const at = new Date();
+            if (codexDraftWrite(this.page.id, d.base, { body: d.body, note: d.note, initial: d.initial.body, at: at.toISOString() })) {
+                this.draftStatus = 'Draft kept on this device · ' + at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+        },
+        clearDraft() {
+            clearTimeout(this.draftTimer);
+            this.draftTimer = null;
+            codexDraftClear(this.page.id);
+            this.draftStatus = '';
+        },
+        // A draft on an older base is restored onto that base, so Save gets 409 and the conflict panel shows the diff.
+        restoreDraft() {
+            const o = this.draftOffer;
+            if (!o) return;
+            const d = this.draft;
+            d.body = o.body;
+            d.note = o.note;
+            if (o.base !== d.base) {
+                d.base = o.base;
+                d.initial.body = o.initial;
+            }
+            const v = this.editorReady ? this.editor.view : null;
+            if (v) v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: o.body } });
+            this.draftOffer = null;
+            this.queueDraft();
+        },
+        discardDraftOffer() {
+            this.draftOffer = null;
+            this.clearDraft();
+        },
+        async cancelEdit() {
+            if (this.isDirty) {
+                const ok = await this.askConfirm({
+                    eyebrow: 'Page', title: 'Discard your changes?', message: 'The page has changes that are not saved.', confirmLabel: 'Discard changes'
+                });
+                if (!ok) return;
+            }
+            this.clearDraft();
+            this.saved = true;
+            window.location.href = this.pageUrl(this.page);
         },
         async save() {
             if (this.busy || this.uploading || !this.draft || this.draft.locked) return;
@@ -2432,6 +2586,7 @@ window.codexPage = function () {
                 const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}`, 'PUT', { base_revision: d.base, body: d.body, note: d.note.trim() });
                 if (response.ok) {
                     this.saved = true;
+                    this.clearDraft();
                     window.location.href = this.pageUrl(this.page) + (response.status === 201 ? `?saved=${data.revision.number}` : '?unchanged=1');
                 } else if (response.status === 409 && data.code === 'stale_base') {
                     const diff = diffWords(d.initial.body, data.latest.body);
@@ -2460,6 +2615,7 @@ window.codexPage = function () {
         },
         discardMine() {
             this.saved = true;
+            this.clearDraft();
             window.location.href = this.pageUrl(this.page);
         },
 
