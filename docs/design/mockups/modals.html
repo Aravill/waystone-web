@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waystone Modals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IM+Fell+English+SC&family=Inter:wght@400;500;600&family=Barlow+Condensed:wght@600&display=swap">
+<style>
+/* Modal mock-up: every dialog in the app, redrawn for readability, plus "Today" for comparison.
+   Tokens are STYLE_GUIDE.md's (Parchment / Candlelight). Codices dialogs use the Codices pair
+   (Inter + Barlow Condensed) and the Codices dark bar, the way their pages do. */
+:root, [data-theme="light"] {
+    --bg: #F2EAD8; --folio: #E6DBC2; --ink: #2B241C; --muted: #6B5E4B;
+    --line: rgba(43, 36, 28, 0.4); --ctl: rgba(43, 36, 28, 0.64);
+    --rubric: #8E2A1E; --verdigris: #355E52; --ochre: #7A5A12;
+    --shadow: rgba(43, 36, 28, 0.32);
+    --scrim: rgba(43, 36, 28, 0.55);
+    --cx-bar: #2B241C; --cx-bar-text: #F2EAD8; --cx-bar-accent: #D9735C; --cx-bar-line: rgba(242, 234, 216, 0.22);
+    --font-text: 'IBM Plex Mono', 'Courier New', monospace;
+    --font-display: 'IM Fell English SC', serif;
+    color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+        --line: rgba(232, 220, 196, 0.3); --ctl: rgba(232, 220, 196, 0.5);
+        --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
+        --shadow: rgba(0, 0, 0, 0.7); --scrim: rgba(0, 0, 0, 0.74);
+        --cx-bar: #0C0A07; --cx-bar-text: #E8DCC4; --cx-bar-line: rgba(232, 220, 196, 0.2);
+        color-scheme: dark;
+    }
+}
+:root[data-theme="dark"] {
+    --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+    --line: rgba(232, 220, 196, 0.3); --ctl: rgba(232, 220, 196, 0.5);
+    --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
+    --shadow: rgba(0, 0, 0, 0.7); --scrim: rgba(0, 0, 0, 0.74);
+    --cx-bar: #0C0A07; --cx-bar-text: #E8DCC4; --cx-bar-line: rgba(232, 220, 196, 0.2);
+    color-scheme: dark;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--font-text); }
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* ---------- mock-up chrome ---------- */
+.bar {
+    position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+    padding: 10px 16px; background: #2b2b2b; color: #eee; font: 13px/1.4 Inter, system-ui, sans-serif;
+}
+.bar strong { font-weight: 600; margin-right: auto; }
+.seg { display: inline-flex; border: 1px solid #555; }
+.seg button { background: none; border: 0; color: #ddd; padding: 5px 10px; font-size: 13px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: #eee; color: #222; }
+.doc { max-width: 76rem; margin: 0 auto; padding: 32px 16px 80px; }
+.doc > h1 { font: 44px/1.1 var(--font-display); margin-bottom: 8px; }
+.lede { color: var(--muted); max-width: 70ch; margin-bottom: 28px; }
+.doc h2.sec { font: 25px/1.2 var(--font-display); margin: 48px 0 6px; padding-bottom: 6px; border-bottom: 1px solid var(--ink); }
+.doc h2.sec::before { content: "§ "; color: var(--rubric); }
+.sec-note { color: var(--muted); font-size: 14.5px; max-width: 75ch; margin: 8px 0 18px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 20px; }
+.notes { display: grid; gap: 6px; padding-left: 1.25rem; font-size: 15px; max-width: 75ch; }
+.notes b { font-weight: 600; }
+.ask { border-left: 3px solid var(--rubric); padding: 4px 0 4px 14px; margin-top: 16px; font-size: 15px; max-width: 75ch; }
+
+.shot { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.shot--wide { grid-column: 1 / -1; }
+.cap { font-size: 14px; color: var(--muted); }
+.cap b { color: var(--ink); font-weight: 600; }
+.stage {
+    display: grid; place-items: center; padding: 40px 20px; min-width: 0;
+    background:
+        repeating-linear-gradient(0deg, transparent 0 22px, var(--line) 22px 23px) 0 0 / 100% 23px,
+        var(--bg);
+    position: relative; isolation: isolate; border: 1px solid var(--line);
+}
+.stage::before { content: ""; position: absolute; inset: 0; background: var(--scrim); z-index: -1; }
+.stage > .m { max-height: none; }
+.stage--phone { padding: 0; width: 375px; max-width: 100%; height: 560px; place-items: end center; margin: 0 auto; }
+
+/* ================= Proposed modal ================= */
+.m {
+    width: 100%; max-width: 28rem; max-height: min(44rem, 88vh);
+    display: flex; flex-direction: column;
+    background: var(--bg); color: var(--ink);
+    border: 1px solid var(--ink);
+    outline: 1px solid var(--line); outline-offset: 4px;
+    box-shadow: 0 24px 64px var(--shadow);
+    text-align: left;
+}
+.m--m { max-width: 36rem; }
+.m--l { max-width: 56rem; }
+
+.m-head {
+    display: flex; align-items: flex-start; gap: 16px;
+    padding: 16px 16px 14px 24px;
+    background: var(--folio); border-bottom: 1px solid var(--ink);
+}
+.m-head > div { flex: 1; min-width: 0; }
+.m-eyebrow { display: block; font-size: 14px; color: var(--muted); }
+.m-title { font: 28px/1.15 var(--font-display); color: var(--ink); overflow-wrap: anywhere; }
+.m-x {
+    flex: none; width: 40px; height: 40px; display: grid; place-items: center;
+    background: none; border: 1px solid transparent; color: var(--ink); font-size: 24px; line-height: 1; cursor: pointer;
+}
+.m-x:hover { border-color: var(--ink); }
+
+.m-body { padding: 22px 24px 24px; display: grid; gap: 20px; overflow-y: auto; min-height: 0; }
+.m-lead { font-size: 16px; line-height: 1.6; max-width: 60ch; }
+.m-lead em { font-style: normal; font-weight: 600; }
+
+.m-foot {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px;
+    padding: 14px 24px; background: var(--folio); border-top: 1px solid var(--line);
+}
+.m-foot .start { margin-right: auto; }
+.m-foot .btn--primary, .m-foot .btn--fill-danger { order: 2; }
+
+/* fields: a ledger cell. The ink line stays; the cell gets a fill so an empty field still reads as a field */
+.f { display: grid; gap: 6px; min-width: 0; }
+.f-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 20px; }
+.f-label { font-size: 15px; font-weight: 600; color: var(--ink); }
+.f-label .opt { font-weight: 400; color: var(--muted); }
+.f-label .req { color: var(--rubric); }
+.f-input {
+    width: 100%; min-height: 44px; padding: 10px 12px;
+    background: var(--folio); color: var(--ink);
+    border: 1px solid transparent; border-bottom: 1px solid var(--ink);
+    font-size: 16px; line-height: 1.4;
+}
+textarea.f-input { min-height: 7rem; resize: vertical; border: 1px solid var(--line); border-bottom-color: var(--ink); }
+select.f-input { appearance: none; padding-right: 36px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%), linear-gradient(-45deg, transparent 50%, var(--ink) 50%);
+    background-position: right 18px top 50%, right 13px top 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+.f-input::placeholder { color: var(--muted); }
+.f-input:focus, .f-input.is-focus { outline: none; border-color: var(--rubric); box-shadow: inset 0 -2px 0 var(--rubric); }
+.f-hint { font-size: 14px; line-height: 1.55; color: var(--muted); max-width: 60ch; }
+.f-error { font-size: 14.5px; font-weight: 600; color: var(--rubric); }
+
+fieldset.f { border: 0; }
+.choice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); cursor: pointer; }
+.choice + .choice { margin-top: -1px; }
+.choice input { accent-color: var(--rubric); margin-top: 4px; width: 16px; height: 16px; flex: none; }
+.choice.on { border-color: var(--rubric); box-shadow: inset 3px 0 0 var(--rubric); position: relative; }
+.choice small { display: block; color: var(--muted); font-size: 14px; }
+.check { display: flex; gap: 10px; align-items: center; font-size: 15px; }
+.check input { accent-color: var(--rubric); width: 16px; height: 16px; }
+
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; min-height: 42px; min-width: 7rem;
+    padding: 8px 18px; background: none; color: var(--ink); border: 1px solid var(--ctl);
+    font-size: 14.5px; font-weight: 500; cursor: pointer;
+}
+.btn:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn--primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn--primary:hover { opacity: .85; }
+.btn--danger { color: var(--rubric); border-color: var(--rubric); }
+.btn--danger:hover { background: var(--rubric); color: var(--bg); border-color: var(--rubric); }
+.btn--fill-danger { background: var(--rubric); color: var(--bg); border-color: var(--rubric); }
+.btn--fill-danger:hover { opacity: .85; background: var(--rubric); }
+.btn--sm { min-height: 36px; min-width: 0; padding: 4px 12px; font-size: 14px; }
+.link { background: none; border: 0; color: var(--rubric); text-decoration: underline; text-underline-offset: 4px; font-size: 14.5px; cursor: pointer; min-height: 40px; }
+
+/* lists inside dialogs */
+.rows { display: grid; border-top: 1px solid var(--line); }
+.rowi { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.rowi > .grow { flex: 1; min-width: 10rem; }
+.rowi small { display: block; color: var(--muted); font-size: 14px; }
+.av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--folio); border: 1px solid var(--line); font-size: 14px; flex: none; }
+.state { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--folio); font-size: 15px; flex-wrap: wrap; }
+.state b { font-weight: 600; }
+.ok { color: var(--verdigris); }
+.group-t { font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px 2px 10px; background: var(--folio); border: 1px solid var(--line); font-size: 14px; }
+.chip button { background: none; border: 0; width: 26px; height: 26px; cursor: pointer; color: var(--muted); font-size: 16px; }
+.stepper { display: flex; align-items: stretch; gap: 0; }
+.stepper .f-input { width: 4.5rem; text-align: center; }
+.stepper button { width: 40px; background: none; border: 1px solid var(--ctl); cursor: pointer; font-size: 18px; }
+.dur { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 15px; }
+
+/* Codices dialogs: Codices type and the dark bar, as on their pages */
+.cx { --font-text: 'Inter', system-ui, sans-serif; --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif; font-family: var(--font-text); }
+.cx .m-head { background: var(--cx-bar); border-bottom: 2px solid var(--cx-bar-accent); }
+.cx .m-eyebrow { color: var(--cx-bar-text); opacity: .72; }
+.cx .m-title { color: var(--cx-bar-text); font-weight: 600; font-size: 26px; letter-spacing: .02em; text-transform: uppercase; }
+.cx .m-x { color: var(--cx-bar-text); }
+.cx .m-x:hover { border-color: var(--cx-bar-line); }
+.cx textarea.mono { font: 14px/1.55 'IBM Plex Mono', monospace; min-height: 11rem; }
+.tpl-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 24px; }
+.tpl-card { display: block; width: 100%; text-align: left; padding: 10px 12px; background: none; border: 1px solid var(--line); cursor: pointer; }
+.tpl-card + .tpl-card { margin-top: -1px; }
+.tpl-card b { display: block; font-weight: 600; font-size: 15px; }
+.tpl-card span { color: var(--muted); font-size: 14px; }
+.tpl-card.on { border-color: var(--rubric); box-shadow: inset 3px 0 0 var(--rubric); position: relative; }
+.preview { border: 1px solid var(--line); padding: 14px 16px; font-size: 15px; background: var(--bg); }
+.preview h3 { font: 600 20px/1.2 var(--font-display); text-transform: uppercase; margin-bottom: 6px; }
+.preview h4 { font: 600 16px/1.2 var(--font-display); text-transform: uppercase; margin: 12px 0 4px; padding: 2px 8px; background: var(--folio); border-left: 3px solid var(--rubric); }
+.preview p { color: var(--ink); }
+.preview i { color: var(--muted); }
+.lightbox { background: #000; width: 100%; max-width: 30rem; padding: 12px; color: #eee; font-size: 14px; text-align: center; }
+.lightbox .pic { height: 180px; background: repeating-linear-gradient(45deg, #333 0 10px, #2a2a2a 10px 20px); margin-bottom: 8px; }
+
+/* ---------- phones: a bottom sheet, actions stacked with the main one on top ---------- */
+.stage--phone .m { max-width: none; max-height: 92%; outline: 0; border-width: 1px 0 0; box-shadow: 0 -12px 40px var(--shadow); }
+.stage--phone .m-foot { flex-direction: column-reverse; align-items: stretch; }
+.stage--phone .m-foot .btn { width: 100%; }
+.stage--phone .m-head { padding-left: 16px; }
+.stage--phone .m-body, .stage--phone .m-foot { padding-left: 16px; padding-right: 16px; }
+@media (max-width: 600px) {
+    .tpl-cols { grid-template-columns: 1fr; }
+    .stage { padding: 24px 0; }
+    .m-foot .btn { flex: 1 1 auto; }
+}
+
+/* ================= Today (for comparison) ================= */
+[data-look="today"] .m { outline: 1px solid var(--ink); outline-offset: 5px; box-shadow: none; }
+[data-look="today"] .m-head { background: none; border-bottom: 3px double var(--ink); padding: 20px 24px; }
+[data-look="today"] .m-title { font-size: 32px; }
+[data-look="today"] .m-x { border-color: var(--line); }
+[data-look="today"] .m-body { padding: 24px 24px 0; gap: 16px; }
+[data-look="today"] .m-lead { color: var(--muted); font-size: 14px; }
+[data-look="today"] .m-foot { background: none; margin: 16px 24px 24px; padding: 16px 0 0; }
+[data-look="today"] .m-foot .btn--primary,
+[data-look="today"] .m-foot .btn--fill-danger { order: 0; width: 100%; }
+[data-look="today"] .m-foot .btn--fill-danger { background: none; color: var(--rubric); }
+[data-look="today"] .f-label { font-size: 14.5px; font-weight: 500; }
+[data-look="today"] .f-input { background: transparent; border: 0; border-bottom: 1px solid var(--ink); padding: 10px 2px; box-shadow: none; }
+[data-look="today"] .f-input.is-focus { border-bottom: 2px solid var(--rubric); }
+[data-look="today"] .cx { --font-text: 'IBM Plex Mono', monospace; --font-display: 'IM Fell English SC', serif; }
+[data-look="today"] .cx .m-head { background: none; border-bottom: 3px double var(--ink); }
+[data-look="today"] .cx .m-title, [data-look="today"] .cx .m-x { color: var(--ink); text-transform: none; font-weight: 400; letter-spacing: 0; }
+[data-look="today"] .cx .m-eyebrow { color: var(--muted); opacity: 1; }
+[data-look="today"] .stage--phone .m-foot { flex-direction: row; }
+.only-today { display: none; }
+[data-look="today"] .only-today { display: inline; }
+[data-look="today"] .only-new { display: none; }
+
+/* live demo overlay */
+.overlay { position: fixed; inset: 0; z-index: 100; display: none; place-items: center; padding: 16px; background: var(--scrim); }
+.overlay.open { display: grid; }
+</style>
+</head>
+<body>
+<div class="bar">
+    <strong>Waystone · modals mock-up</strong>
+    <span>Theme</span>
+    <div class="seg" id="themeSeg"><button data-v="light">Parchment</button><button data-v="dark">Candlelight</button></div>
+    <span>Look</span>
+    <div class="seg" id="lookSeg"><button data-v="new">Proposed</button><button data-v="today">Today</button></div>
+    <button class="btn btn--sm" style="color:#eee;border-color:#777" id="demoBtn">Open one as a real overlay</button>
+</div>
+
+<main class="doc">
+    <h1>Modals</h1>
+    <p class="lede">Every dialog in the app, redrawn so it reads at a glance. Same tokens, same faces and the same double frame, with fewer lines fighting and clearer zones. Use <b>Look → Today</b> to compare.</p>
+
+    <section>
+        <h2 class="sec">What makes them hard to read today</h2>
+        <ol class="notes">
+            <li><b>The sheet melts into the page.</b> It is the same <code>--bg</code> as the page under the backdrop, with no shadow, so in Candlelight its edge is only a thin line.</li>
+            <li><b>Four parallel rules in the first 80px:</b> the border, the outline 5px out and the 3px double header rule all compete with the content.</li>
+            <li><b>An empty field is just a line.</b> The ledger-line input reads like another divider (in the screenshot, the rubric line under "Folder name" looks like a rule, not a field).</li>
+            <li><b>Explanations are small and muted.</b> Confirm messages are 14px <code>--muted</code> monospace: the one thing you have to read is the faintest text.</li>
+            <li><b>The buttons break the layout.</b> The main button is <code>.submit-btn</code> at <code>width: 100%</code>, a bright slab in dark mode, so Cancel wraps underneath on the right. Every dialog orders its buttons differently.</li>
+        </ol>
+
+        <h2 class="sec">The proposal</h2>
+        <ol class="notes">
+            <li><b>Three zones:</b> a <code>--folio</code> header band (eyebrow + 28px title, borderless × until hover), the <code>--bg</code> body, and a <code>--folio</code> footer for the actions. The body scrolls; header and footer stay put.</li>
+            <li><b>Lift the sheet:</b> darker scrim (<code>rgba(43,36,28,.55)</code> / <code>rgba(0,0,0,.74)</code>) and a soft shadow. The double frame stays, but the outer line drops to <code>--line</code> at 4px so it frames instead of competing. One ink rule under the header replaces the 3px double rule.</li>
+            <li><b>Fields are ledger cells:</b> the ink bottom line stays, the cell gets a <code>--folio</code> fill and 12px padding. Focus turns the frame rubric with a 2px rubric bottom line. Labels 15px/600, hints 14px under the field.</li>
+            <li><b>Read text is ink, 16px, line-height 1.6.</b> Muted stays for hints and meta only.</li>
+            <li><b>One button order everywhere:</b> right-aligned, Cancel then the main action (auto width, min 7rem); a destructive or secondary action (Delete game, Clear character, Manage templates) sits at the far left. On phones the sheet docks to the bottom and buttons stack full width, main action on top.</li>
+            <li><b>Three widths:</b> S 28rem (confirms, one or two fields), M 36rem (longer forms, lists), L 56rem (Codices New page, Templates, template editor).</li>
+            <li><b>Codices dialogs</b> wear the Codices pair (Inter + Barlow Condensed, from the font fix) and the Codices dark bar for the header, so they match the page they open from.</li>
+        </ol>
+        <p class="ask"><b>Two calls for you:</b> (a) a destructive confirm ("Delete page") gets a <b>rubric-filled</b> button rather than the outlined danger button, because it is the one action in the dialog; (b) inputs in dialogs become filled ledger cells, which bends the guide's "a ledger line, not a box". Both show in every sheet below.</p>
+    </section>
+
+    <!-- ======================= Before / after ======================= -->
+    <section>
+        <h2 class="sec">The one from the screenshot</h2>
+        <p class="sec-note">Codices → nav → “+ New folder”. The field is shown focused.</p>
+        <div class="cols">
+            <div class="shot">
+                <div class="stage">
+                    <div class="cx m" role="dialog" aria-labelledby="t1">
+                        <div class="m-head"><div><span class="m-eyebrow">Folder</span><h3 class="m-title" id="t1">New folder</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body">
+                            <div class="f"><label class="f-label" for="i1">Folder name</label><input class="f-input is-focus" id="i1" placeholder="e.g. Places"><p class="f-hint">Folders only sort pages. Links and page titles work the same wherever a page is filed.</p></div>
+                        </div>
+                        <div class="m-foot"><button class="btn btn--primary">Create folder</button><button class="btn">Cancel</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>New folder / Rename folder</b> · S · codex.html <code>dlg.type 'folder'</code></p>
+            </div>
+            <div class="shot">
+                <div class="stage stage--phone">
+                    <div class="cx m" role="dialog" aria-labelledby="t1p">
+                        <div class="m-head"><div><span class="m-eyebrow">Folder</span><h3 class="m-title" id="t1p">New folder</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body">
+                            <div class="f"><label class="f-label" for="i1p">Folder name</label><input class="f-input" id="i1p" placeholder="e.g. Places"><p class="f-hint">Folders only sort pages. Links and page titles work the same wherever a page is filed.</p></div>
+                        </div>
+                        <div class="m-foot"><button class="btn btn--primary">Create folder</button><button class="btn">Cancel</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>Same, on a phone</b> (375px): a bottom sheet, buttons stacked, main action on top.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ======================= Confirm ======================= -->
+    <section>
+        <h2 class="sec">Confirm dialog</h2>
+        <p class="sec-note">One component, <code>#confirmModal</code> / <code>.confirm-modal</code>, on Games, Game, Journal, Profile, Characters (delete) and Codices. Shown: a destructive confirm and a plain one.</p>
+        <div class="cols">
+            <div class="shot">
+                <div class="stage">
+                    <div class="m" role="dialog" aria-labelledby="t2">
+                        <div class="m-head"><div><span class="m-eyebrow">Journal</span><h3 class="m-title" id="t2">Delete this entry?</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body"><p class="m-lead">The entry for <em>Session 4, Nov 14</em> and its 6 revisions will be gone for everyone in the game. This cannot be undone.</p></div>
+                        <div class="m-foot"><button class="btn btn--fill-danger">Delete entry</button><button class="btn">Cancel</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>Destructive</b> · S · also Delete game, Delete character, Delete page, Delete tag, Delete account</p>
+            </div>
+            <div class="shot">
+                <div class="stage">
+                    <div class="m" role="dialog" aria-labelledby="t3">
+                        <div class="m-head"><div><span class="m-eyebrow">The Karrow Marches</span><h3 class="m-title" id="t3">Leave this game?</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body"><p class="m-lead">You will drop out of upcoming sessions and stop getting reminders. The DM can add you back.</p></div>
+                        <div class="m-foot"><button class="btn btn--primary">Leave game</button><button class="btn">Cancel</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>Plain</b> · S · also Cancel session, Discard your changes? (Codices template editor)</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ======================= Games & calendar ======================= -->
+    <section>
+        <h2 class="sec">Games, calendar and game page</h2>
+        <div class="cols">
+            <div class="shot shot--wide">
+                <div class="stage">
+                    <div class="m m--m" role="dialog" aria-labelledby="t4">
+                        <div class="m-head"><div><span class="m-eyebrow">Games</span><h3 class="m-title" id="t4">Edit game</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body">
+                            <div class="state"><span>Status: <b class="ok">● Ongoing</b></span><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn--sm">Set On Hiatus</button><button class="btn btn--sm">Set Finished</button></span></div>
+                            <div class="f"><label class="f-label" for="g1">Title <span class="req">*</span></label><input class="f-input" id="g1" value="The Karrow Marches"></div>
+                            <div class="f"><label class="f-label" for="g2">Summary <span class="req">*</span></label><input class="f-input" id="g2" value="Toll roads, dark waystones and villages that stopped answering."><p class="f-hint">One line, shown on the game banner.</p></div>
+                            <div class="f"><label class="f-label" for="g3">Description <span class="req">*</span></label><textarea class="f-input" id="g3">A border country of toll roads and dark waystones. Weekly, Thursdays, online.</textarea></div>
+                            <div class="f-row">
+                                <div class="f"><label class="f-label" for="g4">Type</label><select class="f-input" id="g4"><option>Campaign</option><option>One-shot</option></select></div>
+                                <div class="f"><label class="f-label" for="g5">System</label><input class="f-input" id="g5" value="Mörk Borg"></div>
+                            </div>
+                            <div class="f-row">
+                                <div class="f"><label class="f-label" for="g6">Codex</label><select class="f-input" id="g6"><option>The Karrow Marches</option><option>None</option></select></div>
+                                <div class="f"><label class="f-label" for="g7">Desired player count</label><input class="f-input" id="g7" type="number" value="4"></div>
+                            </div>
+                        </div>
+                        <div class="m-foot"><button class="btn btn--danger start">Delete game</button><button class="btn btn--primary">Save</button><button class="btn">Cancel</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>Register game / Edit game</b> · M · campaigns.html <code>#createCampaignModal</code>. Paired fields share a row; the body scrolls and Save stays in view. Delete game (admins) moves to the far left.</p>
+            </div>
+            <div class="shot">
+                <div class="stage">
+                    <div class="m m--m" role="dialog" aria-labelledby="t5">
+                        <div class="m-head"><div><span class="m-eyebrow">Sign-ups</span><h3 class="m-title" id="t5">The Karrow Marches</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body">
+                            <div class="state"><span><b class="ok">Sign-ups open</b> · 3 of 4 seats taken</span><button class="btn btn--sm">Close sign-ups</button></div>
+                            <div>
+                                <p class="group-t">Pending (2)</p>
+                                <div class="rows">
+                                    <div class="rowi"><span class="av">S</span><div class="grow">Simon<small>signed up Nov 19</small></div><button class="btn btn--sm btn--primary">Accept</button><button class="btn btn--sm">Decline</button></div>
+                                    <div class="rowi"><span class="av">A</span><div class="grow">Adam<small>signed up Nov 20</small></div><button class="btn btn--sm btn--primary">Accept</button><button class="btn btn--sm">Decline</button></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="m-foot"><button class="btn btn--primary">Done</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>Sign-ups</b> · M · campaigns.html <code>#signupsModal</code>. A list dialog: the footer only closes it.</p>
+            </div>
+            <div class="shot">
+                <div class="stage">
+                    <div class="m" role="dialog" aria-labelledby="t6">
+                        <div class="m-head"><div><span class="m-eyebrow">The Karrow Marches</span><h3 class="m-title" id="t6">Suggest a session</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body">
+                            <div class="f-row">
+                                <div class="f"><label class="f-label" for="s1">Date</label><input class="f-input" id="s1" value="Thu, Nov 26" readonly></div>
+                                <div class="f"><label class="f-label" for="s2">Time <span class="req">*</span></label><input class="f-input" id="s2" value="19:00"></div>
+                            </div>
+                            <div class="f"><span class="f-label">Duration <span class="req">*</span></span>
+                                <div class="dur"><span class="stepper"><button aria-label="One hour less">−</button><input class="f-input" value="3" aria-label="Hours"><button aria-label="One hour more">+</button></span> h <span class="stepper"><button aria-label="One minute less">−</button><input class="f-input" value="30" aria-label="Minutes"><button aria-label="One minute more">+</button></span> min</div></div>
+                            <div class="f"><label class="f-label" for="s3">Timezone <span class="req">*</span></label><select class="f-input" id="s3"><option>Europe/Prague</option></select></div>
+                        </div>
+                        <div class="m-foot"><button class="btn btn--primary">Suggest</button><button class="btn">Cancel</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>Suggest a session</b> · S · calendar.html <code>#createSessionModal</code> (today a 20rem compact variant; it moves to S, the compact styles go).</p>
+            </div>
+            <div class="shot">
+                <div class="stage">
+                    <div class="m" role="dialog" aria-labelledby="t7">
+                        <div class="m-head"><div><span class="m-eyebrow">The Karrow Marches</span><h3 class="m-title" id="t7">Your character</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body">
+                            <fieldset class="f"><legend class="f-label" style="margin-bottom:6px">Play as</legend>
+                                <label class="choice on"><input type="radio" name="pc" checked><span>Brannoc Vell<small>Also in: Saltmarsh</small></span></label>
+                                <label class="choice"><input type="radio" name="pc"><span>Ysolde of the Ford<small>Not in another game</small></span></label>
+                            </fieldset>
+                            <button class="link" style="justify-self:start">+ New character</button>
+                        </div>
+                        <div class="m-foot"><button class="link start">Clear character</button><button class="btn btn--primary">Confirm</button><button class="btn">Cancel</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>Your character</b> · S · game.html <code>#pickerModal</code></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ======================= Codices ======================= -->
+    <section>
+        <h2 class="sec">Codices</h2>
+        <p class="sec-note">One <code>.modal</code> in codex.html switches on <code>dlg.type</code>: 14 kinds. The one-field ones share the New folder layout (Rename page, Rename folder, New tag, Rename tag, Move, Change folder, Move folder). Shown here: the ones that differ.</p>
+        <div class="cols">
+            <div class="shot">
+                <div class="stage">
+                    <div class="cx m" role="dialog" aria-labelledby="c1">
+                        <div class="m-head"><div><span class="m-eyebrow">Page</span><h3 class="m-title" id="c1">Change folder</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body"><div class="f"><label class="f-label" for="c1i">Folder</label><select class="f-input" id="c1i"><option>People</option><option>Places / Settlements</option></select><p class="f-hint">Old Hesk moves; its links keep working.</p></div></div>
+                        <div class="m-foot"><button class="btn btn--primary">Save</button><button class="btn">Cancel</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>Rename page, Change folder, Move, Move folder, New / Rename tag</b> · S</p>
+            </div>
+            <div class="shot">
+                <div class="stage">
+                    <div class="cx m" role="dialog" aria-labelledby="c2">
+                        <div class="m-head"><div><span class="m-eyebrow">Page</span><h3 class="m-title" id="c2">Tags</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body">
+                            <div class="chips"><span class="chip">npc<button aria-label="Remove npc">&times;</button></span><span class="chip">toll<button aria-label="Remove toll">&times;</button></span></div>
+                            <div class="f"><label class="f-label" for="c2i">Add a tag</label><input class="f-input" id="c2i" placeholder="Type, then Enter"><p class="f-hint">Enter or a comma adds it.</p></div>
+                        </div>
+                        <div class="m-foot"><button class="btn btn--primary">Save</button><button class="btn">Cancel</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>Tags</b> · S · also <b>Aliases</b> (a textarea, one name per line)</p>
+            </div>
+            <div class="shot">
+                <div class="stage">
+                    <div class="cx m" role="dialog" aria-labelledby="c3">
+                        <div class="m-head"><div><span class="m-eyebrow">Codex</span><h3 class="m-title" id="c3">New codex</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body">
+                            <div class="f"><label class="f-label" for="c3a">Name</label><input class="f-input" id="c3a"></div>
+                            <div class="f"><label class="f-label" for="c3b">Description <span class="opt">(optional)</span></label><textarea class="f-input" id="c3b"></textarea></div>
+                        </div>
+                        <div class="m-foot"><button class="btn btn--primary">Create codex</button><button class="btn">Cancel</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>New codex / Edit codex</b> · S</p>
+            </div>
+            <div class="shot">
+                <div class="stage">
+                    <div class="cx m m--m" role="dialog" aria-labelledby="c4">
+                        <div class="m-head"><div><span class="m-eyebrow">Page</span><h3 class="m-title" id="c4">Copy page</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body">
+                            <div class="f"><label class="f-label" for="c4a">Title</label><input class="f-input" id="c4a" value="Old Hesk (copy)"></div>
+                            <div class="f-row">
+                                <div class="f"><label class="f-label" for="c4b">Codex</label><select class="f-input" id="c4b"><option>The Karrow Marches</option></select></div>
+                                <div class="f"><label class="f-label" for="c4c">Folder</label><select class="f-input" id="c4c"><option>People</option></select></div>
+                            </div>
+                            <div style="display:grid;gap:8px"><label class="check"><input type="checkbox" checked> Copy its tags</label><label class="check"><input type="checkbox" checked> Copy its images</label></div>
+                        </div>
+                        <div class="m-foot"><button class="btn btn--primary">Copy page</button><button class="btn">Cancel</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>Copy page</b> · M</p>
+            </div>
+            <div class="shot">
+                <div class="stage">
+                    <div class="cx m m--m" role="dialog" aria-labelledby="c5">
+                        <div class="m-head"><div><span class="m-eyebrow">Page</span><h3 class="m-title" id="c5">Save as template</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body">
+                            <div class="f"><label class="f-label" for="c5a">Name</label><input class="f-input" id="c5a" value="Toll-keeper"></div>
+                            <div class="f"><label class="f-label" for="c5b">Description</label><input class="f-input" id="c5b" placeholder="One line, shown on the card"></div>
+                            <fieldset class="f"><legend class="f-label" style="margin-bottom:6px">Keep</legend>
+                                <label class="choice on"><input type="radio" name="keep" checked><span>Headings only<small>The page's ## sections, empty</small></span></label>
+                                <label class="choice"><input type="radio" name="keep"><span>All the text</span></label>
+                            </fieldset>
+                            <label class="check"><input type="checkbox"> New pages get this page's tags</label>
+                        </div>
+                        <div class="m-foot"><button class="btn btn--primary">Save template</button><button class="btn">Cancel</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>Save as template</b> · M</p>
+            </div>
+            <div class="shot shot--wide">
+                <div class="stage">
+                    <div class="cx m m--l" role="dialog" aria-labelledby="c6">
+                        <div class="m-head"><div><span class="m-eyebrow">Codex</span><h3 class="m-title" id="c6">New page</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body">
+                            <div class="f-row">
+                                <div class="f"><label class="f-label" for="c6a">Title</label><input class="f-input is-focus" id="c6a" value="The Toll House"></div>
+                                <div class="f"><label class="f-label" for="c6b">Folder</label><select class="f-input" id="c6b"><option>Places / Landmarks</option></select></div>
+                            </div>
+                            <div class="tpl-cols">
+                                <div>
+                                    <p class="group-t">Start from · Built-in</p>
+                                    <div role="radiogroup" aria-label="Start from">
+                                        <button class="tpl-card" role="radio" aria-checked="false"><b>Blank</b><span>An empty page.</span></button>
+                                        <button class="tpl-card on" role="radio" aria-checked="true"><b>Place</b><span>Where it is, who is there, what's wrong.</span></button>
+                                        <button class="tpl-card" role="radio" aria-checked="false"><b>Person</b><span>Who they are and what they want.</span></button>
+                                    </div>
+                                    <p class="group-t" style="margin-top:14px">This codex</p>
+                                    <button class="tpl-card" role="radio" aria-checked="false"><b>Toll-keeper</b><span>by Adam</span></button>
+                                    <button class="link">Manage templates</button>
+                                </div>
+                                <div>
+                                    <p class="group-t">Preview</p>
+                                    <div class="preview">
+                                        <h3>The Toll House</h3>
+                                        <p><i>Where it is, who is there, and what's wrong with it.</i></p>
+                                        <h4>Where</h4><p>On the road to …</p>
+                                        <h4>Who is there</h4><p>…</p>
+                                        <p class="f-hint" style="margin-top:10px">Adds tags: place</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="m-foot"><button class="btn btn--primary">Create page</button><button class="btn">Cancel</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>New page</b> · L · <b>Templates</b> (a list of rows with Use / Copy / Edit / Delete) and the <b>template editor</b> (name, description, tags, a monospace text area) use the same L sheet; the editor's Back sits at the far left of the footer.</p>
+            </div>
+            <div class="shot">
+                <div class="stage">
+                    <div class="cx m m--m" role="dialog" aria-labelledby="c7">
+                        <div class="m-head"><div><span class="m-eyebrow">Template</span><h3 class="m-title" id="c7">Edit template</h3></div><button class="m-x" aria-label="Close">&times;</button></div>
+                        <div class="m-body">
+                            <div class="f"><label class="f-label" for="c7a">Name</label><input class="f-input" id="c7a" value="Toll-keeper"></div>
+                            <div class="f"><label class="f-label" for="c7b">Text</label><textarea class="f-input mono" id="c7b">*Who keeps this toll, and what it costs.*
+
+## Takes
+[[ ]]
+
+## Answers to</textarea><p class="f-hint"><code>{{title}}</code> and <code>{{date}}</code> are filled in; an empty <code>[[ ]]</code> marks a link to write.</p></div>
+                        </div>
+                        <div class="m-foot"><button class="btn start">Back</button><button class="btn btn--primary">Save template</button><button class="btn">Cancel</button></div>
+                    </div>
+                </div>
+                <p class="cap"><b>Template editor</b> (shown at M here to fit; it is L in the app). Markdown stays monospace.</p>
+            </div>
+            <div class="shot">
+                <div class="stage">
+                    <div class="lightbox"><div class="pic"></div>Karrow Ford at dusk<br><span style="opacity:.7">ford.jpg · 1600×1000</span></div>
+                </div>
+                <p class="cap"><b>Image lightbox</b> (<code>dialog.cx-lightbox</code>) is a viewer, not a form: it keeps its black ground and is not part of this redesign.</p>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2 class="sec">All modals in the app</h2>
+        <ol class="notes">
+            <li><b>Games</b> (campaigns.html): Register / Edit game, Sign-ups, Confirm.</li>
+            <li><b>Calendar</b> (calendar.html): Suggest a session.</li>
+            <li><b>Game page</b> (game.html): Your character, Confirm (leave game, cancel or delete a session, …).</li>
+            <li><b>Journal</b> (journal.html), <b>Profile</b> (profile.html), <b>Characters</b> (characters.html): Confirm.</li>
+            <li><b>Codices</b> (codex.html): New page, Templates, New / Edit template, Save as template, Copy page, New / Edit codex, Rename page, Aliases, Tags, Move to another codex, Change folder, New / Rename folder, Move folder, New / Rename tag, Confirm; plus the image lightbox (out of scope).</li>
+        </ol>
+        <p class="sec-note">Build: restyle the shared <code>.modal-*</code> classes in styles.css (header band, footer band, field cells, button order via a <code>.modal-actions</code> footer), retire <code>.compact-modal-*</code>, make <code>.submit-btn</code> auto-width inside <code>.modal-actions</code>, and in codex.css give <code>.codex-page .modal-header</code> the dark bar. Markup changes are small: move each dialog's buttons into one footer, Cancel after the main action in the DOM order shown.</p>
+    </section>
+</main>
+
+<div class="overlay" id="overlay" aria-hidden="true"></div>
+
+<script>
+const root = document.documentElement;
+function seg(id, attr, initial) {
+    const el = document.getElementById(id);
+    const set = v => { root.setAttribute(attr, v); el.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v))); };
+    el.addEventListener('click', e => { const b = e.target.closest('button'); if (b) set(b.dataset.v); });
+    set(initial);
+}
+seg('themeSeg', 'data-theme', matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+seg('lookSeg', 'data-look', 'new');
+
+const overlay = document.getElementById('overlay');
+let lastFocus = null;
+function closeDemo() { overlay.classList.remove('open'); overlay.innerHTML = ''; overlay.setAttribute('aria-hidden', 'true'); if (lastFocus) lastFocus.focus(); }
+document.getElementById('demoBtn').addEventListener('click', e => {
+    lastFocus = e.currentTarget;
+    const sheet = document.querySelector('.stage .m').cloneNode(true);
+    sheet.setAttribute('aria-modal', 'true');
+    sheet.querySelector('.is-focus')?.classList.remove('is-focus');
+    overlay.appendChild(sheet);
+    overlay.classList.add('open'); overlay.removeAttribute('aria-hidden');
+    sheet.querySelector('input').focus();
+    sheet.querySelectorAll('.m-x, .m-foot .btn').forEach(b => b.addEventListener('click', closeDemo));
+});
+overlay.addEventListener('click', e => { if (e.target === overlay) closeDemo(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.classList.contains('open')) closeDemo(); });
+</script>
+</body>
+</html>
