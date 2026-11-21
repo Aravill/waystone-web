@@ -172,12 +172,20 @@ test.describe('Codices templates and copying', () => {
   let editor;
   let codex;
   const made = []; // page ids to remove
+  let hadTags; // names of the tags the codex had before the test: only new ones are removed
 
   test.beforeEach(async () => {
     editor = await apiAs('roy');
     const home = await (await editor.get('/api/codices')).json();
     codex = home.codices.find((c) => c.can_edit);
     expect(codex, 'roy can edit a codex').toBeTruthy();
+    hadTags = (await (await editor.get(`/api/codices/c/${codex.id}/tags`)).json()).map((t) => t.name);
+    // adam is the see-only viewer: set that up here instead of relying on the seed or other tests.
+    const admin = await apiAs(env.ADMIN_USERNAME);
+    const adam = (await access(admin)).users.find((u) => u.username === 'adam');
+    await setRight(admin, adam.id, 'codices.see', true);
+    await setLevel(admin, codex.id, adam.id, 'see');
+    await admin.dispose();
   });
 
   test.afterEach(async () => {
@@ -185,7 +193,7 @@ test.describe('Codices templates and copying', () => {
     const templates = await (await editor.get(`/api/codices/c/${codex.id}/templates`)).json();
     for (const t of templates.filter((x) => x.name.startsWith('E2E'))) await editor.delete(`/api/codices/templates/${t.id}`);
     const tags = await (await editor.get(`/api/codices/c/${codex.id}/tags`)).json();
-    for (const t of tags.filter((x) => x.name === 'session' || x.name === 'e2e-tpl-tag')) await editor.delete(`/api/codices/tags/${t.id}`);
+    for (const t of tags.filter((x) => (x.name === 'session' || x.name === 'e2e-tpl-tag') && !hadTags.includes(x.name))) await editor.delete(`/api/codices/tags/${t.id}`);
     await editor.dispose();
   });
 
