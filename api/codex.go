@@ -445,7 +445,7 @@ func handleGetCodex(w http.ResponseWriter, r *http.Request, id string) {
 			if tagIDs == nil {
 				tagIDs = []string{}
 			}
-			list = append(list, map[string]interface{}{"id": p.ID, "title": p.Title, "has_map": p.HasMap, "aliases": p.Aliases, "folder_id": p.FolderID, "tag_ids": tagIDs})
+			list = append(list, map[string]interface{}{"id": p.ID, "kind": p.Kind, "title": p.Title, "has_map": p.HasMap, "aliases": p.Aliases, "folder_id": p.FolderID, "tag_ids": tagIDs})
 		}
 	}
 	folders, err := db.GetFolders(id)
@@ -480,6 +480,8 @@ type pageCreateRequest struct {
 	Body     string `json:"body"`
 	CodexID  string `json:"codex_id"`
 	FolderID string `json:"folder_id"`
+	// Kind is "lore" (an article, also the default) or "timeline".
+	Kind string `json:"kind"`
 	// TemplateID (builtin:name, or a template of the same codex) makes the server fill the body and
 	// tags from the template, ignoring Body.
 	TemplateID string `json:"template_id"`
@@ -511,6 +513,18 @@ func handleCreatePage(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusForbidden, "you can't edit this codex")
 		return
 	}
+	kind := req.Kind
+	if kind == "" {
+		kind = models.PageLore
+	}
+	if !models.ValidNewPageKind(kind) {
+		writeJSONError(w, http.StatusBadRequest, "unknown page type")
+		return
+	}
+	if kind == models.PageTimeline && req.TemplateID != "" {
+		writeJSONError(w, http.StatusBadRequest, "a timeline starts empty and can't use a template")
+		return
+	}
 	body, tagNames, ok := pageStart(w, req.TemplateID, req.CodexID, title, req.Body)
 	if !ok {
 		return
@@ -519,7 +533,7 @@ func handleCreatePage(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "body is too long")
 		return
 	}
-	page := models.Page{ID: db.GenerateUUID(), Kind: models.PageLore, CodexID: req.CodexID, FolderID: req.FolderID, Title: title, AuthorID: userID}
+	page := models.Page{ID: db.GenerateUUID(), Kind: kind, CodexID: req.CodexID, FolderID: req.FolderID, Title: title, AuthorID: userID}
 	if err := db.CreatePageWith(page, body, models.NewPageExtras{TagNames: tagNames}); err != nil {
 		codexStoreError(w, err, "create page")
 		return
@@ -615,7 +629,8 @@ func handleCodexPageRoutes(w http.ResponseWriter, r *http.Request, parts []strin
 			handleCopyPage(w, r, id)
 		}
 	default:
-		if !handleCodexMapRoutes(w, r, id, rest, method) && !handleCodexPictureRoutes(w, r, id, rest, method) {
+		if !handleCodexMapRoutes(w, r, id, rest, method) && !handleCodexPictureRoutes(w, r, id, rest, method) &&
+			!handleCodexTimelineRoutes(w, r, id, rest, method) {
 			writeJSONError(w, http.StatusNotFound, "not found")
 		}
 	}
@@ -721,7 +736,7 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 	}
 	payload := map[string]interface{}{
 		"page": map[string]interface{}{
-			"id": page.ID, "title": page.Title,
+			"id": page.ID, "kind": page.Kind, "title": page.Title,
 			"codex": codexCodexRef(codices, page.CodexID), "folder_id": page.FolderID, "folder_path": folderPath, "aliases": page.Aliases, "body": page.Body,
 			"current_revision": page.CurrentRevision, "revision_count": page.RevisionCount,
 			"created_at": page.CreatedAt, "updated_at": page.UpdatedAt,
@@ -732,6 +747,15 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 		"backlinks":      backList,
 		"incoming_count": incoming,
 		"on_maps":        []interface{}{},
+		"timeline":       nil,
+	}
+	if page.Kind == models.PageTimeline {
+		if payload["timeline"], err = codexTimelinePayload(id, page.CodexID); err != nil {
+			return nil, http.StatusInternalServerError, "failed to retrieve timeline"
+		}
+	}
+	if payload["on_timelines"], err = codexOnTimelines(id); err != nil {
+		return nil, http.StatusInternalServerError, "failed to retrieve timelines"
 	}
 	tags, err := db.GetPageTags(id)
 	if err != nil {

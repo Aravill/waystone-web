@@ -329,7 +329,14 @@ func handleCopyPage(w http.ResponseWriter, r *http.Request, id string) {
 			x.TagNames = append(x.TagNames, t.Name)
 		}
 	}
-	page := models.Page{ID: db.GenerateUUID(), Kind: models.PageLore, CodexID: req.CodexID, FolderID: req.FolderID, Title: title, AuthorID: userID}
+	page := models.Page{ID: db.GenerateUUID(), Kind: src.Kind, CodexID: req.CodexID, FolderID: req.FolderID, Title: title, AuthorID: userID}
+	if src.Kind == models.PageTimeline {
+		// Links to pages stay only inside the same codex; elsewhere an event keeps its title.
+		if err := copyTimelineInto(&x, id, src.CodexID == req.CodexID); err != nil {
+			codexServerError(w, "copy the timeline")
+			return
+		}
+	}
 	// Cheap checks first, so a refused copy never duplicates a file.
 	if err := db.CheckNewPage(req.CodexID, req.FolderID, title); err != nil {
 		codexStoreError(w, err, "copy page")
