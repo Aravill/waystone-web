@@ -1,6 +1,12 @@
 /* Codices. The page also carries .journal-page, which supplies the editor panes, history and diff styles
    (see styles.css). Tokens only, square corners. The layout (.cx-*) is at the end. */
 
+/* Markdown stays monospace while it is being written */
+.codex-page .cm-host .cm-editor,
+.codex-page .cx-tpl-body {
+    font-family: var(--font-mono);
+}
+
 .codex-page .muted {
     color: var(--muted);
 }

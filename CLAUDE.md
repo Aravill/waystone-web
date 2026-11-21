@@ -45,7 +45,7 @@ Waystone Web: Go (stdlib `net/http`, SQLite via `modernc.org/sqlite`, local user
 
 - Go: handlers named `HandleXxx`; always set `Content-Type: application/json` and an explicit status; decode bodies with `json.NewDecoder(r.Body).Decode(&v)`; guard methods with `r.Method` checks.
 - JS: `fetch()` only; wrap calls in try/catch and report via `showMessage(text, 'error')`; use `textContent` (or `escapeHtml()`) for user-generated content; init on `DOMContentLoaded`.
-- Styling follows `STYLE_GUIDE.md` ("Scriptorium": parchment/candlelight themes via CSS tokens, IBM Plex Mono + IM Fell, rubric-red accent that means "you"; mock-ups in `docs/design/mockups/`). Read it before UI work. Bump the `?v=N` cache-busting query on CSS links when changing CSS.
+- Styling follows `STYLE_GUIDE.md` ("Scriptorium": parchment/candlelight themes via CSS tokens, Inter + Barlow Condensed, IBM Plex Mono only in Markdown editors, rubric-red accent that means "you"; mock-ups in `docs/design/mockups/`). Read it before UI work. Bump the `?v=N` cache-busting query on CSS links when changing CSS.
 - Keep the app lightweight and minimal: surgical changes, reuse existing helpers before adding abstractions, no broad refactors unless asked.
 
 ## Git
