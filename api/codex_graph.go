@@ -14,6 +14,7 @@ var (
 	graphImageRe = regexp.MustCompile(`!\[\[[^\[\]\n]*\]\]`)
 	graphLinkRe  = regexp.MustCompile(`\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{1,200}))?\]\]`)
 	graphMdLink  = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
+	graphHeadingRe = regexp.MustCompile(`^#{1,6}s`)
 	graphListRe  = regexp.MustCompile(`^([-*+]|\d+\.|>)\s+`)
 	graphMarkup  = strings.NewReplacer("*", "", "_", "", "`", "")
 )
@@ -24,7 +25,7 @@ func graphExcerpt(body string) string {
 	var lines []string
 	for _, l := range strings.Split(body, "\n") {
 		l = strings.TrimSpace(l)
-		if l == "" || strings.HasPrefix(l, "#") {
+		if l == "" || graphHeadingRe.MatchString(l) {
 			continue
 		}
 		lines = append(lines, graphListRe.ReplaceAllString(l, ""))
@@ -49,7 +50,9 @@ func graphExcerpt(body string) string {
 // handleCodexGraph serves GET /api/codices/c/{id}/graph: every page of the codex as a node and
 // every stored [[link]] as a link, plus a node for each title that is linked but has no page
 // (missing: true, id "missing:<normalized text>"). A↔B stay two links; the client draws one line.
-// Map pins are not included.
+// Map pins are not included. With ?around={pageId} it returns only that page, its direct neighbours
+// (both directions) and the links among them, without excerpts (the page's Local graph); the page
+// must belong to the codex or the answer is 404.
 func handleCodexGraph(w http.ResponseWriter, r *http.Request, codexID string) {
 	_, rt, ok := codexRightsFor(w, r)
 	if !ok || !rt.checkCodex(w, codexID, false) {
@@ -99,10 +102,15 @@ func handleCodexGraph(w http.ResponseWriter, r *http.Request, codexID string) {
 	}
 	sort.Slice(roots, func(i, j int) bool { return db.NormName(roots[i].Name) < db.NormName(roots[j].Name) })
 
+	around := r.URL.Query().Get("around")
 	known := map[string]bool{}
 	nodes := make([]map[string]interface{}, 0, len(pages))
 	for _, p := range pages {
 		known[p.ID] = true
+		excerpt := ""
+		if around == "" {
+			excerpt = graphExcerpt(p.Body)
+		}
 		fp := path(p.FolderID)
 		var top interface{}
 		if len(fp) > 0 {
@@ -110,11 +118,16 @@ func handleCodexGraph(w http.ResponseWriter, r *http.Request, codexID string) {
 		}
 		nodes = append(nodes, map[string]interface{}{
 			"id": p.ID, "title": p.Title, "folder_id": p.FolderID, "top_folder": top, "folder_path": fp,
-			"tags": p.Tags, "excerpt": graphExcerpt(p.Body), "missing": false,
+			"tags": p.Tags, "excerpt": excerpt, "missing": false,
 		})
+	}
+	if around != "" && !known[around] {
+		writeJSONError(w, http.StatusNotFound, db.ErrPageNotFound.Error())
+		return
 	}
 	out := make([]map[string]string, 0, len(links))
 	missing := map[string]bool{}
+	seenLink := map[string]bool{}
 	for _, l := range links {
 		if !known[l.FromPageID] {
 			continue
@@ -132,7 +145,40 @@ func handleCodexGraph(w http.ResponseWriter, r *http.Request, codexID string) {
 		} else if target == l.FromPageID {
 			continue
 		}
-		out = append(out, map[string]string{"source": l.FromPageID, "target": target})
+		// Links are stored per target text, so two aliases of one page make two rows.
+		if key := l.FromPageID + "|" + target; !seenLink[key] {
+			seenLink[key] = true
+			out = append(out, map[string]string{"source": l.FromPageID, "target": target})
+		}
+	}
+	if around != "" {
+		keep := map[string]bool{around: true}
+		for _, l := range out {
+			if l["source"] == around {
+				keep[l["target"]] = true
+			}
+			if l["target"] == around {
+				keep[l["source"]] = true
+			}
+		}
+		nodes = filterGraph(nodes, func(n map[string]interface{}) bool { return keep[n["id"].(string)] })
+		kept := out[:0]
+		for _, l := range out {
+			if keep[l["source"]] && keep[l["target"]] {
+				kept = append(kept, l)
+			}
+		}
+		out = kept
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"nodes": nodes, "links": out, "top_folders": roots})
+}
+
+func filterGraph(nodes []map[string]interface{}, ok func(map[string]interface{}) bool) []map[string]interface{} {
+	out := nodes[:0]
+	for _, n := range nodes {
+		if ok(n) {
+			out = append(out, n)
+		}
+	}
+	return out
 }

@@ -834,7 +834,7 @@ window.codexPage = function () {
             this.localGraph = false;
             if (!(pageData.links || []).length && !pageData.backlinks.some((b) => b.via.some((v) => v !== 'pin'))) return;
             try {
-                const { response, data } = await this.send(`/api/codices/c/${encodeURIComponent(pageData.page.codex.id)}/graph`, 'GET');
+                const { response, data } = await this.send(`/api/codices/c/${encodeURIComponent(pageData.page.codex.id)}/graph?around=${encodeURIComponent(pageData.page.id)}`, 'GET');
                 if (seq !== this.localSeq || !response.ok) return;
                 this.localGraph = true;
                 await this.$nextTick();

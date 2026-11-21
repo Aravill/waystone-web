@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=75">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=21">
+    <link rel="stylesheet" href="/static/codex.css?v=22">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -174,6 +174,7 @@
                                 <a class="cx-act cx-act--primary" id="gvCardOpen" href="#">Open page</a>
                                 <button type="button" class="cx-act cx-act--primary" id="gvCardCreate" hidden>Create page</button>
                             </div>
+                            <p class="gv-nomatch" id="gvNoMatch" role="status" hidden>No page matches.</p>
                             <p class="gv-hint">Drag to move around · scroll or pinch to zoom · drag a page to move it · click a page for details</p>
                         </div>
                     </section>
@@ -826,7 +827,7 @@
     <script src="/campaigns.js?v=63"></script>
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=3"></script>
-    <script src="/static/codex-graph.js?v=1"></script>
-    <script src="/static/codex.js?v=21"></script>
+    <script src="/static/codex-graph.js?v=2"></script>
+    <script src="/static/codex.js?v=22"></script>
 </body>
 </html>

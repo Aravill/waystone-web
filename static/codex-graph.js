@@ -11,7 +11,7 @@
         if (!d3Promise) {
             d3Promise = new Promise((resolve, reject) => {
                 const el = document.createElement('script');
-                el.src = '/static/vendor/d3-force.bundle.js?v=1';
+                el.src = '/static/vendor/d3-force.bundle.js?v=2';
                 el.onload = () => resolve(window.D3F);
                 el.onerror = () => {
                     d3Promise = null;
@@ -128,7 +128,7 @@
             t.textContent = o.maxLabel ? truncate(d.title, o.maxLabel) : d.title;
             g.append(c, t);
             if (o.focusable) {
-                g.setAttribute('tabindex', '0');
+                g.setAttribute('tabindex', '-1'); // roving: the mount makes one node tabbable
                 g.setAttribute('role', 'button');
                 g.setAttribute('aria-label', d.title + (d.missing ? ' (not written yet)' : ''));
             }
@@ -185,6 +185,7 @@
         const showOrphans = $('#gvOrphans');
         const showLabels = $('#gvLabels');
         const settings = $('#gvSettings');
+        const noMatch = $('#gvNoMatch');
         if (window.matchMedia('(max-width: 900px)').matches) settings.open = false;
         showLabels.checked = g.nodes.length <= 60;
 
@@ -210,7 +211,14 @@
         tags.forEach((t) => tagSel.append(new Option(t, t)));
 
         nodesInit(g.nodes);
+        // A second mount (the screen reloaded) replaces the first: stop its simulation and listeners.
+        if (root._gv) root._gv.abort();
+        if (root._gvSim) root._gvSim.stop();
+        const ac = new AbortController();
+        root._gv = ac;
+        const on = (el, type, fn, opt) => el.addEventListener(type, fn, { ...opt, signal: ac.signal });
         const sim = layout(D3, g.nodes, g.pairs, { distance: 110, charge: -450, pull: 0.03, xScale: Math.min(1, Math.max(0.25, svg.clientHeight / (svg.clientWidth || 1))) });
+        root._gvSim = sim;
         const dr = draw(svg, g.nodes, g.pairs, { currentId: opts.currentId, focusable: true });
         const view = { k: 1, tx: 0, ty: 0 };
         let selected = null;
@@ -227,7 +235,8 @@
             const vis = visibleNodes();
             if (!w || !h || !vis.length) return;
             const b = bbox(vis);
-            const pad = w < 600 ? 34 : 70;
+            const pad = w < 600 ? 44 : 80;
+            b.y1 += 18; // room for the titles under the lowest nodes
             const bw = Math.max(b.x1 - b.x0, 1);
             const bh = Math.max(b.y1 - b.y0, 1);
             view.k = Math.max(0.2, Math.min((w - pad * 2) / bw, (h - pad * 2) / bh, 1.6));
@@ -282,12 +291,20 @@
             create.hidden = !(d.missing && opts.canEdit);
             create.dataset.title = d.title;
             card.hidden = false;
+            card.scrollIntoView({ block: 'nearest' });
+            setTab(dr.nodeEls.get(id));
+        }
+        // Roving tabindex: one node is in the tab order; arrow keys move between nodes.
+        let tabbed = null;
+        function setTab(el) {
+            if (tabbed) tabbed.setAttribute('tabindex', '-1');
+            tabbed = el;
+            if (el) el.setAttribute('tabindex', '0');
         }
         function applyFilters() {
             const q = find.value.trim().toLowerCase();
             const tag = tagSel.value;
             const filtering = !!(q || tag);
-            svg.classList.toggle('filtering', filtering);
             svg.classList.toggle('nolabels', !showLabels.checked);
             g.nodes.forEach((d) => {
                 const e = dr.nodeEls.get(d.id);
@@ -296,13 +313,18 @@
                 e.classList.toggle('match', filtering && (!q || d.title.toLowerCase().includes(q)) && (!tag || d.tags.includes(tag)));
             });
             dr.lines.forEach((l) => l.el.classList.toggle('is-hidden', hiddenOf(l.a.id) || hiddenOf(l.b.id)));
+            const hits = filtering ? g.nodes.filter((d) => dr.nodeEls.get(d.id).classList.contains('match') && !hiddenOf(d.id)).length : 0;
+            // With nothing to match, say so instead of fading every node.
+            noMatch.hidden = !filtering || hits > 0;
+            svg.classList.toggle('filtering', filtering && hits > 0);
             if (selected && hiddenOf(selected)) select(null);
+            if (!tabbed || hiddenOf(tabbed._d.id)) setTab(dr.nodeEls.get((visibleNodes()[0] || g.nodes[0]).id));
         }
         [find, tagSel, showMissing, showOrphans, showLabels].forEach((c) => {
-            c.addEventListener('input', applyFilters);
-            c.addEventListener('change', applyFilters);
+            on(c, 'input', applyFilters);
+            on(c, 'change', applyFilters);
         });
-        find.addEventListener('keydown', (e) => {
+        on(find, 'keydown', (e) => {
             if (e.key !== 'Enter') return;
             e.preventDefault();
             const q = find.value.trim().toLowerCase();
@@ -318,7 +340,7 @@
         const pointers = new Map();
         let drag = null;
         const nodeAt = (e) => (e.target.closest ? e.target.closest('.node') : null);
-        svg.addEventListener('pointerdown', (e) => {
+        on(svg, 'pointerdown', (e) => {
             svg.setPointerCapture(e.pointerId);
             pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
             if (pointers.size === 2) {
@@ -330,7 +352,7 @@
             drag = { node: n ? n._d : null, lx: e.clientX, ly: e.clientY, moved: 0 };
             if (!n) svg.classList.add('panning');
         });
-        svg.addEventListener('pointermove', (e) => {
+        on(svg, 'pointermove', (e) => {
             if (!pointers.has(e.pointerId)) return;
             pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
             if (!drag) return;
@@ -348,7 +370,11 @@
             drag.ly = e.clientY;
             drag.moved += Math.abs(dx) + Math.abs(dy);
             if (drag.node) {
-                if (drag.moved < 5) return;
+                if (drag.moved < 5) {
+                    drag.lx -= dx; // not a drag yet: keep the distance so the page doesn't lag behind the pointer
+                    drag.ly -= dy;
+                    return;
+                }
                 const n = drag.node;
                 n.fx = (n.fx === undefined || n.fx === null ? n.x : n.fx) + dx / view.k;
                 n.fy = (n.fy === undefined || n.fy === null ? n.y : n.fy) + dy / view.k;
@@ -366,45 +392,56 @@
             if (!drag || drag.pinch || pointers.size === 0) drag = null;
             svg.classList.remove('panning');
         }
-        svg.addEventListener('pointerup', up);
-        svg.addEventListener('pointercancel', up);
-        svg.addEventListener('wheel', (e) => {
+        on(svg, 'pointerup', up);
+        on(svg, 'pointercancel', up);
+        on(svg, 'wheel', (e) => {
             e.preventDefault();
             const r = svg.getBoundingClientRect();
             zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
         }, { passive: false });
-        svg.addEventListener('pointerover', (e) => {
+        on(svg, 'pointerover', (e) => {
             if (e.pointerType !== 'mouse' || drag) return;
             const n = nodeAt(e);
             if (n) hover(n._d.id);
         });
-        svg.addEventListener('pointerout', (e) => {
+        on(svg, 'pointerout', (e) => {
             const n = nodeAt(e);
             if (n && !(e.relatedTarget && n.contains(e.relatedTarget))) hover(null);
         });
-        svg.addEventListener('focusin', (e) => {
+        on(svg, 'focusin', (e) => {
             const n = nodeAt(e);
-            if (n) hover(n._d.id);
-        });
-        svg.addEventListener('focusout', () => hover(null));
-        svg.addEventListener('keydown', (e) => {
-            const n = nodeAt(e);
-            if (n && (e.key === 'Enter' || e.key === ' ')) {
-                e.preventDefault();
-                select(n._d.id);
+            if (n) {
+                setTab(n);
+                hover(n._d.id);
             }
         });
+        on(svg, 'focusout', () => hover(null));
+        on(svg, 'keydown', (e) => {
+            const n = nodeAt(e);
+            if (!n) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                select(n._d.id);
+                return;
+            }
+            const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+            if (!step) return;
+            e.preventDefault();
+            const vis = visibleNodes();
+            const next = vis[(vis.indexOf(n._d) + step + vis.length) % vis.length];
+            if (next) dr.nodeEls.get(next.id).focus();
+        });
         sim.on('tick', dr.place);
-        $('#gvIn').addEventListener('click', () => zoomAt(1.3, svg.clientWidth / 2, svg.clientHeight / 2));
-        $('#gvOut').addEventListener('click', () => zoomAt(1 / 1.3, svg.clientWidth / 2, svg.clientHeight / 2));
-        $('#gvFit').addEventListener('click', fit);
-        $('#gvCardClose').addEventListener('click', () => select(null));
-        $('#gvCardCreate').addEventListener('click', (e) => {
+        on($('#gvIn'), 'click', () => zoomAt(1.3, svg.clientWidth / 2, svg.clientHeight / 2));
+        on($('#gvOut'), 'click', () => zoomAt(1 / 1.3, svg.clientWidth / 2, svg.clientHeight / 2));
+        on($('#gvFit'), 'click', fit);
+        on($('#gvCardClose'), 'click', () => select(null));
+        on($('#gvCardCreate'), 'click', (e) => {
             const title = e.currentTarget.dataset.title;
             select(null);
             opts.onCreate(title);
         });
-        document.addEventListener('keydown', (e) => {
+        on(document, 'keydown', (e) => {
             if (e.key === 'Escape' && root.isConnected && !card.hidden) select(null);
         });
 

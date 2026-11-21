@@ -284,6 +284,16 @@ test.describe('Codices graph', () => {
     const graph = await (await page.request.get(`/api/codices/c/${codex.id}/graph`)).json();
     const pages = graph.nodes.filter((n) => !n.missing);
     expect(pages.length).toBeGreaterThan(1);
+    const keys = graph.links.map((l) => l.source + '|' + l.target);
+    expect(new Set(keys).size, 'links are not repeated').toBe(keys.length);
+    // ?around= gives just a page, its neighbours and the links among them, without excerpts.
+    const hub = graph.nodes.find((n) => n.title === 'Karrow Ford');
+    const near = await (await page.request.get(`/api/codices/c/${codex.id}/graph?around=${hub.id}`)).json();
+    expect(near.nodes.length).toBeGreaterThan(1);
+    expect(near.nodes.length).toBeLessThan(graph.nodes.length);
+    expect(near.nodes.every((n) => n.excerpt === '')).toBe(true);
+    expect(near.nodes.map((n) => n.id)).toContain(hub.id);
+    expect((await page.request.get(`/api/codices/c/${codex.id}/graph?around=missing:nope`)).status()).toBe(404);
     await page.goto(`/codices/c/${codex.id}/graph`);
     await expect(page.locator('#gvSvg .node')).toHaveCount(graph.nodes.length);
     await expect(page.locator('#gvSvg .node.missing')).toHaveCount(graph.nodes.length - pages.length);
