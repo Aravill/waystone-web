@@ -474,6 +474,15 @@ func (s *SQLiteStore) initSchema() error {
 			return fmt.Errorf("failed to add pages.cover_image_id column: %w", err)
 		}
 	}
+	var charHasCodexURL int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('characters') WHERE name = 'codex_url'`).Scan(&charHasCodexURL); err != nil {
+		return fmt.Errorf("failed to inspect characters table: %w", err)
+	}
+	if charHasCodexURL == 0 {
+		if _, err := s.db.Exec(`ALTER TABLE characters ADD COLUMN codex_url TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("failed to add characters.codex_url column: %w", err)
+		}
+	}
 	if err := s.rescueUnsortedPages(); err != nil {
 		return err
 	}

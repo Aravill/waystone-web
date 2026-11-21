@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -19,7 +21,48 @@ type characterRequest struct {
 	SystemID    string                 `json:"system_id"`
 	Description string                 `json:"description"`
 	Background  string                 `json:"background"`
+	CodexURL    string                 `json:"codex_url"`
 	Status      models.CharacterStatus `json:"status"`
+}
+
+const errCodexURL = "Only links to a Codices page on waystone.aravill.org are allowed."
+
+// validCodexURL is the one gate for a character's Codex link: https://waystone.aravill.org/codices...
+// (exact host, no port or userinfo), or /codices... on a local host the request itself came to
+// (http or https; dev and tests). It returns the normalised URL; "" is valid and clears the link.
+func validCodexURL(raw, requestHost string) (string, bool) {
+	if raw == "" {
+		return "", true
+	}
+	if len(raw) > 500 {
+		return "", false
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.User != nil || u.Opaque != "" || u.Host == "" {
+		return "", false
+	}
+	host := strings.ToLower(u.Host)
+	switch {
+	case u.Scheme == "https" && host == "waystone.aravill.org":
+	case (u.Scheme == "http" || u.Scheme == "https") && host == strings.ToLower(requestHost) && isLocalHost(host):
+	default:
+		return "", false
+	}
+	p := path.Clean(u.Path)
+	if p != "/codices" && !strings.HasPrefix(p, "/codices/") {
+		return "", false
+	}
+	u.Host = host
+	return u.String(), true
+}
+
+// isLocalHost reports whether a host[:port] is localhost, 127.0.0.1 or [::1].
+func isLocalHost(hostport string) bool {
+	h := hostport
+	if i := strings.LastIndex(h, ":"); i >= 0 && !strings.HasSuffix(h, "]") {
+		h = h[:i]
+	}
+	return h == "localhost" || h == "127.0.0.1" || h == "[::1]"
 }
 
 // normalize trims the text fields and returns a validation message, or "" if valid.
@@ -28,6 +71,7 @@ func (req *characterRequest) normalize() string {
 	req.Description = strings.TrimSpace(req.Description)
 	req.Background = strings.TrimSpace(req.Background)
 	req.SystemID = strings.TrimSpace(req.SystemID)
+	req.CodexURL = strings.TrimSpace(req.CodexURL)
 	if req.Status == "" {
 		req.Status = models.CharacterAlive
 	}
@@ -137,6 +181,7 @@ func (v *characterViewer) characterJSON(c models.Character, assignments []models
 		"name":           c.Name,
 		"description":    c.Description,
 		"background":     c.Background,
+		"codex_url":      c.CodexURL,
 		"status":         c.Status,
 		"created_at":     c.CreatedAt,
 		"updated_at":     c.UpdatedAt,
@@ -226,6 +271,11 @@ func handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, msg)
 		return
 	}
+	codexURL, ok := validCodexURL(req.CodexURL, r.Host)
+	if !ok {
+		writeJSONError(w, http.StatusBadRequest, errCodexURL)
+		return
+	}
 	systems, err := systemsByID()
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve systems")
@@ -238,7 +288,7 @@ func handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	c := models.Character{
 		ID: db.GenerateUUID(), OwnerID: userID, SystemID: req.SystemID, Name: req.Name,
-		Description: req.Description, Background: req.Background, Status: req.Status,
+		Description: req.Description, Background: req.Background, CodexURL: codexURL, Status: req.Status,
 		CreatedAt: now, UpdatedAt: now,
 	}
 	if err := db.CreateCharacter(c); err != nil {
@@ -346,13 +396,18 @@ func handleUpdateCharacter(w http.ResponseWriter, r *http.Request, id string) {
 		writeJSONError(w, http.StatusBadRequest, msg)
 		return
 	}
+	codexURL, ok := validCodexURL(req.CodexURL, r.Host)
+	if !ok {
+		writeJSONError(w, http.StatusBadRequest, errCodexURL)
+		return
+	}
 	if _, ok := v.systems[req.SystemID]; !ok {
 		writeJSONError(w, http.StatusBadRequest, "choose a known system")
 		return
 	}
 	updated := *c
-	updated.SystemID, updated.Name, updated.Description, updated.Background, updated.Status =
-		req.SystemID, req.Name, req.Description, req.Background, req.Status
+	updated.SystemID, updated.Name, updated.Description, updated.Background, updated.CodexURL, updated.Status =
+		req.SystemID, req.Name, req.Description, req.Background, codexURL, req.Status
 	updated.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	if err := db.UpdateCharacter(updated); err != nil {
 		switch {

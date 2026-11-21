@@ -26,6 +26,7 @@ type Character struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
 	Background  string          `json:"background"`
+	CodexURL    string          `json:"codex_url"` // optional link to the character's Codices page
 	Status      CharacterStatus `json:"status"`
 	CreatedAt   string          `json:"created_at"`
 	UpdatedAt   string          `json:"updated_at"`

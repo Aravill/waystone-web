@@ -8,11 +8,11 @@ import (
 	"waystone-web/models"
 )
 
-const characterColumns = `id, owner_id, system_id, name, description, background, status, created_at, updated_at`
+const characterColumns = `id, owner_id, system_id, name, description, background, codex_url, status, created_at, updated_at`
 
 func scanCharacter(row rowScanner) (models.Character, error) {
 	var c models.Character
-	err := row.Scan(&c.ID, &c.OwnerID, &c.SystemID, &c.Name, &c.Description, &c.Background, &c.Status, &c.CreatedAt, &c.UpdatedAt)
+	err := row.Scan(&c.ID, &c.OwnerID, &c.SystemID, &c.Name, &c.Description, &c.Background, &c.CodexURL, &c.Status, &c.CreatedAt, &c.UpdatedAt)
 	return c, err
 }
 
@@ -40,8 +40,8 @@ func endUserAssignments(tx *sql.Tx, campaignID, userID, at string) error {
 func (s *SQLiteStore) CreateCharacter(c models.Character) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	_, err := s.db.Exec(`INSERT INTO characters (`+characterColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.ID, c.OwnerID, c.SystemID, c.Name, c.Description, c.Background, c.Status, c.CreatedAt, c.UpdatedAt)
+	_, err := s.db.Exec(`INSERT INTO characters (`+characterColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.ID, c.OwnerID, c.SystemID, c.Name, c.Description, c.Background, c.CodexURL, c.Status, c.CreatedAt, c.UpdatedAt)
 	return err
 }
 
@@ -83,9 +83,9 @@ func (s *SQLiteStore) GetCharactersByOwner(ownerID string) ([]models.Character, 
 func (s *SQLiteStore) UpdateCharacter(c models.Character) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	res, err := s.db.Exec(`UPDATE characters SET system_id = ?, name = ?, description = ?, background = ?, updated_at = ?
+	res, err := s.db.Exec(`UPDATE characters SET system_id = ?, name = ?, description = ?, background = ?, codex_url = ?, updated_at = ?
 		WHERE id = ? AND (system_id = ? OR NOT EXISTS (SELECT 1 FROM character_assignments WHERE character_id = ? AND ended_at = ''))`,
-		c.SystemID, c.Name, c.Description, c.Background, c.UpdatedAt, c.ID, c.SystemID, c.ID)
+		c.SystemID, c.Name, c.Description, c.Background, c.CodexURL, c.UpdatedAt, c.ID, c.SystemID, c.ID)
 	if err != nil {
 		return err
 	}
