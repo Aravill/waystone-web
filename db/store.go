@@ -153,6 +153,14 @@ type Store interface {
 	AddMapImage(img models.MapImage) error
 	RestoreMapImage(pageID, imageID, userID string) (models.MapImage, error)
 	RemoveMap(pageID, userID string) (int, error)
+	GetTimelineEvents(pageID string) ([]models.TimelineEvent, error)
+	GetEventsLinkingTo(pageID string) ([]models.TimelineEvent, error)
+	CreateTimelineEvent(e models.TimelineEvent) (models.TimelineEvent, error)
+	CreateTimelineEventWithPage(e models.TimelineEvent, p models.Page, body string, x models.NewPageExtras) (models.TimelineEvent, error)
+	UpdateTimelineEvent(e models.TimelineEvent) error
+	DeleteTimelineEvent(pageID, eventID string) error
+	GetTimelineCalendar(pageID string) (models.TimelineCalendar, error)
+	SetTimelineCalendar(pageID string, c models.TimelineCalendar, userID string) error
 	GetMapPins(pageID string) ([]models.MapPin, error)
 	AddMapPin(pin models.MapPin) (models.MapPin, error)
 	AddMapPinWithNewPage(page models.Page, pin models.MapPin) (models.MapPin, error)

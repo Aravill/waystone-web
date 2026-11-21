@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=78">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=25">
+    <link rel="stylesheet" href="/static/codex.css?v=27">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -291,11 +291,15 @@
                     <div>
                         <header class="cx-head">
                             <div class="cx-head-text">
+                                <p class="cx-kicker" x-show="isTimeline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18"/><rect x="5" y="5" width="4" height="4" fill="currentColor"/><rect x="5" y="15" width="4" height="4"/><path d="M12 7h8M12 17h6"/></svg>Timeline</p>
                                 <h1 class="cx-title" tabindex="-1" x-text="page.title"></h1>
                             </div>
                             <div class="cx-actions">
                                 <a class="cx-act" x-show="screen !== 'page'" :href="pageUrl(page)">Read</a>
-                                <a class="cx-act cx-act--primary" x-show="canEdit" :href="pageUrl(page, '/edit')" :aria-current="screen === 'edit' ? 'page' : null">
+                                <button type="button" class="cx-act cx-act--primary" x-show="canEdit && isTimeline && screen === 'page'" @click="openEvent(null)">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add event
+                                </button>
+                                <a class="cx-act" :class="{ 'cx-act--primary': !isTimeline }" x-show="canEdit" :href="pageUrl(page, '/edit')" :aria-current="screen === 'edit' ? 'page' : null">
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Edit
                                 </a>
                                 <a class="cx-act" :href="pageUrl(page, '/history')" :aria-current="screen === 'history' ? 'page' : null" :title="countLabel(page.revision_count, 'revision')">
@@ -312,23 +316,25 @@
                                         <button type="button" role="menuitem" x-show="canEdit" @click="moreDo('openPageFolder')">Change folder</button>
                                         <button type="button" role="menuitem" x-show="canEdit" @click="moreDo('openMove')">Move to another codex…</button>
                                         <button type="button" role="menuitem" x-show="canCopy" @click="moreDo('openCopyPage')">Copy page…</button>
-                                        <button type="button" role="menuitem" x-show="canEdit" @click="moreDo('openSaveTemplate')">Save as template…</button>
+                                        <button type="button" role="menuitem" x-show="canEdit && isTimeline" @click="moreDo('openCalendar')">Calendar…</button>
+                                        <button type="button" role="menuitem" x-show="canEdit && !isTimeline" @click="moreDo('openSaveTemplate')">Save as template…</button>
                                         <hr x-show="canEdit">
                                         <button type="button" role="menuitem" class="cx-danger" x-show="canEdit" @click="moreDo('deletePage')">Delete page</button>
                                     </div>
                                 </div>
                             </div>
                         </header>
-                        <p class="cx-sub" x-show="screen === 'page'" x-text="'Revision ' + page.current_revision + ' · last edited by ' + page.updated_by_user.display_name + ' ' + formatStamp(page.updated_at)"></p>
+                        <p class="cx-sub" x-show="screen === 'page'" x-text="isTimeline ? tlSummary : 'Revision ' + page.current_revision + ' · last edited by ' + page.updated_by_user.display_name + ' ' + formatStamp(page.updated_at)"></p>
                         <p class="cx-sub" x-show="screen === 'edit' && draft" x-text="draft ? 'Saving adds revision ' + (draft.base + 1) + '. To change the title, use Rename.' : ''"></p>
                         <p class="cx-sub" x-show="screen === 'history'" x-text="journalByline(page)"></p>
                         <p class="cx-sub" x-show="screen === 'history' && pruned">Only the latest 200 revisions are kept.</p>
+                        <p class="cx-sub" x-show="screen === 'history' && isTimeline">Events are not part of the history. They save as soon as they change.</p>
                     </div>
                 </template>
 
                 <!-- Page -->
                 <template x-if="screen === 'page' && pageData">
-                    <div @scroll.window.passive="updateToc()">
+                    <div @scroll.window.passive="updateToc(); updateJump()">
                         <section class="cx-props" aria-label="Properties">
                             <h2 class="cx-props-label">Properties</h2>
                             <figure class="cx-cover" x-show="pageData.cover">
@@ -356,8 +362,21 @@
                                 </ul>
                             </details>
                             <div class="game-text codex-text" x-ref="body" @click="onBodyClick($event)" @pointerover="onBodyOver($event)" @pointerout="onBodyOut($event)" x-html="bodyHtml" x-effect="bodyHtml; $nextTick(() => buildToc())"></div>
-                            <p class="same" x-show="!page.body.trim()">This page is empty.<span x-show="canEdit"> <a :href="pageUrl(page, '/edit')">Write it</a>.</span></p>
+                            <p class="same" x-show="!page.body.trim() && !isTimeline">This page is empty.<span x-show="canEdit"> <a :href="pageUrl(page, '/edit')">Write it</a>.</span></p>
                         </article>
+                        <section class="tl-wrap" x-show="isTimeline" aria-label="Timeline" @click="onTimelineClick($event)" @pointerover="onBodyOver($event)" @pointerout="onBodyOut($event)">
+                            <div class="tl-legend" aria-label="Key" x-show="tlEvents.length">
+                                <span><b>Newest at the top</b>, scroll down to go back in time</span>
+                                <span><span class="tl-mk tl-mk--linked" aria-hidden="true"></span>has its own page</span>
+                                <span><span class="tl-mk" aria-hidden="true"></span>no page</span>
+                            </div>
+                            <ol class="tl" aria-label="Events, newest first" x-show="tlEvents.length" x-html="tlHtml" x-effect="tlHtml; $nextTick(() => updateJump())"></ol>
+                            <div class="tl-empty" x-show="!tlEvents.length">
+                                <p>No events yet.</p>
+                                <button type="button" class="cx-act cx-act--primary" x-show="canEdit" data-add><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add the first event</button>
+                            </div>
+                            <p class="tl-orn" aria-hidden="true" x-show="tlEvents.length">❦ ❦ ❦</p>
+                        </section>
                     </div>
                 </template>
 
@@ -496,6 +515,17 @@
             <div class="cx-rail-in">
                 <template x-if="screen === 'page' && pageData">
                     <div>
+                        <section class="cx-box cx-box--jump" aria-label="Jump to" x-show="isTimeline && tlJump.length">
+                            <h2>Jump to</h2>
+                            <ul class="tl-jump">
+                                <template x-for="r in tlJump" :key="r.key">
+                                    <li>
+                                        <span class="tl-cent" x-show="r.cent" x-text="r.label"></span>
+                                        <a x-show="!r.cent" :href="'#y' + r.year" :aria-current="tlActiveYear === r.year ? 'location' : null" @click="tlActiveYear = r.year"><span x-text="r.label"></span><span class="tl-count" x-text="r.count"></span></a>
+                                    </li>
+                                </template>
+                            </ul>
+                        </section>
                         <section class="cx-box cx-box--outline" aria-label="Outline" x-show="toc.length >= 2">
                             <h2>Outline</h2>
                             <ul class="cx-outline">
@@ -517,6 +547,14 @@
                             <ul x-show="linkedFrom.length">
                                 <template x-for="b in linkedFrom" :key="b.id">
                                     <li><a :href="pageUrl(b)" x-text="b.title"></a><small class="muted" x-show="b.aliases.length" x-text="'as ' + b.aliases.map((a) => '“' + a + '”').join(', ')"></small></li>
+                                </template>
+                            </ul>
+                        </section>
+                        <section class="cx-box" aria-label="On the timeline" x-show="onTimelines.length">
+                            <h2>On the timeline</h2>
+                            <ul>
+                                <template x-for="o in onTimelines" :key="o.key">
+                                    <li><a :href="pageUrl(o.timeline)" x-text="o.timeline.title"></a><small><a :href="o.url" x-text="o.date"></a></small></li>
                                 </template>
                             </ul>
                         </section>
@@ -583,7 +621,16 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="cx-np-cols">
+                        <div class="cx-np-kind">
+                            <p class="cx-np-label" id="dKindLabel">Type</p>
+                            <div class="cx-types" role="radiogroup" aria-labelledby="dKindLabel" @keydown="onKindKey($event)">
+                                <button type="button" class="cx-type" role="radio" :aria-checked="dlg.kind === 'lore' ? 'true' : 'false'" :tabindex="dlg.kind === 'lore' ? 0 : -1" @click="dlg.kind = 'lore'"><strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M9 10h6M9 14h6M9 18h4"/></svg>Article</strong><span>Text with headings, pictures and links</span></button>
+                                <button type="button" class="cx-type" role="radio" :aria-checked="dlg.kind === 'timeline' ? 'true' : 'false'" :tabindex="dlg.kind === 'timeline' ? 0 : -1" @click="dlg.kind = 'timeline'"><strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18"/><rect x="5" y="5" width="4" height="4" fill="currentColor"/><rect x="5" y="15" width="4" height="4"/><path d="M12 7h8M12 17h6"/></svg>Timeline</strong><span>Events by date, newest first, under a short intro</span></button>
+                                <button type="button" class="cx-type" role="radio" aria-checked="false" aria-disabled="true" tabindex="-1"><strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg>Map</strong><span>A picture with pins that point at pages. Later</span></button>
+                            </div>
+                        </div>
+                        <p class="cx-tpl-note" x-show="dlg.kind === 'timeline'">A timeline starts empty. Add its events once it is made. The type can't be changed later.</p>
+                        <div class="cx-np-cols" x-show="dlg.kind === 'lore'">
                             <div class="cx-np-pick">
                                 <p class="cx-np-label" id="dTplLabel">Start from</p>
                                 <div class="cx-tpl-pick" role="radiogroup" aria-labelledby="dTplLabel" @keydown="onTplKey($event)">
@@ -609,6 +656,62 @@
                                 <p class="cx-np-tags" x-show="tplSelected.tags.length" x-text="'Adds tags: ' + tplSelected.tags.join(', ')"></p>
                             </div>
                         </div>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'event'">
+                    <div>
+                        <div class="form-group">
+                            <span class="tl-label" id="dEvPageLabel">Page <span class="muted">(optional)</span></span>
+                            <div class="tl-picker" x-show="!dlg.linked">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                                <input type="text" id="dEvPick" role="combobox" aria-labelledby="dEvPageLabel" aria-controls="dEvList" aria-autocomplete="list" autocomplete="off" :aria-expanded="dlg.pickOpen ? 'true' : 'false'" :aria-activedescendant="dlg.pickOpen && tlPickResults[dlg.pickIdx] ? 'dEvOpt-' + tlPickResults[dlg.pickIdx].id : null" :placeholder="'Find a page in ' + page.codex.name" x-model="dlg.pickQ" @focus="dlg.pickOpen = true" @input="dlg.pickOpen = true; dlg.pickIdx = 0" @blur="dlg.pickOpen = false" @keydown="onPickKey($event)">
+                                <ul class="tl-pick-list" id="dEvList" role="listbox" aria-labelledby="dEvPageLabel" x-show="dlg.pickOpen">
+                                    <template x-for="(p, i) in tlPickResults" :key="p.id">
+                                        <li role="option" :id="'dEvOpt-' + p.id" :aria-selected="i === dlg.pickIdx ? 'true' : 'false'" @mousedown.prevent="pickPage(p)"><span x-text="p.title"></span><small x-text="p.folder"></small></li>
+                                    </template>
+                                    <li class="tl-pick-none" x-show="tlPickResults.length === 0">No page called that. Leave it unlinked, or tick “Create a page for it”.</li>
+                                </ul>
+                            </div>
+                            <div class="tl-linked" x-show="dlg.linked">
+                                <span class="tl-mk tl-mk--linked" aria-hidden="true"></span>
+                                <span class="tl-linked-title"><span x-text="dlg.linked ? dlg.linked.title : ''"></span><small x-text="dlg.linked ? [dlg.linked.folder, ...dlg.linked.tags].filter(Boolean).join(' · ') : ''"></small></span>
+                                <button type="button" class="text-link" @click="unlinkEvent()">Unlink</button>
+                            </div>
+                            <p class="hint" x-show="!dlg.linked">Link a page and the event takes its title.</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="dEvTitle">Title</label>
+                            <input type="text" id="dEvTitle" maxlength="120" autocomplete="off" x-model="dlg.title" :readonly="!!dlg.linked" @input="!dlg.linked && (dlg.ownTitle = dlg.title)">
+                            <p class="hint" x-show="dlg.linked">From the linked page. Rename the page to change it.</p>
+                        </div>
+                        <div class="form-group">
+                            <span class="tl-label" id="dEvDateLabel">Date</span>
+                            <div class="tl-date-row" role="group" aria-labelledby="dEvDateLabel">
+                                <div><label for="dEvYear">Year</label><input type="number" id="dEvYear" step="1" inputmode="numeric" x-model="dlg.year"></div>
+                                <div><label for="dEvMonth">Month <span class="muted">(optional)</span></label>
+                                    <select id="dEvMonth" x-model="dlg.month">
+                                        <option value="">—</option>
+                                        <template x-for="o in monthOptions" :key="o.n"><option :value="String(o.n)" x-text="o.label" :selected="String(o.n) === dlg.month"></option></template>
+                                    </select>
+                                </div>
+                                <div><label for="dEvDay">Day <span class="muted">(optional)</span></label><input type="number" id="dEvDay" min="1" max="100" inputmode="numeric" :disabled="!dlg.month" x-model="dlg.day"></div>
+                            </div>
+                        </div>
+                        <label class="cx-check" x-show="!dlg.linked && !dlg.eventId"><input type="checkbox" x-model="dlg.createPage"><span>Create a page for it <small x-text="codex && codex.folders.some((f) => !f.parent_id && f.name.trim().toLowerCase() === 'events') ? '(from the Event template, in Events)' : '(from the Event template, at the top level)'"></small></span></label>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'calendar'">
+                    <div>
+                        <div class="form-group">
+                            <label for="dCalMonths">Month names, one per line</label>
+                            <textarea id="dCalMonths" rows="8" spellcheck="false" x-model="dlg.months" x-ref="dlgFocus"></textarea>
+                            <p class="hint">Leave it empty to use plain month numbers. Up to 100 names.</p>
+                        </div>
+                        <div class="tl-date-row tl-era-row">
+                            <div><label for="dCalEra">Era</label><input type="text" id="dCalEra" maxlength="12" placeholder="AR" x-model="dlg.era"></div>
+                            <div><label for="dCalBefore">Before era</label><input type="text" id="dCalBefore" maxlength="12" placeholder="BR" x-model="dlg.beforeEra"></div>
+                        </div>
+                        <p class="hint">Example: <strong x-text="calExample"></strong>. Enter a year before the era as a negative number, such as -40.</p>
                     </div>
                 </template>
                 <template x-if="dlg.type === 'templates'">
@@ -787,6 +890,7 @@
                 </template>
                 <div class="notice" role="alert" x-show="dlg.error"><p x-text="dlg.error"></p></div>
                 <div class="modal-actions">
+                    <button type="button" class="text-link" x-show="dlg.type === 'event' && dlg.eventId" :disabled="dlg.busy" @click="deleteEvent()">Delete event</button>
                     <button type="submit" class="submit-btn" x-show="dlg.type !== 'templates'" :disabled="dlg.busy" x-text="dlgSubmit"></button>
                     <button type="button" class="btn-cancel" @click="cancelDlg()" x-text="dlg.type === 'templates' ? 'Close' : dlg.type === 'template' && dlg.back ? 'Back' : 'Cancel'"></button>
                 </div>
@@ -828,6 +932,6 @@
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=3"></script>
     <script src="/static/codex-graph.js?v=3"></script>
-    <script src="/static/codex.js?v=22"></script>
+    <script src="/static/codex.js?v=23"></script>
 </body>
 </html>

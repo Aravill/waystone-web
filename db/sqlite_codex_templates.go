@@ -36,6 +36,19 @@ func (s *SQLiteStore) CreatePageWith(p models.Page, body string, x models.NewPag
 			return err
 		}
 	}
+	if p.Kind == models.PageTimeline {
+		if x.Calendar != nil {
+			if err := setTimelineCalendarTx(tx, p.ID, *x.Calendar, p.AuthorID); err != nil {
+				return err
+			}
+		}
+		for _, e := range x.Events {
+			e.ID, e.PageID = GenerateUUID(), p.ID
+			if err := insertTimelineEventTx(tx, e); err != nil {
+				return err
+			}
+		}
+	}
 	return tx.Commit()
 }
 

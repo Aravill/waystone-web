@@ -1,8 +1,14 @@
 package models
 
-// PageLore is the kind of every page; the kind column is kept but nothing branches on it. A map
-// is an optional part of any page (map_images, map_pins).
-const PageLore = "lore"
+// Page kinds. A lore page is an article; a timeline page also lists dated events (timeline_events).
+// A map is an optional part of any page (map_images, map_pins), not a kind.
+const (
+	PageLore     = "lore"
+	PageTimeline = "timeline"
+)
+
+// ValidNewPageKind tells whether a page can be created with this kind.
+func ValidNewPageKind(k string) bool { return k == PageLore || k == PageTimeline }
 
 // Codex is a folder of Codex pages. Games point at a codex with campaigns.codex_id (a label only).
 type Codex struct {
@@ -54,6 +60,7 @@ type Page struct {
 // PageListItem is a page without its body, for lists and link resolution in the client.
 type PageListItem struct {
 	ID       string
+	Kind     string
 	HasMap   bool
 	CodexID  string
 	FolderID string
@@ -223,6 +230,30 @@ type NewPageExtras struct {
 	TagNames     []string
 	Images       []PageImage
 	CoverImageID string
+	Calendar     *TimelineCalendar // timeline pages: the copied calendar
+	Events       []TimelineEvent   // timeline pages: the copied events (ids are replaced)
+}
+
+// TimelineEvent is one dated entry on a timeline page. Month and Day are 0 when unknown. A linked
+// event shows its page's title; Title keeps the last known title for when the link is gone.
+type TimelineEvent struct {
+	ID           string
+	PageID       string
+	Title        string
+	LinkedPageID string // "" = no page
+	Year         int
+	Month        int
+	Day          int
+	CreatedBy    string
+	CreatedAt    string
+	UpdatedAt    string
+}
+
+// TimelineCalendar names a timeline's months (one per entry; none = plain numbers) and its eras.
+type TimelineCalendar struct {
+	Months    []string `json:"months"`
+	Era       string   `json:"era"`
+	BeforeEra string   `json:"before_era"`
 }
 
 // GraphPage is one page of a codex for the graph: the start of its newest revision's body (for

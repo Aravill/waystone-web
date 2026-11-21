@@ -68,6 +68,7 @@ This document describes what must-have features are to be implemented before pre
     - [x] Templates and copying: the New page dialog starts a page from a built-in template (Session, Character, Settlement, Landmark, Event, Faction, Item, Lore, Blank) or one of the codex's own, with its tags and `{{title}}`/`{{date}}` filled in; a Templates list and editor, Save as template (headings only or all the text), and Copy page into any codex you can edit (new history, tags and images optional)
     - [x] Graph: a full graph view per codex (`/codices/c/{id}/graph`: pages and missing pages as nodes, coloured by top-level folder, filters, click card, drag/zoom, d3-force layout) and a Local graph in the page's side panel
     - [x] Access rights (admin page `/admin/access`): per-user See Codices and Edit Codices, and per-codex None / See / Edit for each user; admins always have everything, new users get nothing, and a codex's creator gets Edit on it
+    - [x] Timeline pages: a page type (Article or Timeline) chosen in New page; a timeline lists dated events newest first under its intro, each with an optional link to a page of the codex, a per-timeline calendar (month names and eras), Jump to and On the timeline boxes; see `docs/design/mockups/timeline.html`
 - [x] Technological
     - [x] SQLite
     - [x] Alpine.js

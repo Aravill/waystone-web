@@ -167,9 +167,117 @@ function codexPlainExcerpt(body, max = 220) {
     return chars.length > max ? chars.slice(0, max).join('').trim() + '…' : text;
 }
 
+// ---- Timeline pages: a page with kind "timeline" lists dated events under its intro, newest first. ----
+// Years with events more than this many years apart get a dashed spine and a "N years earlier" note.
+const CODEX_TL_GAP = 30;
+const CODEX_TL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v18"/><rect x="5" y="5" width="4" height="4" fill="currentColor"/><rect x="5" y="15" width="4" height="4"/><path d="M12 7h8M12 17h6"/></svg>';
+const CODEX_TL_PEN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';
+
+// cal is {months, era, before_era}: month names (none = plain numbers) and the era suffixes.
+function codexTlYear(y, cal) {
+    const c = cal || {};
+    if (y < 0) return c.before_era ? `${-y} ${c.before_era}` : `−${-y}`;
+    return c.era ? `${y} ${c.era}` : String(y);
+}
+
+// The year for a year box: the number, then its era in small type.
+function codexTlYearHtml(y, cal) {
+    const c = cal || {};
+    if (y < 0) return c.before_era ? `${-y}<small>${escapeHtml(c.before_era)}</small>` : `−${-y}`;
+    return c.era ? `${y}<small>${escapeHtml(c.era)}</small>` : String(y);
+}
+
+// "2 Thaw" / "Thaw"; without a name for the month (no calendar, or beyond its names) "Month 3, day 14" / "Month 3".
+function codexTlDayMonth(ev, cal) {
+    if (!ev.month) return '';
+    const name = ((cal || {}).months || [])[ev.month - 1];
+    if (name) return ev.day ? `${ev.day} ${name}` : name;
+    return ev.day ? `Month ${ev.month}, day ${ev.day}` : `Month ${ev.month}`;
+}
+
+// "2 Thaw 1203 AR", "Month 3, day 14, 1203", or just the year when there is no month.
+function codexTlDate(ev, cal) {
+    const dm = codexTlDayMonth(ev, cal);
+    const year = codexTlYear(ev.year, cal);
+    if (!dm) return year;
+    return ((cal || {}).months || [])[ev.month - 1] ? `${dm} ${year}` : `${dm}, ${year}`;
+}
+
+// The events (newest first) as [{year, events}], one group per year.
+function codexTlGroups(events) {
+    const groups = [];
+    for (const e of events) {
+        let g = groups[groups.length - 1];
+        if (!g || g.year !== e.year) groups.push((g = { year: e.year, events: [] }));
+        g.events.push(e);
+    }
+    return groups;
+}
+
+// The Jump to list: a century heading, then its years with their event counts. Negative years
+// are grouped by their distance from 0, with the before-era suffix.
+function codexTlJump(groups, cal) {
+    const c = cal || {};
+    const out = [];
+    let last = null;
+    for (const g of groups) {
+        const century = Math.floor(Math.abs(g.year) / 100) * 100;
+        const key = (g.year < 0 ? '-' : '') + century;
+        if (key !== last) {
+            last = key;
+            const label = g.year < 0 ? (c.before_era ? `${century}s ${c.before_era}` : `−${century}s`) : `${century}s` + (c.era ? ` ${c.era}` : '');
+            out.push({ key: 'c' + key, cent: true, label });
+        }
+        out.push({ key: 'y' + g.year, cent: false, year: g.year, label: codexTlYear(g.year, c), count: g.events.length });
+    }
+    return out;
+}
+
+// The event rows (layout B: cards alternate left and right of the spine) as escaped HTML for an <ol>.
+// opts: canEdit (Edit buttons), justAdded (event id to flash), tagUrl (name -> href).
+function codexTlHtml(events, cal, opts) {
+    const o = opts || {};
+    const groups = codexTlGroups(events);
+    let side = 0;
+    let html = '';
+    groups.forEach((g, i) => {
+        const yearLabel = escapeHtml(codexTlYear(g.year, cal));
+        html += `<li><div class="tl-row tl-year" id="y${g.year}"><span class="tl-yr">${codexTlYearHtml(g.year, cal)}</span>` +
+            '<span class="tl-seg"><span class="tl-mk tl-mk--year" aria-hidden="true"></span></span></div>' +
+            `<ol aria-label="${yearLabel}">`;
+        for (const e of g.events) {
+            const l = e.linked;
+            const title = l
+                ? `<a class="tl-title wikilink" href="${escapeHtml(codexPageUrl(l))}" data-pid="${escapeHtml(l.id)}">${escapeHtml(e.title)}</a>`
+                : `<span class="tl-title">${escapeHtml(e.title)}</span>`;
+            const extra = l
+                ? (l.excerpt ? `<p class="tl-ex">${escapeHtml(l.excerpt)}</p>` : '') +
+                    (l.tags.length ? `<div class="tl-tags">${l.tags.map((t) => `<a class="cx-chip cx-chip--tag" href="${escapeHtml(o.tagUrl ? o.tagUrl(t) : '#')}">${escapeHtml(t)}</a>`).join('')}</div>` : '')
+                : '';
+            const edit = o.canEdit
+                ? `<div><button type="button" class="tl-edit" data-edit="${escapeHtml(e.id)}">${CODEX_TL_PEN}Edit<span class="visually-hidden"> ${escapeHtml(e.title)}</span></button></div>`
+                : '';
+            const lr = side++ % 2 ? 'r' : 'l';
+            html += `<li class="tl-row tl-ev ${lr}" id="ev-${escapeHtml(e.id)}">` +
+                `<span class="tl-seg"><span class="tl-mk${l ? ' tl-mk--linked' : ''}" aria-hidden="true"></span></span>` +
+                `<div class="tl-card${o.justAdded === e.id ? ' just-added' : ''}"><div class="tl-date">${escapeHtml(codexTlDate(e, cal))}</div>${title}${extra}${edit}</div></li>`;
+        }
+        html += '</ol>';
+        const next = groups[i + 1];
+        if (next && g.year - next.year > CODEX_TL_GAP) {
+            html += `<div class="tl-row tl-gap"><span class="tl-seg"></span><span class="tl-gap-note">${g.year - next.year} years earlier</span></div>`;
+        }
+        html += '</li>';
+    });
+    if (groups.length) html += '<li class="tl-row tl-end"><span class="tl-seg"></span><span class="tl-end-note">The earliest event</span></li>';
+    return html;
+}
+
 function codexPageItemHtml(p, currentId) {
     const also = p.aliases.length ? `<span class="muted"> · also ${escapeHtml(p.aliases.join(', '))}</span>` : '';
-    return `<li><a href="${codexPageUrl(p)}"${p.id === currentId ? ' aria-current="page"' : ''}>${escapeHtml(p.title)}</a>${also}</li>`;
+    const kind = p.kind === 'timeline' ? `<span class="cx-ty" aria-hidden="true">${CODEX_TL_ICON}</span>` : '';
+    const kindText = p.kind === 'timeline' ? '<span class="visually-hidden"> (timeline)</span>' : '';
+    return `<li><a href="${codexPageUrl(p)}"${p.id === currentId ? ' aria-current="page"' : ''}>${kind}${escapeHtml(p.title)}${kindText}</a>${also}</li>`;
 }
 
 function codexFolderHtml(n, depth, canEdit, currentId) {
@@ -272,6 +380,10 @@ window.codexPage = function () {
         searchTitles: [],
         tabs: [],
         moreOpen: false,
+        // Timeline pages
+        tlActiveYear: null, // the year in view, for Jump to
+        tlJustAdded: '', // the event id whose row flashes after an add, edit or deep link
+        tlJustTimer: null,
         peek: { open: false, x: 0, y: 0, title: '', where: '', text: '' },
         peekTimer: null,
         peekFor: null,
@@ -434,6 +546,7 @@ window.codexPage = function () {
                     this.trackTab(data.page);
                     this.navPromise = this.loadNav(data.page);
                     if (r.screen === 'page') this.loadLocalGraph(data);
+                    if (r.screen === 'page' && data.page.kind === 'timeline') this.$nextTick(() => this.scrollToEventHash());
                     document.title = 'Waystone - ' + data.page.title;
                     if (location.pathname !== this.pageUrl(data.page) + (r.screen === 'page' ? '' : '/' + r.screen)) {
                         history.replaceState(null, '', this.pageUrl(data.page) + (r.screen === 'page' ? '' : '/' + r.screen) + location.search);
@@ -1105,13 +1218,289 @@ window.codexPage = function () {
             return codexPeekCache[id];
         },
 
+        // ---- Timeline pages ----
+        // Events save at once, each change on its own; they are not part of the page's revisions.
+        get isTimeline() {
+            return !!(this.page && this.page.kind === 'timeline');
+        },
+        get tlData() {
+            return (this.pageData && this.pageData.timeline) || { events: [], calendar: { months: [], era: '', before_era: '' } };
+        },
+        get tlEvents() {
+            return this.tlData.events;
+        },
+        get tlCal() {
+            return this.tlData.calendar;
+        },
+        get tlHtml() {
+            return this.isTimeline ? codexTlHtml(this.tlEvents, this.tlCal, { canEdit: this.canEdit, justAdded: this.tlJustAdded, tagUrl: (n) => this.tagUrl(n) }) : '';
+        },
+        get tlJump() {
+            return codexTlJump(codexTlGroups(this.tlEvents), this.tlCal);
+        },
+        // "10 events, 5 with a page · 790–1204 AR" and the usual revision line.
+        get tlSummary() {
+            const p = this.page;
+            const rev = 'Revision ' + p.current_revision + ' · last edited by ' + p.updated_by_user.display_name + ' ' + this.formatStamp(p.updated_at);
+            const ev = this.tlEvents;
+            if (!ev.length) return 'No events yet · ' + rev;
+            const c = this.tlCal;
+            const years = ev.map((e) => e.year);
+            const lo = Math.min(...years);
+            const hi = Math.max(...years);
+            let range = codexTlYear(lo, c);
+            if (lo !== hi) range = lo >= 0 ? `${lo}–${hi}` + (c.era ? ' ' + c.era : '') : `${codexTlYear(lo, c)} – ${codexTlYear(hi, c)}`;
+            return `${this.countLabel(ev.length, 'event')}, ${ev.filter((e) => e.linked).length} with a page · ${range} · ${rev}`;
+        },
+        // The timelines that have an event pointing at this page.
+        get onTimelines() {
+            return ((this.pageData && this.pageData.on_timelines) || []).map((o) => ({
+                key: o.event_id,
+                timeline: o.timeline,
+                date: codexTlDate(o, o.calendar),
+                url: this.pageUrl(o.timeline) + '#ev-' + encodeURIComponent(o.event_id)
+            }));
+        },
+        // Pages of this codex that match the picker's text (title or alias), at most 8.
+        get tlPickResults() {
+            const d = this.dlg;
+            if (d.type !== 'event' || !this.codex) return [];
+            const q = codexNorm(d.pickQ);
+            return this.codex.pages
+                .filter((p) => p.id !== this.page.id && (!q || codexNorm(p.title).includes(q) || p.aliases.some((a) => codexNorm(a).includes(q))))
+                .slice(0, 8)
+                .map((p) => this.tlPickItem(p));
+        },
+        tlPickItem(p) {
+            const folder = p.folder_id ? (this.folderById(p.folder_id) || {}).name || '' : 'Top level';
+            const tags = (p.tag_ids || []).map((id) => (this.codex.tags.find((t) => t.id === id) || {}).name).filter(Boolean);
+            return { id: p.id, title: p.title, folder, tags };
+        },
+        get monthOptions() {
+            const d = this.dlg;
+            const names = this.tlCal.months;
+            const count = Math.max(names.length || 12, Number(d.month) || 0);
+            return Array.from({ length: count }, (_, i) => ({ n: i + 1, label: names[i] ? `${i + 1}. ${names[i]}` : String(i + 1) }));
+        },
+        get calExample() {
+            const d = this.dlg;
+            if (d.type !== 'calendar') return '';
+            const cal = { months: d.months.split('\n').map((s) => s.trim()).filter(Boolean), era: d.era.trim(), before_era: d.beforeEra.trim() };
+            return codexTlDate({ year: 1203, month: 2, day: 14 }, cal) + ' · ' + codexTlDate({ year: -40, month: 0, day: 0 }, cal);
+        },
+        // The year row under the sticky bar is the current one in Jump to.
+        updateJump() {
+            if (!this.isTimeline) return;
+            const rows = document.querySelectorAll('.tl-year');
+            if (!rows.length) return;
+            let cur = rows[0];
+            for (const r of rows) {
+                if (r.parentElement.getBoundingClientRect().top <= 140) cur = r;
+            }
+            const y = Number(cur.id.slice(1));
+            if (y !== this.tlActiveYear) this.tlActiveYear = y;
+        },
+        // Flashes an event row and scrolls it into view (after the row exists).
+        tlFlash(id) {
+            clearTimeout(this.tlJustTimer);
+            this.tlJustAdded = id;
+            this.tlJustTimer = setTimeout(() => (this.tlJustAdded = ''), 2500);
+            this.$nextTick(() => document.getElementById('ev-' + id)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+        },
+        scrollToEventHash() {
+            const m = /^#ev-(.+)$/.exec(location.hash);
+            if (!m) return;
+            let id = m[1];
+            try {
+                id = decodeURIComponent(id);
+            } catch (error) {
+                // keep the raw hash
+            }
+            if (this.tlEvents.some((e) => e.id === id)) this.tlFlash(id);
+        },
+        // Edit buttons and "Add the first event" inside the timeline.
+        onTimelineClick(event) {
+            const edit = event.target.closest('[data-edit]');
+            if (edit) this.openEvent(this.tlEvents.find((e) => e.id === edit.dataset.edit) || null);
+            else if (event.target.closest('[data-add]')) this.openEvent(null);
+        },
+        async refreshTimeline() {
+            try {
+                const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/timeline`, 'GET');
+                if (response.ok) this.pageData.timeline = data;
+            } catch (error) {
+                console.error('Failed to reload the timeline:', error);
+            }
+        },
+        // ev: an event of this timeline to edit, or null to add one.
+        async openEvent(ev) {
+            if (!this.canEdit || !this.isTimeline) return;
+            if (this.navPromise) await this.navPromise; // the codex's pages, for the page picker
+            const l = ev && ev.linked;
+            this.dlg = {
+                type: 'event', eventId: ev ? ev.id : '', title: ev ? ev.title : '', ownTitle: ev && !l ? ev.title : '',
+                linked: l ? { id: l.id, title: l.title, folder: l.folder || 'Top level', tags: l.tags } : null,
+                pickQ: '', pickOpen: false, pickIdx: 0,
+                year: ev ? String(ev.year) : '', month: ev && ev.month ? String(ev.month) : '', day: ev && ev.day ? String(ev.day) : '',
+                createPage: false, error: '', busy: false
+            };
+            this.$nextTick(() => requestAnimationFrame(() => document.getElementById(ev ? 'dEvYear' : 'dEvPick')?.focus()));
+        },
+        // Arrow keys and Enter in the page picker; Esc closes the list only, not the dialog.
+        onPickKey(event) {
+            const d = this.dlg;
+            const list = this.tlPickResults;
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                d.pickOpen = true;
+                if (list.length) d.pickIdx = (d.pickIdx + (event.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
+            } else if (event.key === 'Enter') {
+                event.preventDefault();
+                if (d.pickOpen && list[d.pickIdx]) this.pickPage(list[d.pickIdx]);
+            } else if (event.key === 'Escape' && d.pickOpen) {
+                event.stopPropagation();
+                d.pickOpen = false;
+            }
+        },
+        pickPage(p) {
+            const d = this.dlg;
+            d.linked = { id: p.id, title: p.title, folder: p.folder, tags: p.tags };
+            d.title = p.title;
+            d.pickQ = '';
+            d.pickOpen = false;
+            d.createPage = false;
+            this.$nextTick(() => document.getElementById('dEvYear')?.focus());
+        },
+        unlinkEvent() {
+            const d = this.dlg;
+            d.linked = null;
+            d.title = d.ownTitle;
+            this.$nextTick(() => document.getElementById('dEvPick')?.focus());
+        },
+        async submitEvent(d) {
+            const title = d.title.trim().split(/\s+/).join(' ');
+            if (!d.linked && !title) {
+                d.error = 'Give the event a title or link a page.';
+                return;
+            }
+            if (!d.linked && title.length > 120) {
+                d.error = 'The title can be up to 120 characters.';
+                return;
+            }
+            if (!d.linked && d.createPage && /[\[\]|]/.test(title)) {
+                d.error = "A page title can't contain [ ] or |.";
+                return;
+            }
+            const year = String(d.year).trim();
+            if (!/^-?\d+$/.test(year) || Math.abs(Number(year)) > 1e9) {
+                d.error = 'Enter the year as a whole number.';
+                return;
+            }
+            const month = Number(d.month) || 0;
+            const day = month ? Number(d.day) || 0 : 0;
+            if (month < 0 || month > 100 || day < 0 || day > 100) {
+                d.error = 'The month and day must be between 1 and 100.';
+                return;
+            }
+            const url = `/api/codices/pages/${encodeURIComponent(this.page.id)}/timeline/events` + (d.eventId ? '/' + encodeURIComponent(d.eventId) : '');
+            const { response, data } = await this.send(url, d.eventId ? 'PUT' : 'POST', {
+                title: d.linked ? d.linked.title : title, linked_page_id: d.linked ? d.linked.id : '',
+                year: Number(year), month, day, create_page: !d.linked && !d.eventId && d.createPage
+            });
+            if (response.ok) {
+                this.pageData.timeline = data.timeline;
+                const id = d.eventId || data.event.id;
+                this.closeDlg();
+                this.tlFlash(id);
+                if (data.page) {
+                    this.showMessage(`Created the page “${data.page.title}”.`, 'success');
+                    this.loadNav(this.page);
+                }
+                return;
+            }
+            if (data.code === 'event_deleted') this.refreshTimeline();
+            this.failDlg(d, response, data);
+        },
+        async deleteEvent() {
+            const d = this.dlg;
+            if (d.busy || !d.eventId) return;
+            const ev = this.tlEvents.find((e) => e.id === d.eventId);
+            const ok = await this.askConfirm({
+                eyebrow: this.page.title,
+                title: `Delete “${ev ? ev.title : d.title}” from the timeline?`,
+                message: 'Its page, if it has one, stays.',
+                confirmLabel: 'Delete event',
+                danger: true
+            });
+            if (!ok || this.dlg !== d) return;
+            d.busy = true;
+            try {
+                const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/timeline/events/${encodeURIComponent(d.eventId)}`, 'DELETE');
+                if (response.ok) {
+                    this.pageData.timeline = data.timeline;
+                    this.closeDlg();
+                    return;
+                }
+                if (data.code === 'event_deleted') {
+                    this.refreshTimeline();
+                    this.closeDlg();
+                    this.showMessage('That event was already deleted.', 'info');
+                    return;
+                }
+                this.failDlg(d, response, data);
+            } catch (error) {
+                d.error = 'Something went wrong: ' + error.message;
+            } finally {
+                d.busy = false;
+            }
+        },
+        openCalendar() {
+            const c = this.tlCal;
+            this.dlg = { type: 'calendar', months: c.months.join('\n'), era: c.era, beforeEra: c.before_era, error: '', busy: false };
+            this.focusDlg();
+        },
+        async submitCalendar(d) {
+            const months = d.months.split('\n').map((s) => s.trim()).filter(Boolean);
+            const era = d.era.trim();
+            const beforeEra = d.beforeEra.trim();
+            if (months.length > 100 || months.some((m) => Array.from(m).length > 40)) {
+                d.error = 'Use up to 100 month names of up to 40 characters each.';
+                return;
+            }
+            if (Array.from(era).length > 12 || Array.from(beforeEra).length > 12) {
+                d.error = 'An era can be up to 12 characters.';
+                return;
+            }
+            const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/timeline/calendar`, 'PUT', { months, era, before_era: beforeEra });
+            if (response.ok) {
+                this.pageData.timeline = { ...this.tlData, calendar: data.calendar };
+                this.closeDlg();
+                this.showMessage('Calendar saved.', 'success');
+                return;
+            }
+            this.failDlg(d, response, data);
+        },
+        // Arrow keys move through the page types like a radio group; Map (disabled) is skipped.
+        onKindKey(event) {
+            const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+            if (!step) return;
+            event.preventDefault();
+            const kinds = ['lore', 'timeline'];
+            const d = this.dlg;
+            d.kind = kinds[(kinds.indexOf(d.kind) + step + kinds.length) % kinds.length];
+            this.$nextTick(() => document.querySelector('.cx-type[aria-checked="true"]')?.focus());
+        },
+
         // ---- Dialogs ----
         get dlgEyebrow() {
+            if (this.dlg.type === 'event' || this.dlg.type === 'calendar') return this.page ? this.page.title : 'Timeline';
             return { createPage: 'Codex', codex: 'Codex', templates: 'Codex', template: 'Template', rename: 'Page', aliases: 'Page', move: 'Page', copyPage: 'Page', saveTemplate: 'Page', folder: 'Folder', folderMove: 'Folder', pageFolder: 'Page', tags: 'Page', tag: 'Tag' }[this.dlg.type] || '';
         },
         get dlgTitle() {
             const d = this.dlg;
             if (d.type === 'createPage') return 'New page';
+            if (d.type === 'event') return d.eventId ? 'Edit event' : 'Add event';
+            if (d.type === 'calendar') return 'Calendar';
             return { codex: d.codex ? 'Edit codex' : 'New codex', templates: 'Templates', template: d.template ? 'Edit template' : 'New template', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another codex', copyPage: 'Copy page', saveTemplate: 'Save as template', folder: d.folder ? 'Rename folder' : 'New folder', folderMove: 'Move folder', pageFolder: 'Change folder', tags: 'Tags', tag: d.tag ? 'Rename tag' : 'New tag' }[d.type] || '';
         },
         get dlgWide() {
@@ -1121,13 +1510,17 @@ window.codexPage = function () {
             const d = this.dlg;
             if (d.type === 'createPage') return d.busy ? 'Creating...' : 'Create page';
             if (d.type === 'copyPage') return d.busy ? 'Copying...' : 'Copy page';
+            if (d.type === 'event') return d.busy ? 'Saving...' : d.eventId ? 'Save event' : 'Add event';
+            if (d.type === 'calendar') return d.busy ? 'Saving...' : 'Save calendar';
             if (d.type === 'template' || d.type === 'saveTemplate') return d.busy ? 'Saving...' : 'Save template';
             return d.busy ? 'Saving...' : d.type === 'tag' && !d.tag ? 'Create tag' : d.type === 'move' ? 'Move page' : d.type === 'folderMove' ? 'Move folder' : (d.type === 'codex' && !d.codex) || (d.type === 'folder' && !d.folder) ? 'Create' + (d.type === 'codex' ? ' codex' : ' folder') : 'Save';
         },
         get moveWarning() {
             const n = this.pageData?.incoming_count || 0;
             const here = this.page?.codex.name;
-            return (n > 0
+            const onTl = new Set((this.pageData?.on_timelines || []).map((o) => o.timeline.id)).size;
+            return (this.isTimeline ? 'Its events keep their titles but lose their page links. ' : '') +
+                (onTl > 0 ? `It leaves ${this.countLabel(onTl, 'timeline')}: those events stay as plain events. ` : '') + (n > 0
                 ? `${this.countLabel(n, 'link')} from ${here} will turn into missing links, because links only reach pages in their own codex. `
                 : '') + "This page's own links are checked again in the new codex, and it goes to the top level of its folders." +
                 (this.pageData?.tags?.length ? ' Its tags stay behind, because tags belong to a codex.' : '');
@@ -1200,7 +1593,7 @@ window.codexPage = function () {
                 }
             }
             if (!templates.some((t) => t.id === tplId)) tplId = 'builtin:blank';
-            this.dlg = { type: 'createPage', title, codexId, folders, folderId, templates, tplId, error: '', busy: false };
+            this.dlg = { type: 'createPage', title, codexId, folders, folderId, templates, tplId, kind: 'lore', error: '', busy: false };
             this.focusDlg();
         },
 
@@ -1495,6 +1888,8 @@ window.codexPage = function () {
             d.busy = true;
             try {
                 if (d.type === 'createPage') await this.submitCreatePage(d);
+                else if (d.type === 'event') await this.submitEvent(d);
+                else if (d.type === 'calendar') await this.submitCalendar(d);
                 else if (d.type === 'template') await this.submitTemplate(d);
                 else if (d.type === 'saveTemplate') await this.submitSaveTemplate(d);
                 else if (d.type === 'copyPage') await this.submitCopyPage(d);
@@ -1516,6 +1911,9 @@ window.codexPage = function () {
         // Shared error text for a failed dialog request; true when handled.
         failDlg(d, response, data) {
             if (response.status === 401) d.error = 'Your login has expired. Log in again, then try once more.';
+            else if (data.code === 'event_deleted') d.error = 'Someone deleted that event while you were editing it.';
+            else if (data.code === 'not_a_timeline') d.error = 'This page is not a timeline.';
+            else if (data.code === 'page_not_in_codex') d.error = 'That page is no longer in this codex. Pick another, or leave the event unlinked.';
             else if (response.status === 404) d.error = this.sentence(data.error || 'That no longer exists');
             else if (data.code === 'name_taken') d.error = this.conflictText(data);
             else if (data.code === 'folder_name_taken') d.error = 'A folder with that name already exists there.';
@@ -1532,15 +1930,20 @@ window.codexPage = function () {
                 d.error = 'Save or cancel your changes first.';
                 return;
             }
-            const { response, data } = await this.send('/api/codices/pages', 'POST', { title, codex_id: d.codexId, folder_id: d.folderId || '', template_id: d.tplId });
+            const timeline = d.kind === 'timeline';
+            const { response, data } = await this.send('/api/codices/pages', 'POST', timeline
+                ? { title, codex_id: d.codexId, folder_id: d.folderId || '', kind: 'timeline' }
+                : { title, codex_id: d.codexId, folder_id: d.folderId || '', kind: 'lore', template_id: d.tplId });
             if (response.status === 201) {
-                try {
-                    localStorage.setItem('codex-last-template:' + d.codexId, d.tplId);
-                } catch (error) {
-                    // storage may be blocked; the template just isn't remembered
+                if (!timeline) {
+                    try {
+                        localStorage.setItem('codex-last-template:' + d.codexId, d.tplId);
+                    } catch (error) {
+                        // storage may be blocked; the template just isn't remembered
+                    }
                 }
                 this.saved = true;
-                window.location.href = codexPageUrl({ id: data.page.id, title }, '/edit');
+                window.location.href = codexPageUrl({ id: data.page.id, title }, timeline ? '' : '/edit');
                 return;
             }
             this.failDlg(d, response, data);
@@ -1943,7 +2346,9 @@ window.codexPage = function () {
             const ok = await this.askConfirm({
                 eyebrow: 'Codex',
                 title: `Delete “${p.title}”?`,
-                message: `This deletes the page and all ${p.revision_count} of its revisions. It cannot be undone. Links to it become missing links.`,
+                message: `This deletes the page and all ${p.revision_count} of its revisions. It cannot be undone. Links to it become missing links.` +
+                    (this.isTimeline ? ` Its ${this.countLabel(this.tlEvents.length, 'event')} go with it.` : '') +
+                    ((this.pageData.on_timelines || []).length ? ' Events that point at it stay on their timelines as plain events.' : ''),
                 confirmLabel: 'Delete page',
                 danger: true
             });
