@@ -24,7 +24,7 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 **"Scriptorium": typewritten text on a manuscript page.**
 
 - A calm parchment page with iron-gall ink, and a single red accent. Red means you: things that need the viewer's action
-- Inter for everything you read, Barlow Condensed for titles and headings, blackletter only for the brand. Markdown is written in IBM Plex Mono. Dates are never set in the display face: its old-style zero reads like a letter o
+- Inter for everything you read, Barlow Condensed for headings, IM Fell English SC for page titles and the main nav, blackletter only for the brand. Markdown is written in IBM Plex Mono. Dates are never set in the title face: its old-style zero reads like a letter o
 - Minimal: square corners, hairline and double rules, no textures, gradients or glows, and no shadows except the one under a modal sheet
 - Decoration is typographic and sparse: `§`, `❦`, `✦`, `♛`. Never images of parchment, wax seals or scrolls
 - Copy is plain, modern English ("Your reply", "Yes / Maybe / No"). The medieval feel comes from the visuals, never from archaic wording ("thy", "aye", "well met")
@@ -98,16 +98,17 @@ The same tokens redefined. Applied with `[data-theme="dark"]` on `<html>`, and b
 
 ## Typography
 
-Four families, vendored as woff2 under `static/vendor/fonts/` (SIL Open Font License, latin and latin-ext subsets) and declared with `@font-face` at the top of `styles.css`. Pages need no font link, and nothing loads from a third party at runtime.
+Five families, vendored as woff2 under `static/vendor/fonts/` (SIL Open Font License, latin and latin-ext subsets) and declared with `@font-face` at the top of `styles.css`. Pages need no font link, and nothing loads from a third party at runtime.
 
 | Role | Family | Use for |
 |------|--------|---------|
 | Text (`--font-text`) | `'Inter', system-ui, sans-serif` (400, 400 italic, 500, 600) | Everything by default: body, labels, buttons, badges, inputs, dates |
-| Display (`--font-display`) | `'Barlow Condensed', 'Arial Narrow', sans-serif` (one 600 file, declared for 400–700 so nothing gets faux bold) | Page titles (h1), card titles, modal titles, section headings, the month name, navigation |
+| Title (`--font-title`) | `'IM Fell English SC', serif` | Page titles (`.page-title`, h1) and the main navigation (`.nav-item`) |
+| Display (`--font-display`) | `'Barlow Condensed', 'Arial Narrow', sans-serif` (one 600 file, declared for 400–700 so nothing gets faux bold) | Card titles, modal titles, section headings, the month name, Codices titles |
 | Mono (`--font-mono`) | `'IBM Plex Mono', 'Courier New', monospace` | Only where Markdown is written: the journal editor and its conflict text, the Codices editor and template text |
 | Blackletter | `'UnifrakturMaguntia', serif` | The "Waystone" wordmark and the drop cap on fixed page titles. Never for a whole word other than the brand, never below 32px |
 
-Inter and Barlow Condensed came from the Codices mock-up (D in `docs/design/mockups/codex-wiki.html`) and replaced IBM Plex Mono and IM Fell English SC across the site because they read better. The mock-ups drawn before that still show the old faces.
+Inter and Barlow Condensed came from the Codices mock-up (D in `docs/design/mockups/codex-wiki.html`) and replaced IBM Plex Mono across the site because they read better; IM Fell English SC stayed for page titles and the main nav. The mock-ups drawn before that still show the old faces.
 
 The drop cap goes only on fixed page titles (the Home greeting, Games, Profile, User Management, Change Password and similar). Never on anything that shows user content or a date: game and journal titles, the calendar's title, selected-day and session panel headings, "The company".
 
@@ -118,10 +119,10 @@ Nothing is set below 13px, except the calendar cell's own tally and time (see Se
 | Element | Family | Size | Weight | Notes |
 |---------|--------|------|--------|-------|
 | Wordmark (header) | Blackletter | 34px (28px on phones) | 400 | |
-| Page title (h1) | Display | 44px (drop cap 56px in `--rubric`) | 400 | |
+| Page title (h1) | Title | 44px (drop cap 56px in `--rubric`) | 400 | |
 | Section heading (h2) | Display | 25px, `--ink`, prefixed with a rubric `§` | 400 | |
 | Card / modal title | Display | 27px / 32px | 400 | |
-| Navigation | Display | 21px (19px on phones) | 400 | |
+| Navigation | Title | 21px (19px on phones) | 400 | |
 | Body | Text | 16px, line-height 1.55 | 400 | |
 | Date heading (panels) | Text | 22px | 600 | "Friday, Nov 20" |
 | Month header | Display + Text | name 30px; year 18px, `--muted` | 400; 500 | "November" 2026 |
@@ -169,7 +170,7 @@ Wordmark left, nav centre, then the theme toggle, the inbox and the user menu, a
 .logo { font-family: 'UnifrakturMaguntia', serif; font-size: 34px; color: var(--ink); text-decoration: none; }
 .nav-item {
     padding: 6px 0; color: var(--muted); text-decoration: none;
-    font-family: var(--font-display); font-size: 21px;
+    font-family: var(--font-title); font-size: 21px;
     border-bottom: 2px solid transparent;
 }
 .nav-item:hover { color: var(--ink); }
@@ -453,7 +454,7 @@ Square (no radius), `1px solid var(--line)` frame, `object-fit: cover`. Everyone
 ## Do's and Don'ts
 
 ✅ Use tokens, never raw hex
-✅ Inter for all text, Barlow Condensed for titles, blackletter only for the brand and fixed page titles, monospace only for writing Markdown
+✅ Inter for all text, Barlow Condensed for headings, Fell for page titles and the nav, blackletter only for the brand and fixed page titles, monospace only for writing Markdown
 ✅ One accent (rubric), and red means you. State colours only for state
 ✅ Pair every state colour with a glyph, border style or strikethrough
 ✅ Square corners, hairlines, double rules
