@@ -67,3 +67,48 @@ test('create a character, choose it on the game page, then see the badge and the
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
   await expect(page.locator('.char-game').first()).toHaveAttribute('href', `/games/${world.id}`);
 });
+
+test('a character links to its Codices page, and only Codices links are accepted', async ({ page, world }, testInfo) => {
+  const origin = /** @type {string} */ (testInfo.project.use.baseURL);
+  const roy = await apiAs('roy');
+  try {
+    const systems = await (await roy.get('/api/systems')).json();
+    const systemId = systems.find((/** @type {{name: string}} */ s) => s.name === 'D&D 5e').id;
+    const res = await roy.post('/api/characters', { data: { name: `Codex E2E ${Date.now()}`, system_id: systemId } });
+    expect(res.status()).toBe(201);
+    const id = (await res.json()).character_id;
+    world.characterIds.push(id);
+    const put = (/** @type {string} */ codexUrl) => roy.put(`/api/characters/${id}`, { data: { name: 'Codex E2E', system_id: systemId, codex_url: codexUrl } });
+
+    for (const bad of ['https://evil.example/codices/x', 'https://waystone.aravill.org.evil.com/codices/x', 'http://waystone.aravill.org/codices/x', 'https://waystone.aravill.org/games/x', 'javascript:alert(1)']) {
+      const r = await put(bad);
+      expect(r.status(), bad).toBe(400);
+      expect((await r.json()).error).toContain('Codices page');
+    }
+
+    // The owner sets it in the edit form; the page then shows a button to it.
+    await loginAs(page, 'roy');
+    await page.goto(`/characters/${id}`);
+    await expect(page.locator('.char-codex-link')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.locator('#editCodex').fill('https://evil.example/codices/x');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.locator('.game-form-error')).toContainText('Codices page');
+    await page.locator('#editCodex').fill(`${origin}/codices/c/x`);
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.locator('.char-codex-link')).toHaveAttribute('href', `${origin}/codices/c/x`);
+
+    // Someone else cannot change it.
+    const testy = await apiAs('testy');
+    expect((await testy.put(`/api/characters/${id}`, { data: { name: 'x', system_id: systemId, codex_url: '' } })).status()).toBe(403);
+    await testy.dispose();
+
+    // Clearing removes the button.
+    expect((await put('')).status()).toBe(200);
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.locator('.char-codex-link')).toHaveCount(0);
+  } finally {
+    await roy.dispose();
+  }
+});
