@@ -176,3 +176,27 @@ type CodexAccess struct {
 	UserID  string `json:"user_id"`
 	Level   string `json:"level"`
 }
+
+// CodexTag is a label that belongs to one codex; PageCount is filled when tags are listed.
+type CodexTag struct {
+	ID        string `json:"id"`
+	CodexID   string `json:"codex_id,omitempty"`
+	Name      string `json:"name"`
+	PageCount int    `json:"page_count"`
+	CreatedBy string `json:"-"`
+	CreatedAt string `json:"-"`
+}
+
+// PageImage is a picture uploaded into a page. RemovedAt is set when it is taken out of the
+// editor's list; the row and the file stay so old revisions that mention it still show it.
+type PageImage struct {
+	ID         string `json:"id"`
+	PageID     string `json:"page_id"`
+	Name       string `json:"name"`
+	File       string `json:"file"`
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
+	UploadedBy string `json:"uploaded_by"`
+	CreatedAt  string `json:"created_at"`
+	RemovedAt  string `json:"removed_at"`
+}

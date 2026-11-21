@@ -623,6 +623,10 @@ func (s *SQLiteStore) MovePage(id, codexID string) error {
 	} else if len(conflicts) > 0 {
 		return &NameTakenError{conflicts}
 	}
+	// Tags belong to a codex, so the page leaves its tags behind.
+	if _, err := tx.Exec(`DELETE FROM page_tags WHERE page_id = ?`, id); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`UPDATE pages SET codex_id = ?, folder_id = '', updated_at = ? WHERE id = ?`, codexID, nowUTC(), id); err != nil {
 		return err
 	}
@@ -632,8 +636,8 @@ func (s *SQLiteStore) MovePage(id, codexID string) error {
 	return tx.Commit()
 }
 
-// DeletePage removes a page with everything attached to it and returns the map image files to
-// delete from disk. Links and pins that pointed at it turn missing.
+// DeletePage removes a page with everything attached to it and returns the image files (map
+// and page pictures) to delete from disk. Links and pins that pointed at it turn missing.
 func (s *SQLiteStore) DeletePage(id string) ([]string, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -647,7 +651,7 @@ func (s *SQLiteStore) DeletePage(id string) ([]string, error) {
 		return nil, err
 	}
 	var files []string
-	rows, err := tx.Query(`SELECT DISTINCT file FROM map_images WHERE page_id = ? AND file != ''`, id)
+	rows, err := tx.Query(`SELECT file FROM map_images WHERE page_id = ? AND file != '' UNION SELECT file FROM page_images WHERE page_id = ?`, id, id)
 	if err != nil {
 		return nil, err
 	}
@@ -668,6 +672,8 @@ func (s *SQLiteStore) DeletePage(id string) ([]string, error) {
 		`DELETE FROM map_pins WHERE map_page_id = ?`,
 		`DELETE FROM map_pin_events WHERE map_page_id = ?`,
 		`DELETE FROM map_images WHERE page_id = ?`,
+		`DELETE FROM page_images WHERE page_id = ?`,
+		`DELETE FROM page_tags WHERE page_id = ?`,
 		`DELETE FROM pages WHERE id = ?`,
 	} {
 		if _, err := tx.Exec(q, id); err != nil {

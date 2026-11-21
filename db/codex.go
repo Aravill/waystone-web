@@ -29,6 +29,8 @@ var (
 	ErrPinEventNotFound = errors.New("pin event not found")
 	ErrPinEventUndone   = errors.New("pin change already undone")
 	ErrImageNotFound    = errors.New("image not found")
+	ErrTagNotFound      = errors.New("tag not found")
+	ErrTagNameTaken     = errors.New("a tag with that name already exists in this codex")
 	ErrRevisionNotFound = errors.New("revision not found")
 )
 
@@ -103,6 +105,38 @@ func SetPageFolder(pageID, folderID string) error            { return GetStore()
 
 // DeletePage returns the map image files the caller should remove from disk.
 func DeletePage(id string) ([]string, error) { return GetStore().DeletePage(id) }
+
+func GetCodexTags(codexID string) ([]models.CodexTag, error) { return GetStore().GetCodexTags(codexID) }
+func GetCodexPageTags(codexID string) (map[string][]string, error) {
+	return GetStore().GetCodexPageTags(codexID)
+}
+func GetPageTags(pageID string) ([]models.CodexTag, error) { return GetStore().GetPageTags(pageID) }
+func GetTagCodexID(tagID string) (string, error)           { return GetStore().GetTagCodexID(tagID) }
+func CreateCodexTag(codexID, name, userID string) (models.CodexTag, error) {
+	return GetStore().CreateCodexTag(codexID, name, userID)
+}
+func RenameCodexTag(id, name string) error { return GetStore().RenameCodexTag(id, name) }
+
+// DeleteCodexTag returns how many pages lost the tag.
+func DeleteCodexTag(id string) (int, error) { return GetStore().DeleteCodexTag(id) }
+func SetPageTags(pageID string, names []string, userID string) ([]models.CodexTag, error) {
+	return GetStore().SetPageTags(pageID, names, userID)
+}
+
+// GetPageImages lists every picture ever uploaded to the page (removed ones included, oldest
+// first) and the id of its cover.
+func GetPageImages(pageID string) ([]models.PageImage, string, error) {
+	return GetStore().GetPageImages(pageID)
+}
+
+// AddPageImage stores the picture row; img.Name is made unique within the page and returned.
+func AddPageImage(img models.PageImage) (models.PageImage, error) {
+	return GetStore().AddPageImage(img)
+}
+func RemovePageImage(pageID, imageID string) error {
+	return GetStore().RemovePageImage(pageID, imageID)
+}
+func SetPageCover(pageID, imageID string) error { return GetStore().SetPageCover(pageID, imageID) }
 
 func GetMapImages(pageID string) ([]models.MapImage, error) { return GetStore().GetMapImages(pageID) }
 func AddMapImage(img models.MapImage) error                 { return GetStore().AddMapImage(img) }

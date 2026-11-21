@@ -137,6 +137,24 @@ func (c *codexRights) checkFolder(w http.ResponseWriter, folderID string, edit b
 	return true
 }
 
+// checkTag is checkCodex for the codex that holds a tag; an unknown or invisible tag is a 404.
+func (c *codexRights) checkTag(w http.ResponseWriter, tagID string, edit bool) bool {
+	codexID, err := db.GetTagCodexID(tagID)
+	if err != nil {
+		codexServerError(w, "retrieve tag")
+		return false
+	}
+	if codexID == "" || !c.canSee(codexID) {
+		writeJSONError(w, http.StatusNotFound, db.ErrTagNotFound.Error())
+		return false
+	}
+	if edit && !c.canEdit(codexID) {
+		writeJSONError(w, http.StatusForbidden, "you can't edit this codex")
+		return false
+	}
+	return true
+}
+
 // codexAllowedFor reports whether the user may use the Codices module at all (the See Codices
 // right, or admin). Errors count as no.
 func codexAllowedFor(userID string) bool {
