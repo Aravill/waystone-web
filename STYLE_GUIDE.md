@@ -18,6 +18,7 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 | `ux-home-games.dc.html` | Home, the Games page sections, the user menu header and the toast (board 2). Its blue `.tag` labels are review notes and never ship |
 | `ux-game-calendar.dc.html` | The game page as a normal page, Ahead as ledger rows and the calendar (board 3). Its two-number calendar cells are superseded: the cells keep the four-column tally (see Session replies) |
 | `modals.html` | Modal redesign (built): every dialog in the app in the folio-banded sheet, filled field cells and one button order, with a Today toggle for comparison |
+| `timeline.html` | Timeline pages (proposal): the first special page type, events on a vertical spine, newest first, in two layouts (A Ledger, B Alternating), the Add event dialog and the New page type picker |
 
 ## Design Philosophy
 
