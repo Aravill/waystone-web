@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=78">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=30">
+    <link rel="stylesheet" href="/static/codex.css?v=31">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -557,6 +557,23 @@
                                 </template>
                             </ul>
                         </section>
+                        <section class="cx-box cx-box--mentions" aria-label="Mentioned, not linked" x-show="mentions.loaded">
+                            <h2>Mentioned, not linked · <span x-text="mentions.total"></span></h2>
+                            <p class="cx-box-empty" x-show="mentions.list.length === 0">No plain mentions of this title.</p>
+                            <p class="cx-box-actions" x-show="mentions.can_edit && mentions.list.length > 1"><button type="button" class="text-link" :disabled="mentions.busy" @click="linkAllMentions()" x-text="mentions.progress || ('Link all ' + mentions.list.length)"></button></p>
+                            <ul x-show="mentions.list.length">
+                                <template x-for="m in mentions.list" :key="m.page.id">
+                                    <li>
+                                        <a :href="pageUrl(m.page)" x-text="m.page.title"></a>
+                                        <template x-for="(s, i) in m.snippets" :key="i">
+                                            <small class="cx-snippet"><span x-text="s.before"></span> <mark class="cx-mention" x-text="s.match"></mark> <span x-text="s.after"></span></small>
+                                        </template>
+                                        <button type="button" class="text-link" x-show="mentions.can_edit" :disabled="mentions.busy" @click="linkMentions(m)" x-text="m.count > 1 ? 'Link ' + m.count : 'Link'" :aria-label="'Link ' + m.count + ' in ' + m.page.title"></button>
+                                    </li>
+                                </template>
+                            </ul>
+                            <p class="cx-box-empty" x-show="mentions.total > mentions.list.length" x-text="'and ' + (mentions.total - mentions.list.length) + ' more'"></p>
+                        </section>
                         <section class="cx-box" aria-label="On the timeline" x-show="onTimelines.length">
                             <h2>On the timeline</h2>
                             <ul>
@@ -939,6 +956,6 @@
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=3"></script>
     <script src="/static/codex-graph.js?v=3"></script>
-    <script src="/static/codex.js?v=26"></script>
+    <script src="/static/codex.js?v=27"></script>
 </body>
 </html>

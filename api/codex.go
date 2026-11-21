@@ -624,6 +624,14 @@ func handleCodexPageRoutes(w http.ResponseWriter, r *http.Request, parts []strin
 		if method(http.MethodPut) {
 			handleSetPageTags(w, r, id)
 		}
+	case rest[0] == "mentions" && (len(rest) == 1 || len(rest) == 2 && rest[1] == "link"):
+		if len(rest) == 1 {
+			if method(http.MethodGet) {
+				handleGetMentions(w, r, id)
+			}
+		} else if method(http.MethodPost) {
+			handleLinkMentions(w, r, id)
+		}
 	case rest[0] == "copy" && len(rest) == 1:
 		if method(http.MethodPost) {
 			handleCopyPage(w, r, id)

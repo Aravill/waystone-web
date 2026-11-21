@@ -275,3 +275,11 @@ type GraphLink struct {
 	TargetText string
 	ToPageID   string
 }
+
+// PageBody is a page with the body of its newest revision.
+type PageBody struct {
+	ID              string
+	Title           string
+	CurrentRevision int
+	Body            string
+}

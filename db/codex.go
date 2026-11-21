@@ -74,6 +74,9 @@ func GetCodexPages() ([]models.PageListItem, error)         { return GetStore().
 func GetPage(id string) (*models.Page, error)               { return GetStore().GetPage(id) }
 func GetPageLinks(fromID string) ([]models.PageLink, error) { return GetStore().GetPageLinks(fromID) }
 func GetBacklinks(id string) ([]models.PageBacklink, error) { return GetStore().GetBacklinks(id) }
+func GetCodexBodies(codexID string) ([]models.PageBody, error) {
+	return GetStore().GetCodexBodies(codexID)
+}
 func GetWantedPages(codexID string) ([]models.WantedPage, error) {
 	return GetStore().GetWantedPages(codexID)
 }
