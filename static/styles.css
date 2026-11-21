@@ -4534,6 +4534,13 @@ select option {
     gap: 0.5rem;
 }
 
+.char-codex-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    text-decoration: none;
+}
+
 .char-head {
     display: grid;
     gap: 0.75rem;

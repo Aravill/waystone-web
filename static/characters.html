@@ -6,7 +6,7 @@
     <title>Waystone - Characters</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=8"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=74">
+    <link rel="stylesheet" href="/static/styles.css?v=75">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -72,6 +72,11 @@
                     <textarea id="newBg" rows="6" maxlength="10000" x-model="form.background"></textarea>
                     <p class="form-hint">Their backstory. Basic Markdown.</p>
                 </div>
+                <div class="form-group">
+                    <label for="newCodex">Codex page</label>
+                    <input id="newCodex" type="url" maxlength="500" autocomplete="off" placeholder="https://waystone.aravill.org/codices/..." x-model="form.codex_url">
+                    <p class="form-hint">A link to this character's page in Codices (waystone.aravill.org only).</p>
+                </div>
                 <p class="game-form-error" role="alert" x-show="formError" x-text="'✗ ' + formError"></p>
 
             <div class="game-form-btns">
@@ -122,6 +127,6 @@
 
     <script src="/static/notifications.js?v=11"></script>
     <script src="/campaigns.js?v=63"></script>
-    <script src="/static/characters.js?v=2"></script>
+    <script src="/static/characters.js?v=3"></script>
 </body>
 </html>

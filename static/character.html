@@ -6,7 +6,7 @@
     <title>Waystone - Character</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=8"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=74">
+    <link rel="stylesheet" href="/static/styles.css?v=75">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -57,6 +57,9 @@
                     </p>
                     <div class="char-games" x-html="gameBadgesHtml(character.games)"></div>
                     <div class="char-head-actions">
+                        <template x-if="safeCodexUrl(character.codex_url) && !editing">
+                            <a class="campaign-action-btn char-codex-link" :href="safeCodexUrl(character.codex_url)"><svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.500 4H19v13H5.500A1.500 1.500 0 0 0 4 18.500z"/><path d="M4 18.500A1.500 1.500 0 0 0 5.500 20H19v-3"/></svg> Codex page</a>
+                        </template>
                         <button type="button" class="campaign-action-btn" x-show="character.can_edit && !editing" @click="startEdit()">Edit</button>
                     </div>
                 </header>
@@ -90,6 +93,11 @@
                     <label for="editBg">Background</label>
                     <textarea id="editBg" rows="6" maxlength="10000" x-model="form.background"></textarea>
                     <p class="form-hint">Their backstory. Basic Markdown.</p>
+                </div>
+                <div class="form-group">
+                    <label for="editCodex">Codex page</label>
+                    <input id="editCodex" type="url" maxlength="500" autocomplete="off" placeholder="https://waystone.aravill.org/codices/..." x-model="form.codex_url">
+                    <p class="form-hint">A link to this character's page in Codices (waystone.aravill.org only).</p>
                 </div>
                 <p class="game-form-error" role="alert" x-show="formError" x-text="'✗ ' + formError"></p>
 
@@ -125,6 +133,6 @@
 
     <script src="/static/notifications.js?v=11"></script>
     <script src="/campaigns.js?v=63"></script>
-    <script src="/static/characters.js?v=2"></script>
+    <script src="/static/characters.js?v=3"></script>
 </body>
 </html>
