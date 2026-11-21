@@ -373,7 +373,24 @@ func (s *SQLiteStore) initSchema() error {
 		created_at TEXT NOT NULL,
 		removed_at TEXT NOT NULL DEFAULT ''
 	);
+	CREATE TABLE IF NOT EXISTS codex_templates (
+		id TEXT PRIMARY KEY,
+		codex_id TEXT NOT NULL,
+		name TEXT NOT NULL,
+		description TEXT NOT NULL DEFAULT '',
+		body TEXT NOT NULL DEFAULT '',
+		created_by TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS codex_template_tags (
+		template_id TEXT NOT NULL,
+		tag_id TEXT NOT NULL,
+		PRIMARY KEY (template_id, tag_id)
+	);
 	CREATE INDEX IF NOT EXISTS idx_pages_codex ON pages(codex_id);
+	CREATE INDEX IF NOT EXISTS idx_codex_templates_codex ON codex_templates(codex_id);
+	CREATE INDEX IF NOT EXISTS idx_codex_template_tags_tag ON codex_template_tags(tag_id);
 	CREATE INDEX IF NOT EXISTS idx_codex_tags_codex ON codex_tags(codex_id);
 	CREATE INDEX IF NOT EXISTS idx_page_tags_tag ON page_tags(tag_id);
 	CREATE INDEX IF NOT EXISTS idx_page_images_page ON page_images(page_id);

@@ -198,6 +198,19 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 				handleCreateCodex(w, r)
 			}
 		}
+	case "templates":
+		switch {
+		case len(parts) == 2 && parts[1] == "builtin":
+			if method(http.MethodGet) {
+				handleBuiltinTemplates(w, r)
+			}
+		case len(parts) == 2:
+			if method(http.MethodPut, http.MethodDelete) {
+				handleCodexTemplate(w, r, parts[1])
+			}
+		default:
+			writeJSONError(w, http.StatusNotFound, "not found")
+		}
 	case "titles":
 		if len(parts) == 1 && method(http.MethodGet) {
 			handleCodexTitles(w, r)
@@ -226,6 +239,10 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 		case len(parts) == 3 && parts[2] == "tags":
 			if method(http.MethodGet, http.MethodPost) {
 				handleCodexTags(w, r, parts[1])
+			}
+		case len(parts) == 3 && parts[2] == "templates":
+			if method(http.MethodGet, http.MethodPost) {
+				handleCodexTemplates(w, r, parts[1])
 			}
 		case len(parts) != 2:
 			writeJSONError(w, http.StatusNotFound, "not found")
@@ -459,6 +476,9 @@ type pageCreateRequest struct {
 	Body     string `json:"body"`
 	CodexID  string `json:"codex_id"`
 	FolderID string `json:"folder_id"`
+	// TemplateID (builtin:name, or a template of the same codex) makes the server fill the body and
+	// tags from the template, ignoring Body.
+	TemplateID string `json:"template_id"`
 }
 
 func handleCreatePage(w http.ResponseWriter, r *http.Request) {
@@ -487,8 +507,16 @@ func handleCreatePage(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusForbidden, "you can't edit this codex")
 		return
 	}
+	body, tagNames, ok := pageStart(w, req.TemplateID, req.CodexID, title, req.Body)
+	if !ok {
+		return
+	}
+	if utf8.RuneCountInString(body) > maxPageBodyRunes {
+		writeJSONError(w, http.StatusBadRequest, "body is too long")
+		return
+	}
 	page := models.Page{ID: db.GenerateUUID(), Kind: models.PageLore, CodexID: req.CodexID, FolderID: req.FolderID, Title: title, AuthorID: userID}
-	if err := db.CreatePage(page, req.Body); err != nil {
+	if err := db.CreatePageWith(page, body, models.NewPageExtras{TagNames: tagNames}); err != nil {
 		codexStoreError(w, err, "create page")
 		return
 	}
@@ -577,6 +605,10 @@ func handleCodexPageRoutes(w http.ResponseWriter, r *http.Request, parts []strin
 	case rest[0] == "tags" && len(rest) == 1:
 		if method(http.MethodPut) {
 			handleSetPageTags(w, r, id)
+		}
+	case rest[0] == "copy" && len(rest) == 1:
+		if method(http.MethodPost) {
+			handleCopyPage(w, r, id)
 		}
 	default:
 		if !handleCodexMapRoutes(w, r, id, rest, method) && !handleCodexPictureRoutes(w, r, id, rest, method) {

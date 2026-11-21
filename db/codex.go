@@ -15,23 +15,25 @@ const (
 )
 
 var (
-	ErrCodexNotFound    = errors.New("codex not found")
-	ErrCodexNameTaken   = errors.New("a codex with that name already exists")
-	ErrCodexInUse       = errors.New("codex still has pages")
-	ErrFolderNotFound   = errors.New("folder not found")
-	ErrFolderNameTaken  = errors.New("a folder with that name already exists here")
-	ErrFolderCycle      = errors.New("a folder can't go inside itself")
-	ErrParentNotFound   = errors.New("parent folder not found")
-	ErrFolderTooDeep    = errors.New("folders can nest up to 10 levels")
-	ErrPageNotFound     = errors.New("page not found")
-	ErrNoMap            = errors.New("the page has no map")
-	ErrPinNotFound      = errors.New("pin not found")
-	ErrPinEventNotFound = errors.New("pin event not found")
-	ErrPinEventUndone   = errors.New("pin change already undone")
-	ErrImageNotFound    = errors.New("image not found")
-	ErrTagNotFound      = errors.New("tag not found")
-	ErrTagNameTaken     = errors.New("a tag with that name already exists in this codex")
-	ErrRevisionNotFound = errors.New("revision not found")
+	ErrCodexNotFound     = errors.New("codex not found")
+	ErrCodexNameTaken    = errors.New("a codex with that name already exists")
+	ErrCodexInUse        = errors.New("codex still has pages")
+	ErrFolderNotFound    = errors.New("folder not found")
+	ErrFolderNameTaken   = errors.New("a folder with that name already exists here")
+	ErrFolderCycle       = errors.New("a folder can't go inside itself")
+	ErrParentNotFound    = errors.New("parent folder not found")
+	ErrFolderTooDeep     = errors.New("folders can nest up to 10 levels")
+	ErrPageNotFound      = errors.New("page not found")
+	ErrNoMap             = errors.New("the page has no map")
+	ErrPinNotFound       = errors.New("pin not found")
+	ErrPinEventNotFound  = errors.New("pin event not found")
+	ErrPinEventUndone    = errors.New("pin change already undone")
+	ErrImageNotFound     = errors.New("image not found")
+	ErrTagNotFound       = errors.New("tag not found")
+	ErrTagNameTaken      = errors.New("a tag with that name already exists in this codex")
+	ErrTemplateNotFound  = errors.New("template not found")
+	ErrTemplateNameTaken = errors.New("a template with that name already exists in this codex")
+	ErrRevisionNotFound  = errors.New("revision not found")
 )
 
 // NameConflict is another page in the same codex that already has a title or alias.
@@ -122,6 +124,27 @@ func DeleteCodexTag(id string) (int, error) { return GetStore().DeleteCodexTag(i
 func SetPageTags(pageID string, names []string, userID string) ([]models.CodexTag, error) {
 	return GetStore().SetPageTags(pageID, names, userID)
 }
+
+// CreatePageWith is CreatePage plus tags, pictures and a revision note, in one transaction.
+func CreatePageWith(p models.Page, body string, x models.NewPageExtras) error {
+	return GetStore().CreatePageWith(p, body, x)
+}
+
+func GetCodexTemplates(codexID string) ([]models.CodexTemplate, error) {
+	return GetStore().GetCodexTemplates(codexID)
+}
+
+// GetCodexTemplate returns nil, nil when there is no such template.
+func GetCodexTemplate(id string) (*models.CodexTemplate, error) {
+	return GetStore().GetCodexTemplate(id)
+}
+func CreateCodexTemplate(t models.CodexTemplate, tagNames []string) (models.CodexTemplate, error) {
+	return GetStore().CreateCodexTemplate(t, tagNames)
+}
+func UpdateCodexTemplate(id, name, description, body string, tagNames []string, userID string) error {
+	return GetStore().UpdateCodexTemplate(id, name, description, body, tagNames, userID)
+}
+func DeleteCodexTemplate(id string) error { return GetStore().DeleteCodexTemplate(id) }
 
 // GetPageImages lists every picture ever uploaded to the page (removed ones included, oldest
 // first) and the id of its cover.

@@ -93,6 +93,11 @@ func (s *SQLiteStore) CreatePage(p models.Page, body string) error {
 
 // createPageTx does CreatePage's work inside a caller's transaction.
 func createPageTx(tx *sql.Tx, p models.Page, body string) error {
+	return createPageNoteTx(tx, p, body, "")
+}
+
+// createPageNoteTx is createPageTx with a note on revision 1.
+func createPageNoteTx(tx *sql.Tx, p models.Page, body, note string) error {
 	if err := codexExists(tx, p.CodexID); err != nil {
 		return err
 	}
@@ -122,7 +127,7 @@ func createPageTx(tx *sql.Tx, p models.Page, body string) error {
 			return err
 		}
 	}
-	if _, err := insertPageRevision(tx, p.ID, models.PageRevision{AuthorID: p.AuthorID, Title: p.Title, Body: body, CreatedAt: now}, PageKeepRevisions); err != nil {
+	if _, err := insertPageRevision(tx, p.ID, models.PageRevision{AuthorID: p.AuthorID, Title: p.Title, Body: body, Note: note, CreatedAt: now}, PageKeepRevisions); err != nil {
 		return err
 	}
 	idx, err := loadCodexIndex(tx, p.CodexID)
