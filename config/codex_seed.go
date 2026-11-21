@@ -18,6 +18,7 @@ const InitialCodexCampaignID = sojournID
 
 // CodexSeedPage is a demo page. Links are written as [[Title]], so pages are matched by title. Revisions after the first are amendments.
 type CodexSeedPage struct {
+	Kind     string // "" = lore (an article); models.PageTimeline for a timeline
 	Title    string
 	Aliases  []string
 	AuthorID string
@@ -67,6 +68,32 @@ var InitialCodexPages = []CodexSeedPage{
 		Body: "Keepers of the lamps along the great roads. Their charter is older than the [[The Waystones|waystones]], they say."},
 	{Title: "Wandering Merchants", AuthorID: adamID,
 		Body: "Peddlers who go wherever the roads are open. Not yet placed on any road."},
+	{Kind: models.PageTimeline, Title: InitialTimelineTitle, AuthorID: royID,
+		Body: "What the Karrow remembers, from the first boats at [[Karrow Ford]] to the fire at [[Cloveswick]]."},
+}
+
+// InitialTimelineTitle is the demo timeline page; its calendar and events follow.
+const InitialTimelineTitle = "History of the Karrow"
+
+var InitialTimelineCalendar = models.TimelineCalendar{
+	Months: []string{"Frost", "Thaw", "Sowing", "Rain", "Bloom", "Midsummer", "Hay", "Harvest", "Leaffall", "Mist", "Ember", "Longnight"},
+	Era:    "AR", BeforeEra: "BR",
+}
+
+// CodexSeedEvent is a demo timeline event. Page, when set, is the title of the page it links.
+type CodexSeedEvent struct {
+	Page, Title      string
+	Year, Month, Day int
+}
+
+var InitialTimelineEvents = []CodexSeedEvent{
+	{Page: "Cloveswick", Year: 1203, Month: 10, Day: 3},
+	{Title: "Lights seen on the river", Year: 1203, Month: 9},
+	{Page: "Ferrymen of the Ford", Year: 1186, Month: 8, Day: 1},
+	{Page: "The Toll House", Year: 1187},
+	{Page: "The Third Waystone", Year: 812},
+	{Title: "First boats at the ford", Year: 790, Month: 6},
+	{Title: "The standing stones are raised", Year: -204},
 }
 
 // InitialMapPage is the demo map. Pins name pages by title; "Hollow Tor" has no page yet.

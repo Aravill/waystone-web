@@ -63,7 +63,11 @@ func seedCodex() error {
 		return f.ID, nil
 	}
 	create := func(sp config.CodexSeedPage) (string, error) {
-		p := models.Page{ID: GenerateUUID(), Kind: models.PageLore, Title: sp.Title, Aliases: sp.Aliases, AuthorID: sp.AuthorID}
+		kind := sp.Kind
+		if kind == "" {
+			kind = models.PageLore
+		}
+		p := models.Page{ID: GenerateUUID(), Kind: kind, Title: sp.Title, Aliases: sp.Aliases, AuthorID: sp.AuthorID}
 		p.CodexID = w.ID
 		parent := ""
 		for _, name := range sp.Folder {
@@ -113,6 +117,18 @@ func seedCodex() error {
 			return err
 		}
 		ids[sp.Title] = id
+	}
+	if tlID, ok := ids[config.InitialTimelineTitle]; ok {
+		author := seedAuthor(config.InitialCodexPages, config.InitialTimelineTitle)
+		if err := store.SetTimelineCalendar(tlID, config.InitialTimelineCalendar, author); err != nil {
+			return fmt.Errorf("failed to seed timeline calendar: %w", err)
+		}
+		for _, e := range config.InitialTimelineEvents {
+			ev := models.TimelineEvent{PageID: tlID, Title: e.Title, LinkedPageID: ids[e.Page], Year: e.Year, Month: e.Month, Day: e.Day, CreatedBy: author}
+			if _, err := store.CreateTimelineEvent(ev); err != nil {
+				return fmt.Errorf("failed to seed timeline event: %w", err)
+			}
+		}
 	}
 	mapID, err := create(config.InitialMapPage)
 	if err != nil {
