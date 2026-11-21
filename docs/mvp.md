@@ -66,6 +66,7 @@ This document describes what must-have features are to be implemented before pre
     - [x] Folders inside a codex (nested, up to 10 levels, collapsible tree), a page layout with a contents rail and summary box
     - [x] Tags (labels per codex, any number per page, a list of the pages with a tag) and pictures in pages (`![[file|caption]]`, a cover, a lightbox, upload by file, drop or paste)
     - [x] Templates and copying: the New page dialog starts a page from a built-in template (Session, Character, Settlement, Landmark, Event, Faction, Item, Lore, Blank) or one of the codex's own, with its tags and `{{title}}`/`{{date}}` filled in; a Templates list and editor, Save as template (headings only or all the text), and Copy page into any codex you can edit (new history, tags and images optional)
+    - [x] Graph: a full graph view per codex (`/codices/c/{id}/graph`: pages and missing pages as nodes, coloured by top-level folder, filters, click card, drag/zoom, d3-force layout) and a Local graph in the page's side panel
     - [x] Access rights (admin page `/admin/access`): per-user See Codices and Edit Codices, and per-codex None / See / Edit for each user; admins always have everything, new users get nothing, and a codex's creator gets Edit on it
 - [x] Technological
     - [x] SQLite

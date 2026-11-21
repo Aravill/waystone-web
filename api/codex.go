@@ -240,6 +240,10 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 			if method(http.MethodGet, http.MethodPost) {
 				handleCodexTags(w, r, parts[1])
 			}
+		case len(parts) == 3 && parts[2] == "graph":
+			if method(http.MethodGet) {
+				handleCodexGraph(w, r, parts[1])
+			}
 		case len(parts) == 3 && parts[2] == "templates":
 			if method(http.MethodGet, http.MethodPost) {
 				handleCodexTemplates(w, r, parts[1])

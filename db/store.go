@@ -131,6 +131,7 @@ type Store interface {
 	DeletePage(id string) ([]string, error)
 	GetCodexTags(codexID string) ([]models.CodexTag, error)
 	GetCodexPageTags(codexID string) (map[string][]string, error)
+	GetCodexGraph(codexID string) ([]models.GraphPage, []models.GraphLink, error)
 	GetPageTags(pageID string) ([]models.CodexTag, error)
 	GetTagCodexID(tagID string) (string, error)
 	CreateCodexTag(codexID, name, userID string) (models.CodexTag, error)

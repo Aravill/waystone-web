@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=75">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=20">
+    <link rel="stylesheet" href="/static/codex.css?v=22">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -95,6 +95,7 @@
                             <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#tags'">Tags <span class="cx-count" x-text="codex.tags.length"></span></a>
                             <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#wanted'">Wanted pages <span class="cx-count" x-text="codex.wanted.length"></span></a>
                             <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#recent'">Recent changes</a>
+                            <a :href="graphUrl()" :aria-current="screen === 'graph' ? 'page' : null">Graph view</a>
                             <a href="#templates" id="cxTemplatesLink" @click.prevent="openTemplates()">Templates</a>
                         </div>
                     </div>
@@ -104,13 +105,14 @@
 
         <main class="cx-main" :inert="navOpen ? '' : null">
             <!-- Recently opened pages of this codex -->
-            <nav class="cx-tabs" x-show="screen !== 'home' && tabs.length" x-cloak aria-label="Recently opened pages">
+            <nav class="cx-tabs" x-show="screen !== 'home' && (tabs.length || screen === 'graph')" x-cloak aria-label="Recently opened pages">
                 <template x-for="t in tabs" :key="t.id">
                     <span class="cx-tab" :class="{ on: t.id === currentPageId }">
                         <a :href="pageUrl(t)" :aria-current="t.id === currentPageId ? 'page' : null" x-text="t.title"></a>
                         <button type="button" class="cx-tab-x" :aria-label="'Close the tab ' + t.title" @click="closeTab(t)">&times;</button>
                     </span>
                 </template>
+                <span class="cx-tab on" x-show="screen === 'graph'"><a :href="graphUrl()" aria-current="page">Graph</a></span>
             </nav>
 
             <div class="cx-inner">
@@ -131,6 +133,52 @@
                 </template>
 
                 <div class="message journal-message" :class="messageType" x-show="messageVisible" role="status" x-text="messageText"></div>
+
+                <!-- Graph -->
+                <template x-if="screen === 'graph' && codex">
+                    <section class="cx-graph" id="gvRoot" aria-labelledby="gvTitle">
+                        <header class="cx-head">
+                            <div class="cx-head-text">
+                                <h1 class="cx-title" id="gvTitle" tabindex="-1">Graph</h1>
+                            </div>
+                            <div class="cx-actions" x-show="graphFrom">
+                                <a class="cx-act" :href="graphFrom ? pageUrl(graphFrom) : '#'" x-text="graphFrom ? '← ' + graphFrom.title : ''"></a>
+                            </div>
+                        </header>
+                        <p class="cx-sub" x-text="graphSummary"></p>
+                        <p class="same" x-show="graphLoading">Loading the graph...</p>
+                        <p class="same" x-show="graphError" role="alert" x-text="graphError"></p>
+                        <div class="gv-legend" id="gvLegend" aria-label="Node colours"></div>
+                        <div class="gv-stage" x-show="graphReady">
+                            <svg class="gv-svg" id="gvSvg" role="group" aria-label="The pages of this codex and the links between them. Use the filters to jump to one."></svg>
+                            <div class="gv-zoom">
+                                <button type="button" id="gvIn" aria-label="Zoom in">+</button>
+                                <button type="button" id="gvOut" aria-label="Zoom out">&minus;</button>
+                                <button type="button" id="gvFit" aria-label="Fit the whole graph">Fit</button>
+                            </div>
+                            <details class="gv-settings" id="gvSettings" open>
+                                <summary>Filters</summary>
+                                <label>Find a page<input type="search" id="gvFind" placeholder="Title" autocomplete="off"></label>
+                                <label>Highlight a tag<select id="gvTag"><option value="">None</option></select></label>
+                                <label class="ck"><input type="checkbox" id="gvMissing" checked> Pages not written yet</label>
+                                <label class="ck"><input type="checkbox" id="gvOrphans" checked> Pages with no links</label>
+                                <label class="ck"><input type="checkbox" id="gvLabels" checked> Always show titles</label>
+                            </details>
+                            <div class="gv-card" id="gvCard" role="dialog" aria-labelledby="gvCardTitle" hidden>
+                                <button type="button" class="cx-icon gv-card-close" id="gvCardClose" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+                                <strong id="gvCardTitle"></strong>
+                                <div class="where" id="gvCardWhere"></div>
+                                <div class="gv-card-tags" id="gvCardTags"></div>
+                                <p id="gvCardText"></p>
+                                <p class="gv-card-count" id="gvCardCount"></p>
+                                <a class="cx-act cx-act--primary" id="gvCardOpen" href="#">Open page</a>
+                                <button type="button" class="cx-act cx-act--primary" id="gvCardCreate" hidden>Create page</button>
+                            </div>
+                            <p class="gv-nomatch" id="gvNoMatch" role="status" hidden>No page matches.</p>
+                            <p class="gv-hint">Drag to move around · scroll or pinch to zoom · drag a page to move it · click a page for details</p>
+                        </div>
+                    </section>
+                </template>
 
                 <!-- Home -->
                 <template x-if="screen === 'home' && home">
@@ -456,6 +504,13 @@
                                 </template>
                             </ul>
                         </section>
+                        <section class="cx-box cx-box--local" aria-label="Local graph" x-show="localGraph">
+                            <h2>Local graph</h2>
+                            <a class="local-graph" :href="graphUrl(page.id)" aria-label="Open the graph view">
+                                <svg class="gv-svg" id="localSvg" viewBox="0 0 240 160" aria-hidden="true"></svg>
+                                <span class="local-open">Open graph view →</span>
+                            </a>
+                        </section>
                         <section class="cx-box" aria-label="Linked from">
                             <h2>Linked from · <span x-text="linkedFrom.length"></span></h2>
                             <p class="cx-box-empty" x-show="linkedFrom.length === 0">No other page links here yet.</p>
@@ -772,6 +827,7 @@
     <script src="/campaigns.js?v=63"></script>
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=3"></script>
-    <script src="/static/codex.js?v=20"></script>
+    <script src="/static/codex-graph.js?v=3"></script>
+    <script src="/static/codex.js?v=22"></script>
 </body>
 </html>

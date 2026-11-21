@@ -224,3 +224,21 @@ type NewPageExtras struct {
 	Images       []PageImage
 	CoverImageID string
 }
+
+// GraphPage is one page of a codex for the graph: the start of its newest revision's body (for
+// the excerpt) and its tag names.
+type GraphPage struct {
+	ID       string
+	Title    string
+	FolderID string
+	Body     string
+	Tags     []string
+}
+
+// GraphLink is one stored [[link]] between two pages of a codex; ToPageID is "" when the target
+// has no page.
+type GraphLink struct {
+	FromPageID string
+	TargetText string
+	ToPageID   string
+}
