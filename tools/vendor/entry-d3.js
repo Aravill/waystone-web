@@ -1,1 +1,1 @@
-export { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, forceX, forceY } from 'd3-force';
+export { forceSimulation, forceLink, forceManyBody, forceCollide, forceX, forceY } from 'd3-force';

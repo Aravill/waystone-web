@@ -5,7 +5,8 @@
 //
 // Writes static/vendor/codemirror.bundle.js (global `CM`, see entry.js) and
 // static/vendor/leaflet/{leaflet.js,leaflet.css,LICENSE} and static/vendor/d3-force.bundle.js
-// (global `D3F`, see entry-d3.js; d3-force is ISC, the banner carries the notice).
+// (global `D3F`, see entry-d3.js) and static/vendor/d3-force/LICENSE (ISC; it also covers the
+// d3-dispatch, d3-quadtree and d3-timer code the bundle includes).
 import { build } from 'esbuild';
 import { readFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -36,9 +37,13 @@ await build({
   format: 'iife',
   globalName: 'D3F',
   outfile: path.join(out, 'd3-force.bundle.js'),
-  banner: { js: `/* d3-force ${pkg.dependencies['d3-force']} (ISC License, Copyright 2010-2021 Mike Bostock, https://github.com/d3/d3-force). Built by tools/vendor/build.mjs */` },
+  banner: { js: `/* d3-force ${pkg.dependencies['d3-force']} with d3-dispatch, d3-quadtree and d3-timer (ISC, Mike Bostock; see d3-force/LICENSE). Built by tools/vendor/build.mjs */` },
   legalComments: 'none',
 });
+
+const d3dest = path.join(out, 'd3-force');
+mkdirSync(d3dest, { recursive: true });
+copyFileSync(path.join(here, 'node_modules/d3-force/LICENSE'), path.join(d3dest, 'LICENSE'));
 
 const lf = path.join(here, 'node_modules/leaflet');
 const dest = path.join(out, 'leaflet');
