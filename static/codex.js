@@ -69,15 +69,11 @@ function codexMarkdown(body, lookup, canCreate = true, images = null) {
     });
 }
 
-// Save as template, "Headings only": the page's ## and ### lines (not the ones inside a code
-// fence), one blank line apart. "" when there are none.
+// Save as template, "Headings only": the page's ## and ### lines (as the renderer reads them: up
+// to 3 leading spaces, a space or tab after the hashes, some text), one blank line apart. "" when
+// there are none.
 function codexHeadingsOnly(body) {
-    let fenced = false;
-    const out = [];
-    for (const line of String(body || '').split('\n')) {
-        if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
-        else if (!fenced && /^#{2,3} /.test(line)) out.push(line.trimEnd());
-    }
+    const out = String(body || '').split('\n').filter((l) => /^[ \t]{0,3}#{2,3}[ \t]+\S/.test(l)).map((l) => l.trim());
     return out.length ? out.join('\n\n') + '\n\n' : '';
 }
 
@@ -1067,15 +1063,30 @@ window.codexPage = function () {
             }
         },
         focusDlg() {
-            this.$nextTick(() => this.$refs.dlgFocus?.focus());
+            this.$nextTick(() => requestAnimationFrame(() => this.$refs.dlgFocus?.focus()));
         },
         closeDlg() {
             this.dlg = { type: '' };
         },
-        // Cancel: the template editor goes back to the list it came from, everything else closes.
-        cancelDlg() {
-            if (this.dlg.type === 'template' && this.dlg.back) this.openTemplates();
-            else this.closeDlg();
+        // Cancel, Esc, the backdrop and the cross: the template editor asks before dropping unsaved
+        // changes and goes back to its list; everything else closes.
+        async cancelDlg() {
+            const d = this.dlg;
+            if (d.type === 'template') {
+                if (JSON.stringify([d.name, d.description, d.tags, d.body]) !== d.snap) {
+                    // After the key event has reached every handler, or the confirm's own Esc handler closes it at once.
+                    await new Promise((resolve) => setTimeout(resolve));
+                    const ok = await this.askConfirm({
+                        eyebrow: 'Template', title: 'Discard your changes?', message: 'The template has changes that are not saved.', confirmLabel: 'Discard changes'
+                    });
+                    if (!ok || this.dlg !== d) return;
+                }
+                if (d.back) {
+                    this.openTemplates();
+                    return;
+                }
+            }
+            this.closeDlg();
         },
         // folderId: the folder to prefill (a page's missing links start in its own folder); tplId: the
         // template to start from (the last one used in this codex when empty).
@@ -1085,7 +1096,10 @@ window.codexPage = function () {
                 return;
             }
             const codexId = this.currentCodexId;
-            if (!codexId) return;
+            if (!codexId) {
+                this.showMessage('Make a codex first.', 'error');
+                return;
+            }
             let templates;
             try {
                 templates = await this.loadTemplates(codexId);
@@ -1161,6 +1175,7 @@ window.codexPage = function () {
             try {
                 const templates = await this.loadTemplates(codexId);
                 this.dlg = { type: 'templates', codexId, templates, canEdit: this.canEdit, error: '', busy: false };
+                this.focusTemplatesIntro();
             } catch (error) {
                 this.showMessage('Could not load the templates: ' + error.message, 'error');
             }
@@ -1168,12 +1183,15 @@ window.codexPage = function () {
         // t: the template to edit, or null for a new one; from: a template whose fields start a new one.
         openTemplateEditor(t, from = null) {
             const s = t || from;
+            const f = { name: s ? s.name : '', description: s ? s.description : '', tags: s ? s.tags.join(', ') : '', body: s ? s.body : '## \n\n' };
             this.dlg = {
-                type: 'template', template: t, codexId: this.dlg.codexId, back: true,
-                name: s ? s.name : '', description: s ? s.description : '', tags: s ? s.tags.join(', ') : '', body: s ? s.body : '## \n\n',
-                error: '', busy: false
+                type: 'template', template: t, codexId: this.dlg.codexId, back: true, ...f,
+                snap: JSON.stringify([f.name, f.description, f.tags, f.body]), error: '', busy: false
             };
-            this.focusDlg();
+        },
+        // The Templates list keeps focus inside the dialog: on its intro line (tabindex -1).
+        focusTemplatesIntro() {
+            this.$nextTick(() => requestAnimationFrame(() => document.getElementById('dTplsIntro')?.focus()));
         },
         copyTemplate(t) {
             const name = Array.from(t.name + ' (copy)').length > 80 ? Array.from(t.name).slice(0, 72).join('') + ' (copy)' : t.name + ' (copy)';
@@ -1194,7 +1212,10 @@ window.codexPage = function () {
                     this.showMessage(this.sentence(data.error || 'Could not delete the template'), 'error');
                     return;
                 }
-                if (this.dlg === d) d.templates = await this.loadTemplates(d.codexId);
+                if (this.dlg === d) {
+                    d.templates = await this.loadTemplates(d.codexId);
+                    this.focusTemplatesIntro();
+                }
                 this.showMessage('Template deleted', 'success');
             } catch (error) {
                 this.showMessage('Could not delete the template: ' + error.message, 'error');
@@ -1230,7 +1251,7 @@ window.codexPage = function () {
                 return;
             }
             const body = d.keep === 'all' ? codexWithoutPictures(this.page.body) : codexHeadingsOnly(this.page.body);
-            if (!body) {
+            if (d.keep === 'headings' && !body) {
                 d.error = 'This page has no ## or ### headings to keep. Choose “All the text” instead.';
                 return;
             }
@@ -1252,9 +1273,10 @@ window.codexPage = function () {
             }
             const codexId = this.codexChoices.some((c) => c.id === this.page.codex.id) ? this.page.codex.id : this.codexChoices[0].id;
             const folders = this.codex && this.codex.codex.id === codexId ? this.codex.folders || [] : (await this.fetchFolders(codexId)) || [];
-            const base = Array.from(this.page.title).slice(0, 120 - ' (copy)'.length).join('');
-            const title = this.page.title.length + ' (copy)'.length <= 120 ? this.page.title + ' (copy)' : base + ' (copy)';
-            this.dlg = { type: 'copyPage', title, codexId, folders, folderId: '', copyTags: true, copyImages: true, error: '', busy: false };
+            const chars = Array.from(this.page.title);
+            const title = chars.slice(0, 120 - ' (copy)'.length).join('') + ' (copy)';
+            const folderId = codexId === this.page.codex.id && folders.some((f) => f.id === this.page.folder_id) ? this.page.folder_id : '';
+            this.dlg = { type: 'copyPage', title: chars.length + ' (copy)'.length <= 120 ? this.page.title + ' (copy)' : title, codexId, folders, folderId, copyTags: true, copyImages: true, error: '', busy: false };
             this.focusDlg();
         },
         async submitCopyPage(d) {
@@ -1288,8 +1310,12 @@ window.codexPage = function () {
             const d = this.dlg;
             const codexId = d.codexId;
             d.folderId = '';
+            d.folders = [];
             const folders = await this.fetchFolders(codexId);
-            if (this.dlg === d && d.codexId === codexId) d.folders = folders || [];
+            if (this.dlg === d && d.codexId === codexId) {
+                d.folders = folders || [];
+                if (!d.folders.some((f) => f.id === d.folderId)) d.folderId = '';
+            }
         },
         openNewFolder(parentId) {
             this.dlg = { type: 'folder', folder: null, parentId, name: '', error: '', busy: false };
@@ -1418,6 +1444,10 @@ window.codexPage = function () {
             const title = d.title.trim();
             if (!title) {
                 d.error = 'Give the page a title.';
+                return;
+            }
+            if (this.isDirty) {
+                d.error = 'Save or cancel your changes first.';
                 return;
             }
             const { response, data } = await this.send('/api/codices/pages', 'POST', { title, codex_id: d.codexId, folder_id: d.folderId || '', template_id: d.tplId });

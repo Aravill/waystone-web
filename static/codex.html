@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=74">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=18">
+    <link rel="stylesheet" href="/static/codex.css?v=19">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -503,14 +503,14 @@
     </div>
 
     <!-- Form dialogs -->
-    <div class="modal" :class="{ 'modal-open': dlg.type }" @click.self="closeDlg()" @keydown.escape.window="dlg.type && closeDlg()" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <div class="modal" :class="{ 'modal-open': dlg.type }" @click.self="cancelDlg()" @keydown.escape.window="dlg.type && !confirmDialog.open && cancelDlg()" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
         <div class="modal-content confirm-modal-content" :class="{ 'cx-dlg--wide': dlgWide }">
             <div class="modal-header">
                 <div>
                     <span class="modal-eyebrow" x-text="dlgEyebrow"></span>
                     <h2 id="dlgTitle" x-text="dlgTitle"></h2>
                 </div>
-                <button type="button" class="modal-close" @click="closeDlg()" aria-label="Close">&times;</button>
+                <button type="button" class="modal-close" @click="cancelDlg()" aria-label="Close">&times;</button>
             </div>
             <form class="modal-form" @submit.prevent="submitDlg()" novalidate>
                 <template x-if="dlg.type === 'createPage'">
@@ -558,7 +558,7 @@
                 </template>
                 <template x-if="dlg.type === 'templates'">
                     <div>
-                        <p class="hint">The built-in templates are the same in every codex: copy one to change it. Changing or deleting a template never changes pages already made from it.</p>
+                        <p class="hint" id="dTplsIntro" tabindex="-1">The built-in templates are the same in every codex: copy one to change it. Changing or deleting a template never changes pages already made from it.</p>
                         <ul class="cx-tpl-list">
                             <template x-for="t in dlg.templates" :key="t.id">
                                 <li class="cx-tpl-row">
@@ -584,7 +584,7 @@
                     <div>
                         <div class="form-group">
                             <label for="dTplName">Name</label>
-                            <input type="text" id="dTplName" maxlength="80" x-model="dlg.name" x-ref="dlgFocus">
+                            <input type="text" id="dTplName" maxlength="80" x-model="dlg.name" x-init="$nextTick(() => requestAnimationFrame(() => $el.focus()))">
                         </div>
                         <div class="form-group">
                             <label for="dTplDesc">Description</label>
@@ -640,8 +640,8 @@
                                 <template x-for="o in folderOptions(dlg.folders)" :key="o.id"><option :value="o.id" x-text="o.label" :selected="o.id === dlg.folderId"></option></template>
                             </select>
                         </div>
-                        <label class="cx-check"><input type="checkbox" x-model="dlg.copyTags"><span>Copy its tags</span></label>
-                        <label class="cx-check"><input type="checkbox" x-model="dlg.copyImages"><span>Copy its images <small>The files are duplicated, so each page keeps its own.</small></span></label>
+                        <label class="cx-check" x-show="pageData.tags.length"><input type="checkbox" x-model="dlg.copyTags"><span x-text="'Copy its tags (' + pageData.tags.map((t) => t.name).join(', ') + ')'"></span></label>
+                        <label class="cx-check" x-show="pageData.images.length"><input type="checkbox" x-model="dlg.copyImages"><span><span x-text="'Copy its ' + countLabel(pageData.images.length, 'image')"></span> <small>The files are duplicated, so each page keeps its own.</small></span></label>
                         <p class="hint">The copy starts its own history at revision 1. Aliases are not copied, and [[links]] stay as written and point at pages of the codex it goes to.</p>
                     </div>
                 </template>
@@ -772,6 +772,6 @@
     <script src="/campaigns.js?v=63"></script>
     <script src="/static/journal.js?v=1"></script>
     <script src="/static/codex-editor.js?v=3"></script>
-    <script src="/static/codex.js?v=18"></script>
+    <script src="/static/codex.js?v=19"></script>
 </body>
 </html>

@@ -2393,3 +2393,9 @@ html:has(dialog.cx-lightbox[open]) {
         padding: 1rem;
     }
 }
+
+.cx-tpl-card strong,
+.cx-tpl-card span,
+.cx-tpl-info strong {
+    overflow-wrap: anywhere;
+}
