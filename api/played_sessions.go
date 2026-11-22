@@ -284,4 +284,3 @@ func (req *playedSessionRequest) normalizePeople(campaign *models.Campaign, allo
 	}
 	return guests, ids, dmThere, ""
 }
-
