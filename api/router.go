@@ -28,6 +28,18 @@ func ServePageWithFallback(pageName string) http.HandlerFunc {
 	}
 }
 
+// RevalidateUnversioned makes browsers check back (a cheap 304) before reusing anything requested
+// without a ?v= cache-busting query, so a deploy's new pages, which point at the new ?v= assets,
+// show at once. Handlers that set their own Cache-Control (immutable uploads) override it.
+func RevalidateUnversioned(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("v") == "" {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func RegisterRoutes() {
 	// Public auth endpoints
 	http.HandleFunc("/auth/login", HandleLogin)
