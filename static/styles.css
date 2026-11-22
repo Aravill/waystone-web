@@ -276,7 +276,20 @@ a {
     max-width: 71rem;
     margin: 0 auto;
     padding: 1.75rem 0 1.125rem;
+    position: relative;
+    border-bottom: 3px solid transparent; /* room for the rule below */
+}
+
+/* The double rule under the header runs edge to edge; body clips the overflow. */
+.header::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -3px;
+    width: 100vw;
+    transform: translateX(-50%);
     border-bottom: 3px double var(--ink);
+    pointer-events: none;
 }
 
 .header-left {
