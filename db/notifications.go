@@ -21,3 +21,8 @@ func MarkNotificationRead(userID, id string) error {
 func MarkAllNotificationsRead(userID string) error {
 	return GetStore().MarkAllNotificationsRead(userID)
 }
+
+// GetPollReminderUserIDs returns, per poll id, the users who already got a poll_reminder for it.
+func GetPollReminderUserIDs(pollIDs []string) (map[string]map[string]bool, error) {
+	return GetStore().GetPollReminderUserIDs(pollIDs)
+}

@@ -6,7 +6,7 @@
     <title>Waystone - Game</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=8"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=78">
+    <link rel="stylesheet" href="/static/styles.css?v=79">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -69,26 +69,31 @@
                             <p class="pending-notice" x-show="pendingNotice"><span aria-hidden="true">✦</span> <span x-text="pendingNotice"></span> <button type="button" class="text-link" x-show="noticeIsCharacterNudge" @click="openPicker()">Choose →</button></p>
 
                             <!-- Phones: the reply you owe sits right under the lede, before the tale -->
-                            <template x-if="replySession">
+                            <template x-if="replyRow">
                                 <div class="game-reply-block panel-session awaits-reply">
                                     <div class="panel-session-head">
-                                        <span class="panel-session-time" x-text="formatShort(replySession.date)"></span>
-                                        <span class="panel-status-tag" :class="`chip-${replySession.status}`" x-text="replySession.status"></span>
+                                        <span class="panel-session-time" x-text="replyRow.kind === 'poll' ? pollRangeLabel(replyRow.dates) : formatShort(replyRow.s.date)"></span>
+                                        <span class="panel-status-tag" :class="replyRow.kind === 'poll' ? 'chip-Suggested' : `chip-${replyRow.s.status}`" x-text="replyRow.kind === 'poll' ? 'Poll' : replyRow.s.status"></span>
                                     </div>
-                                    <p class="panel-session-meta" x-text="replyBlockMeta(replySession)"></p>
-                                    <p class="game-reply-who"><a href="#gamePanel" @click.prevent="pick(replySession.id)">Who?</a></p>
-                                    <div class="session-actions session-replies" role="group" aria-label="Your reply">
-                                        <button type="button" class="btn-response btn-response--accepted" :disabled="busy" @click="reply('Accepted', replySession)">Yes</button>
-                                        <button type="button" class="btn-response btn-response--tentative" :disabled="busy" @click="reply('Tentative', replySession)">Maybe</button>
-                                        <button type="button" class="btn-response btn-response--declined" :disabled="busy" @click="reply('Declined', replySession)">No</button>
-                                    </div>
+                                    <p class="panel-session-meta" x-text="replyBlockMeta(replyRow)"></p>
+                                    <p class="game-reply-who"><a href="#gamePanel" @click.prevent="pick(replyRow.id)">Who?</a></p>
+                                    <template x-for="d in replyRow.dates" :key="d.id">
+                                        <div class="reply-date">
+                                            <p class="reply-date-label" x-show="replyRow.kind === 'poll'"><span x-text="formatShort(d.date)"></span> <span x-text="upcomingTime(d)"></span></p>
+                                            <div class="session-actions session-replies" role="group" :aria-label="replyRow.kind === 'poll' ? 'Your reply for ' + formatShort(d.date) : 'Your reply'">
+                                                <button type="button" class="btn-response btn-response--accepted" :class="{ 'selected': d.current_user_participation === 'Accepted' }" :aria-pressed="d.current_user_participation === 'Accepted'" :disabled="busy" @click="reply('Accepted', d)">Yes</button>
+                                                <button type="button" class="btn-response btn-response--tentative" :class="{ 'selected': d.current_user_participation === 'Tentative' }" :aria-pressed="d.current_user_participation === 'Tentative'" :disabled="busy" @click="reply('Tentative', d)">Maybe</button>
+                                                <button type="button" class="btn-response btn-response--declined" :class="{ 'selected': d.current_user_participation === 'Declined' }" :aria-pressed="d.current_user_participation === 'Declined'" :disabled="busy" @click="reply('Declined', d)">No</button>
+                                            </div>
+                                        </div>
+                                    </template>
                                 </div>
                             </template>
                         </div>
                         <div class="game-head-actions">
                             <a class="campaign-action-btn game-calendar-btn" x-show="isMember" :href="'/games/' + encodeURIComponent(campaign.id) + '/calendar'"
-                               :title="unansweredCount > 0 ? unansweredCount + ' suggested session' + (unansweredCount === 1 ? '' : 's') + ' awaiting your response' : null"
-                               :aria-label="unansweredCount > 0 ? 'Calendar, ' + unansweredCount + ' awaiting your response' : null">Calendar<span class="campaign-action-count" x-show="unansweredCount > 0" x-text="unansweredCount"></span></a>
+                               :title="unansweredCount > 0 ? pluralCount(unansweredCount, 'poll') + ' awaiting your reply' : null"
+                               :aria-label="unansweredCount > 0 ? 'Calendar, ' + unansweredCount + ' awaiting your reply' : null">Calendar<span class="campaign-action-count" x-show="unansweredCount > 0" x-text="unansweredCount"></span></a>
                         </div>
                     </header>
 
@@ -109,13 +114,13 @@
                                 <h3 class="game-ledger-label">Ahead</h3>
                                 <p class="panel-empty" x-show="upcoming.length === 0">Nothing ahead on the calendar.</p>
                                 <div class="game-ahead" x-show="upcoming.length > 0">
-                                    <template x-for="s in upcoming" :key="s.id">
-                                        <button type="button" class="ahead-row" :class="{ 'is-selected': selectedId === s.id }" :aria-pressed="selectedId === s.id" :aria-label="cellLabel(s)" @click="pick(s.id)">
-                                            <span class="ahead-date" x-text="formatShort(s.date)"></span>
-                                            <span class="ahead-time" :title="s.timezone" x-text="s.time ? timeRange(s) : ''"></span>
-                                            <span class="ahead-status"><span class="panel-status-tag" :class="`chip-${s.status}`" x-text="s.status"></span></span>
-                                            <span class="ahead-counts" x-text="isMember ? aheadCounts(s) : ''"></span>
-                                            <span class="ahead-mine" :class="aheadMineClass(s)" x-show="isPlayer" x-html="aheadMine(s)"></span>
+                                    <template x-for="r in aheadRows" :key="r.id">
+                                        <button type="button" class="ahead-row" :class="{ 'is-selected': selectedId === r.id }" :aria-pressed="selectedId === r.id" :aria-label="r.kind === 'poll' ? aheadPollLabel(r) : cellLabel(r.s)" @click="pick(r.id)">
+                                            <span class="ahead-date" x-text="r.kind === 'poll' ? pollRangeLabel(r.dates) : formatShort(r.s.date)"></span>
+                                            <span class="ahead-time" :title="r.kind === 'poll' ? '' : r.s.timezone" x-text="r.kind === 'poll' ? pluralCount(r.dates.length, 'date') : (r.s.time ? timeRange(r.s) : '')"></span>
+                                            <span class="ahead-status"><span class="panel-status-tag" :class="r.kind === 'poll' ? 'chip-Suggested' : `chip-${r.s.status}`" x-text="r.kind === 'poll' ? 'Poll' : r.s.status"></span></span>
+                                            <span class="ahead-counts" :class="{ 'ahead-poll-note': r.kind === 'poll' }" x-text="r.kind === 'poll' ? 'Poll · ' + pluralCount(r.dates.length, 'date') : (isMember ? aheadCounts(r.s) : '')"></span>
+                                            <span class="ahead-mine" :class="aheadRowMineClass(r)" x-show="isPlayer" x-html="aheadRowMine(r)"></span>
                                         </button>
                                     </template>
                                 </div>
@@ -180,15 +185,17 @@
                         <aside id="gamePanel" class="game-panel">
                             <div class="game-panel-inner">
                                 <div class="game-panel-states" aria-live="polite">
-                                    <template x-for="s in selectedUpcomingList" :key="s.id">
+                                    <template x-for="g in upcomingGroups" :key="g.key">
                                         <div class="game-panel-state">
                                             <div>
-                                                <p class="modal-eyebrow" x-text="upcomingEyebrow(s)"></p>
-                                                <h3 class="panel-heading" tabindex="-1" x-text="formatHeading(s.date)"></h3>
+                                                <p class="modal-eyebrow" x-text="g.multi ? 'Poll · ' + pluralCount(g.sessions.length, 'date') : upcomingEyebrow(g.sessions[0])"></p>
+                                                <h3 class="panel-heading" tabindex="-1" x-text="g.multi ? pollRangeLabel(g.sessions) : formatHeading(g.sessions[0].date)"></h3>
                                             </div>
-                                            <div class="panel-session" :class="{ 'awaits-reply': awaitsMe(s) }">
+                                            <div class="poll-card" :class="{ 'is-poll': g.multi, 'awaits-reply': g.multi && g.sessions.some((d) => awaitsMe(d)) }">
+                                            <template x-for="s in g.sessions" :key="s.id">
+                                            <div class="panel-session" :class="{ 'awaits-reply': !g.multi && awaitsMe(s) }">
                                                 <div class="panel-session-head">
-                                                    <span class="panel-session-time" :title="s.timezone" x-text="upcomingTime(s)"></span>
+                                                    <span class="panel-session-time" :title="s.timezone"><span x-show="g.multi" x-text="formatShort(s.date) + ' · '"></span><span x-text="upcomingTime(s)"></span></span>
                                                     <span class="panel-status-tag" :class="`chip-${s.status}`" x-text="s.status"></span>
                                                 </div>
                                                 <div class="panel-session-meta" x-text="upcomingMeta(s)"></div>
@@ -217,9 +224,17 @@
                                                 <div class="panel-dm-actions" x-show="isDM">
                                                     <div class="session-actions">
                                                         <button type="button" class="btn-action btn-action-confirm" x-show="s.status === 'Suggested'" :disabled="busy" @click="setSessionStatus('Confirmed', s)">Confirm</button>
-                                                        <button type="button" class="btn-action btn-action-cancel" :disabled="busy" @click="setSessionStatus('Cancelled', s)">Cancel</button>
+                                                        <button type="button" class="btn-action btn-action-cancel" :disabled="busy" x-text="s.status === 'Suggested' ? 'Withdraw' : 'Cancel'" @click="setSessionStatus('Cancelled', s)"></button>
                                                     </div>
                                                 </div>
+                                            </div>
+                                            </template>
+                                            <div class="poll-card-foot panel-dm-actions" x-show="isDM && g.pollId">
+                                                <div class="session-actions">
+                                                    <a class="text-link" :href="g.pollId ? addDateUrl(g.pollId) : '#'">+ Add a date</a>
+                                                    <button type="button" class="btn-action btn-action-cancel" x-show="g.multi" :disabled="busy" @click="withdrawPoll(g.pollId, g.sessions)">Withdraw poll</button>
+                                                </div>
+                                            </div>
                                             </div>
                                             <button type="button" class="text-link game-back" @click="showCompany()">Show the players</button>
                                         </div>
@@ -511,8 +526,8 @@
         </div>
     </div>
 
-    <script src="/static/notifications.js?v=11"></script>
-    <script src="/campaigns.js?v=64"></script>
+    <script src="/static/notifications.js?v=12"></script>
+    <script src="/campaigns.js?v=65"></script>
     <script src="/static/characters.js?v=3"></script>
     <script src="/static/game.js?v=15"></script>
 </body>

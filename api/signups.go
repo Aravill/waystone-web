@@ -332,9 +332,13 @@ func handleUpdateSignup(w http.ResponseWriter, r *http.Request, campaignID, targ
 			break
 		}
 	}
+	polls, _ := openPollStates(campaign, time.Now())
 	updated := applySignupStatus(w, campaignID, targetUserID, req.Status, "sign-up updated")
 	if updated == nil {
 		return
+	}
+	if wasPlayer && req.Status == models.SignupDeclined {
+		notifyCompletedPolls(updated, polls)
 	}
 	if req.Status == models.SignupAccepted && !wasPlayer {
 		notify(userID, []string{targetUserID}, models.NotificationSignupAccepted, campaign, "", acceptedNotificationData(campaign))
@@ -360,6 +364,7 @@ func handleWithdrawSignup(w http.ResponseWriter, r *http.Request, campaignID, ta
 		return
 	}
 
+	polls, _ := openPollStates(campaign, time.Now())
 	wasPlayer, err := db.WithdrawCampaignSignup(campaignID, userID)
 	if err != nil {
 		switch {
@@ -378,6 +383,11 @@ func handleWithdrawSignup(w http.ResponseWriter, r *http.Request, campaignID, ta
 		notifType, message = models.NotificationPlayerLeft, "left the game"
 	}
 	notify(userID, []string{campaign.DM}, notifType, campaign, "", nil)
+	if wasPlayer {
+		if updated, err := db.GetCampaignByID(campaignID); err == nil {
+			notifyCompletedPolls(updated, polls)
+		}
+	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":  "success",
@@ -407,8 +417,10 @@ func handleKickPlayer(w http.ResponseWriter, r *http.Request, campaignID, target
 		return
 	}
 
-	if applySignupStatus(w, campaignID, targetUserID, models.SignupKicked, "player removed") != nil {
+	polls, _ := openPollStates(campaign, time.Now())
+	if updated := applySignupStatus(w, campaignID, targetUserID, models.SignupKicked, "player removed"); updated != nil {
 		notify(userID, []string{targetUserID}, models.NotificationPlayerKicked, campaign, "", nil)
+		notifyCompletedPolls(updated, polls)
 	}
 }
 

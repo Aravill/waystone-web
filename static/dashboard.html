@@ -6,8 +6,8 @@
     <title>Waystone - Home</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=8"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=78">
-    <link rel="stylesheet" href="dashboard.css?v=13">
+    <link rel="stylesheet" href="/static/styles.css?v=79">
+    <link rel="stylesheet" href="dashboard.css?v=14">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -80,20 +80,27 @@
                 <section x-show="agenda.awaiting.length > 0" aria-labelledby="awaitsHeading">
                     <h2 id="awaitsHeading" class="section-header">Waiting for your reply</h2>
                     <div class="rl-list">
-                        <template x-for="s in agenda.awaiting" :key="s.id">
+                        <template x-for="p in agenda.awaiting" :key="p.poll_id">
                             <article class="rl">
                                 <div class="rl-day">
-                                    <span x-text="dayParts(s).month"></span>
-                                    <b x-text="dayParts(s).day"></b>
-                                    <span x-text="dayParts(s).weekday"></span>
+                                    <span x-text="dayParts(p.sessions[0]).month"></span>
+                                    <b x-text="dayParts(p.sessions[0]).day"></b>
+                                    <span x-text="dayParts(p.sessions[0]).weekday"></span>
                                 </div>
                                 <div class="rl-body">
-                                    <h3 class="rl-title"><a :href="gameUrl(s)" x-text="s.campaign.title"></a></h3>
-                                    <p class="rl-meta" x-text="awaitMeta(s)"></p>
-                                    <div class="session-actions session-replies" role="group" :aria-label="'Your reply for ' + s.campaign.title">
-                                        <button type="button" class="btn-response btn-response--accepted" :disabled="busy" @click="reply('Accepted', s)">Yes</button>
-                                        <button type="button" class="btn-response btn-response--tentative" :disabled="busy" @click="reply('Tentative', s)">Maybe</button>
-                                        <button type="button" class="btn-response btn-response--declined" :disabled="busy" @click="reply('Declined', s)">No</button>
+                                    <h3 class="rl-title"><a :href="gameUrl(p)" x-text="p.campaign.title"></a></h3>
+                                    <p class="rl-meta" x-text="pollMeta(p)"></p>
+                                    <div class="rl-dates">
+                                        <template x-for="s in p.sessions" :key="s.id">
+                                            <div class="rl-date">
+                                                <p class="rl-date-label" x-show="p.sessions.length > 1"><b x-text="shortDate(s)"></b> <span x-text="timeRange(s)"></span></p>
+                                                <div class="session-actions session-replies" role="group" :aria-label="'Your reply for ' + p.campaign.title + (p.sessions.length > 1 ? ', ' + shortDate(s) : '')">
+                                                    <button type="button" class="btn-response btn-response--accepted" :class="{ 'selected': s.current_user_participation === 'Accepted' }" :aria-pressed="s.current_user_participation === 'Accepted'" :disabled="busy" @click="reply('Accepted', s)">Yes</button>
+                                                    <button type="button" class="btn-response btn-response--tentative" :class="{ 'selected': s.current_user_participation === 'Tentative' }" :aria-pressed="s.current_user_participation === 'Tentative'" :disabled="busy" @click="reply('Tentative', s)">Maybe</button>
+                                                    <button type="button" class="btn-response btn-response--declined" :class="{ 'selected': s.current_user_participation === 'Declined' }" :aria-pressed="s.current_user_participation === 'Declined'" :disabled="busy" @click="reply('Declined', s)">No</button>
+                                                </div>
+                                            </div>
+                                        </template>
                                     </div>
                                 </div>
                             </article>
@@ -182,8 +189,8 @@
 
     <div class="message" :class="messageType" x-show="messageVisible" role="status" x-text="messageText"></div>
 
-    <script src="/static/notifications.js?v=11"></script>
-    <script src="/campaigns.js?v=63"></script>
-    <script src="dashboard.js?v=5"></script>
+    <script src="/static/notifications.js?v=12"></script>
+    <script src="/campaigns.js?v=65"></script>
+    <script src="dashboard.js?v=6"></script>
 </body>
 </html>

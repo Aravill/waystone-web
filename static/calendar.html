@@ -6,7 +6,7 @@
     <title>Waystone - Calendar</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=8"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=78">
+    <link rel="stylesheet" href="/static/styles.css?v=79">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -34,7 +34,7 @@
     </div>
 
     <div class="container">
-        <main id="calendarPage" @keydown.escape.window="sessionClipboard && !showCreateSessionModal && !pasteSubmitting && clearClipboard()">
+        <main id="calendarPage" @keydown.escape.window="showPollDialog ? backToCalendar() : (picking && !pollSubmitting && cancelPicking())">
             <nav class="game-crumb" aria-label="Breadcrumb">
                 <a :href="campaign ? '/campaigns#campaign-' + encodeURIComponent(campaign.id) : '/campaigns'">Games</a>
                 <template x-if="campaign">
@@ -75,6 +75,7 @@
                                     <span class="legend-item legend-confirmed">confirmed</span>
                                     <span class="legend-item legend-suggested">suggested</span>
                                     <span class="legend-item legend-cancelled">cancelled</span>
+                                    <span class="legend-item legend-poll"><span class="legend-poll-tag" aria-hidden="true">A</span> poll</span>
                                 </div>
                                 <div class="calendar-message message" :class="messageType" x-show="messageVisible" role="status" x-text="messageText"></div>
                             </div>
@@ -98,9 +99,10 @@
                                              'has-session': hasSession(day),
                                              'is-selected': isSelectedDay(day),
                                              'is-today': isToday(day),
-                                             'is-paste-target': sessionClipboard && isCurrentMonth(day) && !pasteSelection[formatDateLocal(day)] && !getPasteBlockReason(day),
-                                             'is-paste-blocked': sessionClipboard && isCurrentMonth(day) && !pasteSelection[formatDateLocal(day)] && getPasteBlockReason(day),
-                                             'is-paste-selected': sessionClipboard && isCurrentMonth(day) && pasteSelection[formatDateLocal(day)],
+                                             'is-pick-target': picking && isCurrentMonth(day) && !pickSelection[formatDateLocal(day)] && !getPickBlockReason(day),
+                                             'is-pick-blocked': picking && isCurrentMonth(day) && !pickSelection[formatDateLocal(day)] && getPickBlockReason(day),
+                                             'is-pick-selected': picking && isCurrentMonth(day) && pickSelection[formatDateLocal(day)],
+                                             'is-poll-sibling': isPollSibling(day),
                                              'day-suggested': getDayStatusClass(day) === 'day-suggested',
                                              'day-confirmed': getDayStatusClass(day) === 'day-confirmed',
                                              'day-cancelled': getDayStatusClass(day) === 'day-cancelled'
@@ -109,6 +111,8 @@
                                          :aria-label="getDayAriaLabel(day)"
                                          role="button"
                                          tabindex="0"
+                                         @mouseenter="hoverPollId = pollIdOfDay(day); hoverDay = formatDateLocal(day)"
+                                         @mouseleave="hoverPollId = ''; hoverDay = ''"
                                          @click="handleDayActivate(day)"
                                          @keydown.enter.prevent="handleDayActivate(day)"
                                          @keydown.space.prevent="handleDayActivate(day)">
@@ -119,6 +123,9 @@
                                                 <span class="day-candidate-mark" aria-hidden="true" x-show="isStrongCandidate(s)">✦</span>
                                                 <div class="day-frame-head">
                                                     <span class="day-number" x-text="day.getDate()"></span>
+                                                    <template x-if="getPollTag(day)">
+                                                        <span class="day-poll-tag"><span x-text="getPollTag(day).letter"></span><span class="day-poll-of" x-text="' ' + getPollTag(day).n + '/' + getPollTag(day).of"></span></span>
+                                                    </template>
                                                     <span class="day-overflow" x-show="getCellOverflow(day) > 0">+<span x-text="getCellOverflow(day)"></span><span class="day-overflow-word"> more</span></span>
                                                 </div>
                                                 <div class="day-time" x-text="s.time"></div>
@@ -135,7 +142,7 @@
                                     </div>
                                 </template>
                             </div>
-                            <div class="calendar-reply-key" x-show="!sessionClipboard">
+                            <div class="calendar-reply-key" x-show="!picking">
                                 <span class="reply-accepted" x-html="replyGlyph('accepted') + ' yes'"></span>
                                 <span class="reply-tentative">? maybe</span>
                                 <span class="reply-declined" x-html="replyGlyph('declined') + ' no'"></span>
@@ -146,16 +153,17 @@
 
                         <!-- Day / agenda panel -->
                         <aside class="calendar-panel" x-ref="dayPanel">
-                            <div class="calendar-paste-bar" x-show="sessionClipboard">
-                                <div class="paste-summary">
-                                    <span class="paste-label">Copied</span>
-                                    <span x-text="sessionClipboard ? getSessionTimeRange(sessionClipboard) : ''"></span>
-                                    <span class="paste-meta" x-text="sessionClipboard ? getSessionMeta(sessionClipboard) : ''"></span>
-                                </div>
-                                <p class="paste-note" :class="pasteNote.type" role="status" x-text="pasteNote.text || (pasteCount ? pasteCount + (pasteCount === 1 ? ' day' : ' days') + ' selected' : 'Choose the days to paste it on.')"></p>
+                            <div class="calendar-paste-bar" x-show="picking">
+                                <span class="pick-label" x-text="getPickLabel()"></span>
+                                <p class="paste-note" :class="pickNote.type" role="status" x-text="getPickNote()"></p>
+                                <ul class="pick-list" x-show="pickCount > 0">
+                                    <template x-for="d in pickedDates" :key="d">
+                                        <li><span x-text="formatShortDate(d)"></span><span x-text="picking?.preset?.time || ''"></span></li>
+                                    </template>
+                                </ul>
                                 <div class="paste-actions">
-                                    <button type="button" class="btn-action" x-ref="pasteCancel" :disabled="pasteSubmitting" @click="clearClipboard()">Cancel<span class="paste-esc-hint">(Esc)</span></button>
-                                    <button type="button" class="btn-create" :disabled="!pasteCount || pasteSubmitting" @click="submitPaste()" x-text="pasteSubmitting ? 'Pasting…' : (pasteCount ? 'Paste to ' + pasteCount + (pasteCount === 1 ? ' day' : ' days') : 'Paste')"></button>
+                                    <button type="button" class="btn-action" x-ref="pickCancel" :disabled="pollSubmitting" @click="cancelPicking()">Cancel<span class="paste-esc-hint">(Esc)</span></button>
+                                    <button type="button" class="btn-create" x-ref="pickNext" :disabled="!pickCount || pollSubmitting" @click="openPollDialog()" x-text="pickCount ? 'Next: set times (' + pickCount + ')' : 'Next'"></button>
                                 </div>
                             </div>
                             <template x-if="selectedDay">
@@ -163,53 +171,67 @@
                                     <p class="modal-eyebrow">Selected day</p>
                                     <h3 class="panel-heading" x-text="formatDayHeading(selectedDay)"></h3>
                                     <p class="panel-empty" x-show="getSelectedDaySessions().length === 0">No sessions on this day.</p>
-                                    <template x-for="s in getSelectedDaySessions()" :key="s.id">
-                                        <div class="panel-session" :class="{ 'awaits-reply': !isCurrentUserDM && s.status === 'Suggested' && !s.current_user_participation }">
-                                            <div class="panel-session-head">
-                                                <span class="panel-session-time" x-text="getSessionTimeRangeZone(s)"></span>
-                                                <span class="panel-status-tag" :class="`chip-${s.status}`" x-text="s.status"></span>
-                                            </div>
-                                            <div class="panel-session-meta" x-text="getSessionMeta(s)"></div>
-
-                                            <p class="panel-candidate" x-show="isStrongCandidate(s)"><span class="panel-candidate-mark" aria-hidden="true">✦</span> <span x-text="getCandidateNote(s)"></span></p>
-                                            <div class="roster" x-show="getRoster(s).length > 0">
-                                                <template x-for="row in getRoster(s)" :key="row.key">
-                                                    <div class="roster-row" :class="`avatars-${row.cls}`">
-                                                        <span class="roster-avatar" x-html="avatarHtml(row.user)"></span>
-                                                        <span class="roster-name" x-text="row.user.display_name || row.user.name || 'Unknown'"></span>
-                                                        <span class="roster-said" :class="[`reply-${row.kind}`, row.you ? 'is-you' : '']"><span x-html="replyGlyph(row.kind)"></span> <span x-text="row.label"></span></span>
+                                    <template x-for="g in getPanelGroups()" :key="g.key">
+                                        <div class="poll-card" :class="{ 'is-poll': g.poll?.multi, 'awaits-reply': pollGroupAwaitsMe(g) }">
+                                            <p class="poll-card-head" x-show="g.poll?.multi" x-text="g.poll ? pollHeading(g.poll) : ''"></p>
+                                            <template x-for="s in g.sessions" :key="s.id">
+                                                <div class="panel-session" :class="{ 'awaits-reply': !g.poll?.multi && awaitsMe(s), 'is-current': !!g.poll?.multi && s.id === g.selectedId }">
+                                                    <div class="panel-session-head">
+                                                        <span class="panel-session-time"><span x-show="g.poll?.multi" x-text="formatAgendaDate(s) + ' · '"></span><span x-text="getSessionTimeRangeZone(s)"></span></span>
+                                                        <span class="panel-status-tag" :class="`chip-${s.status}`" x-text="s.status"></span>
                                                     </div>
-                                                </template>
-                                            </div>
+                                                    <div class="panel-session-meta" x-text="getSessionMeta(s)"></div>
 
-                                            <div class="player-responses" x-show="!isCurrentUserDM && s.status !== 'Cancelled'">
-                                                <div class="session-actions session-replies" role="group" aria-label="Your reply">
-                                                    <button type="button" class="btn-response btn-response--accepted"
-                                                            :class="{ 'selected': s.current_user_participation === 'Accepted' }"
-                                                            @click="submitResponse('Accepted', s)">Yes</button>
-                                                    <button type="button" class="btn-response btn-response--tentative"
-                                                            :class="{ 'selected': s.current_user_participation === 'Tentative' }"
-                                                            @click="submitResponse('Tentative', s)">Maybe</button>
-                                                    <button type="button" class="btn-response btn-response--declined"
-                                                            :class="{ 'selected': s.current_user_participation === 'Declined' }"
-                                                            @click="submitResponse('Declined', s)">No</button>
+                                                    <p class="panel-candidate" x-show="isStrongCandidate(s)"><span class="panel-candidate-mark" aria-hidden="true">✦</span> <span x-text="getCandidateNote(s)"></span></p>
+                                                    <p class="panel-empty" x-show="isPastSuggestion(s)">This date has passed.</p>
+                                                    <div class="roster" x-show="getRoster(s).length > 0">
+                                                        <template x-for="row in getRoster(s)" :key="row.key">
+                                                            <div class="roster-row" :class="`avatars-${row.cls}`">
+                                                                <span class="roster-avatar" x-html="avatarHtml(row.user)"></span>
+                                                                <span class="roster-name" x-text="row.user.display_name || row.user.name || 'Unknown'"></span>
+                                                                <span class="roster-said" :class="[`reply-${row.kind}`, row.you ? 'is-you' : '']"><span x-html="replyGlyph(row.kind)"></span> <span x-text="row.label"></span></span>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+
+                                                    <div class="player-responses" x-show="!isCurrentUserDM && s.status !== 'Cancelled' && !isPastSuggestion(s)">
+                                                        <div class="session-actions session-replies" role="group" aria-label="Your reply">
+                                                            <button type="button" class="btn-response btn-response--accepted"
+                                                                    :class="{ 'selected': s.current_user_participation === 'Accepted' }"
+                                                                    @click="submitResponse('Accepted', s)">Yes</button>
+                                                            <button type="button" class="btn-response btn-response--tentative"
+                                                                    :class="{ 'selected': s.current_user_participation === 'Tentative' }"
+                                                                    @click="submitResponse('Tentative', s)">Maybe</button>
+                                                            <button type="button" class="btn-response btn-response--declined"
+                                                                    :class="{ 'selected': s.current_user_participation === 'Declined' }"
+                                                                    @click="submitResponse('Declined', s)">No</button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="panel-dm-actions" x-show="isCurrentUserDM && s.status !== 'Cancelled'">
+                                                        <div class="session-actions">
+                                                            <button type="button" class="btn-action btn-action-confirm"
+                                                                    x-show="s.status === 'Suggested' && !isPastSuggestion(s)"
+                                                                    @click="requestSessionStatusChange('Confirmed', s)">Confirm</button>
+                                                            <button type="button" class="btn-action btn-action-cancel"
+                                                                    x-text="s.status === 'Suggested' ? 'Withdraw' : 'Cancel'"
+                                                                    @click="requestSessionStatusChange('Cancelled', s)"></button>
+                                                            <button type="button" class="btn-action" @click="copySession(s)">Copy</button>
+                                                        </div>
+                                                        <p class="session-status-warning" x-show="selectedSession && selectedSession.id === s.id && pendingSessionAction" x-text="selectedSession && selectedSession.id === s.id ? getSessionStatusWarning() : ''"></p>
+                                                    </div>
                                                 </div>
-                                            </div>
-
-                                            <div class="panel-dm-actions" x-show="isCurrentUserDM && s.status !== 'Cancelled'">
+                                            </template>
+                                            <div class="poll-card-foot panel-dm-actions" x-show="isCurrentUserDM && g.poll">
                                                 <div class="session-actions">
-                                                    <button type="button" class="btn-action btn-action-confirm"
-                                                            x-show="s.status === 'Suggested'"
-                                                            @click="requestSessionStatusChange('Confirmed', s)">Confirm</button>
-                                                    <button type="button" class="btn-action btn-action-cancel"
-                                                            @click="requestSessionStatusChange('Cancelled', s)">Cancel</button>
-                                                    <button type="button" class="btn-action" @click="copySession(s)">Copy</button>
+                                                    <button type="button" class="btn-action" @click="addPollDate(g.poll)">+ Add a date</button>
+                                                    <button type="button" class="btn-action btn-action-cancel" x-show="g.poll?.multi" @click="requestPollWithdraw(g.poll)">Withdraw poll</button>
                                                 </div>
-                                                <p class="session-status-warning" x-show="selectedSession && selectedSession.id === s.id && pendingSessionAction" x-text="getSessionStatusWarning()"></p>
+                                                <p class="session-status-warning" x-show="g.poll && pendingPollWithdraw === g.poll.id" x-text="g.poll ? getPollWithdrawWarning(g.poll) : ''"></p>
                                             </div>
                                         </div>
                                     </template>
-                                    <button type="button" class="btn-action panel-suggest" x-show="isCurrentUserDM" @click="openCreateSession(selectedDay)">+ Suggest session</button>
+                                    <button type="button" class="btn-action panel-suggest" x-show="isCurrentUserDM && !picking && !getPickBlockReason(selectedDay)" @click="openCreateSession(selectedDay)">+ Suggest session</button>
                                     <button type="button" class="btn-close" @click="clearSelectedDay()">Show month agenda</button>
                                 </div>
                             </template>
@@ -218,15 +240,14 @@
                                     <p class="modal-eyebrow">Month agenda</p>
                                     <h3 class="panel-heading" x-text="`Sessions in ${formatMonthYear()}`"></h3>
                                     <p class="panel-empty" x-show="sessions.length === 0">No sessions this month.</p>
-                                    <template x-for="s in sessions" :key="s.id">
-                                        <button type="button" class="agenda-row" :class="`chip-${s.status}`" @click="selectDay(parseDateLocal(s.date))">
-                                            <span class="agenda-date" x-text="formatAgendaDate(s)"></span>
-                                            <span class="agenda-time" x-text="getSessionTimeRangeZone(s)"></span>
-                                            <span class="agenda-status" x-text="s.status"></span>
+                                    <template x-for="row in agendaRows" :key="row.key">
+                                        <button type="button" class="agenda-row" :class="row.cls" @click="selectDay(parseDateLocal(row.date))">
+                                            <span class="agenda-date" x-text="formatShortDate(row.date)"></span>
+                                            <span class="agenda-time" x-text="row.text"></span>
+                                            <span class="agenda-status" x-text="row.status"></span>
                                         </button>
                                     </template>
-                                    <p class="panel-empty" x-show="isCurrentUserDM && !sessionClipboard">Select a day to suggest a session.</p>
-
+                                    <button type="button" class="btn-action panel-suggest" x-show="isCurrentUserDM && !picking" @click="startPicking({ mode: 'new' })">Suggest dates</button>
                                 </div>
                             </template>
                         </aside>
@@ -236,67 +257,53 @@
         </main>
     </div>
 
-    <!-- Session Creation Modal -->
-    <div id="createSessionModal" class="modal create-session-modal" :class="{ 'modal-open': showCreateSessionModal }" @click="handleCreateSessionBackdropClick($event)">
-        <div class="modal-content create-session-modal-content">
+    <!-- Suggest dates dialog: a row per picked day -->
+    <div id="pollDialog" class="modal" :class="{ 'modal-open': showPollDialog }" role="dialog" aria-modal="true" aria-labelledby="pollDialogTitle" @click.self="backToCalendar()">
+        <div class="modal-content">
             <div class="modal-header">
                 <div class="modal-title-block"><p class="modal-eyebrow" x-text="currentCampaignTitle"></p>
-                <h2>Suggest a session</h2></div>
-                <button type="button" class="modal-close" aria-label="Close" @click="closeCreateSessionModal()">&times;</button>
+                <h2 id="pollDialogTitle" x-text="picking?.mode === 'add' ? 'Add dates' : 'Suggest dates'"></h2></div>
+                <button type="button" class="modal-close" aria-label="Close" @click="backToCalendar()">&times;</button>
             </div>
-            <form @submit.prevent="createSession()" class="modal-form">
-                <div class="form-group">
-                    <label for="sessionDate">Date</label>
-                    <input type="date" id="sessionDate" x-model="sessionFormData.date" readonly>
-                </div>
-                <div class="form-group">
-                    <label for="sessionTime">Time *</label>
-                    <input type="time" id="sessionTime" x-model="sessionFormData.time" required>
-                </div>
-                <div class="form-group">
-                    <label>Duration *</label>
-                    <div class="duration-row">
-                        <div class="duration-unit">
-                            <span class="duration-unit-label">H</span>
-                            <div class="duration-control">
-                                <input type="number" id="sessionDurationHours" class="duration-input" x-model.number="sessionFormData.durationHours" min="0" step="1" required>
-                                <div class="duration-arrows">
-                                    <button type="button" class="duration-arrow-btn" aria-label="One hour less" @click="adjustDurationPart('durationHours', -1)">−</button>
-                                    <button type="button" class="duration-arrow-btn" aria-label="One hour more" @click="adjustDurationPart('durationHours', 1)">+</button>
-                                </div>
-                            </div>
+            <form @submit.prevent="submitPoll()" class="modal-form">
+                <div class="poll-rows">
+                    <div class="poll-rows-head" aria-hidden="true"><span>Date</span><span>Start</span><span>Length</span><span></span></div>
+                    <template x-for="(r, i) in pollRows" :key="r.date">
+                        <div class="poll-row">
+                            <span class="poll-row-date"><span x-text="formatShortDate(r.date)"></span><small x-text="r.date.slice(0, 4)"></small></span>
+                            <input type="time" required x-model="r.time" :aria-label="'Start on ' + formatShortDate(r.date)">
+                            <select :aria-label="'Length on ' + formatShortDate(r.date)" @change="r.duration = Number($event.target.value)">
+                                <template x-for="m in lengthOptions(r)" :key="m">
+                                    <option :value="m" :selected="m === r.duration" x-text="lengthLabel(m)"></option>
+                                </template>
+                            </select>
+                            <button type="button" class="poll-row-x" :aria-label="'Remove ' + formatShortDate(r.date)" @click="removePollRow(i)">&times;</button>
                         </div>
-                        <div class="duration-unit">
-                            <span class="duration-unit-label">M</span>
-                            <div class="duration-control">
-                                <input type="number" id="sessionDurationMinutes" class="duration-input" x-model.number="sessionFormData.durationMinutes" min="0" max="59" step="1" required>
-                                <div class="duration-arrows">
-                                    <button type="button" class="duration-arrow-btn" aria-label="One minute less" @click="adjustDurationPart('durationMinutes', -1)">−</button>
-                                    <button type="button" class="duration-arrow-btn" aria-label="One minute more" @click="adjustDurationPart('durationMinutes', 1)">+</button>
-                                </div>
-                            </div>
-                        </div>
+                    </template>
+                    <div class="poll-rows-under">
+                        <button type="button" class="text-link" x-show="pollRows.length > 1" @click="useFirstRowForAll()">Use the first row's time for all</button>
+                        <button type="button" class="text-link" @click="backToCalendar()">Back to the calendar</button>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="sessionTimezone">Timezone *</label>
-                    <select id="sessionTimezone" x-model="sessionFormData.timezone" required>
+                    <label for="pollTimezone">Timezone</label>
+                    <select id="pollTimezone" x-model="pollTimezone" required>
                         <template x-for="tz in timezoneOptions" :key="tz">
-                            <option :value="tz" x-text="tz" :selected="tz === sessionFormData.timezone"></option>
+                            <option :value="tz" x-text="tz" :selected="tz === pollTimezone"></option>
                         </template>
                     </select>
                 </div>
+                <p class="poll-error" role="alert" x-show="pollError" x-text="pollError"></p>
                 <div class="modal-actions">
-                    <button type="submit" class="btn-create">Create</button>
-                    <button type="button" class="btn-cancel" @click="closeCreateSessionModal()">Cancel</button>
+                    <button type="submit" class="btn-create" :disabled="pollSubmitting || pollRows.length === 0" x-text="pollSubmitLabel"></button>
+                    <button type="button" class="btn-cancel" :disabled="pollSubmitting" @click="closePollDialog()">Cancel</button>
                 </div>
             </form>
         </div>
     </div>
 
-
-    <script src="/static/notifications.js?v=11"></script>
-    <script src="/campaigns.js?v=63"></script>
-    <script src="/static/calendar.js?v=3"></script>
+    <script src="/static/notifications.js?v=12"></script>
+    <script src="/campaigns.js?v=65"></script>
+    <script src="/static/calendar.js?v=4"></script>
 </body>
 </html>

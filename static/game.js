@@ -1,6 +1,7 @@
 // Game detail page. Relies on campaigns.js (loaded first) for CAMPAIGN_TYPES, TYPE_ICON_PATHS,
 // campaignStatusClass, userAvatarHtml, escapeHtml, renderMarkdown and getDefaultTimezone, and on
-// characters.js for characterStatusHtml.
+// characters.js for characterStatusHtml. Poll helpers (groupPolls, pollRangeLabel, pollConfirmWarning, sessionRoster,
+// pluralCount) are in campaigns.js.
 
 // A blank record-session form. attendees holds ticked user ids; former holds ex-players kept on an edited session.
 function emptyForm() {
@@ -19,7 +20,7 @@ window.gamePage = function () {
         showAll: false,
         taleOpen: false, // phones fold a long tale to three lines
         taleCanFold: false,
-        selectedId: null, // a session id from upcoming or played; null shows the company
+        selectedId: null, // a session id from upcoming or played, or 'poll:{id}' for a poll's Ahead row; null shows the company
         panelOpened: false, // the first load picks the opening selection, later loads keep it
         recording: false,
         editingId: '',
@@ -89,9 +90,12 @@ window.gamePage = function () {
                 if (!this.panelOpened) {
                     // Like the calendar: open on the first session awaiting a reply, otherwise on the company.
                     this.panelOpened = true;
-                    this.selectedId = this.upcoming.find((s) => this.awaitsMe(s))?.id || null;
-                } else if (this.selectedId && !this.selectedUpcoming && !this.selectedPlayed) {
-                    this.selectedId = null;
+                    const owed = this.upcoming.find((s) => this.awaitsMe(s));
+                    this.selectedId = owed ? this.rowIdFor(owed) : null;
+                } else if (this.selectedId && !this.selectedUpcoming && !this.selectedPlayed && !this.selectedPoll) {
+                    // A poll that is down to one date is an ordinary row now
+                    const left = this.selectedId.startsWith('poll:') ? this.upcoming.find((s) => s.poll_id === this.selectedId.slice(5)) : null;
+                    this.selectedId = left ? left.id : null;
                 }
                 this.notFound = false;
                 this.loadError = '';
@@ -158,16 +162,38 @@ window.gamePage = function () {
         get selectedPlayed() {
             return this.recording ? null : this.played.find((s) => s.id === this.selectedId) || null;
         },
-        // x-for over a one-item list gives the panel a named session without repeating the getter.
-        get selectedUpcomingList() {
-            return this.selectedUpcoming ? [this.selectedUpcoming] : [];
+        // Ahead rows: each Confirmed session, and each poll of several upcoming dates as one row at its first date.
+        // A poll with one date is an ordinary session row.
+        get aheadRows() {
+            const polls = groupPolls(this.upcoming);
+            const rows = [];
+            for (const s of this.upcoming) {
+                const dates = s.status === 'Suggested' ? polls[s.poll_id] : null;
+                if (!dates || dates.length < 2) rows.push({ kind: 'session', id: s.id, s, dates: [s] });
+                else if (dates[0].id === s.id) rows.push({ kind: 'poll', id: 'poll:' + s.poll_id, pollId: s.poll_id, dates });
+            }
+            return rows;
+        },
+        rowIdFor(s) {
+            return this.aheadRows.find((r) => r.dates.some((d) => d.id === s.id))?.id || s.id;
+        },
+        get selectedPoll() {
+            return this.recording ? null : this.aheadRows.find((r) => r.kind === 'poll' && r.id === this.selectedId) || null;
+        },
+        // x-for over a short list gives the panel a named session or poll without repeating the getter.
+        // multi: the poll chrome (range heading, one card round the dates); pollId: a Suggested date's poll, for "+ Add a date".
+        get upcomingGroups() {
+            if (this.selectedPoll) return [{ key: this.selectedPoll.id, pollId: this.selectedPoll.pollId, multi: true, sessions: this.selectedPoll.dates }];
+            const s = this.selectedUpcoming;
+            return s ? [{ key: s.id, pollId: s.status === 'Suggested' ? s.poll_id : '', multi: false, sessions: [s] }] : [];
         },
         get selectedPlayedList() {
             return this.selectedPlayed ? [this.selectedPlayed] : [];
         },
-        // The session the viewer owes a reply on: the phone layout shows it right under the lede.
-        get replySession() {
-            return this.upcoming.find((s) => this.awaitsMe(s)) || null;
+        // The Ahead row the viewer owes a reply on (a session, or a poll with a date they haven't answered):
+        // the phone layout shows it right under the lede, with a reply row per date.
+        get replyRow() {
+            return this.aheadRows.find((r) => r.dates.some((d) => this.awaitsMe(d))) || null;
         },
         // The DM, then each player with how many played sessions they attended.
         get company() {
@@ -216,7 +242,7 @@ window.gamePage = function () {
             return this.isPlayer ? (parseInt(this.campaign?.unanswered_sessions_count, 10) || 0) : 0;
         },
         get pendingNotice() {
-            if (this.unansweredCount > 0) return this.unansweredCount === 1 ? 'A session needs your reply' : `${this.unansweredCount} sessions need your reply`;
+            if (this.unansweredCount > 0) return this.unansweredCount === 1 ? 'A poll awaits your reply' : `${this.unansweredCount} polls await your reply`;
             if (this.pendingCount > 0) return `${this.pendingCount} sign-up${this.pendingCount === 1 ? '' : 's'} to review`;
             if (this.characterNudge) return 'Choose your character';
             return '';
@@ -285,10 +311,30 @@ window.gamePage = function () {
             const p = s.current_user_participation;
             return p === 'Accepted' ? 'reply-accepted' : p === 'Tentative' ? 'reply-tentative' : p === 'Declined' ? 'reply-nay' : this.awaitsMe(s) ? 'is-you' : 'reply-none';
         },
-        // Phone reply block: "18:00–22:00 CET, proposed by ♛ X. 1 yes, 3 no reply."
-        replyBlockMeta(s) {
-            const counts = this.aheadCounts(s);
-            return `${this.upcomingTime(s)}, proposed by ♛ ${this.campaign?.dm_user?.display_name || 'the DM'}.${counts ? ' ' + counts + '.' : ''}`;
+        // The viewer's state on an Ahead row: a session as above; a poll says "Your reply?" until every date is answered.
+        aheadRowMine(r) {
+            if (r.kind === 'session') return this.aheadMine(r.s);
+            return this.isPlayer ? (this.pollAwaitsMe(r) ? 'Your reply?' : 'Replied') : '';
+        },
+        aheadRowMineClass(r) {
+            if (r.kind === 'session') return this.aheadMineClass(r.s);
+            return this.pollAwaitsMe(r) ? 'is-you' : 'reply-none';
+        },
+        pollAwaitsMe(r) {
+            return r.dates.some((d) => this.awaitsMe(d));
+        },
+        // "Poll, 3 dates, Dec 11–16, awaiting your reply"
+        aheadPollLabel(r) {
+            const parts = ['Poll', pluralCount(r.dates.length, 'date'), pollRangeLabel(r.dates)];
+            if (this.pollAwaitsMe(r)) parts.push('awaiting your reply');
+            return parts.join(', ');
+        },
+        // Phone reply block: "18:00–22:00 CET, proposed by ♛ X. 1 yes, 3 no reply."; a poll: "3 dates, proposed by ♛ X."
+        replyBlockMeta(r) {
+            const dm = this.campaign?.dm_user?.display_name || 'the DM';
+            if (r.kind === 'poll') return `${pluralCount(r.dates.length, 'date')}, proposed by ♛ ${dm}.`;
+            const counts = this.aheadCounts(r.s);
+            return `${this.upcomingTime(r.s)}, proposed by ♛ ${dm}.${counts ? ' ' + counts + '.' : ''}`;
         },
         // The DM is marked in the name too, not by colour alone.
         attendeeName(u) {
@@ -391,16 +437,7 @@ window.gamePage = function () {
             return everyone.filter((u) => !there.has(u.id));
         },
         upcomingRoster(s) {
-            const kinds = { Accepted: 'accepted', Tentative: 'tentative', Declined: 'declined' };
-            const order = ['accepted', 'tentative', 'declined', 'awaiting'];
-            return (s.replies || [])
-                .map((r) => {
-                    const kind = kinds[r.participation] || 'awaiting';
-                    // The awaited reply is the viewer's own: ask for it in rubric; others stay quiet
-                    const you = kind === 'awaiting' && r.user.id === this.currentUserId && s.status === 'Suggested';
-                    return { key: `${kind}-${r.user.id}`, user: r.user, label: you ? 'Your reply?' : replyWord(r.participation), cls: `participation-${kind === 'awaiting' ? 'pending' : kind}`, kind, you };
-                })
-                .sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+            return sessionRoster(s, this.currentUserId);
         },
         playedRoster(s) {
             const there = s.attendees.map((u, i) => ({ key: u.id || 'guest-' + i, user: u, label: 'There', character: u.character || null, cls: 'participation-accepted', kind: 'accepted' }));
@@ -435,12 +472,39 @@ window.gamePage = function () {
         async setSessionStatus(status, s) {
             if (this.busy) return;
             const when = `${this.formatHeading(s.date)}${s.time ? ', ' + s.time : ''}`;
-            const ok = await this.askConfirm(status === 'Confirmed'
-                ? { title: 'Confirm session', message: `Confirm the session on ${when}? The players will be notified.`, confirmLabel: 'Confirm' }
-                : { title: 'Cancel session', message: `Cancel the session on ${when}?`, confirmLabel: 'Cancel session' });
-            if (!ok) return;
-            await this.postAction(`/api/campaigns/${encodeURIComponent(this.campaign.id)}/sessions/${encodeURIComponent(s.id)}`,
+            const dates = groupPolls(this.upcoming)[s.poll_id] || [];
+            const suggested = s.status === 'Suggested';
+            let ask;
+            if (status === 'Confirmed') {
+                // Confirming one date of a poll removes the others, so say which
+                const warning = pollConfirmWarning(s, dates);
+                ask = { title: 'Confirm session', message: warning ? `${warning} The players will be notified.` : `Confirm the session on ${when}? The players will be notified.`, confirmLabel: 'Confirm' };
+            } else if (suggested) {
+                // The last upcoming date counts as withdrawing the poll, so the players are told
+                ask = { title: 'Withdraw date', message: `Withdraw the date ${when}?${dates.length <= 1 ? ' The players will be told.' : ''}`, confirmLabel: 'Withdraw' };
+            } else {
+                ask = { title: 'Cancel session', message: `Cancel the session on ${when}?`, confirmLabel: 'Cancel session' };
+            }
+            if (!(await this.askConfirm(ask))) return;
+            const done = await this.postAction(`/api/campaigns/${encodeURIComponent(this.campaign.id)}/sessions/${encodeURIComponent(s.id)}`,
                 'PUT', 'Session updated', 'Failed to update session', { status });
+            // The poll's row is gone; keep the panel on the confirmed session
+            if (done && status === 'Confirmed') this.selectedId = s.id;
+        },
+        async withdrawPoll(pollId, dates) {
+            if (this.busy) return;
+            const ok = await this.askConfirm({
+                title: 'Withdraw poll',
+                message: `Withdraw the poll? All ${pluralCount(dates.length, 'date')} and their replies will be removed. The players will be told.`,
+                confirmLabel: 'Withdraw poll'
+            });
+            if (!ok) return;
+            const done = await this.postAction(`/api/campaigns/${encodeURIComponent(this.campaign.id)}/polls/${encodeURIComponent(pollId)}`,
+                'DELETE', 'Poll withdrawn', 'Failed to withdraw the poll');
+            if (done) this.focusPanel('.panel-heading');
+        },
+        addDateUrl(pollId) {
+            return `/games/${encodeURIComponent(this.campaign.id)}/calendar?add=${encodeURIComponent(pollId)}`;
         },
 
         startRecording() {

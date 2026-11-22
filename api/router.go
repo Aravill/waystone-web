@@ -177,6 +177,11 @@ func HandleCampaignRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(parts) >= 2 && parts[1] == "polls" {
+		HandlePolls(w, r)
+		return
+	}
+
 	if len(parts) >= 3 && parts[1] == "journal" {
 		HandleJournal(w, r)
 		return

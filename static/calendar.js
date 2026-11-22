@@ -1,6 +1,11 @@
 // Calendar page (/games/{id}/calendar). Relies on campaigns.js (loaded first) for the top-level
 // helpers: REPLY_GLYPHS, userAvatarHtml, parseDateLocal, getSessionEndTime, getSessionCounts, getTally,
-// isStrongCandidate, getCandidateNote, getDurationLabel, getDefaultTimezone and getTimezoneOptions. It does not use campaignsPage().
+// isStrongCandidate, getCandidateNote, getDurationLabel, getDefaultTimezone and getTimezoneOptions, and for the poll
+// helpers groupPolls, pollRangeLabel, pollConfirmWarning and sessionRoster. It does not use campaignsPage().
+
+// Choices for a poll date's length, in minutes (a copied length outside the list is added to its row's select).
+const LENGTH_OPTIONS = [60, 90, 120, 150, 180, 210, 240, 270, 300, 360, 420, 480];
+const MAX_POLL_DATES = 31;
 
 window.calendarPage = function () {
     return {
@@ -24,22 +29,23 @@ window.calendarPage = function () {
         sessions: [],
         sessionMap: {},
         selectedDay: null,
-        showCreateSessionModal: false,
         pendingSessionAction: '',
         selectedSession: null,
-        sessionFormData: {
-            date: '',
-            time: '',
-            durationHours: 1,
-            durationMinutes: 0,
-            timezone: ''
-        },
         timezoneOptions: getTimezoneOptions(),
         sessionResponseCache: {},
-        sessionClipboard: null,
-        pasteSelection: {},
-        pasteNote: { text: '', type: '' },
-        pasteSubmitting: false,
+        // Poll picking: the DM clicks days across months, then "Next" opens the dialog with a row per day.
+        picking: null, // null, or { mode: 'new' | 'add', pollId, preset: { time, duration, timezone } | null }
+        pickSelection: {}, // YYYY-MM-DD -> true
+        pickNote: { text: '', type: '' },
+        showPollDialog: false,
+        pollRows: [], // { date, time, duration }
+        pollTimezone: '',
+        pollSubmitting: false,
+        pollError: '',
+        pollInfo: {}, // pollId -> { id, dates (upcoming, by start), multi, letter }
+        hoverPollId: '',
+        hoverDay: '',
+        pendingPollWithdraw: '',
         sessionsMonth: '',
         sessionsLoadSeq: 0,
 
@@ -90,7 +96,11 @@ window.calendarPage = function () {
                 // The sessions API only answers the DM and the players (403 for anyone else).
                 this.forbidden = !this.isCurrentUserDM && !(data.players || []).includes(this.currentUserId);
                 if (this.forbidden) return;
-                await this.openCalendar(data.first_unanswered_session_date || '');
+                const params = new URLSearchParams(location.search);
+                await this.openCalendar(params.get('date') || data.first_unanswered_session_date || '');
+                // "+ Add a date" on the game page lands here with ?add={pollId}
+                const addTo = params.get('add');
+                if (addTo && this.isCurrentUserDM && this.pollInfo[addTo]) this.addPollDate(this.pollInfo[addTo]);
             } catch (error) {
                 this.loadError = 'Could not load the game: ' + error.message;
             } finally {
@@ -104,21 +114,15 @@ window.calendarPage = function () {
             const focus = /^\d{4}-\d{2}-\d{2}$/.test(focusDate) ? this.parseDateLocal(focusDate) : null;
             this.currentCalendarDate = focus ? new Date(focus.getFullYear(), focus.getMonth(), 1) : new Date();
             this.selectedDay = null;
-            this.showCreateSessionModal = false;
             this.selectedSession = null;
             this.pendingSessionAction = '';
+            this.pendingPollWithdraw = '';
             this.sessionResponseCache = {};
-            this.clearClipboard();
+            this.cancelPicking();
             this.generateCalendarDays();
             await this.loadSessions();
             if (focus) {
                 await this.selectDay(focus);
-            }
-        },
-
-        handleCreateSessionBackdropClick(event) {
-            if (event.target.id === 'createSessionModal') {
-                this.closeCreateSessionModal();
             }
         },
 
@@ -203,6 +207,7 @@ window.calendarPage = function () {
                 this.sessions = Array.isArray(data) ? data : [];
                 this.buildSessionMap();
                 this.sessionsMonth = `${year}-${month}`;
+                this.buildPollInfo();
             } catch (error) {
                 if (seq !== this.sessionsLoadSeq) return;
                 this.showMessage('Error loading sessions: ' + error.message, 'error');
@@ -210,6 +215,48 @@ window.calendarPage = function () {
                 this.sessionMap = {};
                 this.sessionsMonth = '';
             }
+        },
+
+        // The game's own data holds every open poll across months, with replies; the month view holds only one month.
+        async refreshCampaign() {
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.currentCampaignId)}`);
+                if (!response.ok) return;
+                const data = await response.json();
+                this.campaign = data;
+                this.buildPollInfo();
+            } catch (error) {
+                console.error('Could not refresh the game:', error);
+            }
+        },
+
+        // After a reply, confirm, withdraw or new poll: both views change.
+        async refresh() {
+            await Promise.all([this.loadSessions(), this.refreshCampaign()]);
+            await this.loadDayResponses();
+        },
+
+        // Open polls from the game's upcoming Suggested dates. Letters (A, B, ...) go to polls of several dates
+        // that have a date in the shown month, ordered by that date; they are per month view, never stored.
+        buildPollInfo() {
+            const ym = `${this.currentCalendarDate.getFullYear()}-${String(this.currentCalendarDate.getMonth() + 1).padStart(2, '0')}`;
+            const byStart = (a, b) => `${a.date} ${a.time || ''}`.localeCompare(`${b.date} ${b.time || ''}`);
+            const info = {};
+            for (const [id, list] of Object.entries(groupPolls(this.campaign?.upcoming_sessions))) {
+                const dates = [...list].sort(byStart);
+                info[id] = { id, dates, multi: dates.length > 1, letter: '' };
+            }
+            Object.values(info)
+                .filter((p) => p.multi && p.dates.some((d) => d.date.startsWith(ym)))
+                .sort((a, b) => byStart(a.dates.find((d) => d.date.startsWith(ym)), b.dates.find((d) => d.date.startsWith(ym))))
+                .forEach((p, i) => { p.letter = i < 26 ? String.fromCharCode(65 + i) : String(i + 1); });
+            this.pollInfo = info;
+        },
+
+        // The poll a session belongs to while it is one of its upcoming dates (not a past suggestion or a mocked one).
+        pollOf(session) {
+            const info = session?.status === 'Suggested' ? this.pollInfo[session.poll_id] : null;
+            return info && info.dates.some((d) => d.id === session.id) ? info : null;
         },
 
         buildSessionMap() {
@@ -272,7 +319,7 @@ window.calendarPage = function () {
         },
 
         getDayTitle(date) {
-            if (this.sessionClipboard && this.isCurrentMonth(date)) return this.getPasteDayLabel(date);
+            if (this.picking && this.isCurrentMonth(date)) return this.getPickDayLabel(date);
             const summary = this.getDaySummary(date);
             if (!this.isHistoricalDay(date)) return summary;
             return `${summary}. ${this.isCurrentUserDM
@@ -281,7 +328,7 @@ window.calendarPage = function () {
         },
 
         getDayAriaLabel(date) {
-            if (this.sessionClipboard && this.isCurrentMonth(date)) return this.getPasteDayLabel(date);
+            if (this.picking && this.isCurrentMonth(date)) return this.getPickDayLabel(date);
             const summary = this.getDaySummary(date);
             if (!summary) return '';
             const head = this.formatDayHeading(date);
@@ -291,10 +338,10 @@ window.calendarPage = function () {
                 : 'Previously planned session is inactive.'}`;
         },
 
-        getPasteDayLabel(date) {
+        getPickDayLabel(date) {
             const head = this.formatDayHeading(date);
-            if (this.pasteSelection[this.formatDateLocal(date)]) return `Remove ${head} from paste`;
-            return this.getPasteBlockReason(date) || `Paste session on ${head}`;
+            if (this.pickSelection[this.formatDateLocal(date)]) return `Remove ${head} from the poll`;
+            return this.getPickBlockReason(date) || `Add ${head} to the poll`;
         },
 
         getSessionEndTime(session) {
@@ -337,6 +384,8 @@ window.calendarPage = function () {
                 const c = this.getSessionCounts(s);
                 parts[0] += `: ${c.accepted} yes, ${c.tentative} maybe, ${c.declined} no, ${c.awaiting} no reply yet`;
             }
+            const tag = this.getPollTag(date);
+            if (tag) parts.push(`Poll ${tag.letter}, date ${tag.n} of ${tag.of}`);
             if (this.isStrongCandidate(s)) parts.push('Strong candidate');
             const more = this.getCellOverflow(date);
             if (more > 0) parts.push(`+${more} more session${more === 1 ? '' : 's'}`);
@@ -347,7 +396,32 @@ window.calendarPage = function () {
             return REPLY_GLYPHS[kind] || '';
         },
 
+        // {letter, n, of} when the day's session is an upcoming date of a poll with several dates.
+        getPollTag(date) {
+            const s = this.getPrimarySessionForDay(date);
+            const info = this.pollOf(s);
+            if (!info || !info.multi || !info.letter) return null;
+            return { letter: info.letter, n: info.dates.findIndex((d) => d.id === s.id) + 1, of: info.dates.length };
+        },
+
+        pollIdOfDay(date) {
+            const info = this.pollOf(this.getPrimarySessionForDay(date));
+            return info && info.multi ? info.id : '';
+        },
+
+        // The other dates of the poll under the pointer or the selected day get an outline.
+        isPollSibling(date) {
+            if (this.picking) return false;
+            const id = this.pollIdOfDay(date);
+            if (!id) return false;
+            const key = this.formatDateLocal(date);
+            if (this.isSelectedDay(date) || key === this.hoverDay) return false;
+            return id === this.hoverPollId || (!!this.selectedDay && id === this.pollIdOfDay(this.selectedDay));
+        },
+
         getRoster(session) {
+            // Poll dates come with their replies; other sessions load them per day.
+            if (session.replies) return sessionRoster(session, this.currentUserId);
             return this.getResponseGroups(session).flatMap((g) => g.users.map((user, i) => {
                 // The awaited reply is the viewer's own: ask for it in rubric; others stay quiet
                 const you = g.kind === 'awaiting' && !!user.id && user.id === this.currentUserId && session.status === 'Suggested';
@@ -388,7 +462,7 @@ window.calendarPage = function () {
             this.selectedDay = date;
             this.selectedSession = null;
             this.pendingSessionAction = '';
-            this.showCreateSessionModal = false;
+            this.pendingPollWithdraw = '';
             for (const session of this.getSelectedDaySessions()) {
                 this.invalidateSessionCache(session.id);
             }
@@ -402,35 +476,26 @@ window.calendarPage = function () {
             await this.loadDayResponses();
         },
 
-        openCreateSession(date) {
-            if (!this.isCurrentUserDM || !date) return;
-            this.sessionFormData = {
-                date: this.formatDateLocal(date),
-                time: '19:00',
-                durationHours: 1,
-                durationMinutes: 0,
-                timezone: getDefaultTimezone()
-            };
-            this.showCreateSessionModal = true;
-        },
+        // ---- Poll picking: choose days on the month, then set the times in a dialog ----
 
-        copySession(session) {
-            if (!this.isCurrentUserDM || !session) return;
-            this.sessionClipboard = {
-                time: session.time,
-                duration: session.duration,
-                timezone: session.timezone || getDefaultTimezone()
-            };
-            this.pasteSelection = {};
-            this.pasteNote = { text: '', type: '' };
-            // Read refs first: clearSelectedDay removes the Copy button, and $refs resolves from it.
-            const { pasteCancel, calendarMain, dayPanel } = this.$refs;
+        // preset is { time, duration, timezone } from a copied session or a poll's first date; date is picked at once.
+        startPicking({ mode = 'new', pollId = '', preset = null, date = null } = {}) {
+            if (!this.isCurrentUserDM) return;
+            // Read refs first: clearing the selected day removes the button that was clicked, and $refs resolves from it.
+            const { pickCancel, calendarMain, dayPanel } = this.$refs;
             this.clearSelectedDay();
+            this.picking = { mode, pollId, preset };
+            this.pickSelection = {};
+            this.pickNote = { text: '', type: '' };
+            this.pollRows = [];
+            this.pollTimezone = '';
+            this.pollError = '';
+            if (date) this.togglePickDay(date);
             this.$nextTick(() => {
                 // x-show reveals the bar a frame later, and a hidden button can't take focus.
                 requestAnimationFrame(() => setTimeout(() => {
                     if (dayPanel) dayPanel.scrollTop = 0;
-                    pasteCancel?.focus({ preventScroll: true });
+                    pickCancel?.focus({ preventScroll: true });
                     if (window.matchMedia('(max-width: 768px)').matches) {
                         calendarMain?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }
@@ -438,99 +503,196 @@ window.calendarPage = function () {
             });
         },
 
-        clearClipboard() {
-            this.sessionClipboard = null;
-            this.pasteSelection = {};
-            this.pasteNote = { text: '', type: '' };
+        cancelPicking() {
+            this.picking = null;
+            this.pickSelection = {};
+            this.pickNote = { text: '', type: '' };
+            this.showPollDialog = false;
+            this.pollRows = [];
+            this.pollTimezone = '';
+            this.pollError = '';
         },
 
-        getPasteBlockReason(date) {
+        // "+ Suggest session" on the selected day: picking with that day already picked.
+        openCreateSession(date) {
+            this.startPicking({ mode: 'new', date });
+        },
+
+        // Copy: a new poll that starts from this session's time, length and zone.
+        copySession(session) {
+            if (!session) return;
+            this.startPicking({
+                mode: 'new',
+                preset: { time: session.time, duration: Number(session.duration) || 240, timezone: session.timezone || getDefaultTimezone() }
+            });
+        },
+
+        addPollDate(info) {
+            const first = info?.dates[0];
+            if (!first) return;
+            this.startPicking({
+                mode: 'add',
+                pollId: info.id,
+                preset: { time: first.time, duration: Number(first.duration) || 240, timezone: first.timezone || getDefaultTimezone() }
+            });
+        },
+
+        getPickLabel() {
+            if (this.picking?.mode !== 'add') return 'Suggest dates';
+            const letter = this.pollInfo[this.picking.pollId]?.letter;
+            return letter ? `Add dates to poll ${letter}` : 'Add dates to the poll';
+        },
+
+        getPickBlockReason(date) {
             const year = this.currentCalendarDate.getFullYear();
             const month = String(this.currentCalendarDate.getMonth() + 1).padStart(2, '0');
             if (this.sessionsMonth !== `${year}-${month}`) return "This month's sessions have not loaded yet";
-            if (this.formatDateLocal(date) < this.formatDateLocal(new Date())) return 'That day is in the past';
+            const key = this.formatDateLocal(date);
+            if (key < this.formatDateLocal(new Date())) return 'That day is in the past';
+            if (this.picking?.mode === 'add' && this.pollInfo[this.picking.pollId]?.dates.some((d) => d.date === key)) return 'That day is already in this poll';
             if (this.hasPlannedSession(date)) return 'That day already has a session';
             return '';
         },
 
         handleDayActivate(date) {
-            if (this.sessionClipboard) {
-                this.togglePasteDay(date);
+            if (this.picking) {
+                this.togglePickDay(date);
             } else {
                 this.selectDay(date);
             }
         },
 
-        togglePasteDay(date) {
-            if (!this.isCurrentMonth(date) || this.pasteSubmitting) return;
+        togglePickDay(date) {
+            if (!this.picking || !this.isCurrentMonth(date) || this.pollSubmitting) return;
             const key = this.formatDateLocal(date);
-            if (this.pasteSelection[key]) {
-                delete this.pasteSelection[key];
-                this.pasteNote = { text: '', type: '' };
+            if (this.pickSelection[key]) {
+                const next = { ...this.pickSelection };
+                delete next[key];
+                this.pickSelection = next;
+                this.pickNote = { text: '', type: '' };
                 return;
             }
-            const reason = this.getPasteBlockReason(date);
+            const reason = this.getPickBlockReason(date) || (this.pickCount >= MAX_POLL_DATES ? `A poll can have up to ${MAX_POLL_DATES} dates` : '');
             if (reason) {
-                this.pasteNote = { text: reason, type: 'error' };
+                this.pickNote = { text: reason, type: 'error' };
                 return;
             }
-            this.pasteSelection[key] = true;
-            this.pasteNote = { text: '', type: '' };
+            this.pickSelection = { ...this.pickSelection, [key]: true };
+            this.pickNote = { text: '', type: '' };
         },
 
-        get pasteCount() {
-            return Object.keys(this.pasteSelection).length;
+        get pickedDates() {
+            return Object.keys(this.pickSelection).sort();
         },
 
-        async submitPaste() {
-            if (this.pasteSubmitting || this.pasteCount === 0) return;
-            const clip = this.sessionClipboard;
-            if (!clip) return;
-            const campaignId = this.currentCampaignId;
-            const keys = Object.keys(this.pasteSelection).sort();
-            let done = 0;
-            let failed = 0;
-            let lastError = '';
-            this.pasteSubmitting = true;
+        get pickCount() {
+            return this.pickedDates.length;
+        },
+
+        getPickNote() {
+            return this.pickNote.text || (this.pickCount ? pluralCount(this.pickCount, 'day') + ' picked' : 'Choose the days to offer.');
+        },
+
+        // ---- The "Suggest dates" dialog ----
+
+        // Next: one row per picked day. Rows already edited keep their values; a new row takes the first row's time.
+        openPollDialog() {
+            if (!this.picking || this.pickCount === 0) return;
+            const preset = this.picking.preset;
+            const first = this.pollRows[0] || (preset ? { time: preset.time, duration: preset.duration } : { time: '19:00', duration: 240 });
+            const kept = Object.fromEntries(this.pollRows.map((r) => [r.date, r]));
+            this.pollRows = this.pickedDates.map((date) => kept[date] || { date, time: first.time, duration: first.duration });
+            this.pollTimezone = this.pollTimezone || preset?.timezone || getDefaultTimezone();
+            this.pollError = '';
+            this.showPollDialog = true;
+            this.$nextTick(() => document.querySelector('#pollDialog .poll-row input[type="time"]')?.focus());
+        },
+
+        // Closes the dialog and keeps the picks.
+        backToCalendar() {
+            if (this.pollSubmitting) return;
+            this.showPollDialog = false;
+            this.pollError = '';
+            this.$nextTick(() => this.$refs.pickNext?.focus({ preventScroll: true }));
+        },
+
+        // The dialog's Cancel and x: leave picking altogether.
+        closePollDialog() {
+            if (this.pollSubmitting) return;
+            this.cancelPicking();
+        },
+
+        removePollRow(i) {
+            const row = this.pollRows[i];
+            if (!row) return;
+            const next = { ...this.pickSelection };
+            delete next[row.date];
+            this.pickSelection = next;
+            this.pollRows = this.pollRows.filter((_, j) => j !== i);
+            if (this.pollRows.length === 0) this.backToCalendar();
+        },
+
+        useFirstRowForAll() {
+            const first = this.pollRows[0];
+            if (!first) return;
+            this.pollRows = this.pollRows.map((r) => ({ ...r, time: first.time, duration: first.duration }));
+        },
+
+        lengthOptions(row) {
+            return LENGTH_OPTIONS.includes(row.duration) ? LENGTH_OPTIONS : [...LENGTH_OPTIONS, row.duration].sort((a, b) => a - b);
+        },
+
+        lengthLabel(minutes) {
+            return getDurationLabel({ duration: minutes });
+        },
+
+        get pollSubmitLabel() {
+            const verb = this.picking?.mode === 'add' ? 'Add' : 'Suggest';
+            if (this.pollSubmitting) return verb === 'Add' ? 'Adding…' : 'Suggesting…';
+            return `${verb} ${pluralCount(this.pollRows.length, 'date')}`;
+        },
+
+        async submitPoll() {
+            if (this.pollSubmitting || !this.picking || this.pollRows.length === 0) return;
+            const missing = this.pollRows.find((r) => !r.time);
+            if (missing) {
+                this.pollError = `Set a start time for ${formatShortDate(missing.date)}.`;
+                return;
+            }
+            const add = this.picking.mode === 'add';
+            const base = `/api/campaigns/${encodeURIComponent(this.currentCampaignId)}/polls`;
+            this.pollSubmitting = true;
+            this.pollError = '';
             try {
-                for (const key of keys) {
-                    try {
-                        const response = await fetch(`/api/campaigns/${campaignId}/sessions`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ date: key, time: clip.time, duration: clip.duration, timezone: clip.timezone })
-                        });
-                        const data = await response.json().catch(() => ({}));
-                        if (!response.ok) {
-                            failed++;
-                            lastError = data.error || 'Failed to create session';
-                            continue;
-                        }
-                        done++;
-                        if (this.sessionClipboard === clip) delete this.pasteSelection[key];
-                    } catch (error) {
-                        failed++;
-                        lastError = error.message;
-                    }
+                const response = await fetch(add ? `${base}/${encodeURIComponent(this.picking.pollId)}/dates` : base, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        timezone: this.pollTimezone,
+                        dates: this.pollRows.map((r) => ({ date: r.date, time: r.time, duration: Number(r.duration) }))
+                    })
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    const msg = data.error || 'Failed to suggest the dates';
+                    this.pollError = msg.charAt(0).toUpperCase() + msg.slice(1) + (msg.endsWith('.') ? '' : '.');
+                    return;
                 }
+                const n = Array.isArray(data.sessions) ? data.sessions.length : this.pollRows.length;
+                this.cancelPicking();
+                await this.refresh();
+                this.showMessage(`${add ? 'Added' : 'Suggested'} ${pluralCount(n, 'date')}`, 'success');
+            } catch (error) {
+                this.pollError = 'Error: ' + error.message;
             } finally {
-                this.pasteSubmitting = false;
+                this.pollSubmitting = false;
             }
-            await this.loadSessions();
-            await this.loadDayResponses();
-            if (failed === 0) {
-                if (this.sessionClipboard === clip) this.clearClipboard();
-                this.showMessage(`Pasted to ${done} ${done === 1 ? 'day' : 'days'}`, 'success');
-                return;
-            }
-            const text = `Pasted ${done}, ${failed} failed: ${lastError}`;
-            if (this.sessionClipboard === clip) this.pasteNote = { text, type: 'error' };
-            this.showMessage(text, 'error');
         },
 
         async loadDayResponses() {
             try {
-                await Promise.all(this.getSelectedDaySessions().map((session) => this.getSessionResponseDetails(session.id)));
+                // Poll dates carry their replies in the game's data
+                await Promise.all(this.getSelectedDaySessions().filter((session) => !this.pollOf(session)).map((session) => this.getSessionResponseDetails(session.id)));
             } catch (error) {
                 this.showMessage('Error loading responses: ' + error.message, 'error');
             }
@@ -607,67 +769,59 @@ window.calendarPage = function () {
             this.selectedDay = null;
             this.selectedSession = null;
             this.pendingSessionAction = '';
+            this.pendingPollWithdraw = '';
         },
 
-        closeCreateSessionModal() {
-            this.showCreateSessionModal = false;
-            this.sessionFormData = { date: '', time: '', durationHours: 1, durationMinutes: 0, timezone: '' };
-        },
-
-        adjustDurationPart(field, delta) {
-            if (field !== 'durationHours' && field !== 'durationMinutes') {
-                return;
-            }
-
-            const current = Math.floor(Number(this.sessionFormData[field]) || 0);
-            let next = current + delta;
-            if (field === 'durationHours') {
-                next = Math.max(0, next);
-            } else {
-                next = Math.max(0, Math.min(59, next));
-            }
-            this.sessionFormData[field] = next;
-        },
-
-        async createSession() {
-            if (!this.isCurrentUserDM) {
-                this.showMessage('Only the game DM can create sessions', 'error');
-                return;
-            }
-            const durationHours = Math.max(0, Math.floor(Number(this.sessionFormData.durationHours) || 0));
-            const durationMinutes = Math.max(0, Math.min(59, Math.floor(Number(this.sessionFormData.durationMinutes) || 0)));
-            this.sessionFormData.durationHours = durationHours;
-            this.sessionFormData.durationMinutes = durationMinutes;
-            const totalDuration = (durationHours * 60) + durationMinutes;
-            if (!this.sessionFormData.date || !this.sessionFormData.time || totalDuration <= 0) {
-                this.showMessage('All session fields are required', 'error');
-                return;
-            }
-
-            try {
-                const payload = {
-                    date: this.sessionFormData.date,
-                    time: this.sessionFormData.time,
-                    duration: totalDuration,
-                    timezone: this.sessionFormData.timezone
-                };
-                const response = await fetch(`/api/campaigns/${this.currentCampaignId}/sessions`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                    this.showMessage(data.error || 'Failed to create session', 'error');
-                    return;
+        // The selected day's cards. A date of an open poll opens the whole poll (every upcoming date, from the game's
+        // own data, across months); anything else (Confirmed, Cancelled, past suggestions) is a one-session card.
+        getPanelGroups() {
+            const groups = [];
+            const seen = {};
+            for (const s of this.getSelectedDaySessions()) {
+                const info = this.pollOf(s);
+                if (!info) {
+                    groups.push({ key: s.id, poll: null, sessions: [s], selectedId: s.id });
+                } else if (!seen[info.id]) {
+                    seen[info.id] = true;
+                    groups.push({ key: 'poll:' + info.id, poll: info, sessions: info.dates, selectedId: s.id });
                 }
-                this.showMessage('Session created successfully!', 'success');
-                this.closeCreateSessionModal();
-                await this.loadSessions();
-                await this.loadDayResponses();
-            } catch (error) {
-                this.showMessage('Error creating session: ' + error.message, 'error');
             }
+            return groups;
+        },
+
+        // A Suggested date whose start has passed: it dropped out of its poll and takes no replies or confirmation.
+        isPastSuggestion(session) {
+            return session.status === 'Suggested' && !this.pollOf(session) && session.date <= this.formatDateLocal(new Date());
+        },
+
+        // The viewer owes a reply on this date.
+        awaitsMe(session) {
+            return !this.isCurrentUserDM && session.status === 'Suggested' && !session.current_user_participation && !this.isPastSuggestion(session);
+        },
+
+        pollGroupAwaitsMe(group) {
+            return !!group.poll?.multi && group.sessions.some((s) => this.awaitsMe(s));
+        },
+
+        pollHeading(info) {
+            return `Poll ${info.letter}`.trim() + ` · ${pluralCount(info.dates.length, 'date')} · ${pollRangeLabel(info.dates)}`;
+        },
+
+        // Month agenda: each poll of several dates is one row, at its first date in the month.
+        get agendaRows() {
+            const rows = [];
+            const seen = {};
+            for (const s of this.sessions) {
+                const info = this.pollOf(s);
+                if (info && info.multi) {
+                    if (seen[info.id]) continue;
+                    seen[info.id] = true;
+                    rows.push({ key: 'poll:' + info.id, date: s.date, text: this.pollHeading(info), status: 'Suggested', cls: 'chip-Suggested' });
+                } else {
+                    rows.push({ key: s.id, date: s.date, text: this.getSessionTimeRangeZone(s), status: s.status, cls: `chip-${s.status}` });
+                }
+            }
+            return rows;
         },
 
         async requestSessionStatusChange(status, session) {
@@ -676,6 +830,7 @@ window.calendarPage = function () {
                 this.showMessage('Only suggested sessions can be confirmed', 'error');
                 return;
             }
+            this.pendingPollWithdraw = '';
 
             if (this.selectedSession?.id !== session.id || this.pendingSessionAction !== status) {
                 this.selectedSession = session;
@@ -690,6 +845,7 @@ window.calendarPage = function () {
 
         async updateSessionStatus(status, session) {
             if (!session) return;
+            const withdrawing = status === 'Cancelled' && session.status === 'Suggested';
             try {
                 const response = await fetch(`/api/campaigns/${this.currentCampaignId}/sessions/${session.id}`, {
                     method: 'PUT',
@@ -701,18 +857,42 @@ window.calendarPage = function () {
                     this.showMessage(data.error || `Failed to update session to ${status}`, 'error');
                     return;
                 }
-                this.showMessage(`Session ${status.toLowerCase()} successfully`, 'success');
+                this.showMessage(withdrawing ? 'Date withdrawn' : `Session ${status.toLowerCase()} successfully`, 'success');
                 this.invalidateSessionCache(session.id);
-                await this.loadSessions();
-                await this.loadDayResponses();
+                await this.refresh();
             } catch (error) {
                 this.showMessage('Error updating session: ' + error.message, 'error');
+            }
+        },
+
+        // Withdraw the poll: two steps, like Confirm.
+        async requestPollWithdraw(info) {
+            if (!info) return;
+            if (this.pendingPollWithdraw !== info.id) {
+                this.pendingPollWithdraw = info.id;
+                this.pendingSessionAction = '';
+                this.selectedSession = null;
+                return;
+            }
+            this.pendingPollWithdraw = '';
+            try {
+                const response = await fetch(`/api/campaigns/${this.currentCampaignId}/polls/${encodeURIComponent(info.id)}`, { method: 'DELETE' });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to withdraw the poll', 'error');
+                    return;
+                }
+                this.showMessage('Poll withdrawn', 'success');
+                await this.refresh();
+            } catch (error) {
+                this.showMessage('Error withdrawing the poll: ' + error.message, 'error');
             }
         },
 
         async submitResponse(participation, session) {
             if (!session) return;
             this.pendingSessionAction = '';
+            this.pendingPollWithdraw = '';
             this.selectedSession = null;
             try {
                 const response = await fetch(`/api/campaigns/${this.currentCampaignId}/sessions/${session.id}/responses`, {
@@ -726,8 +906,7 @@ window.calendarPage = function () {
                     return;
                 }
                 this.invalidateSessionCache(session.id);
-                await this.loadSessions();
-                await this.loadDayResponses();
+                await this.refresh();
                 this.showMessage('Response submitted!', 'success');
             } catch (error) {
                 this.showMessage('Error submitting response: ' + error.message, 'error');
@@ -735,13 +914,23 @@ window.calendarPage = function () {
         },
 
         getSessionStatusWarning() {
+            const s = this.selectedSession;
+            const info = this.pollOf(s);
             if (this.pendingSessionAction === 'Confirmed') {
-                return 'Are you sure you want to confirm the session?';
+                return (info && pollConfirmWarning(s, info.dates)) || 'Are you sure you want to confirm the session?';
             }
             if (this.pendingSessionAction === 'Cancelled') {
+                if (s?.status === 'Suggested') {
+                    // The last upcoming date counts as withdrawing the poll, so the players are told.
+                    return `Withdraw ${formatShortDate(s.date)}?${info && info.dates.length === 1 ? ' Players will be told.' : ''}`;
+                }
                 return 'Are you sure you want to cancel the session?';
             }
             return '';
+        },
+
+        getPollWithdrawWarning(info) {
+            return `Withdraw the poll? All ${pluralCount(info.dates.length, 'date')} and their replies will be removed. Players will be told.`;
         },
 
         async handleLogout() {

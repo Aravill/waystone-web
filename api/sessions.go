@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -244,12 +245,13 @@ func handleCreateSession(w http.ResponseWriter, r *http.Request, campaignID stri
 		Duration:   req.Duration,
 		Timezone:   req.Timezone,
 		Status:     models.SessionSuggested,
+		PollID:     db.GenerateUUID(),
 	}
 	if err := db.SaveSession(session); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to create session")
 		return
 	}
-	notifySessionChange(userID, campaign, session, models.NotificationSessionSuggested, "")
+	notifyPoll(userID, campaign.Players, models.NotificationSessionSuggested, campaign, session, []models.CampaignSession{session}, nil)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -302,10 +304,27 @@ func handleUpdateSessionStatus(w http.ResponseWriter, r *http.Request, campaignI
 	switch req.Status {
 	case models.SessionConfirmed:
 		prev := session.Status
-		session.Status = models.SessionConfirmed
-		if err := db.SaveSession(*session); err != nil {
-			writeJSONError(w, http.StatusInternalServerError, "failed to update session")
-			return
+		if prev == models.SessionSuggested {
+			// Confirming a date also removes the other dates of its poll, in one transaction.
+			if start, ok := sessionStart(*session); !ok || !start.After(time.Now()) {
+				writeJSONError(w, http.StatusConflict, "this date has already begun")
+				return
+			}
+			if err := db.ConfirmSession(session.ID); err != nil {
+				if errors.Is(err, db.ErrSessionNotSuggested) {
+					writeJSONError(w, http.StatusConflict, "this date is no longer suggested")
+				} else {
+					writeJSONError(w, http.StatusInternalServerError, "failed to update session")
+				}
+				return
+			}
+			session.Status = models.SessionConfirmed
+		} else {
+			session.Status = models.SessionConfirmed
+			if err := db.SaveSession(*session); err != nil {
+				writeJSONError(w, http.StatusInternalServerError, "failed to update session")
+				return
+			}
 		}
 		if prev != models.SessionConfirmed {
 			notifySessionChange(userID, campaign, *session, models.NotificationSessionConfirmed, string(prev))
@@ -317,11 +336,10 @@ func handleUpdateSessionStatus(w http.ResponseWriter, r *http.Request, campaignI
 		})
 	case models.SessionCancelled:
 		if session.Status == models.SessionSuggested {
-			if err := db.DeleteSession(session.ID); err != nil {
+			if err := withdrawSuggestedDate(userID, campaign, *session); err != nil {
 				writeJSONError(w, http.StatusInternalServerError, "failed to cancel session")
 				return
 			}
-			notifySessionChange(userID, campaign, *session, models.NotificationSessionCancelled, string(models.SessionSuggested))
 			writeJSON(w, http.StatusOK, map[string]interface{}{
 				"status":  "success",
 				"message": "session cancelled and removed successfully",
@@ -377,11 +395,10 @@ func handleDeleteSession(w http.ResponseWriter, r *http.Request, campaignID, ses
 	}
 
 	if session.Status == models.SessionSuggested {
-		if err := db.DeleteSession(sessionID); err != nil {
+		if err := withdrawSuggestedDate(userID, campaign, *session); err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "failed to delete session")
 			return
 		}
-		notifySessionChange(userID, campaign, *session, models.NotificationSessionCancelled, string(models.SessionSuggested))
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"status":  "success",
 			"message": "session deleted successfully",
@@ -435,7 +452,23 @@ func handleSubmitSessionResponse(w http.ResponseWriter, r *http.Request, campaig
 		return
 	}
 
-	writeSessionResponse(w, r, sessionID, userID)
+	if session.Status == models.SessionSuggested {
+		if start, ok := sessionStart(*session); !ok || !start.After(time.Now()) {
+			writeJSONError(w, http.StatusConflict, "this date has already begun")
+			return
+		}
+	}
+
+	// Whether this reply completes the poll is judged against the state before it.
+	wasComplete := false
+	if session.Status == models.SessionSuggested && session.PollID != "" {
+		if _, complete, err := pollState(campaign, session.PollID, time.Now()); err == nil {
+			wasComplete = complete
+		}
+	}
+	if writeSessionResponse(w, r, sessionID, userID) && session.Status == models.SessionSuggested {
+		notifyPollCompleted(campaign, session.PollID, wasComplete)
+	}
 }
 
 func isCampaignPlayer(c *models.Campaign, userID string) bool {
@@ -448,20 +481,21 @@ func isCampaignPlayer(c *models.Campaign, userID string) bool {
 }
 
 // writeSessionResponse decodes the participation body, stores the user's
-// response to the session and writes the 201 reply.
-func writeSessionResponse(w http.ResponseWriter, r *http.Request, sessionID, userID string) {
+// response to the session and writes the 201 reply
+// and reports whether it was stored.
+func writeSessionResponse(w http.ResponseWriter, r *http.Request, sessionID, userID string) bool {
 	type submitResponseRequest struct {
 		Participation models.ParticipationStatus `json:"participation"`
 	}
 	var req submitResponseRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid request body")
-		return
+		return false
 	}
 
 	if req.Participation != models.Accepted && req.Participation != models.Declined && req.Participation != models.Tentative {
 		writeJSONError(w, http.StatusBadRequest, "invalid participation status")
-		return
+		return false
 	}
 
 	response := models.SessionResponse{
@@ -472,7 +506,7 @@ func writeSessionResponse(w http.ResponseWriter, r *http.Request, sessionID, use
 	}
 	if err := db.UpsertSessionResponse(response); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to submit response")
-		return
+		return false
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
@@ -480,6 +514,7 @@ func writeSessionResponse(w http.ResponseWriter, r *http.Request, sessionID, use
 		"message":  "response submitted successfully",
 		"response": response,
 	})
+	return true
 }
 
 func handleGetSessionResponses(w http.ResponseWriter, r *http.Request, campaignID, sessionID string) {

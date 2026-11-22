@@ -362,8 +362,10 @@ func HandleAdminCampaignActions(w http.ResponseWriter, r *http.Request) {
 			adminError(w, http.StatusNotFound, "player not found")
 			return
 		}
-		if applySignupStatus(w, campaignID, uid, models.SignupKicked, "player removed") != nil {
+		polls, _ := openPollStates(campaign, time.Now())
+		if updated := applySignupStatus(w, campaignID, uid, models.SignupKicked, "player removed"); updated != nil {
 			notify(caller.ID, []string{uid}, models.NotificationPlayerKicked, campaign, "", nil)
+			notifyCompletedPolls(updated, polls)
 		}
 
 	default:
