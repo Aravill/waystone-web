@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waystone Session Polls</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Barlow+Condensed:wght@600&family=IM+Fell+English+SC&display=swap">
+<style>
+/* Session polls mock-up: how the DM builds a "when is the next session" poll on the calendar page.
+   A = pick days on the calendar, then set a time per day. B = one dialog with rows.
+   Tokens are STYLE_GUIDE.md's (Parchment / Candlelight). */
+:root, [data-theme="light"] {
+    --bg: #F2EAD8; --folio: #E6DBC2; --ink: #2B241C; --muted: #6B5E4B;
+    --line: rgba(43, 36, 28, 0.4); --ctl: rgba(43, 36, 28, 0.64);
+    --rubric: #8E2A1E; --verdigris: #355E52; --ochre: #7A5A12;
+    --shadow: rgba(43, 36, 28, 0.32); --scrim: rgba(43, 36, 28, 0.55);
+    --font-text: 'Inter', system-ui, sans-serif;
+    --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    --font-title: 'IM Fell English SC', serif;
+    color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+        --line: rgba(232, 220, 196, 0.3); --ctl: rgba(232, 220, 196, 0.5);
+        --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
+        --shadow: rgba(0, 0, 0, 0.7); --scrim: rgba(0, 0, 0, 0.74);
+        color-scheme: dark;
+    }
+}
+:root[data-theme="dark"] {
+    --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+    --line: rgba(232, 220, 196, 0.3); --ctl: rgba(232, 220, 196, 0.5);
+    --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
+    --shadow: rgba(0, 0, 0, 0.7); --scrim: rgba(0, 0, 0, 0.74);
+    color-scheme: dark;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--font-text); }
+button, input, select { font: inherit; color: inherit; }
+
+/* ---------- mock-up chrome ---------- */
+.bar { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+    padding: 10px 16px; background: #2b2b2b; color: #eee; font: 13px/1.4 Inter, system-ui, sans-serif; }
+.bar strong { font-weight: 600; margin-right: auto; }
+.seg { display: inline-flex; border: 1px solid #555; }
+.seg button { background: none; border: 0; color: #ddd; padding: 5px 10px; font-size: 13px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: #eee; color: #222; }
+.doc { max-width: 76rem; margin: 0 auto; padding: 32px 16px 80px; }
+.doc > h1 { font: 44px/1.1 var(--font-display); margin-bottom: 8px; }
+.lede { color: var(--muted); max-width: 72ch; margin-bottom: 12px; }
+.doc h2.sec { font: 25px/1.2 var(--font-display); margin: 48px 0 6px; padding-bottom: 6px; border-bottom: 1px solid var(--ink); }
+.doc h2.sec::before { content: "§ "; color: var(--rubric); }
+.sec-note { color: var(--muted); font-size: 14.5px; max-width: 78ch; margin: 8px 0 18px; }
+.notes { display: grid; gap: 6px; padding-left: 1.25rem; font-size: 15px; max-width: 78ch; margin-top: 18px; }
+.notes b { font-weight: 600; }
+.step { font-size: 14px; color: var(--muted); margin: 22px 0 8px; }
+.step b { color: var(--ink); font-weight: 600; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 1000px) { .pair { grid-template-columns: 1fr; } }
+
+/* ---------- calendar page (from styles.css) ---------- */
+.cal-page { border: 1px solid var(--line); padding: 20px 24px 24px; background: var(--bg); }
+.crumb { font-size: 14.5px; color: var(--muted); }
+.crumb a { color: var(--rubric); text-decoration: underline; text-underline-offset: 4px; }
+.eyebrow { font-size: 14px; color: var(--muted); }
+.cal-title { font: 36px/1.1 var(--font-title); margin: 2px 0 0; }
+.layout { display: flex; gap: 1.75rem; padding-top: 1.25rem; flex-wrap: wrap; }
+.cal-main { flex: 1 1 30rem; min-width: 0; }
+.cal-nav { display: flex; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.nav-btn { min-width: 2.5rem; min-height: 38px; background: none; border: 1px solid var(--ctl); font-size: 1.25rem; cursor: pointer; }
+.month-name { font: 1.875rem/1 var(--font-display); }
+.month-year { color: var(--muted); font-size: 1.125rem; font-weight: 500; }
+.legend { margin-left: auto; display: flex; gap: .875rem; color: var(--muted); font-size: .875rem; }
+.legend span::before { content: ''; display: inline-block; width: .625rem; height: .625rem; margin-right: .375rem; vertical-align: -1px; border: 1px solid var(--ink); }
+.legend .lc::before { border-color: var(--verdigris); background: var(--verdigris); }
+.legend .ls::before { border-style: dashed; }
+.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-left: 1px solid var(--line); }
+.dh { padding: .5rem; border-bottom: 1px solid var(--ink); text-align: center; color: var(--muted); font-size: .875rem; }
+.day { position: relative; aspect-ratio: 1; min-width: 0; container-type: inline-size; overflow: hidden; background: var(--bg);
+    border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); cursor: pointer; transition: background-color .15s; }
+.day:hover { background: var(--folio); }
+.day.other { color: color-mix(in srgb, var(--ink) 35%, var(--bg)); cursor: default; }
+.day.other:hover { background: var(--bg); }
+.dn { display: block; padding: 5cqw; font-size: clamp(.8125rem, 11cqw, 1rem); line-height: 1.2; }
+.day.today > .dn { width: fit-content; margin: 5cqw; padding: 0 .3125rem; background: var(--ink); color: var(--bg); font-weight: 600; }
+.day.past { cursor: not-allowed; }
+.day.past:hover { background: var(--bg); }
+.frame { position: absolute; inset: 2cqw; display: flex; flex-direction: column; gap: 2cqw; padding: 3.5cqw 4cqw; border: 1px dashed var(--ink); }
+.frame .dn { padding: 0; }
+.frame.conf { border: 1px solid var(--verdigris); background: color-mix(in srgb, var(--verdigris) 10%, var(--bg)); }
+.ftime { font-size: clamp(.8125rem, 15cqw, 1rem); line-height: 1.2; white-space: nowrap; }
+.tally { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: auto; padding-top: 2cqw; border-top: 1px solid var(--line); text-align: center; }
+.frame.conf .tally { border-top-color: var(--verdigris); }
+.tally > div { display: flex; flex-direction: column; align-items: center; font-size: clamp(.6875rem, 11cqw, .875rem); line-height: 1.15; }
+.tally > div + div { border-left: 1px solid var(--line); }
+.tally b { font-size: clamp(.875rem, 18cqw, 1.5rem); font-weight: 600; line-height: 1.1; }
+.tally .z { color: var(--muted); } .tally .z b { font-weight: 400; }
+.ra { color: var(--verdigris); } .rt { color: var(--ochre); } .rd, .rw { color: var(--rubric); }
+
+/* pick mode: the paste-mode look */
+.picking .day.free { cursor: copy; }
+.picking .day.blocked { cursor: not-allowed; }
+.picking .day.blocked:hover { background: var(--bg); }
+.picking .day.free::after, .day.chosen::after { position: absolute; top: 3cqw; right: 4cqw; color: var(--rubric); font-size: clamp(.8125rem, 12cqw, 1.125rem); line-height: 1; }
+.picking .day.free::after { content: '+'; }
+.day.chosen::after { content: '✓'; }
+.day.chosen, .day.chosen:hover { background: var(--folio); outline: 2px solid var(--rubric); outline-offset: -2px; }
+.day.chosen .pick-time { position: absolute; left: 5cqw; bottom: 5cqw; font-size: clamp(.75rem, 13cqw, .9375rem); color: var(--ink); }
+
+/* panel */
+.panel { flex: 1 1 18rem; min-width: 15rem; padding-left: 1.75rem; border-left: 1px solid var(--ink); }
+.panel h3 { font-size: 1.375rem; font-weight: 600; line-height: 1.25; margin: 2px 0 .75rem; }
+.pick-bar { display: grid; gap: .625rem; padding: .625rem .75rem; border: 1px solid var(--rubric); margin-bottom: 1rem; }
+.pick-bar .lbl { font-weight: 600; }
+.pick-bar .note { font-size: 14px; color: var(--muted); }
+.pick-bar .note.err { color: var(--rubric); }
+.pick-list { list-style: none; display: grid; font-size: 15px; border-top: 1px solid var(--line); }
+.pick-list li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.pick-list li span:last-child { color: var(--muted); }
+.acts { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 8px 16px; background: none; color: var(--ink);
+    border: 1px solid var(--ctl); font-size: 14.5px; font-weight: 500; cursor: pointer; transition: background-color .15s, color .15s; }
+.btn:hover:not(:disabled) { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn--primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn--primary:hover:not(:disabled) { opacity: .85; }
+.btn:disabled { color: var(--muted); border: 1px dashed var(--line); background: none; cursor: default; }
+.btn--wide { width: 100%; }
+.hint { font-size: 14px; color: var(--muted); }
+.link { background: none; border: 0; color: var(--rubric); text-decoration: underline; text-underline-offset: 4px; font-size: 14.5px; cursor: pointer; }
+.agenda-row { display: grid; grid-template-columns: 6.5rem 1fr auto; gap: 8px; width: 100%; padding: 8px 0; background: none; border: 0; border-bottom: 1px solid var(--line); text-align: left; font-size: 15px; }
+.agenda-row .st { font-size: 13.5px; padding: 0 7px; border: 1px solid var(--verdigris); color: var(--verdigris); }
+
+/* ---------- dialog (from modals.html) ---------- */
+.stage { display: grid; place-items: center; padding: 32px 20px; position: relative; isolation: isolate; border: 1px solid var(--line); background: var(--bg); }
+.stage::before { content: ""; position: absolute; inset: 0; background: var(--scrim); z-index: -1; }
+.m { width: 100%; max-width: 36rem; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--ink);
+    outline: 1px solid var(--line); outline-offset: 4px; box-shadow: 0 24px 64px var(--shadow); }
+.m-head { display: flex; align-items: flex-start; gap: 16px; padding: 16px 16px 14px 24px; background: var(--folio); border-bottom: 1px solid var(--ink); }
+.m-head > div { flex: 1; }
+.m-eyebrow { display: block; font-size: 14px; color: var(--muted); }
+.m-title { font: 28px/1.15 var(--font-display); }
+.m-x { width: 40px; height: 40px; background: none; border: 1px solid transparent; font-size: 24px; line-height: 1; cursor: pointer; }
+.m-x:hover { border-color: var(--ink); }
+.m-body { padding: 22px 24px 24px; display: grid; gap: 18px; }
+.m-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; padding: 14px 24px; background: var(--folio); border-top: 1px solid var(--line); }
+.m-foot .btn { min-width: 7rem; }
+.m-foot .start { margin-right: auto; }
+.f-label { font-size: 15px; font-weight: 600; }
+.f-input { width: 100%; min-height: 44px; padding: 10px 12px; background: var(--folio); border: 1px solid transparent; border-bottom: 1px solid var(--ink); font-size: 16px; line-height: 1.4; }
+.f-input:focus { outline: none; border-color: var(--rubric); box-shadow: inset 0 -2px 0 var(--rubric); }
+select.f-input { appearance: none; padding-right: 32px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%), linear-gradient(-45deg, transparent 50%, var(--ink) 50%);
+    background-position: right 16px top 50%, right 11px top 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+.f { display: grid; gap: 6px; }
+
+/* option rows */
+.opts { display: grid; }
+.opts-head, .opt { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) 40px; gap: 10px; align-items: center; }
+.opts-head { font-size: 14px; color: var(--muted); padding-bottom: 6px; border-bottom: 1px solid var(--ink); }
+.opt { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.opt-date { font-weight: 600; }
+.opt-date small { display: block; font-weight: 400; font-size: 14px; color: var(--muted); }
+.opt .f-input { min-height: 40px; padding: 8px 10px; }
+.opt-x { width: 40px; height: 40px; background: none; border: 1px solid transparent; color: var(--muted); font-size: 20px; cursor: pointer; }
+.opt-x:hover { border-color: var(--rubric); color: var(--rubric); }
+.opt.is-error .f-input { border-bottom-color: var(--rubric); }
+.opt-err { grid-column: 1 / -1; font-size: 14px; font-weight: 600; color: var(--rubric); }
+.under { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: center; margin-top: 6px; }
+.summary { padding: 10px 12px; background: var(--folio); font-size: 15px; }
+.summary b { font-weight: 600; }
+@media (max-width: 560px) {
+    .opts-head { display: none; }
+    .opt { grid-template-columns: 1fr 1fr 40px; }
+    .opt-date { grid-column: 1 / -1; }
+}
+</style>
+</head>
+<body>
+<div class="bar">
+    <strong>Waystone · Session polls mock-up</strong>
+    <span>Theme</span>
+    <div class="seg" id="theme">
+        <button type="button" data-v="light" aria-pressed="true">Parchment</button>
+        <button type="button" data-v="dark" aria-pressed="false">Candlelight</button>
+    </div>
+</div>
+
+<div class="doc">
+    <h1>Suggesting a poll of dates</h1>
+    <p class="lede">The DM offers several dates for the next session as one poll, each date with its own start time and length. Players reply Yes / Maybe / No to each date as today. When the DM confirms one date, the others are removed, and players get one notification for the poll and one for the confirmation.</p>
+    <p class="lede">There are two ways to build the poll. The pages are live: click days, change times, remove rows.</p>
+
+    <!-- ================= A ================= -->
+    <h2 class="sec">A · Pick days on the calendar, then set the times</h2>
+    <p class="sec-note">This grows out of today's Copy → paste mode. The DM clicks <b>Suggest dates</b> in the panel (or <b>Copy</b> on a session, which fills in its time), clicks days in the month, then <b>Next</b> opens one dialog with a row per day. Days in other months can be added by moving the month while picking.</p>
+
+    <p class="step"><b>1 · Picking.</b> The bar sits at the top of the side panel, like the paste bar. Free days show a red +, picked days a ✓. Past days and days that already have a session can't be picked.</p>
+    <div class="cal-page">
+        <div class="crumb"><a href="#">Games</a> › <a href="#">The Sunless Citadel</a> › Calendar</div>
+        <div class="layout picking" id="a-layout">
+            <div class="cal-main">
+                <p class="eyebrow">Calendar of sessions</p>
+                <h1 class="cal-title">The Sunless Citadel</h1>
+                <div class="cal-nav" style="margin-top:14px">
+                    <button class="nav-btn" type="button" aria-label="Previous month">‹</button>
+                    <span><span class="month-name">December</span> <span class="month-year">2026</span></span>
+                    <button class="nav-btn" type="button" aria-label="Next month">›</button>
+                    <div class="legend"><span class="lc">confirmed</span><span class="ls">suggested</span></div>
+                </div>
+                <div class="grid" id="a-grid"></div>
+            </div>
+            <aside class="panel">
+                <div class="pick-bar">
+                    <span class="lbl">Suggest dates</span>
+                    <span class="note" id="a-note">Choose the days to offer.</span>
+                    <ul class="pick-list" id="a-list"></ul>
+                    <div class="acts">
+                        <button type="button" class="btn">Cancel (Esc)</button>
+                        <button type="button" class="btn btn--primary" id="a-next">Next</button>
+                    </div>
+                </div>
+                <p class="eyebrow">Month agenda</p>
+                <h3>Sessions in December 2026</h3>
+                <button type="button" class="agenda-row"><span>Sat, Dec 5</span><span>18:00–22:00 CET</span><span class="st">Confirmed</span></button>
+            </aside>
+        </div>
+    </div>
+
+    <p class="step"><b>2 · Times.</b> One row per picked day. New rows take the first row's time and length, so the DM only changes the odd one out. The timezone is shared by every row.</p>
+    <div class="stage">
+        <div class="m" role="dialog" aria-label="Suggest dates">
+            <div class="m-head">
+                <div><span class="m-eyebrow">The Sunless Citadel</span><span class="m-title">Suggest dates</span></div>
+                <button class="m-x" type="button" aria-label="Close">×</button>
+            </div>
+            <div class="m-body">
+                <div class="opts">
+                    <div class="opts-head"><span>Date</span><span>Start</span><span>Length</span><span></span></div>
+                    <div id="a-rows"></div>
+                    <div class="under">
+                        <button type="button" class="link" id="a-same">Use the first row's time for all</button>
+                        <button type="button" class="link">Back to the calendar</button>
+                    </div>
+                </div>
+                <div class="f">
+                    <label class="f-label" for="a-tz">Timezone</label>
+                    <select class="f-input" id="a-tz"><option>Europe/Prague</option><option>Europe/London</option><option>UTC</option></select>
+                </div>
+                <p class="summary" id="a-sum"></p>
+            </div>
+            <div class="m-foot">
+                <button type="button" class="btn">Cancel</button>
+                <button type="button" class="btn btn--primary" id="a-post">Suggest 3 dates</button>
+            </div>
+        </div>
+    </div>
+    <ul class="notes">
+        <li><b>Good:</b> the month is in view while choosing, so clashes with other sessions and the gaps between dates are obvious. It reuses the paste mode the DM already knows, and Copy simply pre-fills the time.</li>
+        <li><b>Cost:</b> two steps, and picking mode is one more calendar state (it already exists for paste).</li>
+        <li><b>Phones:</b> the bar sits above the month; the dialog is a bottom sheet and each row wraps to date on top, then start and length.</li>
+    </ul>
+
+    <!-- ================= B ================= -->
+    <h2 class="sec">B · One dialog with rows</h2>
+    <p class="sec-note">The DM clicks <b>Suggest dates</b> (or <b>+ Suggest session</b> on a selected day, which becomes the first row) and adds dates in the dialog itself, with a date field per row. The calendar stays as it is today, without a picking mode.</p>
+    <div class="pair">
+        <div class="cal-page">
+            <div class="crumb"><a href="#">Games</a> › <a href="#">The Sunless Citadel</a> › Calendar</div>
+            <div class="layout">
+                <div class="cal-main" style="flex-basis:100%">
+                    <p class="eyebrow">Calendar of sessions</p>
+                    <h1 class="cal-title">The Sunless Citadel</h1>
+                    <div class="cal-nav" style="margin-top:14px">
+                        <button class="nav-btn" type="button" aria-label="Previous month">‹</button>
+                        <span><span class="month-name">December</span> <span class="month-year">2026</span></span>
+                        <button class="nav-btn" type="button" aria-label="Next month">›</button>
+                    </div>
+                    <div class="grid" id="b-grid"></div>
+                </div>
+                <aside class="panel" style="flex-basis:100%;border-left:0;padding-left:0;border-top:1px solid var(--ink);padding-top:14px">
+                    <p class="eyebrow">Month agenda</p>
+                    <h3>Sessions in December 2026</h3>
+                    <button type="button" class="btn btn--wide">+ Suggest dates</button>
+                </aside>
+            </div>
+        </div>
+        <div class="stage" style="align-self:stretch">
+            <div class="m" role="dialog" aria-label="Suggest dates">
+                <div class="m-head">
+                    <div><span class="m-eyebrow">The Sunless Citadel</span><span class="m-title">Suggest dates</span></div>
+                    <button class="m-x" type="button" aria-label="Close">×</button>
+                </div>
+                <div class="m-body">
+                    <div class="opts">
+                        <div class="opts-head"><span>Date</span><span>Start</span><span>Length</span><span></span></div>
+                        <div id="b-rows"></div>
+                        <div class="under">
+                            <button type="button" class="link" id="b-add">+ Add a date</button>
+                        </div>
+                    </div>
+                    <div class="f">
+                        <label class="f-label" for="b-tz">Timezone</label>
+                        <select class="f-input" id="b-tz"><option>Europe/Prague</option><option>Europe/London</option><option>UTC</option></select>
+                    </div>
+                </div>
+                <div class="m-foot">
+                    <button type="button" class="btn">Cancel</button>
+                    <button type="button" class="btn btn--primary" id="b-post">Suggest 3 dates</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <ul class="notes">
+        <li><b>Good:</b> one dialog, one step, and nothing new on the calendar itself.</li>
+        <li><b>Cost:</b> the month is hidden behind the dialog, so the DM picks dates blind from a date field and only finds a clash (the 2nd row here) when the row turns red. Copy → paste would need its own place in this dialog.</li>
+        <li><b>Phones:</b> native date pickers are fine on phones, but three fields per row stack into a long sheet.</li>
+    </ul>
+
+    <h2 class="sec">Shared by both</h2>
+    <ul class="notes">
+        <li><b>Length</b> is one select (1h, 1h 30m … 8h) instead of today's hour and minute spinners, which are too wide for a row. Today's single-session dialog would switch to it too.</li>
+        <li>A poll needs at least one date; with one row the button reads "Suggest 1 date" and it behaves like today's single suggestion.</li>
+        <li>Adding a date to an open poll later reuses the same picking (A) or the same dialog with the existing dates locked (B).</li>
+    </ul>
+</div>
+
+<script>
+document.querySelectorAll('#theme button').forEach((b) => b.addEventListener('click', () => {
+    document.documentElement.dataset.theme = b.dataset.v;
+    document.querySelectorAll('#theme button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+}));
+
+const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const LEN = ['1h', '1h 30m', '2h', '2h 30m', '3h', '3h 30m', '4h', '4h 30m', '5h', '6h', '7h', '8h'];
+const TODAY = 22; // Nov 22, 2026; December is all in the future
+const confirmed = { 5: '18:00' };
+const days = []; // Mon Nov 30 … Sun Jan 3
+for (let i = 0; i < 35; i++) {
+    const d = new Date(2026, 10, 30 + i);
+    days.push({ d, other: d.getMonth() !== 11, n: d.getDate(), wd: WD[i % 7] });
+}
+const fmt = (day) => `${day.wd}, Dec ${day.n}`;
+
+function cellHtml(day, picked, pickedTime) {
+    const cls = ['day'];
+    if (day.other) cls.push('other');
+    let inner = `<span class="dn">${day.n}</span>`;
+    if (!day.other && confirmed[day.n]) {
+        cls.push('blocked');
+        inner = `<div class="frame conf"><span class="dn">${day.n}</span><span class="ftime">${confirmed[day.n]}</span>
+            <div class="tally"><div class="ra"><span>✓</span><b>4</b></div><div class="rt z"><span>?</span><b>0</b></div><div class="rd z"><span>✗</span><b>0</b></div><div class="rw"><span>…</span><b>1</b></div></div></div>`;
+    } else if (!day.other) {
+        cls.push(picked ? 'chosen' : 'free');
+        if (picked) inner += `<span class="pick-time">${pickedTime}</span>`;
+    }
+    return `<div class="${cls.join(' ')}" data-n="${day.other ? '' : day.n}" role="button" tabindex="${day.other ? -1 : 0}">${inner}</div>`;
+}
+
+/* ---------- A ---------- */
+let aRows = [
+    { n: 11, time: '19:00', len: '4h' },
+    { n: 12, time: '14:00', len: '5h' },
+    { n: 16, time: '19:00', len: '4h' },
+];
+function aDay(n) { return days.find((x) => !x.other && x.n === n); }
+function renderA() {
+    aRows.sort((x, y) => x.n - y.n);
+    const g = document.getElementById('a-grid');
+    g.innerHTML = WD.map((w) => `<div class="dh">${w}</div>`).join('') +
+        days.map((day) => { const r = aRows.find((x) => !day.other && x.n === day.n); return cellHtml(day, !!r, r ? r.time : ''); }).join('');
+    const c = aRows.length;
+    document.getElementById('a-note').textContent = c ? `${c} ${c === 1 ? 'day' : 'days'} picked` : 'Choose the days to offer.';
+    document.getElementById('a-note').classList.remove('err');
+    document.getElementById('a-list').innerHTML = aRows.map((r) => `<li><span>${fmt(aDay(r.n))}</span><span>${r.time}</span></li>`).join('');
+    const next = document.getElementById('a-next');
+    next.disabled = !c;
+    next.textContent = c ? `Next: set times (${c})` : 'Next';
+    document.getElementById('a-rows').innerHTML = aRows.map((r, i) => `
+        <div class="opt">
+            <span class="opt-date">${fmt(aDay(r.n))}<small>2026</small></span>
+            <input class="f-input" type="time" value="${r.time}" data-i="${i}" data-k="time" aria-label="Start on ${fmt(aDay(r.n))}">
+            <select class="f-input" data-i="${i}" data-k="len" aria-label="Length on ${fmt(aDay(r.n))}">${LEN.map((l) => `<option${l === r.len ? ' selected' : ''}>${l}</option>`).join('')}</select>
+            <button type="button" class="opt-x" data-i="${i}" aria-label="Remove ${fmt(aDay(r.n))}">×</button>
+        </div>`).join('');
+    document.getElementById('a-post').textContent = `Suggest ${c} ${c === 1 ? 'date' : 'dates'}`;
+    document.getElementById('a-post').disabled = !c;
+    document.getElementById('a-sum').innerHTML = c
+        ? `Players get <b>one</b> notification: “Mira suggested ${c} ${c === 1 ? 'date' : 'dates'} for The Sunless Citadel: ${aRows.map((r) => `Dec ${r.n}`).join(', ')}.”`
+        : 'Pick at least one day.';
+}
+document.getElementById('a-grid').addEventListener('click', (e) => {
+    const cell = e.target.closest('.day');
+    if (!cell || !cell.dataset.n) return;
+    const n = Number(cell.dataset.n);
+    const note = document.getElementById('a-note');
+    if (confirmed[n]) { renderA(); note.textContent = 'That day already has a session'; note.classList.add('err'); return; }
+    const i = aRows.findIndex((r) => r.n === n);
+    if (i >= 0) aRows.splice(i, 1);
+    else aRows.push({ n, time: aRows[0]?.time || '19:00', len: aRows[0]?.len || '4h' });
+    renderA();
+});
+document.getElementById('a-rows').addEventListener('change', (e) => {
+    const t = e.target; if (!t.dataset.k) return;
+    aRows[Number(t.dataset.i)][t.dataset.k] = t.value; renderA();
+});
+document.getElementById('a-rows').addEventListener('click', (e) => {
+    const b = e.target.closest('.opt-x'); if (!b) return;
+    aRows.splice(Number(b.dataset.i), 1); renderA();
+});
+document.getElementById('a-same').addEventListener('click', () => {
+    if (!aRows.length) return;
+    aRows.forEach((r) => { r.time = aRows[0].time; r.len = aRows[0].len; }); renderA();
+});
+renderA();
+
+/* ---------- B ---------- */
+let bRows = [
+    { date: '2026-12-11', time: '19:00', len: '4h' },
+    { date: '2026-12-05', time: '14:00', len: '5h' },
+    { date: '2026-12-16', time: '19:00', len: '4h' },
+];
+function renderB() {
+    const g = document.getElementById('b-grid');
+    g.innerHTML = WD.map((w) => `<div class="dh">${w}</div>`).join('') + days.map((day) => cellHtml(day, false, '')).join('');
+    g.querySelectorAll('.free').forEach((c) => c.classList.remove('free'));
+    document.getElementById('b-rows').innerHTML = bRows.map((r, i) => {
+        const n = Number(r.date.slice(8)); const clash = r.date.slice(0, 7) === '2026-12' && confirmed[n];
+        return `<div class="opt${clash ? ' is-error' : ''}">
+            <input class="f-input" type="date" value="${r.date}" min="2026-11-22" data-i="${i}" data-k="date" aria-label="Date ${i + 1}">
+            <input class="f-input" type="time" value="${r.time}" data-i="${i}" data-k="time" aria-label="Start ${i + 1}">
+            <select class="f-input" data-i="${i}" data-k="len" aria-label="Length ${i + 1}">${LEN.map((l) => `<option${l === r.len ? ' selected' : ''}>${l}</option>`).join('')}</select>
+            <button type="button" class="opt-x" data-i="${i}" aria-label="Remove date ${i + 1}">×</button>
+            ${clash ? '<span class="opt-err">Dec 5 already has a session. Pick another day.</span>' : ''}
+        </div>`;
+    }).join('');
+    const c = bRows.length;
+    const p = document.getElementById('b-post');
+    p.textContent = `Suggest ${c} ${c === 1 ? 'date' : 'dates'}`;
+    p.disabled = !c || bRows.some((r) => r.date.slice(0, 7) === '2026-12' && confirmed[Number(r.date.slice(8))]);
+}
+document.getElementById('b-rows').addEventListener('change', (e) => {
+    const t = e.target; if (!t.dataset.k) return;
+    bRows[Number(t.dataset.i)][t.dataset.k] = t.value; renderB();
+});
+document.getElementById('b-rows').addEventListener('click', (e) => {
+    const b = e.target.closest('.opt-x'); if (!b) return;
+    bRows.splice(Number(b.dataset.i), 1); renderB();
+});
+document.getElementById('b-add').addEventListener('click', () => {
+    const last = bRows[bRows.length - 1];
+    bRows.push({ date: '', time: last?.time || '19:00', len: last?.len || '4h' }); renderB();
+});
+renderB();
+</script>
+</body>
+</html>
