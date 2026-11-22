@@ -35,6 +35,7 @@ type Store interface {
 	GetSessionByID(sessionID string) (*models.CampaignSession, error)
 	SaveSession(session models.CampaignSession) error
 	SaveManualSession(session models.CampaignSession, attendeeIDs []string) error
+	SaveSessionAttendance(sessionID string, guests []string, dmAbsent bool, attendeeIDs []string) error
 	DeleteManualSession(sessionID string) error
 	GetSessionsByCampaignIDs(campaignIDs []string, fromDate string) ([]models.CampaignSession, error)
 	GetAcceptedConfirmedSessions(userID string) ([]models.CampaignSession, error)

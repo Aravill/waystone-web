@@ -1424,6 +1424,67 @@ func (s *SQLiteStore) SaveManualSession(session models.CampaignSession, attendee
 	return tx.Commit()
 }
 
+// SaveSessionAttendance sets who was at a played calendar session in one transaction: the guests and
+// the DM's presence on the session, Accepted for each attendee and Declined for any other Accepted
+// reply. Other replies are left alone. It sends no notifications.
+func (s *SQLiteStore) SaveSessionAttendance(sessionID string, guests []string, dmAbsent bool, attendeeIDs []string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if guests == nil {
+		guests = []string{}
+	}
+	guestsJSON, _ := json.Marshal(guests)
+	now := time.Now().UTC().Format(time.RFC3339)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`UPDATE campaign_sessions SET guests = ?, dm_absent = ?, updated_at = ? WHERE id = ?`,
+		string(guestsJSON), dmAbsent, now, sessionID); err != nil {
+		return err
+	}
+	there := map[string]bool{}
+	for _, userID := range attendeeIDs {
+		there[userID] = true
+		res, err := tx.Exec(`UPDATE session_responses SET participation = ?, updated_at = ? WHERE session_id = ? AND user_id = ?`,
+			models.Accepted, now, sessionID, userID)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			if _, err := tx.Exec(`INSERT INTO session_responses (id, session_id, user_id, participation, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+				GenerateUUID(), sessionID, userID, models.Accepted, now, now); err != nil {
+				return err
+			}
+		}
+	}
+	rows, err := tx.Query(`SELECT user_id FROM session_responses WHERE session_id = ? AND participation = ?`, sessionID, models.Accepted)
+	if err != nil {
+		return err
+	}
+	var absent []string
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			rows.Close()
+			return err
+		}
+		if !there[userID] {
+			absent = append(absent, userID)
+		}
+	}
+	rows.Close()
+	for _, userID := range absent {
+		if _, err := tx.Exec(`UPDATE session_responses SET participation = ?, updated_at = ? WHERE session_id = ? AND user_id = ?`,
+			models.Declined, now, sessionID, userID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // DeleteManualSession removes a by-hand session and its responses. Foreign keys are off, so nothing cascades.
 func (s *SQLiteStore) DeleteManualSession(sessionID string) error {
 	s.mutex.Lock()
