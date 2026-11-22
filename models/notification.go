@@ -18,6 +18,8 @@ const (
 	NotificationSessionStarted    NotificationType = "session_started"
 	NotificationPollReminder      NotificationType = "poll_reminder"
 	NotificationPollComplete      NotificationType = "poll_complete"
+	NotificationPollPosted        NotificationType = "poll_posted"
+	NotificationPollSkipped       NotificationType = "poll_skipped"
 	NotificationCharacterStatus   NotificationType = "character_status"
 	NotificationCharacterAssigned NotificationType = "character_assigned"
 	NotificationCharacterCleared  NotificationType = "character_cleared"

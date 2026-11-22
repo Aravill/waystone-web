@@ -177,6 +177,11 @@ func HandleCampaignRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(parts) == 2 && parts[1] == "poll-schedule" {
+		HandlePollSchedule(w, r)
+		return
+	}
+
 	if len(parts) >= 2 && parts[1] == "polls" {
 		HandlePolls(w, r)
 		return
