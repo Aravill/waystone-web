@@ -80,6 +80,9 @@ func GetBacklinks(id string) ([]models.PageBacklink, error) { return GetStore().
 func GetCodexBodies(codexID string) ([]models.PageBody, error) {
 	return GetStore().GetCodexBodies(codexID)
 }
+func CountPagesByAuthor(userID string) (map[string]int, error) {
+	return GetStore().CountPagesByAuthor(userID)
+}
 func GetWantedPages(codexID string) ([]models.WantedPage, error) {
 	return GetStore().GetWantedPages(codexID)
 }

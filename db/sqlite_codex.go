@@ -269,6 +269,27 @@ func (s *SQLiteStore) GetBacklinks(id string) ([]models.PageBacklink, error) {
 	return out, nil
 }
 
+// CountPagesByAuthor returns how many pages the user created (pages.author_id), per codex id.
+func (s *SQLiteStore) CountPagesByAuthor(userID string) (map[string]int, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	rows, err := s.db.Query(`SELECT codex_id, COUNT(*) FROM pages WHERE author_id = ? GROUP BY codex_id`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var id string
+		var n int
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, err
+		}
+		out[id] = n
+	}
+	return out, rows.Err()
+}
+
 // GetCodexBodies lists the pages of a codex with the body of their newest revision, ordered by title.
 func (s *SQLiteStore) GetCodexBodies(codexID string) ([]models.PageBody, error) {
 	s.mutex.RLock()

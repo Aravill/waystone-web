@@ -101,6 +101,8 @@
                         <div class="profile-stats" x-show="!profile.user.deleted && profile.stats">
                             <div class="profile-stat"><span class="profile-stat-value" x-text="profile.stats.campaigns_played"></span><span class="profile-stat-label">Games played</span></div>
                             <div class="profile-stat"><span class="profile-stat-value" x-text="profile.stats.sessions_played"></span><span class="profile-stat-label">Sessions played</span></div>
+                            <div class="profile-stat" x-show="dmCampaigns.length > 0 || profile.stats.sessions_hosted > 0"><span class="profile-stat-value" x-text="profile.stats.sessions_hosted"></span><span class="profile-stat-label">Sessions hosted</span></div>
+                            <div class="profile-stat" x-show="profile.stats.codex_pages !== undefined"><span class="profile-stat-value" x-text="profile.stats.codex_pages"></span><span class="profile-stat-label">Codex entries authored</span></div>
                             <div class="profile-stat"><span class="profile-stat-value" x-text="memberSince"></span><span class="profile-stat-label">Member since</span></div>
                         </div>
                     </div>

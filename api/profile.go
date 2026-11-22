@@ -162,20 +162,67 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		now := time.Now()
+		// ended: by-hand sessions are past by construction and may have no time.
+		ended := func(session models.CampaignSession) bool {
+			if session.Manual {
+				return true
+			}
+			start, ok := sessionStart(session)
+			return ok && !start.Add(time.Duration(session.Duration)*time.Minute).After(now)
+		}
 		for _, session := range accepted {
-			if !session.Manual { // by-hand sessions are past by construction and may have no time
-				start, ok := sessionStart(session)
-				if !ok || start.Add(time.Duration(session.Duration)*time.Minute).After(now) {
-					continue
-				}
+			if !ended(session) {
+				continue
 			}
 			sessionsPlayed++
 			playedCampaigns[session.CampaignID] = true
 		}
+
+		// Sessions hosted: Confirmed, ended sessions of the games the user runs now, unless the DM missed one.
+		dmIDs := make([]string, 0, len(dmCampaigns))
+		for _, c := range dmCampaigns {
+			dmIDs = append(dmIDs, c["id"].(string))
+		}
+		hosted, err := db.GetSessionsByCampaignIDs(dmIDs, "")
+		if err != nil {
+			log.Printf("error fetching hosted sessions: %v", err)
+			writeJSONError(w, http.StatusInternalServerError, "failed to fetch sessions")
+			return
+		}
+		sessionsHosted := 0
+		for _, session := range hosted {
+			if session.Status == models.SessionConfirmed && !session.DMAbsent && ended(session) {
+				sessionsHosted++
+			}
+		}
+
 		stats = map[string]interface{}{
 			"campaigns_played": len(playedCampaigns),
 			"sessions_played":  sessionsPlayed,
+			"sessions_hosted":  sessionsHosted,
 			"member_since":     user.CreatedAt.Format(time.RFC3339),
+		}
+
+		// Codex pages created, counted only in codices the viewer can see; left out without See Codices.
+		rights, err := loadCodexRights(sessionUserID)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "failed to fetch rights")
+			return
+		}
+		if rights.canUse() {
+			perCodex, err := db.CountPagesByAuthor(user.ID)
+			if err != nil {
+				log.Printf("error counting codex pages: %v", err)
+				writeJSONError(w, http.StatusInternalServerError, "failed to fetch codex pages")
+				return
+			}
+			pages := 0
+			for codexID, n := range perCodex {
+				if rights.canSee(codexID) {
+					pages += n
+				}
+			}
+			stats["codex_pages"] = pages
 		}
 	}
 
