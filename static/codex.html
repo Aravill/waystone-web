@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=81">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=41">
+    <link rel="stylesheet" href="/static/codex.css?v=42">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -68,7 +68,7 @@
         <button type="button" class="cx-note" x-show="canNote" x-cloak aria-label="Quick note" aria-keyshortcuts="N" title="Quick note (N)" @click="openQuickNote()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M9 12h6M12 9v6"/></svg><span>Note</span><kbd aria-hidden="true">N</kbd></button>
     </div>
 
-    <div class="cx-shell" :class="{ ['cx-shell--' + screen]: true, 'nav-open': navOpen, 'nav-anim': navAnim }" @keydown.escape.window="navOpen && closeNav()">
+    <div class="cx-shell" :class="{ ['cx-shell--' + screen]: true, ['cx-width--' + pageWidth]: screen === 'page', 'nav-open': navOpen, 'nav-anim': navAnim }" @keydown.escape.window="navOpen && closeNav()">
         <div class="cx-scrim" @click="closeNav()"></div>
 
         <!-- Left nav: the folder tree. A drawer on phones. -->
@@ -366,7 +366,15 @@
                                 </div>
                             </div>
                         </header>
-                        <p class="cx-sub" x-show="screen === 'page'" x-text="isTimeline ? tlSummary : 'Revision ' + page.current_revision + ' · last edited by ' + page.updated_by_user.display_name + ' ' + formatStamp(page.updated_at)"></p>
+                        <div class="cx-subrow" x-show="screen === 'page'">
+                            <p class="cx-sub" x-text="isTimeline ? tlSummary : 'Revision ' + page.current_revision + ' · last edited by ' + page.updated_by_user.display_name + ' ' + formatStamp(page.updated_at)"></p>
+                            <div class="cx-widthpick" role="group" aria-label="Page width">
+                                <span class="muted">Width</span>
+                                <button type="button" class="tab" :aria-pressed="pageWidth === 'thin'" @click="setPageWidth('thin')">Thin</button>
+                                <button type="button" class="tab" :aria-pressed="pageWidth === 'medium'" @click="setPageWidth('medium')">Medium</button>
+                                <button type="button" class="tab" :aria-pressed="pageWidth === 'wide'" @click="setPageWidth('wide')">Wide</button>
+                            </div>
+                        </div>
                         <dl class="cx-jmeta" x-show="journal && screen === 'page'">
                             <div><dt>Played</dt><dd x-text="journal ? parseDateLocal(journal.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : ''"></dd></div>
                             <div><dt>At the table</dt><dd x-text="journalWho"></dd></div>
@@ -1095,6 +1103,6 @@
     <script src="/campaigns.js?v=66"></script>
     <script src="/static/codex-editor.js?v=5"></script>
     <script src="/static/codex-graph.js?v=3"></script>
-    <script src="/static/codex.js?v=34"></script>
+    <script src="/static/codex.js?v=35"></script>
 </body>
 </html>

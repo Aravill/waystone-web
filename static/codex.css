@@ -1325,6 +1325,41 @@ button.wikilink {
     max-width: 90rem;
 }
 
+.cx-shell--page.cx-width--medium .cx-inner {
+    max-width: max(52rem, 75%);
+}
+
+.cx-shell--page.cx-width--wide .cx-inner {
+    max-width: none;
+}
+
+.cx-shell--page:is(.cx-width--medium, .cx-width--wide) .codex-text :is(p, ul, ol, blockquote) {
+    max-width: none;
+}
+
+.cx-subrow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0 1rem;
+}
+
+.cx-widthpick {
+    display: flex;
+    align-items: center;
+    font-size: 0.8125rem;
+}
+
+.cx-widthpick .muted {
+    margin-right: 0.75rem;
+}
+
+.cx-widthpick .tab:last-child {
+    margin-right: 0;
+    padding-right: 0;
+}
+
 .cx-crumb {
     margin: 0 0 0.5rem;
     color: var(--muted);
@@ -2298,6 +2333,10 @@ html:has(dialog.cx-lightbox[open]) {
 
 /* Phones: one column; the folder tree is a drawer opened from the top bar */
 @media (max-width: 900px) {
+    .cx-widthpick {
+        display: none;
+    }
+
     .cx-top {
         gap: 0.5rem;
         padding: 0.5rem;

@@ -675,6 +675,7 @@ window.codexPage = function () {
         notesLoading: false,
         notesError: '',
         confirmDialog: { open: false, eyebrow: '', title: '', message: '', confirmLabel: '', danger: true, resolve: null },
+        pageWidth: 'thin', // page screen reading width: thin, medium or wide (kept in localStorage)
         home: null,
         pagers: { homeRecent: 0, recent: 0, wanted: 0 }, // current page of each short list
         pagerId: '',
@@ -772,6 +773,10 @@ window.codexPage = function () {
                 window.location.href = '/login.html';
                 return;
             }
+            try {
+                const w = localStorage.getItem('codex-page-width');
+                if (w === 'medium' || w === 'wide') this.pageWidth = w;
+            } catch (e) { /* storage blocked: stay thin */ }
             this.route = this.parseRoute();
             if (!this.route) {
                 this.route = { screen: 'home', id: '' };
@@ -887,6 +892,11 @@ window.codexPage = function () {
             });
             if (s === 'page') return [...list, { label: this.page.title, href: '' }];
             return [...list, { label: this.page.title, href: this.pageUrl(this.page) }, { label: s === 'edit' ? 'Edit' : 'History', href: '' }];
+        },
+
+        setPageWidth(w) {
+            this.pageWidth = w;
+            try { localStorage.setItem('codex-page-width', w); } catch (e) { /* not saved */ }
         },
 
         // Short lists on the homes and in the side panel show CODEX_LIST_PAGE rows at a time.
