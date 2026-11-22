@@ -859,3 +859,99 @@ test.describe('Codices quick notes and the Inbox', () => {
     expect(notes.map((n) => n.body)).toContain('E2E from the game');
   });
 });
+
+test.describe('Codices link from selection', () => {
+  let editor;
+  let codex;
+  const ids = [];
+
+  test.beforeEach(async () => {
+    editor = await apiAs('roy');
+    const home = await (await editor.get('/api/codices')).json();
+    codex = home.codices.find((c) => c.can_edit);
+    expect(codex, 'roy can edit a codex').toBeTruthy();
+  });
+
+  test.afterEach(async () => {
+    for (const id of ids.splice(0)) await editor.delete(`/api/codices/pages/${id}`);
+    await editor.dispose();
+  });
+
+  async function makePage(title) {
+    const res = await editor.post('/api/codices/pages', { data: { title, codex_id: codex.id } });
+    expect(res.status(), 'create ' + title).toBe(201);
+    const id = (await res.json()).page.id;
+    ids.push(id);
+    return id;
+  }
+
+  const editUrl = (id) => `/codices/p/${id}/x/edit`;
+
+  test('Ctrl+K links the selection to a page by title, another case or alias', async ({ page }) => {
+    const target = await makePage('E2E Link Target');
+    const aliased = await editor.put(`/api/codices/pages/${target}/aliases`, { data: { aliases: ['E2E Nick'] } });
+    expect(aliased.ok(), 'set alias').toBeTruthy();
+    const host = await makePage('E2E Link Host');
+    await loginAs(page, 'roy');
+    await page.goto(editUrl(host));
+    const content = page.locator('.cm-content');
+    await content.click();
+    // One word group per line; each is selected from the line start and linked.
+    await page.keyboard.type('E2E Nick\ne2e link target\nE2E Link Target\nE2E Unwritten');
+    const linkLine = async (up, text, viaButton) => {
+      await page.keyboard.press('Control+Home');
+      for (let i = 0; i < up; i++) await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('Home');
+      await page.keyboard.down('Shift');
+      for (let i = 0; i < text.length; i++) await page.keyboard.press('ArrowRight');
+      await page.keyboard.up('Shift');
+      if (viaButton) await page.getByRole('button', { name: 'Link', exact: true }).click();
+      else await page.keyboard.press('Control+k');
+    };
+    await linkLine(0, 'E2E Nick');
+    await linkLine(1, 'e2e link target', true);
+    await linkLine(2, 'E2E Link Target');
+    await linkLine(3, 'E2E Unwritten');
+    const lines = (await content.innerText()).split('\n').filter((l) => l.trim());
+    expect(lines).toEqual(['[[E2E Link Target|E2E Nick]]', '[[E2E Link Target|e2e link target]]', '[[E2E Link Target]]', '[[E2E Unwritten]]']);
+  });
+
+  test('after saving, the missing pages dialog creates only the ticked ones from their template', async ({ page }) => {
+    const host = await makePage('E2E Missing Host');
+    await loginAs(page, 'roy');
+    await page.goto(editUrl(host));
+    await page.locator('.cm-content').click();
+    await page.keyboard.type('Meet [[E2E Born Here]] and [[E2E Not Born]].');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    const dlg = page.getByRole('dialog');
+    await expect(dlg.getByRole('heading', { name: 'Create these 2 pages?' })).toBeVisible();
+    await expect(dlg.getByLabel('Create E2E Born Here')).toBeChecked();
+    await dlg.getByLabel('Create E2E Not Born').uncheck();
+    await dlg.getByLabel('Template for E2E Born Here').selectOption({ label: 'Character' });
+    await dlg.getByRole('button', { name: 'Save and create' }).click();
+    await page.waitForURL(/created=1/);
+
+    const list = await (await editor.get(`/api/codices/c/${codex.id}`)).json();
+    const born = list.pages.find((p) => p.title === 'E2E Born Here');
+    expect(born, 'ticked page exists').toBeTruthy();
+    ids.push(born.id);
+    expect(list.pages.some((p) => p.title === 'E2E Not Born')).toBe(false);
+    const full = await (await editor.get(`/api/codices/pages/${born.id}`)).json();
+    const builtin = await (await editor.get('/api/codices/templates/builtin')).json();
+    const character = builtin.templates.find((t) => t.id === 'builtin:character');
+    expect(character.body.trim().length).toBeGreaterThan(0);
+    expect(full.page.body.trim()).toBe(character.body.split('{{title}}').join('E2E Born Here').split('{{date}}').join(builtin.today).trim());
+  });
+
+  test('a save with no new missing links goes straight to the page', async ({ page }) => {
+    await makePage('E2E Exists Already');
+    const host = await makePage('E2E Plain Host');
+    await loginAs(page, 'roy');
+    await page.goto(editUrl(host));
+    await page.locator('.cm-content').click();
+    await page.keyboard.type('See [[E2E Exists Already]] and a picture ![[nothing.png]].');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await page.waitForURL(/saved=/);
+    await expect(page.getByRole('heading', { name: /Create (this|these)/ })).toHaveCount(0);
+  });
+});
