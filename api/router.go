@@ -144,12 +144,17 @@ func RegisterRoutes() {
 	http.Handle("/codices/", middleware.AuthMiddleware(codexGate(codexPage)))
 	http.Handle("/codex/", http.HandlerFunc(redirectOldCodexURL))
 	http.Handle("/games", http.RedirectHandler("/campaigns", http.StatusSeeOther))
+	http.Handle("/auth/discord/start", middleware.AuthMiddleware(http.HandlerFunc(HandleDiscordStart)))
+	http.Handle("/auth/discord/callback", middleware.AuthMiddleware(http.HandlerFunc(HandleDiscordCallback)))
+	http.Handle("/api/profile/discord", middleware.AuthMiddleware(http.HandlerFunc(HandleProfileDiscord)))
+	http.Handle("/api/profile/discord/test", middleware.AuthMiddleware(http.HandlerFunc(HandleProfileDiscordTest)))
 	http.Handle("/profile", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("profile.html"))))
 	http.Handle("/change-password", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("change-password.html"))))
 
 	// Admin page
 	http.Handle("/admin/users", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminUsersPage)))
 	http.Handle("/admin/access", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminAccessPage)))
+	http.Handle("/admin/discord", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminDiscordPage)))
 	http.Handle("/admin", middleware.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 	})))
@@ -159,6 +164,8 @@ func RegisterRoutes() {
 	http.Handle("/api/admin/users/", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminUserActions)))
 	http.Handle("/api/admin/access", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminAccess)))
 	http.Handle("/api/admin/access/", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminAccessActions)))
+	http.Handle("/api/admin/discord", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminDiscord)))
+	http.Handle("/api/admin/discord/", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminDiscordActions)))
 	http.Handle("/api/admin/campaigns/", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminCampaignActions)))
 	http.Handle("/api/admin/systems", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminSystems)))
 	http.Handle("/api/admin/systems/", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminSystemActions)))
@@ -169,6 +176,9 @@ func RegisterRoutes() {
 	})
 	http.HandleFunc("/admin-access.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/admin-access.js")
+	})
+	http.HandleFunc("/admin-discord.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/admin-discord.js")
 	})
 }
 

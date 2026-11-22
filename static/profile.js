@@ -12,6 +12,8 @@ window.profilePage = function() {
         isEnvAdmin: false,
         needsProfileSetup: false,
         calendarToken: '',
+        discordEnabled: false,
+        discord: null,
         editing: null,
         editValue: '',
         saving: false,
@@ -38,6 +40,7 @@ window.profilePage = function() {
                 this.isAdmin = (user.roles || []).includes('admin');
                 this.isEnvAdmin = !!user.is_env_admin;
                 this.needsProfileSetup = !!user.needs_profile_setup;
+                this.discordEnabled = !!user.discord_enabled;
             } catch (error) {
                 console.error('Auth check failed:', error);
                 window.location.href = '/login.html';
@@ -47,7 +50,100 @@ window.profilePage = function() {
             await this.loadProfile();
             if (this.isSelf) {
                 await this.loadCalendarToken();
+                if (this.discordEnabled) {
+                    await this.loadDiscord();
+                }
+                this.showDiscordResult();
             }
+        },
+
+        // ?discord=... is where the OAuth callback sends the user back to.
+        showDiscordResult() {
+            const params = new URLSearchParams(window.location.search);
+            const result = params.get('discord');
+            if (!result) return;
+            const texts = {
+                linked: ['Discord connected.', 'success'],
+                taken: ['This Discord account is linked to another Waystone account.', 'error'],
+                failed: ['Could not connect Discord. Try again.', 'error'],
+                off: ["Discord isn't set up.", 'error']
+            };
+            if (texts[result]) this.showMessage(texts[result][0], texts[result][1]);
+            this.integrationsOpen = true;
+            params.delete('discord');
+            const qs = params.toString();
+            history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+        },
+
+        get discordErrorTime() {
+            const t = this.discord && this.discord.dm_error_at ? new Date(this.discord.dm_error_at) : null;
+            return t && !isNaN(t) ? t.toLocaleString() : '';
+        },
+
+        async loadDiscord() {
+            try {
+                const response = await fetch('/api/profile/discord');
+                if (!response.ok) {
+                    throw new Error('Failed to load Discord settings');
+                }
+                this.discord = await response.json();
+            } catch (error) {
+                this.showMessage('Error loading Discord: ' + error.message, 'error');
+            }
+        },
+
+        async saveDiscordToggles() {
+            try {
+                const t = this.discord.toggles;
+                const response = await fetch('/api/profile/discord', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessions: !!t.sessions, signups: !!t.signups, characters: !!t.characters })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to save');
+                }
+                this.showMessage('Saved.', 'success');
+            } catch (error) {
+                this.showMessage('Error saving Discord settings: ' + error.message, 'error');
+                await this.loadDiscord();
+            }
+        },
+
+        async testDiscord() {
+            try {
+                const response = await fetch('/api/profile/discord/test', { method: 'POST' });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to send');
+                }
+                this.showMessage('Test DM sent.', 'success');
+            } catch (error) {
+                this.showMessage(error.message, 'error');
+            }
+            await this.loadDiscord();
+        },
+
+        async disconnectDiscord() {
+            if (!(await this.askConfirm({
+                title: 'Disconnect Discord',
+                message: 'Stop sending Waystone notifications to your Discord DMs?',
+                confirmLabel: 'Disconnect'
+            }))) {
+                return;
+            }
+            try {
+                const response = await fetch('/api/profile/discord', { method: 'DELETE' });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to disconnect');
+                }
+                this.showMessage('Discord disconnected.', 'success');
+            } catch (error) {
+                this.showMessage('Error disconnecting Discord: ' + error.message, 'error');
+            }
+            await this.loadDiscord();
         },
 
         get calendarUrl() {

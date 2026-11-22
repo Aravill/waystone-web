@@ -99,6 +99,32 @@ func SetSession(w http.ResponseWriter, r *http.Request, user *models.User) error
 	return session.Save(r, w)
 }
 
+// SetSessionValue stores one extra value (such as an OAuth state) in the cookie session.
+func SetSessionValue(w http.ResponseWriter, r *http.Request, key, value string) error {
+	session, err := sessionStore.Get(r, SessionName)
+	if session == nil {
+		return err
+	}
+	session.Values[key] = value
+	return session.Save(r, w)
+}
+
+// TakeSessionValue returns an extra session value and removes it, so it works once.
+func TakeSessionValue(w http.ResponseWriter, r *http.Request, key string) (string, error) {
+	session, err := sessionStore.Get(r, SessionName)
+	if err != nil {
+		return "", err
+	}
+	v, _ := session.Values[key].(string)
+	if _, ok := session.Values[key]; ok {
+		delete(session.Values, key)
+		if err := session.Save(r, w); err != nil {
+			return v, err
+		}
+	}
+	return v, nil
+}
+
 // renewSessionIfDue restarts the cookie's 30 days for an active user, so only
 // inactivity logs them out. Cookies from before renewed_at existed count as due.
 func renewSessionIfDue(w http.ResponseWriter, r *http.Request, user *models.User) {

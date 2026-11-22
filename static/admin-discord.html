@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord - Waystone</title>
+    <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+    <script src="/static/theme.js?v=8"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=81">
+    <link rel="stylesheet" href="/static/notifications.css?v=12">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .admin-subnav { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; color: var(--muted); }
+        .admin-subnav a { color: var(--ink); }
+        .admin-subnav a[aria-current="page"] { color: var(--rubric); text-decoration: none; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        th, td { text-align: left; padding: 0.625rem 0.5rem; vertical-align: middle; }
+        th { color: var(--muted); border-bottom: 1px solid var(--ink); font-size: 0.875rem; font-weight: 500; }
+        tbody tr { border-bottom: 1px solid var(--line); }
+        .admin-empty { padding: 1.25rem 0.5rem; color: var(--muted); text-align: center; }
+        .dc-field { display: block; margin-bottom: 1rem; max-width: 32rem; }
+        .dc-field > span { display: block; margin-bottom: 0.25rem; color: var(--muted); font-size: 0.875rem; }
+        .dc-field input[type="text"] { width: 100%; }
+        .dc-events { border: 0; padding: 0; margin: 0 0 1rem; }
+        .dc-events legend { padding: 0; margin-bottom: 0.25rem; color: var(--muted); font-size: 0.875rem; }
+        .dc-events label { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
+        .dc-game td select { width: auto; min-width: 9rem; max-width: 100%; }
+        .dc-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .dc-env { margin: 0.5rem 0 0 1.25rem; font-family: var(--font-mono, monospace); }
+    </style>
+</head>
+<body x-data="adminDiscordPage()">
+    <div class="header">
+        <div class="header-left">
+            <a href="/" class="logo">Waystone</a>
+        </div>
+        <nav class="nav-bar" aria-label="Main">
+            <a href="/" class="nav-item" data-page="dashboard">Home</a>
+            <a href="/campaigns" class="nav-item" data-page="campaigns">Games</a>
+            <a href="/characters" class="nav-item" data-page="characters">Characters</a>
+            <a href="/codices" class="nav-item" data-page="codex" data-codex hidden>Codices</a>
+            <a href="/admin/users" class="nav-item active" aria-current="page" data-page="admin-users" x-show="isAdmin">Admin</a>
+        </nav>
+        <div class="header-right">
+            <details class="user-menu">
+                <summary><span class="user-menu-avatar" aria-hidden="true" x-text="(displayName || '?').charAt(0).toUpperCase()"></span><span class="user-menu-name" x-text="displayName"></span><span class="user-menu-caret" aria-hidden="true">&#9662;</span></summary>
+                <div class="user-menu-panel">
+                    <a href="/profile">Profile</a>
+                    <button type="button" @click="logout()">Log out</button>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <main class="container">
+        <nav class="admin-subnav" aria-label="Admin sections">
+            <a href="/admin/users">Users</a><span aria-hidden="true">&middot;</span><a href="/admin/access">Access rights</a><span aria-hidden="true">&middot;</span><a href="/admin/discord" aria-current="page">Discord</a>
+        </nav>
+        <h1 class="page-title"><span class="drop-cap">D</span>iscord</h1>
+
+        <div x-show="messageVisible" x-text="messageText" role="status"
+            :class="messageType === 'error' ? 'message error' : 'message success'"
+            style="display: none;"></div>
+
+        <section class="card" style="margin-bottom: 1rem;" x-show="loaded && !data.enabled" x-cloak>
+            <h2 class="section-header">Discord is off</h2>
+            <p class="form-hint">Set these environment variables on the server and restart it: <code>DISCORD_BOT_TOKEN</code> turns the feature on; <code>DISCORD_CLIENT_ID</code>, <code>DISCORD_CLIENT_SECRET</code> and <code>PUBLIC_URL</code> let users link their accounts.</p>
+            <p class="form-hint" x-show="data.missing_env.length">Not set yet:</p>
+            <ul class="dc-env">
+                <template x-for="name in data.missing_env" :key="name"><li x-text="name"></li></template>
+            </ul>
+        </section>
+
+        <template x-if="loaded && data.enabled">
+            <div>
+                <section class="card" style="margin-bottom: 1rem;">
+                    <h2 class="section-header">Server</h2>
+                    <p class="form-hint" x-show="data.missing_env.length">Linking accounts is off until these are set: <span x-text="data.missing_env.join(', ')"></span>.</p>
+                    <label class="dc-field">
+                        <span>Server (guild) ID</span>
+                        <input type="text" id="dcGuild" x-model="form.guild_id" inputmode="numeric" autocomplete="off">
+                        <small class="form-hint" x-show="data.guild_name" x-text="'Connected to ' + data.guild_name"></small>
+                    </label>
+                    <label class="dc-field">
+                        <span>Invite link (shown to players who are not in the server)</span>
+                        <input type="text" id="dcInvite" x-model="form.invite_url" placeholder="https://discord.gg/..." autocomplete="off">
+                    </label>
+                    <fieldset class="dc-events">
+                        <legend>Post to a game's channel when</legend>
+                        <template x-for="o in data.event_options" :key="o.key">
+                            <label><input type="checkbox" :checked="form.events.includes(o.key)" @change="toggleEvent(o.key, $event.target.checked)"> <span x-text="o.label"></span></label>
+                        </template>
+                    </fieldset>
+                    <div class="dc-actions">
+                        <button type="button" class="submit-btn" style="width: auto; padding: 0.625rem 1.25rem;" :disabled="saving" @click="save()">Save</button>
+                    </div>
+                </section>
+
+                <section class="card" style="margin-bottom: 1rem; overflow-x: auto;">
+                    <h2 class="section-header">Games</h2>
+                    <p class="form-hint" x-show="data.channels_error" x-text="data.channels_error"></p>
+                    <p class="form-hint" x-show="!data.guild_id">Set the server ID above to pick channels.</p>
+                    <table class="dc-game">
+                        <thead>
+                            <tr><th>Game</th><th>Status</th><th>Channel</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="g in data.games" :key="g.id">
+                                <tr :data-game="g.title">
+                                    <td x-text="g.title"></td>
+                                    <td x-text="g.status"></td>
+                                    <td>
+                                        <select :aria-label="'Channel for ' + g.title" :disabled="!data.guild_id" @change="setChannel(g, $event)">
+                                            <option value="" :selected="!g.channel_id">None</option>
+                                            <template x-for="c in channelOptions(g)" :key="c.id">
+                                                <option :value="c.id" :selected="c.id === g.channel_id" x-text="'#' + c.name"></option>
+                                            </template>
+                                        </select>
+                                    </td>
+                                    <td><button type="button" class="campaign-link-button" :disabled="!g.channel_id" @click="testGame(g)">Send test</button></td>
+                                </tr>
+                            </template>
+                            <tr x-show="data.games.length === 0"><td colspan="4" class="admin-empty">no games yet</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section class="card" style="overflow-x: auto;">
+                    <h2 class="section-header">Outbox</h2>
+                    <p><span x-text="data.outbox.queued"></span> queued</p>
+                    <table x-show="data.outbox.failures.length">
+                        <thead>
+                            <tr><th>When</th><th>To</th><th>Error</th><th>Tries</th></tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="f in data.outbox.failures" :key="f.id">
+                                <tr>
+                                    <td x-text="formatTime(f.created_at)"></td>
+                                    <td x-text="(f.kind === 'dm' ? 'DM to ' : 'Channel of ') + (f.kind === 'dm' ? f.target_label : (f.campaign_title || f.target_label))"></td>
+                                    <td x-text="f.error"></td>
+                                    <td x-text="f.attempts"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    <p class="form-hint" x-show="!data.outbox.failures.length">No failed messages.</p>
+                </section>
+            </div>
+        </template>
+    </main>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal confirm-modal" :class="{ 'modal-open': confirmDialog.open }" @click.self="closeConfirm(false)" @keydown.escape.window="confirmDialog.open && closeConfirm(false)" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+        <div class="modal-content confirm-modal-content">
+            <div class="modal-header">
+                <h2 id="confirmModalTitle" x-text="confirmDialog.title"></h2>
+                <button type="button" class="modal-close" @click="closeConfirm(false)" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-form">
+                <p class="confirm-modal-message" x-text="confirmDialog.message"></p>
+                <div class="modal-actions">
+                    <button type="button" class="btn-confirm-danger" @click="closeConfirm(true)" x-text="confirmDialog.confirmLabel"></button>
+                    <button type="button" class="btn-cancel" x-ref="confirmCancelBtn" @click="closeConfirm(false)">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/notifications.js?v=15"></script>
+    <script src="/admin-discord.js?v=1"></script>
+</body>
+</html>

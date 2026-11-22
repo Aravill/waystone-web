@@ -233,6 +233,7 @@ func (v *campaignViewer) enrich(campaign models.Campaign) map[string]interface{}
 		"system":                     campaign.System,
 		"codex_id":                   campaign.CodexID,
 		"codex":                      v.codexRef(campaign.CodexID),
+		"discord_channel":            discordChannelRef(campaign),
 		"system_logo_url":            v.systems[strings.ToLower(campaign.System)].LogoURL(),
 		"can_manage":                 v.isAdmin || (currentUserID != "" && campaign.DM == currentUserID),
 		"allowed_status_transitions": campaign.Status.AllowedTransitions(),
