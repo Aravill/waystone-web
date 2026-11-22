@@ -148,6 +148,7 @@ func RegisterRoutes() {
 	http.Handle("/auth/discord/callback", middleware.AuthMiddleware(http.HandlerFunc(HandleDiscordCallback)))
 	http.Handle("/api/profile/discord", middleware.AuthMiddleware(http.HandlerFunc(HandleProfileDiscord)))
 	http.Handle("/api/profile/discord/test", middleware.AuthMiddleware(http.HandlerFunc(HandleProfileDiscordTest)))
+	http.Handle("/api/profile/discord/import", middleware.AuthMiddleware(http.HandlerFunc(HandleProfileDiscordImport)))
 	http.Handle("/profile", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("profile.html"))))
 	http.Handle("/change-password", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("change-password.html"))))
 

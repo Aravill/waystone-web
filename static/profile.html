@@ -202,6 +202,15 @@
                         <template x-if="discord && discord.linked">
                             <div>
                                 <p>Connected as <strong x-text="'@' + discord.username"></strong></p>
+                                <div class="profile-subblock" x-show="discordOffer">
+                                    <p class="form-hint">Use your Discord details on Waystone?</p>
+                                    <label class="check-label"><input type="checkbox" x-model="discordImport.name"> Display name (<span x-text="discord.username"></span>)</label>
+                                    <label class="check-label"><input type="checkbox" x-model="discordImport.avatar"> Profile picture</label>
+                                    <div class="profile-actions">
+                                        <button type="button" class="campaign-link-button" :disabled="discordImporting" @click="importDiscord()">Use them</button>
+                                        <button type="button" class="campaign-link-button" @click="discordOffer = false">No thanks</button>
+                                    </div>
+                                </div>
                                 <p class="form-hint" x-show="discord.in_guild === true">You are in the server.</p>
                                 <p class="form-hint" x-show="discord.in_guild === false">
                                     Join the server to get DMs.
@@ -266,6 +275,6 @@
     <script src="/static/notifications.js?v=15"></script>
     <script src="/campaigns.js?v=66"></script>
     <script src="/static/characters.js?v=3"></script>
-    <script src="profile.js?v=14"></script>
+    <script src="profile.js?v=15"></script>
 </body>
 </html>

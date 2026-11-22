@@ -75,6 +75,7 @@ type User struct {
 	ID         string `json:"id"`
 	Username   string `json:"username"`
 	GlobalName string `json:"global_name"`
+	Avatar     string `json:"avatar"`
 }
 
 type Overwrite struct {
@@ -447,4 +448,21 @@ func AuthorizeURL(clientID, redirectURI, state string) string {
 	q.Set("state", state)
 	q.Set("prompt", "none")
 	return "https://discord.com/oauth2/authorize?" + q.Encode()
+}
+
+// GetUser looks a user up with the bot token (name and avatar hash).
+func (c *Client) GetUser(ctx context.Context, userID string) (*User, error) {
+	var u User
+	if err := c.botGet(ctx, "/users/"+url.PathEscape(userID), &u); err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+// AvatarURL is the user's avatar as a 256px PNG on Discord's CDN, or "" when they have none.
+func AvatarURL(u *User) string {
+	if u == nil || u.Avatar == "" {
+		return ""
+	}
+	return "https://cdn.discordapp.com/avatars/" + url.PathEscape(u.ID) + "/" + url.PathEscape(u.Avatar) + ".png?size=256"
 }
