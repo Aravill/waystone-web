@@ -46,8 +46,9 @@ func HandlePlayedSessions(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// loadManualSession authenticates the DM and loads the by-hand session being changed.
-func loadManualSession(w http.ResponseWriter, r *http.Request, campaignID, sessionID string) (*models.Campaign, *models.CampaignSession, bool) {
+// loadManualSession authenticates the DM and loads the by-hand session being changed; with
+// playedCalendarOK a played calendar session is accepted too (only its attendance is edited).
+func loadManualSession(w http.ResponseWriter, r *http.Request, campaignID, sessionID string, playedCalendarOK bool) (*models.Campaign, *models.CampaignSession, bool) {
 	campaign, userID, ok := loadCampaignAndUser(w, r, campaignID)
 	if !ok {
 		return nil, nil, false
@@ -69,14 +70,23 @@ func loadManualSession(w http.ResponseWriter, r *http.Request, campaignID, sessi
 		return nil, nil, false
 	}
 	if !session.Manual {
-		writeJSONError(w, http.StatusConflict, "only sessions recorded by hand can be changed here")
-		return nil, nil, false
+		if !playedCalendarOK {
+			writeJSONError(w, http.StatusConflict, "only sessions recorded by hand can be changed here")
+			return nil, nil, false
+		}
+		if _, played, err := journalSession(campaign, session.ID); err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "failed to retrieve session")
+			return nil, nil, false
+		} else if !played {
+			writeJSONError(w, http.StatusConflict, "only played sessions can be changed")
+			return nil, nil, false
+		}
 	}
 	return campaign, session, true
 }
 
 func handleRecordPlayedSession(w http.ResponseWriter, r *http.Request, campaignID, sessionID string) {
-	campaign, existing, ok := loadManualSession(w, r, campaignID, sessionID)
+	campaign, existing, ok := loadManualSession(w, r, campaignID, sessionID, true)
 	if !ok {
 		return
 	}
@@ -87,7 +97,8 @@ func handleRecordPlayedSession(w http.ResponseWriter, r *http.Request, campaignI
 		return
 	}
 
-	// On edit, someone who has since left the game may stay on the session.
+	// On edit, someone who has since left the game may stay on the session; on a calendar session
+	// that is anyone who replied.
 	allowed := map[string]bool{}
 	if existing != nil {
 		responses, err := db.GetSessionResponses(existing.ID)
@@ -96,10 +107,14 @@ func handleRecordPlayedSession(w http.ResponseWriter, r *http.Request, campaignI
 			return
 		}
 		for _, resp := range responses {
-			if resp.Participation == models.Accepted {
+			if resp.Participation == models.Accepted || !existing.Manual {
 				allowed[resp.UserID] = true
 			}
 		}
+	}
+	if existing != nil && !existing.Manual {
+		saveCalendarAttendance(w, req, campaign, existing, allowed)
+		return
 	}
 	session, attendeeIDs, msg := req.normalize(campaign, allowed)
 	if msg != "" {
@@ -132,8 +147,28 @@ func handleRecordPlayedSession(w http.ResponseWriter, r *http.Request, campaignI
 	writeJSON(w, status, map[string]interface{}{"status": "success", "message": message, "session": session})
 }
 
+// saveCalendarAttendance edits who was at a played calendar session: only the attendees and guests
+// change (the date and times never do), and nobody is notified.
+func saveCalendarAttendance(w http.ResponseWriter, req playedSessionRequest, campaign *models.Campaign, session *models.CampaignSession, allowed map[string]bool) {
+	guests, ids, dmThere, msg := req.normalizePeople(campaign, allowed)
+	if msg != "" {
+		writeJSONError(w, http.StatusBadRequest, msg)
+		return
+	}
+	if err := db.SaveSessionAttendance(session.ID, guests, !dmThere, ids); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to save session")
+		return
+	}
+	updated, err := db.GetSessionByID(session.ID)
+	if err != nil || updated == nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve session")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "message": "attendance updated", "session": updated})
+}
+
 func handleDeletePlayedSession(w http.ResponseWriter, r *http.Request, campaignID, sessionID string) {
-	if _, _, ok := loadManualSession(w, r, campaignID, sessionID); !ok {
+	if _, _, ok := loadManualSession(w, r, campaignID, sessionID, false); !ok {
 		return
 	}
 	if err := db.DeleteManualSession(sessionID); err != nil {
@@ -194,6 +229,18 @@ func (req *playedSessionRequest) normalize(campaign *models.Campaign, allowedExt
 		duration = int(end.Sub(start).Minutes())
 	}
 
+	guests, ids, dmThere, msg := req.normalizePeople(campaign, allowedExtra)
+	if msg != "" {
+		return session, nil, msg
+	}
+	session.Date, session.Time, session.Duration, session.Timezone = req.Date, req.Start, duration, req.Timezone
+	session.Guests, session.DMAbsent = guests, !dmThere
+	return session, ids, ""
+}
+
+// normalizePeople validates the attendees and guests: the attendee ids without the DM (who never has
+// a response row), the cleaned guest names, whether the DM was there and a validation message, or "".
+func (req *playedSessionRequest) normalizePeople(campaign *models.Campaign, allowedExtra map[string]bool) ([]string, []string, bool, string) {
 	member := map[string]bool{campaign.DM: true}
 	for _, p := range campaign.Players {
 		member[p] = true
@@ -203,7 +250,7 @@ func (req *playedSessionRequest) normalize(campaign *models.Campaign, allowedExt
 	dmThere := false
 	for _, id := range req.AttendeeIDs {
 		if !member[id] && !allowedExtra[id] {
-			return session, nil, "attendees must be the game's DM and players"
+			return nil, nil, false, "attendees must be the game's DM and players"
 		}
 		if seen[id] {
 			continue
@@ -224,19 +271,16 @@ func (req *playedSessionRequest) normalize(campaign *models.Campaign, allowedExt
 			continue
 		}
 		if utf8.RuneCountInString(name) > maxGuestNameRunes {
-			return session, nil, "a guest name must be at most 64 characters"
+			return nil, nil, false, "a guest name must be at most 64 characters"
 		}
 		seenGuest[strings.ToLower(name)] = true
 		guests = append(guests, name)
 	}
 	if len(guests) > maxGuestsPerSession {
-		return session, nil, "at most 20 guests"
+		return nil, nil, false, "at most 20 guests"
 	}
 	if !dmThere && len(ids) == 0 && len(guests) == 0 {
-		return session, nil, "choose at least one person who was there"
+		return nil, nil, false, "choose at least one person who was there"
 	}
-
-	session.Date, session.Time, session.Duration, session.Timezone = req.Date, req.Start, duration, req.Timezone
-	session.Guests, session.DMAbsent = guests, !dmThere
-	return session, ids, ""
+	return guests, ids, dmThere, ""
 }

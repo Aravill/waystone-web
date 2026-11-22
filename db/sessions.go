@@ -43,6 +43,10 @@ func SaveManualSession(session models.CampaignSession, attendeeIDs []string) err
 	return GetStore().SaveManualSession(session, attendeeIDs)
 }
 
+func SaveSessionAttendance(sessionID string, guests []string, dmAbsent bool, attendeeIDs []string) error {
+	return GetStore().SaveSessionAttendance(sessionID, guests, dmAbsent, attendeeIDs)
+}
+
 func DeleteManualSession(sessionID string) error {
 	return GetStore().DeleteManualSession(sessionID)
 }

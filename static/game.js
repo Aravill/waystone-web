@@ -24,6 +24,7 @@ window.gamePage = function () {
         panelOpened: false, // the first load picks the opening selection, later loads keep it
         recording: false,
         editingId: '',
+        editingManual: true, // false while editing the attendance of a calendar session
         form: emptyForm(),
         busy: false, // an action request is in flight
         loadError: '',
@@ -227,7 +228,7 @@ window.gamePage = function () {
             return list.concat(this.campaign?.player_users || [], this.form.former);
         },
         get formTitle() {
-            return this.editingId ? 'Edit a past session' : 'Record a past session';
+            return !this.editingId ? 'Record a past session' : this.editingManual ? 'Edit a past session' : 'Edit attendance';
         },
         get today() {
             const d = new Date();
@@ -580,6 +581,7 @@ window.gamePage = function () {
 
         startRecording() {
             this.editingId = '';
+            this.editingManual = true;
             this.form = emptyForm();
             this.form.attendees = this.formPeopleIds();
             this.form.timezone = getDefaultTimezone();
@@ -590,6 +592,7 @@ window.gamePage = function () {
         startEdit(s) {
             const campaignIds = new Set((this.campaign.dm_user ? [this.campaign.dm_user] : []).concat(this.campaign.player_users || []).map((p) => p.id));
             this.editingId = s.id;
+            this.editingManual = !!s.manual;
             this.form = {
                 ...emptyForm(),
                 date: s.date,
@@ -602,7 +605,7 @@ window.gamePage = function () {
             };
             this.recording = true;
             this.revealPanel();
-            this.focusPanel('#recDate');
+            this.focusPanel(s.manual ? '#recDate' : '.game-check input');
         },
         formPeopleIds() {
             return this.formPeople.map((p) => p.id);
@@ -636,7 +639,8 @@ window.gamePage = function () {
             f.error = '';
             this.addGuest(); // a name typed but not yet added must not be lost
             if (f.error) return;
-            f.error = !f.date ? 'Choose a date.'
+            f.error = !this.editingManual ? (f.attendees.length === 0 && f.guests.length === 0 ? 'Choose at least one person who was there.' : '')
+                : !f.date ? 'Choose a date.'
                 : f.date > this.today ? 'The date must not be in the future.'
                 : f.end && !f.start ? 'An end time needs a start time.'
                 : f.start && new Date(`${f.date}T${f.start}`) > new Date() ? 'The session must not be in the future.'
