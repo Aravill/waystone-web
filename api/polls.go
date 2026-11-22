@@ -169,6 +169,7 @@ func handleCreatePoll(w http.ResponseWriter, r *http.Request, campaign *models.C
 	}
 	fresh := upcomingDates(sessions, now)
 	notifyPoll(userID, campaign.Players, models.NotificationSessionSuggested, campaign, fresh[0], fresh, nil)
+	postNewPoll(campaign, fresh)
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"status":   "success",
 		"message":  "poll created",

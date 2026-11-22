@@ -21,6 +21,11 @@ services:
       - BACKUP_KEEP=${BACKUP_KEEP:-14}
       - DB_PATH=${DB_PATH:-}
       - UPLOAD_DIR=${UPLOAD_DIR:-}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID:-}
+      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET:-}
+      - PUBLIC_URL=${PUBLIC_URL:-}
+      - DISCORD_API_BASE=${DISCORD_API_BASE:-}
     restart: unless-stopped
     volumes:
       - waystone-data:/root/data

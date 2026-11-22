@@ -190,6 +190,7 @@ func postCycle(sc models.PollSchedule, campaign *models.Campaign, k int, now tim
 	fresh := upcomingDates(sessions, now)
 	notifyPoll(campaign.DM, campaign.Players, models.NotificationSessionSuggested, campaign, fresh[0], fresh, nil)
 	notifyPoll("", []string{campaign.DM}, models.NotificationPollPosted, campaign, fresh[0], fresh, nil)
+	postNewPoll(campaign, fresh)
 }
 
 func newPollScheduleView(sc models.PollSchedule) pollScheduleView {

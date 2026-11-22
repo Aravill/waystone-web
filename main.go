@@ -30,6 +30,7 @@ func main() {
 
 	db.StartBackups(ctx)
 	api.StartSessionStartNotifier(ctx)
+	api.StartDiscordSender(ctx)
 
 	port := os.Getenv("PORT")
 	if port == "" {

@@ -302,5 +302,6 @@ func HandleGetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		"needs_profile_setup":  user.NeedsProfileSetup,
 		"is_env_admin":         auth.IsEnvAdmin(user),
 		"codex_access":         codexAllowedFor(user.ID),
+		"discord_enabled":      discordEnabled(),
 	})
 }

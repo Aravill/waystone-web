@@ -895,6 +895,7 @@ func HandleCampaignStatus(w http.ResponseWriter, r *http.Request) {
 			"from_status": string(oldStatus),
 			"to_status":   string(req.Status),
 		})
+		postStatusChanged(campaign, oldStatus, req.Status)
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":                     "success",
