@@ -363,7 +363,7 @@
                         </header>
                         <p class="cx-sub" x-show="screen === 'page'" x-text="isTimeline ? tlSummary : 'Revision ' + page.current_revision + ' · last edited by ' + page.updated_by_user.display_name + ' ' + formatStamp(page.updated_at)"></p>
                         <dl class="cx-jmeta" x-show="journal && screen === 'page'">
-                            <div><dt>Played</dt><dd x-text="journal ? journal.date : ''"></dd></div>
+                            <div><dt>Played</dt><dd x-text="journal ? parseDateLocal(journal.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : ''"></dd></div>
                             <div><dt>At the table</dt><dd x-text="journalWho"></dd></div>
                             <div><dd><a :href="'/games/' + encodeURIComponent(journal ? journal.campaign_id : '')">Session in the game</a></dd></div>
                         </dl>
