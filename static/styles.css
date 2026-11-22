@@ -783,6 +783,31 @@ textarea:focus {
     padding-bottom: 0.625rem;
 }
 
+/* A checkbox with its label on one line (the global input width would stretch it). */
+.check-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+    font-weight: 400;
+    cursor: pointer;
+}
+
+.check-label input[type="checkbox"] {
+    flex: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    accent-color: var(--ink);
+}
+
+.check-label input[type="checkbox"]:focus-visible {
+    outline: 2px solid var(--rubric);
+    outline-offset: 2px;
+}
+
 input[type="file"] {
     width: auto;
     padding: 0;
