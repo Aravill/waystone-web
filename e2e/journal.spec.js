@@ -116,7 +116,7 @@ test.describe('the seeded journal', () => {
     await page.goto(`/codices/p/${three.journal.page_id}/journal`);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(`Session ${three.number}`);
     await expect(page.locator('.cx-kicker', { hasText: 'Campaign journal' })).toContainText('Campaign journal · Age of Sojourn');
-    await expect(page.locator('.cx-jmeta')).toContainText(three.date);
+    await expect(page.locator('.cx-jmeta')).toContainText(new Date(three.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })); // shown like the game page
     await expect(page.locator('.codex-folder').filter({ hasText: 'Age of Sojourn: Campaign Journal' }).getByRole('link', { name: `${three.date} – The Dark Waystone` })).toBeVisible();
   });
 });
