@@ -13,6 +13,9 @@ import (
 
 var discordBackoff = []time.Duration{30 * time.Second, time.Minute, 2 * time.Minute, 5 * time.Minute, 10 * time.Minute, 30 * time.Minute, time.Hour}
 
+// discordStatus is the bot's custom status while the gateway connection is up.
+const discordStatus = "Handling tavern business"
+
 const (
 	discordGiveUp     = 6 * time.Hour
 	discordFailedKeep = 7 * 24 * time.Hour
@@ -26,6 +29,7 @@ func StartDiscordSender(ctx context.Context) {
 		log.Printf("discord: DISCORD_BOT_TOKEN not set, Discord notifications are off")
 		return
 	}
+	go discord.RunGateway(ctx, discordConf().apiBase, discordConf().token, discordStatus)
 	go func() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
