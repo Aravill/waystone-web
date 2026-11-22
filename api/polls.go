@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"sort"
 	"strings"
@@ -166,7 +167,8 @@ func handleCreatePoll(w http.ResponseWriter, r *http.Request, campaign *models.C
 	if !insertPollSessions(w, campaign.ID, sessions) {
 		return
 	}
-	notifySessionChange(userID, campaign, upcomingDates(sessions, now)[0], models.NotificationSessionSuggested, "")
+	fresh := upcomingDates(sessions, now)
+	notifyPoll(userID, campaign.Players, models.NotificationSessionSuggested, campaign, fresh[0], fresh, nil)
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"status":   "success",
 		"message":  "poll created",
@@ -206,7 +208,14 @@ func handleAddPollDates(w http.ResponseWriter, r *http.Request, campaign *models
 	if !insertPollSessions(w, campaign.ID, sessions) {
 		return
 	}
-	notifySessionChange(userID, campaign, upcomingDates(sessions, now)[0], models.NotificationSessionSuggested, "")
+	fresh := upcomingDates(sessions, now)
+	first := fresh[0]
+	if all, err := db.GetPollSessions(campaign.ID, pollID); err == nil {
+		if up := upcomingDates(all, now); len(up) > 0 {
+			first = up[0]
+		}
+	}
+	notifyPoll(userID, campaign.Players, models.NotificationSessionSuggested, campaign, first, fresh, map[string]string{"added": "1"})
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"status":   "success",
 		"message":  "dates added",
@@ -232,7 +241,7 @@ func handleWithdrawPoll(w http.ResponseWriter, campaign *models.Campaign, userID
 		return
 	}
 	if len(upcoming) > 0 {
-		notifySessionChange(userID, campaign, upcoming[0], models.NotificationSessionCancelled, string(models.SessionSuggested))
+		notifyPoll(userID, campaign.Players, models.NotificationSessionCancelled, campaign, upcoming[0], upcoming, map[string]string{"was": string(models.SessionSuggested)})
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":  "success",
@@ -259,26 +268,133 @@ func upcomingDates(sessions []models.CampaignSession, now time.Time) []models.Ca
 	return out
 }
 
+// pollIsComplete reports whether every current player has replied to every given upcoming date.
+// Replies of former players are ignored. A poll with no players or no upcoming date is not complete.
+func pollIsComplete(players []string, upcoming []models.CampaignSession, responses map[string][]models.SessionResponse) bool {
+	if len(players) == 0 || len(upcoming) == 0 {
+		return false
+	}
+	for _, d := range upcoming {
+		replied := map[string]bool{}
+		for _, resp := range responses[d.ID] {
+			replied[resp.UserID] = true
+		}
+		for _, p := range players {
+			if !replied[p] {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// pollState returns a poll's upcoming dates and whether every current player has replied to all of them.
+func pollState(campaign *models.Campaign, pollID string, now time.Time) ([]models.CampaignSession, bool, error) {
+	sessions, err := db.GetPollSessions(campaign.ID, pollID)
+	if err != nil {
+		return nil, false, err
+	}
+	upcoming := upcomingDates(sessions, now)
+	ids := make([]string, 0, len(upcoming))
+	for _, d := range upcoming {
+		ids = append(ids, d.ID)
+	}
+	responses, err := db.GetSessionResponsesBySessionIDs(ids)
+	if err != nil {
+		return nil, false, err
+	}
+	return upcoming, pollIsComplete(campaign.Players, upcoming, responses), nil
+}
+
+// notifyPollCompleted tells the DM when a poll that was incomplete (wasComplete false) now is
+// complete. It is a system notice (no actor), so the DM hears it even about their own action.
+func notifyPollCompleted(campaign *models.Campaign, pollID string, wasComplete bool) {
+	if pollID == "" || wasComplete {
+		return
+	}
+	upcoming, complete, err := pollState(campaign, pollID, time.Now())
+	if err != nil {
+		log.Printf("poll complete %s: %v", pollID, err)
+		return
+	}
+	if complete {
+		notifyPoll("", []string{campaign.DM}, models.NotificationPollComplete, campaign, upcoming[0], upcoming, nil)
+	}
+}
+
+// openPollStates maps every open poll of a game (one with an upcoming date) to whether it is complete.
+func openPollStates(campaign *models.Campaign, now time.Time) (map[string]bool, error) {
+	sessions, err := db.GetSessionsByCampaignIDs([]string{campaign.ID}, "")
+	if err != nil {
+		return nil, err
+	}
+	byPoll := map[string][]models.CampaignSession{}
+	for _, s := range sessions {
+		if s.Manual || s.Status != models.SessionSuggested || s.PollID == "" {
+			continue
+		}
+		byPoll[s.PollID] = append(byPoll[s.PollID], s)
+	}
+	ids := []string{}
+	upcomingByPoll := map[string][]models.CampaignSession{}
+	for pollID, dates := range byPoll {
+		if up := upcomingDates(dates, now); len(up) > 0 {
+			upcomingByPoll[pollID] = up
+			for _, d := range up {
+				ids = append(ids, d.ID)
+			}
+		}
+	}
+	responses, err := db.GetSessionResponsesBySessionIDs(ids)
+	if err != nil {
+		return nil, err
+	}
+	states := make(map[string]bool, len(upcomingByPoll))
+	for pollID, up := range upcomingByPoll {
+		states[pollID] = pollIsComplete(campaign.Players, up, responses)
+	}
+	return states, nil
+}
+
+// notifyCompletedPolls tells the DM about every poll that was incomplete before (see openPollStates)
+// and is complete in the updated game, e.g. after a player left or was removed. updated may be nil.
+func notifyCompletedPolls(updated *models.Campaign, before map[string]bool) {
+	if updated == nil {
+		return
+	}
+	for pollID, wasComplete := range before {
+		notifyPollCompleted(updated, pollID, wasComplete)
+	}
+}
+
 // withdrawSuggestedDate deletes one Suggested date with its replies. It is silent unless the
-// date was the poll's last upcoming one, which counts as withdrawing the poll.
+// date was the poll's last upcoming one, which counts as withdrawing the poll. Withdrawing
+// another upcoming date can complete the poll, which the DM is told.
 func withdrawSuggestedDate(actorID string, campaign *models.Campaign, session models.CampaignSession) error {
 	now := time.Now()
-	wasLast := false
-	if session.PollID != "" {
-		siblings, err := db.GetPollSessions(campaign.ID, session.PollID)
-		if err != nil {
+	upcomingDate := false
+	if start, ok := sessionStart(session); ok && start.After(now) {
+		upcomingDate = true
+	}
+	var upcoming []models.CampaignSession
+	wasComplete := false
+	if upcomingDate && session.PollID != "" {
+		var err error
+		if upcoming, wasComplete, err = pollState(campaign, session.PollID, now); err != nil {
 			return err
 		}
-		upcoming := upcomingDates(siblings, now)
-		wasLast = len(upcoming) == 1 && upcoming[0].ID == session.ID
-	} else if start, ok := sessionStart(session); ok && start.After(now) {
-		wasLast = true
 	}
 	if err := db.DeleteSession(session.ID); err != nil {
 		return err
 	}
-	if wasLast {
-		notifySessionChange(actorID, campaign, session, models.NotificationSessionCancelled, string(models.SessionSuggested))
+	if !upcomingDate {
+		return nil
 	}
+	if len(upcoming) <= 1 {
+		notifyPoll(actorID, campaign.Players, models.NotificationSessionCancelled, campaign, session, []models.CampaignSession{session},
+			map[string]string{"was": string(models.SessionSuggested)})
+		return nil
+	}
+	notifyPollCompleted(campaign, session.PollID, wasComplete)
 	return nil
 }

@@ -2849,3 +2849,70 @@ func (s *SQLiteStore) SaveJournalRevision(campaignID, sessionID, entryID string,
 	}
 	return models.JournalSaveResult{Outcome: outcome, EntryID: current, Revision: rev}, nil
 }
+
+// GetPollReminderCandidates returns every Suggested date of the polls that have a date between
+// fromDate and toDate (inclusive, YYYY-MM-DD), so a poll's whole history is visible to the caller.
+func (s *SQLiteStore) GetPollReminderCandidates(fromDate, toDate string) ([]models.CampaignSession, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(`
+		SELECT id, campaign_id, date, time, duration, status, timezone, manual, guests, dm_absent, created_at, updated_at, poll_id
+		FROM campaign_sessions
+		WHERE status = 'Suggested' AND manual = 0 AND poll_id != '' AND poll_id IN (
+			SELECT poll_id FROM campaign_sessions
+			WHERE status = 'Suggested' AND manual = 0 AND poll_id != '' AND date BETWEEN ? AND ?)
+		ORDER BY date ASC, time ASC, id ASC
+	`, fromDate, toDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []models.CampaignSession
+	for rows.Next() {
+		session, err := scanSession(rows)
+		if err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, session)
+	}
+	return sessions, rows.Err()
+}
+
+// GetPollReminderUserIDs returns, per poll id, the users who already got a poll_reminder for it.
+func (s *SQLiteStore) GetPollReminderUserIDs(pollIDs []string) (map[string]map[string]bool, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	result := map[string]map[string]bool{}
+	if len(pollIDs) == 0 {
+		return result, nil
+	}
+	args := make([]interface{}, 0, len(pollIDs)+1)
+	args = append(args, models.NotificationPollReminder)
+	for _, id := range pollIDs {
+		args = append(args, id)
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(pollIDs)), ",")
+	rows, err := s.db.Query(`
+		SELECT json_extract(data, '$.poll_id'), user_id FROM notifications
+		WHERE type = ? AND json_extract(data, '$.poll_id') IN (`+placeholders+`)
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var pollID, userID string
+		if err := rows.Scan(&pollID, &userID); err != nil {
+			return nil, err
+		}
+		if result[pollID] == nil {
+			result[pollID] = map[string]bool{}
+		}
+		result[pollID][userID] = true
+	}
+	return result, rows.Err()
+}

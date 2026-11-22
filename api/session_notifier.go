@@ -11,10 +11,12 @@ import (
 // StartSessionStartNotifier tells a game's players and followers when a confirmed session
 // begins. It runs once now and then every minute until ctx is done. The notifications table
 // is the dedupe (one session_started row per session), so a restart never repeats one.
-// The DM is deliberately not notified. Errors are logged, never fatal.
+// The DM is deliberately not notified. It also runs remindOpenPolls. Errors are logged, never fatal.
 func StartSessionStartNotifier(ctx context.Context) {
 	go func() {
-		notifyStartedSessions(time.Now())
+		now := time.Now()
+		notifyStartedSessions(now)
+		remindOpenPolls(now)
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
 		for {
@@ -23,6 +25,7 @@ func StartSessionStartNotifier(ctx context.Context) {
 				return
 			case now := <-ticker.C:
 				notifyStartedSessions(now)
+				remindOpenPolls(now)
 			}
 		}
 	}()
@@ -71,4 +74,130 @@ func withoutID(ids []string, drop string) []string {
 		}
 	}
 	return out
+}
+
+// pollReminderWindow is how close a poll's first upcoming date must be for the reminder, and
+// how long before that date the poll must have been posted for it to be sent at all.
+const pollReminderWindow = 120 * time.Hour
+
+// remindOpenPolls sends each player a poll_reminder, once per poll, when the poll's earliest
+// upcoming date is within five days and the poll was posted more than five days before it (a
+// late poll needs none: its "suggested" notification is enough). Only players who have not
+// answered every upcoming date are reminded. The notifications table is the dedupe.
+func remindOpenPolls(now time.Time) {
+	utc := now.UTC()
+	candidates, err := db.GetPollReminderCandidates(
+		utc.AddDate(0, 0, -1).Format("2006-01-02"),
+		utc.AddDate(0, 0, 6).Format("2006-01-02"),
+	)
+	if err != nil {
+		log.Printf("poll reminder: %v", err)
+		return
+	}
+	byPoll := map[string][]models.CampaignSession{}
+	pollOrder := []string{}
+	for _, s := range candidates {
+		if s.Manual {
+			continue
+		}
+		if _, ok := byPoll[s.PollID]; !ok {
+			pollOrder = append(pollOrder, s.PollID)
+		}
+		byPoll[s.PollID] = append(byPoll[s.PollID], s)
+	}
+
+	type duePoll struct {
+		campaign *models.Campaign
+		upcoming []models.CampaignSession
+	}
+	campaigns := map[string]*models.Campaign{}
+	var due []duePoll
+	dueIDs := []string{}
+	for _, pollID := range pollOrder {
+		dates := byPoll[pollID]
+		upcoming := upcomingDates(dates, now)
+		if len(upcoming) == 0 {
+			continue
+		}
+		firstStart, ok := sessionStart(upcoming[0])
+		if !ok || firstStart.Sub(now) > pollReminderWindow {
+			continue
+		}
+		posted, ok := pollPostedAt(dates)
+		if !ok || firstStart.Sub(posted) <= pollReminderWindow {
+			continue
+		}
+		campaignID := dates[0].CampaignID
+		campaign, seen := campaigns[campaignID]
+		if !seen {
+			if campaign, err = db.GetCampaignByID(campaignID); err != nil {
+				log.Printf("poll reminder: campaign %s: %v", campaignID, err)
+			}
+			campaigns[campaignID] = campaign
+		}
+		if campaign == nil || campaign.Status == models.Finished || campaign.Status == models.Cancelled {
+			continue
+		}
+		due = append(due, duePoll{campaign, upcoming})
+		dueIDs = append(dueIDs, pollID)
+	}
+	if len(due) == 0 {
+		return
+	}
+
+	reminded, err := db.GetPollReminderUserIDs(dueIDs)
+	if err != nil {
+		log.Printf("poll reminder: %v", err)
+		return
+	}
+	for _, p := range due {
+		ids := make([]string, 0, len(p.upcoming))
+		for _, d := range p.upcoming {
+			ids = append(ids, d.ID)
+		}
+		responses, err := db.GetSessionResponsesBySessionIDs(ids)
+		if err != nil {
+			log.Printf("poll reminder: %v", err)
+			continue
+		}
+		pollID := p.upcoming[0].PollID
+		recipients := []string{}
+		for _, player := range p.campaign.Players {
+			if reminded[pollID][player] {
+				continue
+			}
+			for _, d := range p.upcoming {
+				replied := false
+				for _, resp := range responses[d.ID] {
+					if resp.UserID == player {
+						replied = true
+						break
+					}
+				}
+				if !replied {
+					recipients = append(recipients, player)
+					break
+				}
+			}
+		}
+		notifyPoll("", recipients, models.NotificationPollReminder, p.campaign, p.upcoming[0], p.upcoming, nil)
+	}
+}
+
+// pollPostedAt is when a poll was posted: the earliest created_at among its current dates.
+func pollPostedAt(dates []models.CampaignSession) (time.Time, bool) {
+	var earliest time.Time
+	found := false
+	for _, d := range dates {
+		t, err := time.Parse(time.RFC3339, d.CreatedAt)
+		if err != nil {
+			if t, err = time.Parse("2006-01-02 15:04:05", d.CreatedAt); err != nil {
+				continue
+			}
+		}
+		if !found || t.Before(earliest) {
+			earliest, found = t, true
+		}
+	}
+	return earliest, found
 }

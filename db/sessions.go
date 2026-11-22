@@ -72,3 +72,9 @@ func DeletePoll(campaignID, pollID string) (int, error) {
 func ConfirmSession(sessionID string) error {
 	return GetStore().ConfirmSession(sessionID)
 }
+
+// GetPollReminderCandidates returns every Suggested date of the polls with a date between
+// fromDate and toDate (inclusive, YYYY-MM-DD).
+func GetPollReminderCandidates(fromDate, toDate string) ([]models.CampaignSession, error) {
+	return GetStore().GetPollReminderCandidates(fromDate, toDate)
+}

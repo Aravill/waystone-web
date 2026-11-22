@@ -210,3 +210,31 @@ func HandleNotificationRoutes(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusNotFound, "not found")
 	}
 }
+
+// pollNotificationData is the payload of a poll notification: the poll's first upcoming date
+// as the notification's own date, plus every date it concerns (YYYY-MM-DD, comma-joined) and
+// their count. extra adds or overrides keys (added, was).
+func pollNotificationData(first models.CampaignSession, dates []models.CampaignSession, extra map[string]string) map[string]string {
+	days := make([]string, 0, len(dates))
+	for _, d := range dates {
+		days = append(days, d.Date)
+	}
+	data := map[string]string{
+		"date":     first.Date,
+		"time":     first.Time,
+		"timezone": first.Timezone,
+		"poll_id":  first.PollID,
+		"dates":    strings.Join(days, ","),
+		"count":    strconv.Itoa(len(dates)),
+	}
+	for k, v := range extra {
+		data[k] = v
+	}
+	return data
+}
+
+// notifyPoll sends one notification about a poll. first (the poll's earliest upcoming date)
+// becomes the notification's session, so its link lands on the calendar at that month.
+func notifyPoll(actorID string, recipients []string, typ models.NotificationType, campaign *models.Campaign, first models.CampaignSession, dates []models.CampaignSession, extra map[string]string) {
+	notify(actorID, recipients, typ, campaign, first.ID, pollNotificationData(first, dates, extra))
+}

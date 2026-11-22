@@ -251,7 +251,7 @@ func handleCreateSession(w http.ResponseWriter, r *http.Request, campaignID stri
 		writeJSONError(w, http.StatusInternalServerError, "failed to create session")
 		return
 	}
-	notifySessionChange(userID, campaign, session, models.NotificationSessionSuggested, "")
+	notifyPoll(userID, campaign.Players, models.NotificationSessionSuggested, campaign, session, []models.CampaignSession{session}, nil)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -459,7 +459,16 @@ func handleSubmitSessionResponse(w http.ResponseWriter, r *http.Request, campaig
 		}
 	}
 
-	writeSessionResponse(w, r, sessionID, userID)
+	// Whether this reply completes the poll is judged against the state before it.
+	wasComplete := false
+	if session.Status == models.SessionSuggested && session.PollID != "" {
+		if _, complete, err := pollState(campaign, session.PollID, time.Now()); err == nil {
+			wasComplete = complete
+		}
+	}
+	if writeSessionResponse(w, r, sessionID, userID) && session.Status == models.SessionSuggested {
+		notifyPollCompleted(campaign, session.PollID, wasComplete)
+	}
 }
 
 func isCampaignPlayer(c *models.Campaign, userID string) bool {
@@ -472,20 +481,21 @@ func isCampaignPlayer(c *models.Campaign, userID string) bool {
 }
 
 // writeSessionResponse decodes the participation body, stores the user's
-// response to the session and writes the 201 reply.
-func writeSessionResponse(w http.ResponseWriter, r *http.Request, sessionID, userID string) {
+// response to the session and writes the 201 reply
+// and reports whether it was stored.
+func writeSessionResponse(w http.ResponseWriter, r *http.Request, sessionID, userID string) bool {
 	type submitResponseRequest struct {
 		Participation models.ParticipationStatus `json:"participation"`
 	}
 	var req submitResponseRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid request body")
-		return
+		return false
 	}
 
 	if req.Participation != models.Accepted && req.Participation != models.Declined && req.Participation != models.Tentative {
 		writeJSONError(w, http.StatusBadRequest, "invalid participation status")
-		return
+		return false
 	}
 
 	response := models.SessionResponse{
@@ -496,7 +506,7 @@ func writeSessionResponse(w http.ResponseWriter, r *http.Request, sessionID, use
 	}
 	if err := db.UpsertSessionResponse(response); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to submit response")
-		return
+		return false
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
@@ -504,6 +514,7 @@ func writeSessionResponse(w http.ResponseWriter, r *http.Request, sessionID, use
 		"message":  "response submitted successfully",
 		"response": response,
 	})
+	return true
 }
 
 func handleGetSessionResponses(w http.ResponseWriter, r *http.Request, campaignID, sessionID string) {

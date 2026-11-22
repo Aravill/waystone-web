@@ -64,6 +64,8 @@ type Store interface {
 	GetPollSessions(campaignID, pollID string) ([]models.CampaignSession, error)
 	DeletePoll(campaignID, pollID string) (int, error)
 	ConfirmSession(sessionID string) error
+	GetPollReminderCandidates(fromDate, toDate string) ([]models.CampaignSession, error)
+	GetPollReminderUserIDs(pollIDs []string) (map[string]map[string]bool, error)
 	SetCampaignSignupStatus(campaignID, userID string, status models.SignupStatus) error
 	WithdrawCampaignSignup(campaignID, userID string) (wasPlayer bool, err error)
 	SetCampaignSignUpsOpen(campaignID string, open bool) error
