@@ -1,5 +1,5 @@
 // Home page Alpine component. Relies on campaigns.js (loaded first) for escapeHtml, userAvatarHtml,
-// REPLY_GLYPHS, replyWord, formatShortDate, sessionRangeWithZone, timeWithZone, zoneAbbr and getSessionCounts.
+// REPLY_GLYPHS, replyWord, formatShortDate, sessionRangeWithZone, timeWithZone, zoneAbbr, getSessionCounts and pluralCount.
 window.dashboardPage = function () {
     return {
         displayName: '',
@@ -92,7 +92,7 @@ window.dashboardPage = function () {
                 parts.push(`${list} ${names.length > 1 ? 'are' : 'is'} in session now.`);
             }
             if (a.awaiting.length > 0) {
-                parts.push(a.awaiting.length === 1 ? 'One session needs your reply.' : `${a.awaiting.length} sessions need your reply.`);
+                parts.push(a.awaiting.length === 1 ? 'One poll awaits your reply.' : `${a.awaiting.length} polls await your reply.`);
             }
             const nudges = this.characterNudges.length;
             if (nudges > 0) {
@@ -146,6 +146,11 @@ window.dashboardPage = function () {
             const c = getSessionCounts(s);
             const replied = c.accepted + c.tentative + c.declined;
             return `${this.timeRange(s)}, proposed by ♛ ${this.dmName(s)}. ${replied} of ${c.total} have replied.`;
+        },
+        // A poll card: "3 dates, proposed by ♛ X."; a poll of one date reads like a single suggestion.
+        pollMeta(p) {
+            if (p.sessions.length === 1) return this.awaitMeta(p.sessions[0]);
+            return `${pluralCount(p.sessions.length, 'date')}, proposed by ♛ ${this.dmName(p)}.`;
         },
 
         // "Began 18:00 CET, ends 22:00 · 1h 20m left"

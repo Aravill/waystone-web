@@ -212,6 +212,25 @@
     margin-bottom: 0;
 }
 
+/* A poll card: a reply row per date, labelled with the date and time */
+.rl-dates {
+    display: grid;
+    gap: 0.875rem;
+}
+
+.rl-date-label {
+    margin: 0 0 0.375rem;
+    font-size: 0.9375rem;
+}
+
+.rl-date-label b {
+    font-weight: 600;
+}
+
+.rl-date-label span {
+    color: var(--muted);
+}
+
 /* Ledger rows: date, time, game, status, your reply */
 .agenda-row-home {
     grid-template-columns: 7.375rem 8.375rem minmax(0, 1fr) 7.75rem;

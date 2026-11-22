@@ -105,6 +105,9 @@
                     location.href = '/games/' + encodeURIComponent(n.campaign_id);
                 } else if (n.campaign_id && n.type === 'signup_accepted' && (n.data || {}).characters) {
                     location.href = '/games/' + encodeURIComponent(n.campaign_id) + '?character=1';
+                } else if (n.campaign_id && (n.data || {}).date && ['session_suggested', 'poll_reminder', 'poll_complete'].includes(n.type)) {
+                    // A poll or suggestion: the calendar, on the month of its first date
+                    location.href = '/games/' + encodeURIComponent(n.campaign_id) + '/calendar?date=' + encodeURIComponent(n.data.date);
                 } else if (n.campaign_id) {
                     const anchor = 'campaign-' + n.campaign_id;
                     const target = location.pathname === '/campaigns' ? document.getElementById(anchor) : null;
@@ -138,8 +141,16 @@
                 return new Date(ts).toLocaleDateString();
             },
 
+            // "Fri, Dec 11" from YYYY-MM-DD (campaigns.js is not loaded on every page)
+            fmtDay(ymd) {
+                const [y, m, day] = String(ymd).split('-').map(Number);
+                return new Date(y, m - 1, day).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            },
+
             message(n) {
                 const d = n.data || {};
+                const count = parseInt(d.count, 10) || 1;
+                const dayList = d.dates ? d.dates.split(',').map((x) => this.fmtDay(x)).join(' · ') : '';
                 const actor = (n.actor_user && n.actor_user.display_name) || 'Someone';
                 const title = n.campaign_title || d.campaign_title || '';
                 const when = `${d.date || ''} ${d.time || ''}`.trim() + (d.timezone ? ` (${d.timezone})` : '');
@@ -153,11 +164,22 @@
                     case 'player_kicked':
                         return `You were removed from "${title}"`;
                     case 'session_suggested':
+                        if (d.added === '1') return `${actor} added ${count === 1 ? 'a date' : count + ' dates'} to the poll for "${title}": ${dayList}`;
+                        if (count > 1) return `${actor} suggested ${count} dates for "${title}": ${dayList}`;
                         return `${actor} suggested a session for "${title}" on ${when}`;
                     case 'session_cancelled':
+                        if (d.was === 'Suggested' && count > 1) return `${actor} withdrew the poll for "${title}"`;
                         return d.was === 'Suggested'
                             ? `${actor} withdrew the suggested session for "${title}" on ${when}`
                             : `${actor} cancelled the session for "${title}" on ${when}`;
+                    case 'poll_reminder':
+                        return count > 1
+                            ? `The poll for "${title}" still needs your reply. First date: ${this.fmtDay(d.date)}`
+                            : `The session suggested for "${title}" on ${when} still needs your reply`;
+                    case 'poll_complete':
+                        return count > 1
+                            ? `Everyone has replied to the poll for "${title}"`
+                            : `Everyone has replied to the session suggested for "${title}" on ${when}`;
                     case 'signup_created':
                         return `${actor} signed up for "${title}"`;
                     case 'player_left':
