@@ -14,6 +14,9 @@ window.profilePage = function() {
         calendarToken: '',
         discordEnabled: false,
         discord: null,
+        discordOffer: false,
+        discordImport: { name: true, avatar: true },
+        discordImporting: false,
         editing: null,
         editValue: '',
         saving: false,
@@ -69,6 +72,7 @@ window.profilePage = function() {
                 off: ["Discord isn't set up.", 'error']
             };
             if (texts[result]) this.showMessage(texts[result][0], texts[result][1]);
+            this.discordOffer = result === 'linked';
             this.integrationsOpen = true;
             params.delete('discord');
             const qs = params.toString();
@@ -108,6 +112,26 @@ window.profilePage = function() {
             } catch (error) {
                 this.showMessage('Error saving Discord settings: ' + error.message, 'error');
                 await this.loadDiscord();
+            }
+        },
+
+        // Right after linking: copy the Discord display name and/or picture into the profile.
+        async importDiscord() {
+            if (!this.discordImport.name && !this.discordImport.avatar) { this.discordOffer = false; return; }
+            this.discordImporting = true;
+            try {
+                const res = await fetch('/api/profile/discord/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.discordImport)
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || 'Could not copy from Discord.');
+                location.reload();
+            } catch (e) {
+                this.showMessage(e.message, 'error');
+            } finally {
+                this.discordImporting = false;
             }
         },
 

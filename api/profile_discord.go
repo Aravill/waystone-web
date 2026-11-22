@@ -2,8 +2,11 @@ package api
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 	"waystone-web/db"
 	"waystone-web/discord"
@@ -115,4 +118,81 @@ func HandleProfileDiscordTest(w http.ResponseWriter, r *http.Request) {
 		log.Printf("discord test dm: %v", err)
 		writeJSONError(w, http.StatusBadGateway, "Discord didn't accept the message")
 	}
+}
+
+// HandleProfileDiscordImport (POST /api/profile/discord/import, {name, avatar}) copies the linked
+// Discord account's display name into the nickname and/or its picture into the avatar.
+func HandleProfileDiscordImport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if !discordEnabled() {
+		writeJSONError(w, http.StatusConflict, "Discord isn't set up")
+		return
+	}
+	userID, _ := r.Context().Value("user_id").(string)
+	var body struct {
+		Name   bool `json:"name"`
+		Avatar bool `json:"avatar"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	link, err := db.GetDiscordLink(userID)
+	if err != nil || link == nil {
+		writeJSONError(w, http.StatusConflict, "Discord isn't connected")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	du, err := discordConf().client.GetUser(ctx, link.DiscordUserID)
+	if err != nil {
+		log.Printf("discord import: %v", err)
+		writeJSONError(w, http.StatusBadGateway, "Could not reach Discord. Try again.")
+		return
+	}
+	if body.Name {
+		name := strings.TrimSpace(du.GlobalName)
+		if name == "" {
+			name = du.Username
+		}
+		if rs := []rune(name); len(rs) > 32 {
+			name = string(rs[:32])
+		}
+		if err := db.SetUserProfile(userID, nil, &name); err != nil {
+			log.Printf("discord import name: %v", err)
+			writeJSONError(w, http.StatusInternalServerError, "failed to save the name")
+			return
+		}
+	}
+	if body.Avatar {
+		src := discord.AvatarURL(du)
+		if src == "" {
+			writeJSONError(w, http.StatusConflict, "Your Discord account has no profile picture")
+			return
+		}
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, src, nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			writeJSONError(w, http.StatusBadGateway, "Could not download the picture from Discord")
+			return
+		}
+		defer resp.Body.Close()
+		data, err := io.ReadAll(io.LimitReader(resp.Body, maxAvatarBytes+1))
+		contentType := http.DetectContentType(data)
+		if err != nil || resp.StatusCode != http.StatusOK || len(data) == 0 || len(data) > maxAvatarBytes || !allowedLogoTypes[contentType] {
+			writeJSONError(w, http.StatusBadGateway, "Could not download the picture from Discord")
+			return
+		}
+		if err := db.SetUserAvatar(userID, data, contentType); err != nil {
+			log.Printf("discord import avatar: %v", err)
+			writeJSONError(w, http.StatusInternalServerError, "failed to save the picture")
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
