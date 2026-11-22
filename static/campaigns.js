@@ -371,6 +371,62 @@ function formatShortDate(dateStr) {
     return parseDateLocal(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+// Session polls: a poll is the Suggested dates sharing a poll_id. These helpers take session objects and are shared by the calendar, game and Home pages.
+
+// {pollId: [dates]} of the Suggested sessions that carry a poll_id, in the given order.
+function groupPolls(sessions) {
+    const polls = {};
+    for (const s of sessions || []) {
+        if (s.status !== 'Suggested' || !s.poll_id) continue;
+        (polls[s.poll_id] = polls[s.poll_id] || []).push(s);
+    }
+    return polls;
+}
+
+// "Dec 11–16" (en dash), or "Dec 28 – Jan 3" across months, from dates sorted by start.
+function pollRangeLabel(dates) {
+    if (!dates || dates.length === 0) return '';
+    const first = dates[0];
+    const last = dates[dates.length - 1];
+    const fmt = (d) => parseDateLocal(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (first.date === last.date) return fmt(first);
+    if (first.date.slice(0, 7) === last.date.slice(0, 7)) return `${fmt(first)}–${parseDateLocal(last.date).getDate()}`;
+    return `${fmt(first)} – ${fmt(last)}`;
+}
+
+// "A", "A and B", "A, B and C"
+function listJoin(items) {
+    if (items.length < 2) return items.join('');
+    return items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
+}
+
+// "3 dates", "1 poll"
+function pluralCount(n, word) {
+    return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+// The two-step Confirm warning for a poll date: "Confirm Sat, Dec 12? Fri, Dec 11 and Wed, Dec 16 will be removed."
+// Empty when the poll has no other date, so the caller keeps its own wording.
+function pollConfirmWarning(session, dates) {
+    const others = (dates || []).filter((d) => d.id !== session.id);
+    if (others.length === 0) return '';
+    return `Confirm ${formatShortDate(session.date)}? ${listJoin(others.map((d) => formatShortDate(d.date)))} will be removed.`;
+}
+
+// Roll call rows from a session's replies (one per current player), ordered Yes, Maybe, No, No reply yet.
+// The awaited reply is the viewer's own: ask for it in rubric; other players' silence stays quiet.
+function sessionRoster(s, currentUserId) {
+    const kinds = { Accepted: 'accepted', Tentative: 'tentative', Declined: 'declined' };
+    const order = ['accepted', 'tentative', 'declined', 'awaiting'];
+    return (s.replies || [])
+        .map((r) => {
+            const kind = kinds[r.participation] || 'awaiting';
+            const you = kind === 'awaiting' && r.user.id === currentUserId && s.status === 'Suggested';
+            return { key: `${kind}-${r.user.id}`, user: r.user, label: you ? 'Your reply?' : replyWord(r.participation), cls: `participation-${kind === 'awaiting' ? 'pending' : kind}`, kind, you };
+        })
+        .sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+}
+
 // Campaigns Alpine component
 window.campaignsPage = function () {
     return {
@@ -784,7 +840,7 @@ window.campaignsPage = function () {
                 ? `<button type="button" class="campaign-action-btn campaign-follow-btn" data-campaign-id="${id}" data-following="${isFollowing}" title="${isFollowing ? 'Stop getting notifications for this game' : 'Get notified about status changes, sign-ups and sessions'}">${isFollowing ? 'Unfollow' : 'Follow'}</button>`
                 : '';
             const calendarBtnHtml = isMember
-                ? `<a class="campaign-action-btn campaign-calendar-btn" href="/games/${encodeURIComponent(campaign?.id ?? '')}/calendar"${unansweredCount > 0 ? ` title="${unansweredCount} suggested session${unansweredCount === 1 ? '' : 's'} awaiting your response" aria-label="Calendar, ${unansweredCount} awaiting your response"` : ''}>Calendar${unansweredCount > 0 ? `<span class="campaign-action-count">${unansweredCount}</span>` : ''}</a>`
+                ? `<a class="campaign-action-btn campaign-calendar-btn" href="/games/${encodeURIComponent(campaign?.id ?? '')}/calendar"${unansweredCount > 0 ? ` title="${pluralCount(unansweredCount, 'poll')} awaiting your reply" aria-label="Calendar, ${unansweredCount} awaiting your reply"` : ''}>Calendar${unansweredCount > 0 ? `<span class="campaign-action-count">${unansweredCount}</span>` : ''}</a>`
                 : '';
             const editBtnHtml = campaign?.can_manage
                 ? `<button type="button" class="campaign-action-btn campaign-edit-btn" data-campaign-id="${id}">Edit</button>`
@@ -842,7 +898,7 @@ window.campaignsPage = function () {
 
             let pendingNoticeHtml = '';
             if (unansweredCount > 0) {
-                pendingNoticeHtml = `<p class="pending-notice"><span aria-hidden="true">✦</span> ${unansweredCount === 1 ? 'A session needs your reply' : `${unansweredCount} sessions need your reply`}</p>`;
+                pendingNoticeHtml = `<p class="pending-notice"><span aria-hidden="true">✦</span> ${unansweredCount === 1 ? 'A poll awaits your reply' : `${unansweredCount} polls await your reply`}</p>`;
             } else if (pendingSignupsCount > 0) {
                 pendingNoticeHtml = `<p class="pending-notice"><span aria-hidden="true">✦</span> ${pendingSignupsCount} sign-up${pendingSignupsCount === 1 ? '' : 's'} to review</p>`;
             } else if (characterNudge) {
