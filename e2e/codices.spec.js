@@ -955,3 +955,87 @@ test.describe('Codices link from selection', () => {
     await expect(page.getByRole('heading', { name: /Create (this|these)/ })).toHaveCount(0);
   });
 });
+
+test.describe('Codices / menu', () => {
+  let editor;
+  let codex;
+  const ids = [];
+
+  test.beforeEach(async () => {
+    editor = await apiAs('roy');
+    const home = await (await editor.get('/api/codices')).json();
+    codex = home.codices.find((c) => c.can_edit);
+    expect(codex, 'roy can edit a codex').toBeTruthy();
+  });
+
+  test.afterEach(async () => {
+    for (const id of ids.splice(0)) await editor.delete(`/api/codices/pages/${id}`);
+    await editor.dispose();
+  });
+
+  async function makePage(title, body) {
+    const res = await editor.post('/api/codices/pages', { data: { title, codex_id: codex.id, body: body || '' } });
+    expect(res.status(), 'create ' + title).toBe(201);
+    const id = (await res.json()).page.id;
+    ids.push(id);
+    return id;
+  }
+
+  test('/per then Enter inserts the Person block', async ({ page }) => {
+    const id = await makePage('E2E Slash Person');
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/p/${id}/x/edit`);
+    const content = page.locator('.cm-content');
+    await content.click();
+    await page.keyboard.type('Intro');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('/per');
+    await expect(page.locator('.cm-tooltip-autocomplete')).toBeVisible();
+    await page.waitForTimeout(200); // the popup ignores Enter for its first 75 ms
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Mira');
+    const lines = (await content.innerText()).split('\n').map((l) => l.trim()).filter(Boolean);
+    expect(lines).toEqual(['Intro', '**Name:** Mira', '**Role:**', '**Wants:**', '**Lives in:** [[ ]]']);
+  });
+
+  test('/Session then Enter inserts that template headings', async ({ page }) => {
+    const id = await makePage('E2E Slash Session');
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/p/${id}/x/edit`);
+    const content = page.locator('.cm-content');
+    await content.click();
+    await page.keyboard.type('/Session');
+    await expect(page.locator('.cm-tooltip-autocomplete')).toContainText('Session headings');
+    await page.waitForTimeout(200); // the popup ignores Enter for its first 75 ms
+    await page.keyboard.press('Enter');
+    const text = await content.innerText();
+    expect(text).toContain('## Summary');
+    expect(text).toContain('## What happened');
+    expect(text).not.toContain('/Session');
+    expect(text).not.toContain('Notes from one game session');
+  });
+
+  test('URLs and and/or open no slash menu, and the Insert / button does', async ({ page }) => {
+    const id = await makePage('E2E Slash Quiet');
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/p/${id}/x/edit`);
+    const content = page.locator('.cm-content');
+    await content.click();
+    await page.keyboard.type('See https://example.com/x and and/or then');
+    await page.waitForTimeout(300);
+    await expect(page.locator('.cm-tooltip-autocomplete')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Insert /' }).click();
+    await expect(page.locator('.cm-tooltip-autocomplete')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.cm-tooltip-autocomplete')).toHaveCount(0);
+  });
+
+  test('a line that is only --- renders as a rule', async ({ page }) => {
+    const nl = String.fromCharCode(10);
+    const id = await makePage('E2E Slash Divider', ['Above', '---', 'Below'].join(nl));
+    await loginAs(page, 'roy');
+    await page.goto(`/codices/p/${id}/x`);
+    await expect(page.locator('.codex-text hr')).toHaveCount(1);
+    await expect(page.locator('.codex-text')).not.toContainText('---');
+  });
+});

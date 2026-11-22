@@ -209,13 +209,14 @@ function codexLiveList(spec, ctx) {
 // for placeholders before rendering so the Markdown renderer never sees them. A placeholder holds
 // spaces, which a Markdown link URL can't, so one inside "(...)" is never swallowed into an href.
 // A paragraph made only of pictures becomes a figure; two or more in a row become a gallery.
+// A line that is only --- becomes a rule (<hr>), here and not in the shared renderer.
 // A {{list ...}} line is swapped the same way for a live list: lists(spec) returns its HTML, and with
 // no lists callback (old revisions, template previews) it shows as a plain "Live list: ..." line.
 function codexMarkdown(body, lookup, canCreate = true, images = null, lists = null) {
     const found = [];
     const pics = [];
     const specs = [];
-    const text = String(body || '').replace(/[\u0001\u0002\u0003]/g, '').replace(CODEX_LIST_RE, (m) => {
+    const text = String(body || '').replace(/[\u0001\u0002\u0003\u0004]/g, '').replace(/^[ \t]*---[ \t]*$/gm, '\n\u0004\n').replace(CODEX_LIST_RE, (m) => {
         specs.push(m.trim().slice(6, -2).trim());
         return `\u0003 ${specs.length - 1} \u0003`;
     }).replace(CODEX_IMAGE_RE, (m, n, caption) => {
@@ -234,7 +235,7 @@ function codexMarkdown(body, lookup, canCreate = true, images = null, lists = nu
         if (spec === undefined) return '';
         return lists ? lists(spec) : `<p class="cx-live-plain">Live list: ${escapeHtml(spec)}</p>`;
     };
-    return renderMarkdown(text).replace(/<p>\u0003 (\d+) \u0003<\/p>/g, (m, i) => list(i)).replace(/\u0003 (\d+) \u0003/g, (m, i) => escapeHtml(`{{list ${specs[Number(i)] || ''}}}`)).replace(/(?:<p>(?:\u0002 \d+ \u0002(?:<br>| )*)+<\/p>)+/g, (run) => {
+    return renderMarkdown(text).replace(/<p>\u0004<\/p>/g, '<hr>').replace(/<p>\u0003 (\d+) \u0003<\/p>/g, (m, i) => list(i)).replace(/\u0003 (\d+) \u0003/g, (m, i) => escapeHtml(`{{list ${specs[Number(i)] || ''}}}`)).replace(/(?:<p>(?:\u0002 \d+ \u0002(?:<br>| )*)+<\/p>)+/g, (run) => {
         const ids = Array.from(run.matchAll(/\u0002 (\d+) \u0002/g), (m) => m[1]);
         if (ids.length === 1) return pic(ids[0], 'figure');
         return `<div class="cx-gallery">${ids.map((i) => pic(i, 'figure')).join('')}</div>`;
@@ -255,6 +256,25 @@ function codexMarkdown(body, lookup, canCreate = true, images = null, lists = nu
 function codexHeadingsOnly(body) {
     const out = String(body || '').split('\n').filter((l) => /^[ \t]{0,3}#{2,3}[ \t]+\S/.test(l)).map((l) => l.trim());
     return out.length ? out.join('\n\n') + '\n\n' : '';
+}
+
+// The / menu in the page editor: snippets, then each template's headings (templates with none are left out).
+const CODEX_SNIPPETS = [
+    { label: 'Person', detail: 'Name, role, wants, lives in', keys: 'npc character', text: '**Name:** \n**Role:** \n**Wants:** \n**Lives in:** [[ ]]', cursor: 10 },
+    { label: 'Callout', detail: 'A quoted note that stands out', keys: 'quote note', text: '> **Note:** ' },
+    { label: 'Loot list', detail: 'A heading and three bullets', keys: 'rewards', text: '## Loot and rewards\n\n- \n- \n- ' },
+    { label: 'Live list', detail: 'Pages by tag, kept up to date', keys: 'tag', text: '{{list tag: links:here}}', cursor: 11 },
+    { label: 'Divider', detail: 'A rule across the page', keys: 'rule line hr', text: '---' }
+];
+function codexSlashItems(templates, today) {
+    const snippets = [...(today ? [{ label: "Today's date", detail: today, keys: 'date', text: today }] : []), ...CODEX_SNIPPETS]
+        .map((s) => ({ ...s, section: 'Snippets' }));
+    const heads = [];
+    for (const t of templates) {
+        const text = codexHeadingsOnly(t.body);
+        if (text) heads.push({ label: t.name + ' headings', detail: t.by ? 'this codex' : '', section: 'Template headings', text });
+    }
+    return [...snippets, ...heads];
 }
 
 // Save as template, "All the text": pictures belong to their page, so lines that are only
@@ -416,7 +436,7 @@ const codexPeekCache = {};
 
 // A few plain lines from the start of a page, for the link preview card.
 function codexPlainExcerpt(body, max = 220) {
-    const text = String(body || '').split('\n').map((l) => l.trim()).filter((l) => l && !/^#{1,6}\s/.test(l) && !/^\{\{list(?:[ \t][^{}]*)?\}\}$/.test(l)).map((l) => l.replace(/^([-*+]|\d+\.|>)\s+/, '')).join(' ')
+    const text = String(body || '').split('\n').map((l) => l.trim()).filter((l) => l && l !== '---' && !/^#{1,6}\s/.test(l) && !/^\{\{list(?:[ \t][^{}]*)?\}\}$/.test(l)).map((l) => l.replace(/^([-*+]|\d+\.|>)\s+/, '')).join(' ')
         .replace(CODEX_IMAGE_RE, '')
         .replace(CODEX_LINK_RE, (m, t, label) => label || t)
         .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
@@ -3237,12 +3257,17 @@ window.codexPage = function () {
             await this.navPromise;
             if (!window.createCodexEditor) return;
             await this.$nextTick();
+            // The / menu's template headings; if they can't load, the snippets still work.
+            let templates = [];
+            try { templates = await this.loadTemplates(this.currentCodexId); } catch (error) { console.error('Templates for the / menu:', error); }
+            const today = this.tplBuiltin ? this.tplBuiltin.today : '';
             try {
                 this.editor = await window.createCodexEditor(this.$refs.editorHost, {
                     doc: () => this.draft.body,
                     titles: () => this.titles,
                     onChange: (value) => { this.draft.body = value; this.queueDraft(); },
-                    onNotice: (text) => this.showMessage(text, 'info')
+                    onNotice: (text) => this.showMessage(text, 'info'),
+                    slash: () => codexSlashItems(templates, today)
                 });
                 this.editorReady = !!this.editor;
             } catch (error) {
