@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=81">
     <link rel="stylesheet" href="/static/notifications.css?v=11">
-    <link rel="stylesheet" href="/static/codex.css?v=42">
+    <link rel="stylesheet" href="/static/codex.css?v=43">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -36,7 +36,7 @@
 
     <!-- Codices top bar: codex picker and search (the site header above stays as on every page) -->
     <div class="cx-top" :inert="navOpen ? '' : null">
-        <button type="button" class="cx-icon cx-menu-btn" x-ref="menuBtn" x-show="screen !== 'home'" x-cloak aria-label="Open the page list" aria-controls="cxNav" :aria-expanded="navOpen ? 'true' : 'false'" @click="toggleNav()">
+        <button type="button" class="cx-icon cx-menu-btn" x-ref="menuBtn" x-show="screen !== 'home' && screen !== 'help'" x-cloak aria-label="Open the page list" aria-controls="cxNav" :aria-expanded="navOpen ? 'true' : 'false'" @click="toggleNav()">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
         </button>
         <a class="cx-brand" href="/codices">Codices</a>
@@ -52,7 +52,7 @@
         </div>
         <div class="cx-search" role="search" @click.outside="searchOpen = false" @focusout="if (!$event.relatedTarget || !$event.currentTarget.contains($event.relatedTarget)) searchOpen = false">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-            <label class="visually-hidden" for="cxSearch" x-text="screen === 'home' ? 'Search all codices' : 'Search this codex'"></label>
+            <label class="visually-hidden" for="cxSearch" x-text="acrossCodices ? 'Search all codices' : 'Search this codex'"></label>
             <input type="search" id="cxSearch" x-ref="search" :placeholder="searchPlaceholder" autocomplete="off" x-model="searchQ" @focus="onSearchFocus()" @input="onSearchInput()" @keydown="onSearchKey($event)">
             <kbd aria-hidden="true">/</kbd>
             <div class="cx-results" x-show="searchOpen && searchQ.trim()" x-cloak>
@@ -62,7 +62,7 @@
                         <span class="cx-results-meta" x-show="r.meta" x-text="r.meta"></span>
                     </a>
                 </template>
-                <p class="cx-pick-note" x-show="searchResults.length === 0" x-text="searchLoading || (screen !== 'home' && !codex) ? 'Searching...' : 'No page matches.'"></p>
+                <p class="cx-pick-note" x-show="searchResults.length === 0" x-text="searchLoading || (!acrossCodices && !codex) ? 'Searching...' : 'No page matches.'"></p>
             </div>
         </div>
         <button type="button" class="cx-note" x-show="canNote" x-cloak aria-label="Quick note" aria-keyshortcuts="N" title="Quick note (N)" @click="openQuickNote()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M9 12h6M12 9v6"/></svg><span>Note</span><kbd aria-hidden="true">N</kbd></button>
@@ -72,7 +72,7 @@
         <div class="cx-scrim" @click="closeNav()"></div>
 
         <!-- Left nav: the folder tree. A drawer on phones. -->
-        <aside class="cx-nav" id="cxNav" x-show="screen !== 'home'" x-cloak aria-label="Pages in this codex" @click="onNavClick($event)">
+        <aside class="cx-nav" id="cxNav" x-show="screen !== 'home' && screen !== 'help'" x-cloak aria-label="Pages in this codex" @click="onNavClick($event)">
             <div class="cx-nav-in">
                 <div class="cx-drawer-head">
                     <span class="cx-drawer-name" x-text="codex ? codex.codex.name : ''"></span>
@@ -100,6 +100,7 @@
                             <a :href="graphUrl()" :aria-current="screen === 'graph' ? 'page' : null">Graph view</a>
                             <a :href="inboxUrl()" x-show="codex.can_edit || screen === 'inbox'" :aria-current="screen === 'inbox' ? 'page' : null">Inbox <span class="cx-badge" x-show="noteCount > 0" x-text="noteCount"></span></a>
                             <a href="#templates" id="cxTemplatesLink" @click.prevent="openTemplates()">Templates</a>
+                            <a href="/codices/help">Writing guide</a>
                         </div>
                     </div>
                 </template>
@@ -108,7 +109,7 @@
 
         <main class="cx-main" :inert="navOpen ? '' : null">
             <!-- Recently opened pages of this codex -->
-            <nav class="cx-tabs" x-show="screen !== 'home' && (tabs.length || screen === 'graph' || screen === 'inbox')" x-cloak aria-label="Recently opened pages">
+            <nav class="cx-tabs" x-show="screen !== 'home' && screen !== 'help' && (tabs.length || screen === 'graph' || screen === 'inbox')" x-cloak aria-label="Recently opened pages">
                 <template x-for="t in tabs" :key="t.id">
                     <span class="cx-tab" :class="{ on: t.id === currentPageId }">
                         <a :href="pageUrl(t)" :aria-current="t.id === currentPageId ? 'page' : null" x-text="t.title"></a>
@@ -216,6 +217,42 @@
                     </section>
                 </template>
 
+                <!-- Writing guide -->
+                <template x-if="screen === 'help'">
+                    <div>
+                        <header class="cx-head">
+                            <div class="cx-head-text">
+                                <h1 class="cx-title" tabindex="-1">Writing guide</h1>
+                            </div>
+                        </header>
+                        <p class="cx-sub">How to write a page. Each example shows what you type and what the page makes of it.</p>
+                        <nav class="cx-help-toc" aria-label="Sections of the guide">
+                            <template x-for="sec in helpSections" :key="sec.id">
+                                <a :href="'#help-' + sec.id" x-text="sec.title"></a>
+                            </template>
+                        </nav>
+                        <template x-for="sec in helpSections" :key="sec.id">
+                            <section class="codex-section" :id="'help-' + sec.id">
+                                <h2 class="section-header" x-text="sec.title"></h2>
+                                <div class="cx-help-intro" x-html="sec.intro"></div>
+                                <template x-for="(ex, i) in sec.examples" :key="i">
+                                    <div class="cx-help-ex">
+                                        <p class="cx-help-note" x-show="ex.note" x-text="ex.note"></p>
+                                        <div class="cx-help-col">
+                                            <p class="cx-help-label">You write</p>
+                                            <pre class="cx-help-src" x-text="ex.src"></pre>
+                                        </div>
+                                        <div class="cx-help-col">
+                                            <p class="cx-help-label">You get</p>
+                                            <div class="game-text codex-text cx-help-out" x-html="ex.html" @click="$event.target.closest('a') && $event.preventDefault()"></div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </section>
+                        </template>
+                    </div>
+                </template>
+
                 <!-- Home -->
                 <template x-if="screen === 'home' && home">
                     <div>
@@ -227,7 +264,7 @@
                                 <button type="button" class="cx-act cx-act--primary" x-show="home.can_create" @click="openCreateCodex()">+ New codex</button>
                             </div>
                         </header>
-                        <p class="cx-sub">Codices hold pages. A page links to others in its codex with [[double brackets]].</p>
+                        <p class="cx-sub">Codices hold pages. A page links to others in its codex with [[double brackets]]. <a href="/codices/help">Writing guide</a></p>
                         <section class="codex-section">
                             <h2 class="section-header">Codices</h2>
                             <p class="same" x-show="home.codices.length === 0" x-text="home.can_create ? 'No codices yet. Make a codex first.' : 'No codices to show yet.'"></p>
@@ -475,6 +512,7 @@
                                             <button type="button" class="cx-act" @click="$refs.imgInput.click()">
                                                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16"/><circle cx="9" cy="10" r="2"/><path d="M3 18l6-5 4 3 3-2 5 4"/></svg>Add image
                                             </button>
+                                            <a class="cx-act" href="/codices/help" target="_blank" rel="noopener" title="Formatting help (opens in a new tab)">? Help</a>
                                         </div>
                                         <div class="cm-host" x-ref="editorHost"></div>
                                         <textarea id="fBody" x-ref="bodyArea" placeholder="Write about it. Link other pages with [[Title]]." x-model="draft.body" x-show="!editorReady" @input="queueDraft()"></textarea>
@@ -508,7 +546,7 @@
                                         </template>
                                     </ul>
                                 </div>
-                                <p class="hint hint--formatting">Formatting: **bold** · *italic* · # heading · - list · 1. list · &gt; quote · [link](https://…) · [[Page title]] or [[Page title|shown text]] to link a page in this codex · ![[image.png|caption]] to show an image</p>
+                                <p class="hint hint--formatting">Formatting: **bold** · *italic* · # heading · - list · 1. list · &gt; quote · [link](https://…) · [[Page title]] or [[Page title|shown text]] to link a page in this codex · ![[image.png|caption]] to show an image · <a href="/codices/help" target="_blank" rel="noopener">Full writing guide</a></p>
                             </div>
                             <div class="field field--note">
                                 <label for="fNote">What changed (optional)</label>
@@ -1103,6 +1141,7 @@
     <script src="/campaigns.js?v=66"></script>
     <script src="/static/codex-editor.js?v=5"></script>
     <script src="/static/codex-graph.js?v=3"></script>
-    <script src="/static/codex.js?v=35"></script>
+    <script src="/static/codex-help.js?v=1"></script>
+    <script src="/static/codex.js?v=36"></script>
 </body>
 </html>

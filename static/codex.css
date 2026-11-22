@@ -801,7 +801,8 @@ button.wikilink {
     min-width: 0;
 }
 
-.cx-shell--home {
+.cx-shell--home,
+.cx-shell--help {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "main";
 }
@@ -876,6 +877,76 @@ button.wikilink {
 
 .cx-nav-foot {
     margin: 0.5rem 0 0;
+}
+
+.cx-help-toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.25rem;
+    margin: 0 0 1.5rem;
+}
+
+.cx-help-intro {
+    margin: 0 0 1rem;
+    max-width: 70ch;
+}
+
+.cx-help-intro p,
+.cx-help-intro ul {
+    margin: 0 0 0.75rem;
+}
+
+.cx-help-intro code,
+.cx-help-intro kbd {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+}
+
+.cx-help-ex {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.5rem 1rem;
+    margin: 0 0 1.25rem;
+}
+
+.cx-help-note {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.cx-help-col {
+    min-width: 0;
+}
+
+.cx-help-label {
+    margin: 0 0 0.25rem;
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+.cx-help-src {
+    margin: 0;
+    padding: 0.625rem 0.75rem;
+    background: var(--folio);
+    border: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.cx-help-out {
+    display: flow-root;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--line);
+}
+
+@media (max-width: 760px) {
+    .cx-help-ex {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 .cx-pager {
@@ -1312,7 +1383,8 @@ button.wikilink {
     padding: 1.25rem 2rem 4rem;
 }
 
-.cx-shell--home .cx-inner {
+.cx-shell--home .cx-inner,
+.cx-shell--help .cx-inner {
     max-width: 64rem;
 }
 
@@ -2359,6 +2431,7 @@ html:has(dialog.cx-lightbox[open]) {
 
     .cx-shell,
     .cx-shell--home,
+    .cx-shell--help,
     .cx-shell--page,
     .cx-shell--codex,
     .cx-shell--edit,
