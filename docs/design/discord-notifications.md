@@ -17,7 +17,7 @@ Waystone posts game announcements into a Discord channel per game and mirrors ea
 
 ## Data model
 
-- `campaigns.discord_channel_id` (ALTER-if-missing, default `''`). Only the admin route writes it (`SetCampaignDiscordChannel`), never `SaveCampaign`, the same way `codex_id` works. The game API sends `discord_channel` `{id, name}` (the name is looked up from Discord and cached by the admin route when set) so the game page can show "Posts to #name" read-only.
+- `campaigns.discord_channel_id` and `campaigns.discord_channel_name` (ALTER-if-missing, default `''`). Only the admin route writes them (`SetCampaignDiscordChannel`), never `SaveCampaign`, the same way `codex_id` works. The game API sends `discord_channel` `{id, name}` (the name is cached when the admin sets the channel) so the game page can show "Posts to #name" read-only.
 - `app_settings (key PRIMARY KEY, value)`: `discord_guild_id`, `discord_invite_url`, `discord_channel_events` (JSON list of event keys).
 - `discord_links`:
 
@@ -85,6 +85,9 @@ Waystone posts game announcements into a Discord channel per game and mirrors ea
 - A goroutine started from `main.go` drains `discord_outbox` in `created_at` order. It honours Discord's rate-limit headers (`X-RateLimit-*`, 429 `retry_after`, global limit) and retries 5xx and network errors with backoff for up to 6 hours, then marks the row `failed`. It wakes on new rows and every 30 s.
 - A DM refused by Discord (50007, cannot send to this user) isn't retried: it sets `dm_error` on the link and marks the row `failed`. Any later successful DM clears `dm_error`. A 404 on the cached DM channel re-creates it once.
 - A channel answering Unknown Channel (10003) or Missing Access (50001) clears `campaigns.discord_channel_id` and drops that game's queued channel rows. It then sends a `discord_channel_lost` notification to every admin ("{game}'s Discord channel is gone", linking to `/admin/discord`). The game's DM isn't told.
+- Missing Permissions (50013, e.g. Embed Links removed) marks the post failed but keeps the channel.
+- **Send test DM** (Profile) and **Send test** (admin) call Discord directly, not through the outbox, so errors show at once.
+- A session counts as confirmed at its `updated_at` (there is no `confirmed_at`), for the "less than 24h" rule.
 - If Discord is off (no token), nothing is queued.
 
 ## Pages and API
@@ -96,7 +99,7 @@ Waystone posts game announcements into a Discord channel per game and mirrors ea
 
 ## Scope extras
 
-- E2E: a tiny fake Discord server in `e2e/` (pointed to by `DISCORD_API_BASE` and a dummy token). One spec: the admin sets the guild and assigns a channel, the DM confirms a session, and the fake receives the channel post and a linked player's DM. The link is seeded directly into the throwaway DB or through a test-only path. OAuth is tested by hand against a real test server.
+- E2E: a tiny fake Discord server in `e2e/` (pointed to by `DISCORD_API_BASE` and a dummy token). One spec: the admin sets the guild and assigns a channel, the DM confirms a session, and the fake receives the channel post and a linked player's DM. The link goes through the real OAuth start and callback against the fake (no test-only path). Only the Discord-side consent screen is tested by hand.
 - No demo seed for Discord (it needs a real bot).
 - The production Discord app needs the bot invited to the server with *View Channels*, *Send Messages* and *Embed Links*, and the redirect URI registered.
 
