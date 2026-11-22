@@ -93,6 +93,45 @@ const CODEX_LINK_RE = /\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{1,200}))?\]\]/g;
 // regex; the leading "!" makes it a picture, so pictures are swapped out before links.
 const CODEX_IMAGE_RE = /!\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{0,200}))?\]\]/g;
 
+// ![[name|OPTIONS|caption]]: OPTIONS is a first segment made only of the keywords below (any case),
+// otherwise everything after the name is the caption. The last keyword of each kind wins; defaults
+// are medium and right. Options matter only for a picture alone in its paragraph.
+const CODEX_PIC_SIZES = ['small', 'medium', 'large', 'full'];
+const CODEX_PIC_ALIGNS = ['left', 'center', 'right'];
+function codexPicOptions(raw) {
+    const parts = String(raw || '').split('|');
+    const words = parts[0].trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const isOpts = words.length > 0 && words.every((w) => CODEX_PIC_SIZES.includes(w) || CODEX_PIC_ALIGNS.includes(w));
+    let size = 'medium';
+    let align = 'right';
+    if (isOpts) {
+        for (const w of words) {
+            if (CODEX_PIC_SIZES.includes(w)) size = w;
+            else align = w;
+        }
+    }
+    const rest = (isOpts ? parts.slice(1) : parts).join('|');
+    return { size, align, caption: rest.trim(), captionRaw: rest };
+}
+
+// Rewrites the index-th picture embed (counted like codexMarkdown: {{list ...}} lines are skipped)
+// with a new size and spot; null when nothing changes or the index is out of range. Defaults and
+// full's spot are left out; the caption is kept as written.
+function codexSetPicLayout(body, index, size, align) {
+    if (!CODEX_PIC_SIZES.includes(size) || !CODEX_PIC_ALIGNS.includes(align)) return null;
+    const re = new RegExp(CODEX_LIST_RE.source + '|' + CODEX_IMAGE_RE.source, 'gm');
+    let i = 0;
+    const out = String(body || '').replace(re, (m, n, raw) => {
+        if (n === undefined || i++ !== index) return m;
+        const cap = codexPicOptions(raw).captionRaw;
+        let opts = size === 'full' ? 'full' : [size === 'medium' ? '' : size, align === 'right' ? '' : align].filter(Boolean).join(' ');
+        // A caption that reads as keywords would be taken for options, so say "medium" first.
+        if (!opts && cap && codexPicOptions(cap).caption === '') opts = 'medium';
+        return `![[${n}${opts ? '|' + opts : ''}${cap ? '|' + cap : ''}]]`;
+    });
+    return out !== body && i > index ? out : null;
+}
+
 const codexNorm = (s) => String(s || '').trim().split(/\s+/).join(' ').toLowerCase();
 // Link targets in savedBody that name no page (lookup(title) is falsy) and were no targets in initialBody;
 // ![[picture]] embeds are not links. Deduped by name, at most 20.
@@ -122,14 +161,25 @@ function codexPageUrl(p, tail = '') {
 // A picture of the page as the Markdown renderer's output: a button (opens the lightbox) around
 // the image, and a caption under it when the text has one. pic is null when the name isn't one of
 // the page's pictures.
-function codexPicHtml(pic, name, caption, kind) {
+// opts ({size, align, n, editable}) is given for a lone figure: size/spot classes, data-pic (the
+// embed's index) and, with editable, the layout bar.
+function codexPicHtml(pic, name, caption, kind, opts) {
     if (!pic) return `<span class="cx-img-missing">Missing image: ${escapeHtml(name)}</span>`;
     const shown = escapeHtml(caption || pic.name);
     const meta = escapeHtml(`${pic.name} · ${pic.width}×${pic.height}`);
     const btn = `<button type="button" class="cx-img-btn${kind === 'inline' ? ' cx-img-btn--inline' : ''}" data-url="${escapeHtml(pic.url)}" data-caption="${shown}" data-meta="${meta}" aria-label="View larger: ${shown}">` +
         `<img src="${escapeHtml(pic.url)}" alt="${shown}" width="${Number(pic.width) || ''}" height="${Number(pic.height) || ''}" loading="lazy"></button>`;
     if (kind === 'inline') return btn;
-    return `<figure class="cx-figure">${btn}${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ''}</figure>`;
+    const figcaption = caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : '';
+    if (!opts) return `<figure class="cx-figure">${btn}${figcaption}</figure>`;
+    const full = opts.size === 'full';
+    const align = full ? 'center' : opts.align;
+    const cap = (v) => v[0].toUpperCase() + v.slice(1);
+    const group = (kind, values, current, off) => `<span class="cx-layout-group" role="group" aria-label="Picture ${kind}">` + values.map((v) =>
+        `<button type="button" data-pic-${kind}="${v}" aria-pressed="${v === current}" aria-label="Picture ${kind}: ${cap(v)}"${off ? ' disabled' : ''}>${cap(v)}</button>`).join('') + '</span>';
+    const bar = opts.editable ? '<div class="cx-layout"><button type="button" class="cx-layout-toggle" data-pic-toggle aria-label="Picture layout">Layout</button>' +
+        `<div class="cx-layout-bar">${group('size', CODEX_PIC_SIZES, opts.size, false)}${group('align', CODEX_PIC_ALIGNS, align, full)}</div></div>` : '';
+    return `<figure class="cx-figure cx-figure--${opts.size} cx-figure--${align}" data-pic="${opts.n}" data-size="${opts.size}" data-align="${opts.align}">${btn}${bar}${figcaption}</figure>`;
 }
 
 // ---- Live lists: a paragraph of its own, {{list tag:npc folder:Places/Inns links:here kind:lore sort:updated limit:20}} ----
@@ -212,23 +262,24 @@ function codexLiveList(spec, ctx) {
 // A line that is only --- becomes a rule (<hr>), here and not in the shared renderer.
 // A {{list ...}} line is swapped the same way for a live list: lists(spec) returns its HTML, and with
 // no lists callback (old revisions, template previews) it shows as a plain "Live list: ..." line.
-function codexMarkdown(body, lookup, canCreate = true, images = null, lists = null) {
+function codexMarkdown(body, lookup, canCreate = true, images = null, lists = null, editable = false) {
     const found = [];
     const pics = [];
     const specs = [];
     const text = String(body || '').replace(/[\u0001\u0002\u0003\u0004]/g, '').replace(/^[ \t]*---[ \t]*$/gm, '\n\u0004\n').replace(CODEX_LIST_RE, (m) => {
         specs.push(m.trim().slice(6, -2).trim());
         return `\u0003 ${specs.length - 1} \u0003`;
-    }).replace(CODEX_IMAGE_RE, (m, n, caption) => {
-        pics.push({ name: n.trim(), caption: (caption || '').trim() });
+    }).replace(CODEX_IMAGE_RE, (m, n, raw) => {
+        const o = codexPicOptions(raw);
+        pics.push({ name: n.trim(), caption: o.caption, size: o.size, align: o.align });
         return `\u0002 ${pics.length - 1} \u0002`;
     }).replace(CODEX_LINK_RE, (m, t, label) => {
         found.push({ text: t.trim(), label: label && label.replace(/\u0002 \d+ \u0002/g, '') });
         return `\u0001 ${found.length - 1} \u0001`;
     });
-    const pic = (i, kind) => {
+    const pic = (i, kind, lone) => {
         const p = pics[Number(i)];
-        return p ? codexPicHtml(images ? images(p.name) : null, p.name, p.caption, kind) : '';
+        return p ? codexPicHtml(images ? images(p.name) : null, p.name, p.caption, kind, lone ? { size: p.size, align: p.align, n: Number(i), editable } : null) : '';
     };
     const list = (i) => {
         const spec = specs[Number(i)];
@@ -237,7 +288,7 @@ function codexMarkdown(body, lookup, canCreate = true, images = null, lists = nu
     };
     return renderMarkdown(text).replace(/<p>\u0004<\/p>/g, '<hr>').replace(/<p>\u0003 (\d+) \u0003<\/p>/g, (m, i) => list(i)).replace(/\u0003 (\d+) \u0003/g, (m, i) => escapeHtml(`{{list ${specs[Number(i)] || ''}}}`)).replace(/(?:<p>(?:\u0002 \d+ \u0002(?:<br>| )*)+<\/p>)+/g, (run) => {
         const ids = Array.from(run.matchAll(/\u0002 (\d+) \u0002/g), (m) => m[1]);
-        if (ids.length === 1) return pic(ids[0], 'figure');
+        if (ids.length === 1) return pic(ids[0], 'figure', true);
         return `<div class="cx-gallery">${ids.map((i) => pic(i, 'figure')).join('')}</div>`;
     }).replace(/\u0002 (\d+) \u0002/g, (m, i) => pic(i, 'inline')).replace(/\u0001 (\d+) \u0001/g, (m, i) => {
         const l = found[Number(i)];
@@ -678,6 +729,7 @@ window.codexPage = function () {
         // Mentioned, not linked: plain mentions of this page elsewhere in the codex
         mentions: { loaded: false, total: 0, list: [], can_edit: false, busy: false, progress: '' },
         mentionSeq: 0,
+        picBusy: false,
         localSeq: 0,
         navOpen: false,
         navAnim: false, // the drawer only animates after the first open, so it never slides shut on load
@@ -1286,7 +1338,7 @@ window.codexPage = function () {
             return (spec) => codexLiveList(spec, ctx);
         },
         get bodyHtml() {
-            return this.page ? codexMarkdown(this.page.body, this.linkLookup, this.canEdit, this.imageLookup, this.listRenderer) : '';
+            return this.page ? codexMarkdown(this.page.body, this.linkLookup, this.canEdit, this.imageLookup, this.listRenderer, this.canEdit) : '';
         },
         // Pages that link here by [[link]]; map pins are not shown.
         get linkedFrom() {
@@ -3026,9 +3078,40 @@ window.codexPage = function () {
         // Any button that carries a picture (data-url) opens the lightbox: article figures, the
         // editor preview, history, the cover.
         onImageClick(event) {
+            if (event.target.closest && event.target.closest('.cx-layout')) return this.onLayoutClick(event);
             const b = event.target.closest && event.target.closest('button.cx-img-btn[data-url]');
             if (!b) return;
             this.openLightbox({ url: b.dataset.url, caption: b.dataset.caption, meta: b.dataset.meta });
+        },
+        // The layout bar of a lone figure on the page view: Layout toggles it on touch, a size or spot
+        // button rewrites that embed and saves the page as a new revision.
+        async onLayoutClick(event) {
+            const btn = event.target.closest('button');
+            if (!btn || btn.disabled) return;
+            const box = btn.closest('.cx-layout');
+            if (btn.hasAttribute('data-pic-toggle')) {
+                box.classList.toggle('is-open');
+                return;
+            }
+            const fig = btn.closest('figure[data-pic]');
+            if (!fig || !this.page || this.picBusy) return;
+            const size = btn.dataset.picSize || fig.dataset.size;
+            const align = btn.dataset.picAlign || fig.dataset.align;
+            const body = codexSetPicLayout(this.page.body, Number(fig.dataset.pic), size, align);
+            if (body === null) return;
+            this.picBusy = true;
+            box.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+            try {
+                const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}`, 'PUT', { base_revision: this.page.current_revision, body, note: 'Picture layout' });
+                if (response.status === 409 && data.code === 'stale_base') this.showMessage('The page changed meanwhile. Reloaded it; try again.', 'error');
+                else if (!response.ok) this.showMessage(this.sentence(data.error || 'Could not change the picture layout'), 'error');
+                await this.load();
+            } catch (error) {
+                this.showMessage('Could not change the picture layout: ' + error.message, 'error');
+                box.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+            } finally {
+                this.picBusy = false;
+            }
         },
         openLightbox(pic) {
             this.lightbox = pic;
