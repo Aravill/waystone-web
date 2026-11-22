@@ -84,7 +84,7 @@ type Store interface {
 	SetSystemLogo(id string, data []byte, contentType string) error
 	GetSystemLogo(id string) ([]byte, string, error)
 	CreateNotifications(notifications []models.Notification) error
-	GetNotifications(userID string, limit int) ([]models.Notification, error)
+	GetNotifications(userID string, unreadOnly bool, limit, offset int) ([]models.Notification, error)
 	CountUnreadNotifications(userID string) (int, error)
 	MarkNotificationRead(userID, id string) error
 	MarkAllNotificationsRead(userID string) error

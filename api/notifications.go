@@ -102,10 +102,26 @@ func HandleNotifications(w http.ResponseWriter, r *http.Request) {
 		limit = 50
 	}
 
-	notifications, err := db.GetNotifications(userID, limit)
+	offset := 0
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			offset = n
+		}
+	}
+	if offset > 10000 {
+		offset = 10000
+	}
+	unreadOnly := r.URL.Query().Get("unread") == "1"
+
+	// One extra row tells whether another page follows.
+	notifications, err := db.GetNotifications(userID, unreadOnly, limit+1, offset)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve notifications")
 		return
+	}
+	hasMore := len(notifications) > limit
+	if hasMore {
+		notifications = notifications[:limit]
 	}
 	unread, err := db.CountUnreadNotifications(userID)
 	if err != nil {
@@ -157,6 +173,7 @@ func HandleNotifications(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"notifications": items,
 		"unread_count":  unread,
+		"has_more":      hasMore,
 	})
 }
 
