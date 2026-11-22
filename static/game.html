@@ -296,10 +296,10 @@
                                                         </div>
                                                     </template>
                                                 </div>
-                                                <div class="panel-dm-actions" x-show="isDM && s.manual">
+                                                <div class="panel-dm-actions" x-show="isDM">
                                                     <div class="session-actions">
-                                                        <button type="button" class="btn-action" :disabled="busy" @click="startEdit(s)">Edit</button>
-                                                        <button type="button" class="btn-action btn-action-cancel" :disabled="busy" @click="deletePlayed(s)">Delete</button>
+                                                        <button type="button" class="btn-action" :disabled="busy" @click="startEdit(s)" x-text="s.manual ? 'Edit' : 'Edit attendance'"></button>
+                                                        <button type="button" class="btn-action btn-action-cancel" :disabled="busy" x-show="s.manual" @click="deletePlayed(s)">Delete</button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -343,15 +343,16 @@
                                 <template x-if="recording">
                                     <form class="game-panel-state" @submit.prevent="savePlayed()" novalidate>
                                         <div>
-                                            <p class="modal-eyebrow">Off the calendar</p>
+                                            <p class="modal-eyebrow" x-text="editingManual ? 'Off the calendar' : 'Played session'"></p>
                                             <h3 class="panel-heading" tabindex="-1" x-text="formTitle"></h3>
                                         </div>
-                                        <p class="form-hint">For games played away from Waystone, or never put on the calendar. It's added to the session list by date.</p>
-                                        <div class="form-group">
+                                        <p class="form-hint" x-show="editingManual">For games played away from Waystone, or never put on the calendar. It's added to the session list by date.</p>
+                                        <p class="form-hint" x-show="!editingManual" x-text="formatDate(form.date)"></p>
+                                        <div class="form-group" x-show="editingManual">
                                             <label for="recDate">Date</label>
                                             <input id="recDate" type="date" :max="today" x-model="form.date">
                                         </div>
-                                        <div class="game-field-row">
+                                        <div class="game-field-row" x-show="editingManual">
                                             <div class="form-group">
                                                 <label for="recStart">Start (optional)</label>
                                                 <input id="recStart" type="time" x-model="form.start">
