@@ -26,7 +26,7 @@ func graphExcerpt(body string) string {
 	var lines []string
 	for _, l := range strings.Split(body, "\n") {
 		l = strings.TrimSpace(l)
-		if l == "" || graphHeadingRe.MatchString(l) || graphLiveRe.MatchString(l) {
+		if l == "" || l == "---" || graphHeadingRe.MatchString(l) || graphLiveRe.MatchString(l) {
 			continue
 		}
 		lines = append(lines, graphListRe.ReplaceAllString(l, ""))

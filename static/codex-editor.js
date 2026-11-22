@@ -21,11 +21,12 @@
     const LINK_RE = /!?\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{0,200}))?\]\]/g;
     const norm = (s) => String(s || '').trim().split(/\s+/).join(' ').toLowerCase();
 
-    // createCodexEditor(el, { doc, titles, onChange }) mounts the editor in el and resolves to
+    // createCodexEditor(el, { doc, titles, onChange, onNotice, slash }) mounts the editor in el and resolves to
     // { view, linkSelection }. doc is the text, or a function returning it (read after the library has loaded, so
     // text typed meanwhile in the fallback box is kept). titles() returns [{ title, aliases }] for this codex; onChange(text) gets every edit;
-    // onNotice(text) hears why Ctrl+K did nothing.
-    window.createCodexEditor = async function (el, { doc, titles, onChange, onNotice }) {
+    // onNotice(text) hears why Ctrl+K did nothing. slash() returns the / menu items
+    // [{ label, detail, section, keys, text, cursor }]; text replaces the "/word", cursor is the caret offset in it (default: its end).
+    window.createCodexEditor = async function (el, { doc, titles, onChange, onNotice, slash }) {
         await loadScriptOnce('/static/vendor/codemirror.bundle.js?v=1');
         const { EditorView, EditorState, keymap, Decoration, ViewPlugin, MatchDecorator, placeholder, drawSelection,
             history, defaultKeymap, historyKeymap, markdown, autocompletion, completionKeymap,
@@ -74,6 +75,35 @@
             return { from: m.from + 2, options, validFor: /^[^\[\]\n|]*$/ };
         };
 
+        // The / menu: "/" at a line start or after whitespace, then up to 20 word characters, filtered on the
+        // label and keys. from is after the "/" (so the library leaves the filtering to us) and apply takes the "/" too.
+        const slashMenu = (ctx) => {
+            const m = ctx.matchBefore(/\/[\w-]{0,20}/);
+            if (!m || !slash || (m.from > 0 && !/\s/.test(ctx.state.doc.sliceString(m.from - 1, m.from)))) return null;
+            const q = m.text.slice(1).toLowerCase();
+            const options = [];
+            for (const it of slash()) {
+                if (q && !((it.label + ' ' + (it.keys || '')).toLowerCase().includes(q))) continue;
+                options.push({
+                    label: it.label,
+                    detail: it.detail,
+                    section: it.section,
+                    apply: (v, c, from, to) => {
+                        v.dispatch({ changes: { from: from - 1, to, insert: it.text }, selection: { anchor: from - 1 + (it.cursor == null ? it.text.length : it.cursor) }, userEvent: 'input.complete', scrollIntoView: true });
+                    }
+                });
+            }
+            return options.length ? { from: m.from + 1, options, filter: false } : null;
+        };
+
+        // The Insert / button: a "/" on a line of its own (a typing event, so the menu opens).
+        const insertSlash = (v) => {
+            const head = v.state.selection.main.head;
+            const text = (head === v.state.doc.lineAt(head).from ? '' : '\n') + '/';
+            v.dispatch({ changes: { from: head, insert: text }, selection: { anchor: head + text.length }, userEvent: 'input.type', scrollIntoView: true });
+            v.focus();
+        };
+
         // Ctrl/Cmd+K and the Link button: the selected words become [[Title]], [[Title|as selected]]
         // (another case, or an alias) or [[as selected]] (a page not written yet). Always true, so the
         // browser's own Ctrl+K stays out of it.
@@ -109,7 +139,7 @@
                     markdown(),
                     syntaxHighlighting(highlight),
                     wikilinks,
-                    autocompletion({ override: [complete], icons: false }),
+                    autocompletion({ override: [complete, slashMenu], icons: false }),
                     placeholder('Write about it. Link other pages with [[Title]].'),
                     EditorView.lineWrapping,
                     EditorView.contentAttributes.of({ 'aria-label': 'The page', 'aria-multiline': 'true' }),
@@ -118,6 +148,6 @@
                 ]
             })
         });
-        return { view, linkSelection: () => linkSelection(view) };
+        return { view, linkSelection: () => linkSelection(view), insertSlash: () => insertSlash(view) };
     };
 })();

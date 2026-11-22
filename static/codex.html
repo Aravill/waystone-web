@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=78">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=36">
+    <link rel="stylesheet" href="/static/codex.css?v=37">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -455,6 +455,9 @@
                                             <span class="cx-edtools-note" role="status" x-text="draftStatus"></span>
                                             <button type="button" class="cx-act" x-show="editorReady" title="Link the selected words (Ctrl+K)" @click="editor.linkSelection()">
                                                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Link
+                                            </button>
+                                            <button type="button" class="cx-act" x-show="editorReady" title="Insert a snippet or template (type / on a new line)" @click="editor.insertSlash()">
+                                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 4L8 20"/></svg>Insert /
                                             </button>
                                             <button type="button" class="cx-act" @click="$refs.imgInput.click()">
                                                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16"/><circle cx="9" cy="10" r="2"/><path d="M3 18l6-5 4 3 3-2 5 4"/></svg>Add image
@@ -1077,8 +1080,8 @@
 
     <script src="/static/notifications.js?v=11"></script>
     <script src="/campaigns.js?v=64"></script>
-    <script src="/static/codex-editor.js?v=4"></script>
+    <script src="/static/codex-editor.js?v=5"></script>
     <script src="/static/codex-graph.js?v=3"></script>
-    <script src="/static/codex.js?v=31"></script>
+    <script src="/static/codex.js?v=32"></script>
 </body>
 </html>

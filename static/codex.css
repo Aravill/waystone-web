@@ -181,6 +181,21 @@ button.wikilink {
     font-family: inherit;
 }
 
+.cm-tooltip-autocomplete .cm-completionSection {
+    padding: 0.25rem 0.5rem 0.125rem;
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-style: normal;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.cm-tooltip-autocomplete .cm-completionDetail {
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
 .cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] {
     background: var(--folio) !important; /* the library's own selected colour is blue */
     color: var(--ink) !important;
@@ -1884,6 +1899,13 @@ html:has(dialog.cx-lightbox[open]) {
     border-left: 4px solid var(--rubric);
     color: var(--ink);
     font-style: italic;
+}
+
+.codex-page .codex-text hr,
+.cx-tpl-preview hr {
+    margin: 1.5rem 0;
+    border: 0;
+    border-top: 1px solid var(--line);
 }
 
 .cx-article--desc {
