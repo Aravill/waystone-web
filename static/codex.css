@@ -3804,3 +3804,28 @@ a.tl-title:hover {
         grid-column: 2;
     }
 }
+
+/* Journal pages: the strip under the title (date, who was at the table, link to the game) */
+.cx-jmeta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.25rem;
+    margin: 0.5rem 0 1.25rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--line);
+    background: var(--folio);
+    font-size: 0.875rem;
+}
+
+.cx-jmeta div {
+    display: flex;
+    gap: 0.375rem;
+}
+
+.cx-jmeta dt {
+    color: var(--muted);
+}
+
+.cx-jmeta dd {
+    margin: 0;
+}

@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=78">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=35">
+    <link rel="stylesheet" href="/static/codex.css?v=36">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -328,7 +328,8 @@
                         <header class="cx-head">
                             <div class="cx-head-text">
                                 <p class="cx-kicker" x-show="isTimeline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18"/><rect x="5" y="5" width="4" height="4" fill="currentColor"/><rect x="5" y="15" width="4" height="4"/><path d="M12 7h8M12 17h6"/></svg>Timeline</p>
-                                <h1 class="cx-title" tabindex="-1" x-text="page.title"></h1>
+                                <p class="cx-kicker" x-show="journal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg>Campaign journal · <span x-text="journal ? journal.campaign_title : ''"></span></p>
+                                <h1 class="cx-title" tabindex="-1" x-text="pageHeading"></h1>
                             </div>
                             <div class="cx-actions">
                                 <a class="cx-act" x-show="screen !== 'page'" :href="pageUrl(page)">Read</a>
@@ -361,6 +362,11 @@
                             </div>
                         </header>
                         <p class="cx-sub" x-show="screen === 'page'" x-text="isTimeline ? tlSummary : 'Revision ' + page.current_revision + ' · last edited by ' + page.updated_by_user.display_name + ' ' + formatStamp(page.updated_at)"></p>
+                        <dl class="cx-jmeta" x-show="journal && screen === 'page'">
+                            <div><dt>Played</dt><dd x-text="journal ? parseDateLocal(journal.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : ''"></dd></div>
+                            <div><dt>At the table</dt><dd x-text="journalWho"></dd></div>
+                            <div><dd><a :href="'/games/' + encodeURIComponent(journal ? journal.campaign_id : '')">Session in the game</a></dd></div>
+                        </dl>
                         <p class="cx-sub" x-show="screen === 'edit' && draft" x-text="draft ? 'Saving adds revision ' + (draft.base + 1) + '. To change the title, use Rename.' : ''"></p>
                         <p class="cx-sub" x-show="screen === 'history'" x-text="journalByline(page)"></p>
                         <p class="cx-sub" x-show="screen === 'history' && pruned">Only the latest 200 revisions are kept.</p>
@@ -1070,10 +1076,9 @@
     </div>
 
     <script src="/static/notifications.js?v=11"></script>
-    <script src="/campaigns.js?v=63"></script>
-    <script src="/static/journal.js?v=1"></script>
+    <script src="/campaigns.js?v=64"></script>
     <script src="/static/codex-editor.js?v=4"></script>
     <script src="/static/codex-graph.js?v=3"></script>
-    <script src="/static/codex.js?v=30"></script>
+    <script src="/static/codex.js?v=31"></script>
 </body>
 </html>

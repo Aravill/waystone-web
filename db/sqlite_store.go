@@ -466,6 +466,11 @@ func (s *SQLiteStore) initSchema() error {
 		}
 	}
 
+	if !cols["journal_folder_id"] {
+		if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN journal_folder_id TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("failed to add campaigns.journal_folder_id column: %w", err)
+		}
+	}
 	if !cols["codex_id"] {
 		if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN codex_id TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("failed to add campaigns.codex_id column: %w", err)
@@ -477,7 +482,7 @@ func (s *SQLiteStore) initSchema() error {
 	if err != nil {
 		return fmt.Errorf("failed to inspect pages table: %w", err)
 	}
-	pageHasFolder, pageHasCover := false, false
+	pageHasFolder, pageHasCover, pageHasSession := false, false, false
 	for rows.Next() {
 		var cid, notnull, pk int
 		var name, ctype string
@@ -491,6 +496,8 @@ func (s *SQLiteStore) initSchema() error {
 			pageHasFolder = true
 		case "cover_image_id":
 			pageHasCover = true
+		case "session_id":
+			pageHasSession = true
 		}
 	}
 	rows.Close()
@@ -503,6 +510,15 @@ func (s *SQLiteStore) initSchema() error {
 		if _, err := s.db.Exec(`ALTER TABLE pages ADD COLUMN cover_image_id TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("failed to add pages.cover_image_id column: %w", err)
 		}
+	}
+	if !pageHasSession {
+		if _, err := s.db.Exec(`ALTER TABLE pages ADD COLUMN session_id TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("failed to add pages.session_id column: %w", err)
+		}
+	}
+	// One journal page per session. Created after the ALTER, so older databases have the column.
+	if _, err := s.db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_pages_session ON pages(session_id) WHERE session_id <> ''`); err != nil {
+		return fmt.Errorf("failed to create idx_pages_session: %w", err)
 	}
 	var folderHasTemplate int
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('codex_folders') WHERE name = 'default_template'`).Scan(&folderHasTemplate); err != nil {
@@ -593,7 +609,8 @@ func (s *SQLiteStore) initSchema() error {
 		}
 	}
 
-	return nil
+	// Journal entries of games that already have a codex move into it (idempotent).
+	return s.migrateJournalToCodex()
 }
 
 // Backup writes a consistent snapshot of the database to path (which must not exist).
@@ -1395,7 +1412,11 @@ func (s *SQLiteStore) DeleteManualSession(sessionID string) error {
 	if _, err := tx.Exec(`DELETE FROM session_responses WHERE session_id = ? AND EXISTS (SELECT 1 FROM campaign_sessions WHERE id = ? AND manual = 1)`, sessionID, sessionID); err != nil {
 		return err
 	}
-	// A by-hand session that is deleted didn't happen, so its journal entry goes too.
+	// The session's journal page stays in its codex as an ordinary page; only the link goes. An
+	// entry still waiting in the legacy tables (the game has no codex) has nowhere to go, so it goes.
+	if _, err := tx.Exec(`UPDATE pages SET session_id = '' WHERE session_id IN (SELECT id FROM campaign_sessions WHERE id = ? AND manual = 1)`, sessionID); err != nil {
+		return err
+	}
 	if err := deleteJournalForSessions(tx, `SELECT id FROM campaign_sessions WHERE id = ? AND manual = 1`, sessionID); err != nil {
 		return err
 	}
@@ -1739,7 +1760,6 @@ var (
 	ErrUserNotFound         = errors.New("user not found")
 	ErrNotificationNotFound = errors.New("notification not found")
 	ErrJournalSessionGone   = errors.New("session not found")
-	ErrJournalNotFound      = errors.New("journal entry not found")
 	ErrCharacterNotFound    = errors.New("character not found")
 	ErrCharacterAssigned    = errors.New("character has an active assignment")
 	ErrCharacterMismatch    = errors.New("character is not the user's or is in another system")
@@ -2029,6 +2049,10 @@ func (s *SQLiteStore) DeleteCampaign(id string) error {
 	defer tx.Rollback()
 
 	if _, err := tx.Exec(`DELETE FROM session_responses WHERE session_id IN (SELECT id FROM campaign_sessions WHERE campaign_id = ?)`, id); err != nil {
+		return err
+	}
+	// Journal pages stay in their codex as ordinary pages; legacy entries (no codex) are deleted.
+	if _, err := tx.Exec(`UPDATE pages SET session_id = '' WHERE session_id IN (SELECT id FROM campaign_sessions WHERE campaign_id = ?)`, id); err != nil {
 		return err
 	}
 	if err := deleteJournalForSessions(tx, `SELECT id FROM campaign_sessions WHERE campaign_id = ?`, id); err != nil {
@@ -2600,126 +2624,6 @@ func scanJournalRevision(row rowScanner) (models.JournalRevision, error) {
 	return r, err
 }
 
-// GetJournalSummaries returns the newest-revision digest of every entry in a campaign, keyed by session id.
-func (s *SQLiteStore) GetJournalSummaries(campaignID string) (map[string]models.JournalSummary, error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	rows, err := s.db.Query(`
-		SELECT e.id, e.session_id, e.author_id, r.name, substr(r.body, 1, 600), r.created_at,
-		       (SELECT COUNT(*) FROM journal_revisions WHERE entry_id = e.id)
-		FROM journal_entries e
-		JOIN journal_revisions r ON r.entry_id = e.id
-		  AND r.number = (SELECT MAX(number) FROM journal_revisions WHERE entry_id = e.id)
-		WHERE e.campaign_id = ?`, campaignID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	result := map[string]models.JournalSummary{}
-	byEntry := map[string]string{} // entry id -> session id
-	for rows.Next() {
-		var j models.JournalSummary
-		if err := rows.Scan(&j.EntryID, &j.SessionID, &j.AuthorID, &j.Name, &j.ExcerptSource, &j.UpdatedAt, &j.Revisions); err != nil {
-			return nil, err
-		}
-		j.AmenderIDs = []string{}
-		result[j.SessionID] = j
-		byEntry[j.EntryID] = j.SessionID
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	people, err := s.db.Query(`
-		SELECT c.entry_id, c.user_id
-		FROM journal_contributors c JOIN journal_entries e ON e.id = c.entry_id
-		WHERE e.campaign_id = ?
-		ORDER BY c.entry_id, c.first_revision`, campaignID)
-	if err != nil {
-		return nil, err
-	}
-	defer people.Close()
-	for people.Next() {
-		var entryID, userID string
-		if err := people.Scan(&entryID, &userID); err != nil {
-			return nil, err
-		}
-		j := result[byEntry[entryID]]
-		if userID != j.AuthorID {
-			j.AmenderIDs = append(j.AmenderIDs, userID)
-			result[j.SessionID] = j
-		}
-	}
-	return result, people.Err()
-}
-
-// GetJournalEntry returns a session's entry with its newest revision and credits, or nil.
-func (s *SQLiteStore) GetJournalEntry(sessionID string) (*models.JournalEntry, error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	var e models.JournalEntry
-	err := s.db.QueryRow(`SELECT id, campaign_id, session_id, author_id, created_at FROM journal_entries WHERE session_id = ?`, sessionID).
-		Scan(&e.ID, &e.CampaignID, &e.SessionID, &e.AuthorID, &e.CreatedAt)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if e.Latest, err = scanJournalRevision(s.db.QueryRow(
-		`SELECT `+journalRevisionColumns+` FROM journal_revisions WHERE entry_id = ? ORDER BY number DESC LIMIT 1`, e.ID)); err != nil {
-		return nil, err
-	}
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM journal_revisions WHERE entry_id = ?`, e.ID).Scan(&e.RevisionCount); err != nil {
-		return nil, err
-	}
-	rows, err := s.db.Query(`SELECT user_id, revisions, first_revision FROM journal_contributors WHERE entry_id = ? ORDER BY first_revision`, e.ID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var c models.JournalScribe
-		if err := rows.Scan(&c.UserID, &c.Revisions, &c.FirstRevision); err != nil {
-			return nil, err
-		}
-		e.Scribes = append(e.Scribes, c)
-	}
-	return &e, rows.Err()
-}
-
-// GetJournalRevisions returns a session's entry id and every kept revision, oldest first.
-// With no entry the id is empty.
-func (s *SQLiteStore) GetJournalRevisions(sessionID string) (string, []models.JournalRevision, error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	var entryID string
-	err := s.db.QueryRow(`SELECT id FROM journal_entries WHERE session_id = ?`, sessionID).Scan(&entryID)
-	if err == sql.ErrNoRows {
-		return "", nil, nil
-	}
-	if err != nil {
-		return "", nil, err
-	}
-	rows, err := s.db.Query(`SELECT `+journalRevisionColumns+` FROM journal_revisions WHERE entry_id = ? ORDER BY number`, entryID)
-	if err != nil {
-		return "", nil, err
-	}
-	defer rows.Close()
-	var revs []models.JournalRevision
-	for rows.Next() {
-		r, err := scanJournalRevision(rows)
-		if err != nil {
-			return "", nil, err
-		}
-		revs = append(revs, r)
-	}
-	return entryID, revs, rows.Err()
-}
-
 // SaveJournalRevision adds a revision to a session's entry in one transaction, creating the
 // entry when entryID and baseRevision are both empty. A save made against anything but the
 // latest revision is refused so the caller can merge. Revisions older than the newest
@@ -2797,26 +2701,4 @@ func (s *SQLiteStore) SaveJournalRevision(campaignID, sessionID, entryID string,
 		return models.JournalSaveResult{}, err
 	}
 	return models.JournalSaveResult{Outcome: outcome, EntryID: current, Revision: rev}, nil
-}
-
-// DeleteJournalEntry removes a session's entry with all its revisions and credits.
-func (s *SQLiteStore) DeleteJournalEntry(sessionID string) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	var one int
-	if err := tx.QueryRow(`SELECT 1 FROM journal_entries WHERE session_id = ?`, sessionID).Scan(&one); err == sql.ErrNoRows {
-		return ErrJournalNotFound
-	} else if err != nil {
-		return err
-	}
-	if err := deleteJournalForSessions(tx, `SELECT ?`, sessionID); err != nil {
-		return err
-	}
-	return tx.Commit()
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"sort"
 	"strconv"
@@ -304,7 +305,7 @@ func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve sessions")
 		return
 	}
-	journals, err := db.GetJournalSummaries(campaign.ID)
+	journals, err := db.GetJournalPages(campaign.ID)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve journal entries")
 		return
@@ -346,13 +347,13 @@ func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string
 			"journal":   nil,
 		}
 		if j, ok := journals[s.ID]; ok {
-			row["journal"] = journalSummaryObject(v.users, j)
+			row["journal"] = v.journalPageObject(j)
 			delete(journals, s.ID)
 		}
 		list = append(list, row)
 	}
 	obj["played_sessions"] = list
-	// Entries left over belong to sessions that were cancelled after someone wrote them.
+	// Pages left over belong to sessions that were cancelled after someone started them.
 	cancelled := []map[string]interface{}{}
 	for sessionID, j := range journals {
 		session, err := db.GetSessionByID(sessionID)
@@ -363,12 +364,21 @@ func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string
 		if session == nil {
 			continue
 		}
-		entry := journalSummaryObject(v.users, j)
+		entry := v.journalPageObject(j)
 		entry["session_id"], entry["date"] = sessionID, session.Date
 		cancelled = append(cancelled, entry)
 	}
 	sort.Slice(cancelled, func(a, b int) bool { return cancelled[a]["date"].(string) > cancelled[b]["date"].(string) })
 	obj["journal_cancelled"] = cancelled
+	// Entries still waiting in the legacy tables for a codex (the DM and admins are told).
+	pending := 0
+	if v.isAdmin || campaign.DM == v.userID {
+		if pending, err = db.CountLegacyJournal(campaign.ID); err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "failed to retrieve journal entries")
+			return
+		}
+	}
+	obj["journal_pending"] = pending
 	upcoming, err := upcomingSessions(campaign, v)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve sessions")
@@ -744,6 +754,7 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 	probe.System = system
 	idChanges := campaignSystemID(byName, campaign) != campaignSystemID(byName, &probe)
 
+	titleChanged := req.Title != campaign.Title
 	if err := db.UpdateCampaignDetails(campaignID, req.Title, req.Summary, req.Description, req.Type, system, playerCountString(req.DesiredPlayerCount), idChanges); err != nil {
 		if errors.Is(err, db.ErrCampaignNotFound) {
 			writeJSONError(w, http.StatusNotFound, err.Error())
@@ -755,6 +766,12 @@ func handleUpdateCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 		}
 		writeJSONError(w, http.StatusInternalServerError, "failed to update game")
 		return
+	}
+	if titleChanged {
+		// The journal folder follows the new name while it still has the generated one.
+		if err := db.RenameJournalFolder(campaignID, campaign.Title, req.Title); err != nil {
+			log.Printf("journal: rename folder of game %s: %v", campaignID, err)
+		}
 	}
 	if newCodex != campaign.CodexID {
 		if err := db.SetCampaignCodex(campaignID, newCodex); err != nil {

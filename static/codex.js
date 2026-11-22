@@ -1,8 +1,90 @@
 // Codices page: /codices (home), /codices/c/{id} (codex), /codices/c/{id}/graph (graph), /codices/c/{id}/inbox (inbox),
 // /codices/p/{id}/{slug}[/edit|/history] (page).
-// Relies on campaigns.js (escapeHtml, renderMarkdown, journalByline, userAvatarHtml), journal.js
-// (diffWords, diffHtml) and codex-editor.js (createCodexEditor). One component picks the screen
+// Relies on campaigns.js (escapeHtml, renderMarkdown, journalByline, userAvatarHtml) and
+// codex-editor.js (createCodexEditor). One component picks the screen
 // from the path. Top-level names here must not clash with those scripts' (const clashes throw).
+
+// Diff helpers for the conflict panel and History (moved here from the old journal page).
+// Past this many cells the LCS matrix would be too big for the browser, so a large rewrite is
+// shown (and merged) as one removal plus one addition.
+const MAX_LCS_CELLS = 4e6;
+
+// Word-level LCS diff. Long unchanged stretches collapse to a marker.
+function diffWords(a, b) {
+    const A = a.match(/\s+|\S+/g) || [], B = b.match(/\s+|\S+/g) || [];
+    let s = 0;
+    while (s < A.length && s < B.length && A[s] === B[s]) s++;
+    let e = 0;
+    while (e < A.length - s && e < B.length - s && A[A.length - 1 - e] === B[B.length - 1 - e]) e++;
+    const X = A.slice(s, A.length - e), Y = B.slice(s, B.length - e);
+    const segs = [];
+    const push = (t, v) => {
+        const last = segs.at(-1);
+        if (last && last.t === t) last.v += v; else segs.push({ t, v });
+    };
+    if (s) push('=', A.slice(0, s).join(''));
+    if (X.length * Y.length > MAX_LCS_CELLS) {
+        if (X.length) push('-', X.join(''));
+        if (Y.length) push('+', Y.join(''));
+    } else {
+        const L = Array.from({ length: X.length + 1 }, () => new Uint16Array(Y.length + 1));
+        for (let i = X.length - 1; i >= 0; i--) {
+            for (let j = Y.length - 1; j >= 0; j--) {
+                L[i][j] = X[i] === Y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+            }
+        }
+        let i = 0, j = 0;
+        while (i < X.length || j < Y.length) {
+            if (i < X.length && j < Y.length && X[i] === Y[j]) { push('=', X[i]); i++; j++; }
+            else if (i < X.length && (j === Y.length || L[i + 1][j] >= L[i][j + 1])) { push('-', X[i]); i++; }
+            else { push('+', Y[j]); j++; }
+        }
+    }
+    if (e) push('=', A.slice(A.length - e).join(''));
+    const words = (t) => segs.filter((g) => g.t === t).reduce((n, g) => n + (g.v.match(/\S+/g) || []).length, 0);
+    return { segs: tidySegs(segs), added: words('+'), removed: words('-') };
+}
+
+// Absorb one- or two-word matches between changes, so a rewritten passage reads as
+// one removal followed by one addition: removed text first, then added.
+function tidySegs(segs) {
+    const out = [];
+    let del = '', ins = '';
+    const flush = () => {
+        if (del) out.push({ t: '-', v: del });
+        if (ins) out.push({ t: '+', v: ins });
+        del = ''; ins = '';
+    };
+    segs.forEach((g, idx) => {
+        if (g.t === '-') del += g.v;
+        else if (g.t === '+') ins += g.v;
+        else if ((del || ins) && idx < segs.length - 1 && !g.v.includes('\n') && (g.v.match(/\S+/g) || []).length <= 2) {
+            del += g.v; ins += g.v;
+        } else {
+            flush();
+            out.push(g);
+        }
+    });
+    flush();
+    return out;
+}
+
+function diffHtml(segs) {
+    return segs.map((g, idx) => {
+        if (g.t === '+') return `<ins>${escapeHtml(g.v)}</ins>`;
+        if (g.t === '-') return `<del>${escapeHtml(g.v)}</del>`;
+        const paras = g.v.split(/\n\s*\n/);
+        const first = idx === 0, last = idx === segs.length - 1;
+        // Keep the paragraph touching each change; collapse the rest.
+        const keepHead = first ? 0 : 1, keepTail = last ? 0 : 1;
+        const hidden = paras.length - keepHead - keepTail;
+        if (hidden < 1) return escapeHtml(g.v);
+        const label = `<span class="gap">⋯ ${hidden} unchanged paragraph${hidden === 1 ? '' : 's'} ⋯</span>`;
+        const head = keepHead ? escapeHtml(paras[0]) : '';
+        const tail = keepTail ? escapeHtml(paras.at(-1)) : '';
+        return head + label + tail;
+    }).join('');
+}
 
 // Mirrors wikiLinkRe in db/codex_links.go.
 const CODEX_LINK_RE = /\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{1,200}))?\]\]/g;
@@ -450,18 +532,26 @@ function codexTlHtml(events, cal, opts) {
     return html;
 }
 
-function codexPageItemHtml(p, currentId, canDrag = false) {
+// A page in a journal folder ("{game}: Campaign Journal") drops its "{game}: " prefix, so the folder reads as a list of dates.
+function codexJournalPrefix(folderName) {
+    const tail = 'Campaign Journal';
+    return folderName.endsWith(': ' + tail) ? folderName.slice(0, folderName.length - tail.length) : '';
+}
+
+function codexPageItemHtml(p, currentId, canDrag = false, prefix = '') {
+    const shown = prefix && p.title.startsWith(prefix) && p.title.length > prefix.length ? p.title.slice(prefix.length) : p.title;
     const also = p.aliases.length ? `<span class="muted"> · also ${escapeHtml(p.aliases.join(', '))}</span>` : '';
     const kind = p.kind === 'timeline' ? `<span class="cx-ty" aria-hidden="true">${CODEX_TL_ICON}</span>` : '';
     const kindText = p.kind === 'timeline' ? '<span class="visually-hidden"> (timeline)</span>' : '';
     const drag = canDrag ? ` draggable="true" data-drag="page:${escapeHtml(p.id)}"` : '';
-    return `<li><a href="${codexPageUrl(p)}"${p.id === currentId ? ' aria-current="page"' : ''}${drag}>${kind}${escapeHtml(p.title)}${kindText}</a>${also}</li>`;
+    return `<li><a href="${codexPageUrl(p)}"${p.id === currentId ? ' aria-current="page"' : ''}${drag}>${kind}${escapeHtml(shown)}${kindText}</a>${also}</li>`;
 }
 
 function codexFolderHtml(n, depth, canEdit, currentId, canDrag = false) {
     const open = codexTransientOpen.has(n.id) || (codexOpenState[n.id] === undefined ? depth === 0 : codexOpenState[n.id]);
     const id = escapeHtml(n.id);
-    const pages = n.pages.length ? `<ul class="page-list">${n.pages.map((p) => codexPageItemHtml(p, currentId, canDrag)).join('')}</ul>` : '';
+    const prefix = codexJournalPrefix(n.name);
+    const pages = n.pages.length ? `<ul class="page-list">${n.pages.map((p) => codexPageItemHtml(p, currentId, canDrag, prefix)).join('')}</ul>` : '';
     return `<details class="codex-folder${depth >= 4 ? ' codex-folder--deep' : ''}" id="folder-${id}" data-id="${id}"${open ? ' open' : ''}>` +
         `<summary${canDrag ? ` draggable="true" data-drag="folder:${id}"` : ''}><span class="codex-folder-name">${escapeHtml(n.name)}</span><span class="codex-folder-count muted" title="${n.count} ${n.count === 1 ? 'page' : 'pages'}"><span aria-hidden="true">${n.count}</span><span class="visually-hidden"> ${n.count} ${n.count === 1 ? 'page' : 'pages'}</span></span>` +
         (canEdit ? `<button type="button" class="codex-menu-btn" data-menu="${id}" aria-label="Actions for folder ${escapeHtml(n.name)}" aria-haspopup="menu" aria-expanded="false">⋯</button>` : '') + '</summary>' +
@@ -682,6 +772,18 @@ window.codexPage = function () {
         },
         get page() {
             return this.pageData ? this.pageData.page : null;
+        },
+        // The journal side of a session's page (null for any other page): the game, the session and who was there.
+        get journal() {
+            return (this.pageData && this.pageData.session) || null;
+        },
+        // A journal page reads "Session 12" (the number is computed when read, never stored in the title).
+        get pageHeading() {
+            return this.journal && this.journal.number ? 'Session ' + this.journal.number : this.page ? this.page.title : '';
+        },
+        get journalWho() {
+            const list = this.journal ? this.journal.attendees : [];
+            return list.length ? list.map((u) => u.display_name || u.name || 'Guest').join(', ') : 'Nobody recorded';
         },
         // Whether the viewer may change what is on screen: the codex's pages and folders, or this page.
         get canEdit() {

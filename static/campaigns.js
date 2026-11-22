@@ -1305,8 +1305,11 @@ function journalByline(j) {
 
 // First plain-text paragraph of an entry body, cut at 130 characters.
 function journalExcerpt(body) {
-    const para = String(body || '').split(/\n[ \t]*\n/).map((p) => p.trim()).filter(Boolean).find((p) => !/^#/.test(p)) || '';
-    const plain = para.replace(/[*_>#]/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').trim();
+    const paras = String(body || '').split(/\n[ \t]*\n/).map((p) => p.trim()).filter(Boolean).filter((p) => !/^#/.test(p));
+    // Skip a block of "**Key:** value" lines (the Session template's header) when there is prose after it.
+    const prose = paras.find((p) => !p.split('\n').every((l) => /^\*\*[^*]+:\*\*/.test(l)));
+    const para = prose || paras[0] || '';
+    const plain = para.replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g, '$2').replace(/\[\[([^\]]*)\]\]/g, '$1').replace(/[*_>#]/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').trim();
     return plain.length > 130 ? plain.slice(0, 130).trimEnd() + '…' : plain;
 }
 

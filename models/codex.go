@@ -47,6 +47,7 @@ type Page struct {
 	Kind            string
 	CodexID         string
 	FolderID        string // "" = the codex's top level
+	SessionID       string // the game session this page is the journal of, or ""
 	Title           string
 	AuthorID        string
 	CreatedAt       string

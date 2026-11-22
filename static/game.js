@@ -63,11 +63,6 @@ window.gamePage = function () {
                 history.replaceState(null, '', location.pathname);
                 if (this.isPlayer && this.acceptsCharacters) this.openPicker();
             }
-            const deleted = new URLSearchParams(location.search).get('entry_deleted');
-            if (deleted !== null) {
-                this.showMessage(Number(deleted) > 0 ? `Entry for session ${Number(deleted)} deleted` : 'Entry deleted', 'success');
-                history.replaceState(null, '', location.pathname);
-            }
         },
 
         async load() {
@@ -142,6 +137,17 @@ window.gamePage = function () {
         },
         get cancelledEntries() {
             return this.campaign?.journal_cancelled || [];
+        },
+        // The journal is a codex page: anyone with Edit on the game's codex starts it.
+        get canWriteJournal() {
+            return !!(this.campaign && this.campaign.codex && this.campaign.codex.can_edit);
+        },
+        // A game without a codex has no journal; its DM is told how to get one.
+        get journalHint() {
+            return !!(this.campaign && !this.campaign.codex && this.campaign.can_manage);
+        },
+        get journalPending() {
+            return this.campaign?.journal_pending || 0;
         },
         get visibleSessions() {
             return this.showAll ? this.played : this.played.slice(0, 5);
@@ -321,11 +327,44 @@ window.gamePage = function () {
             if (this.awaitsMe(s)) parts.push('awaiting your reply');
             return parts.join(', ');
         },
-        journalUrl(sessionId) {
-            return `/games/${encodeURIComponent(this.campaign.id)}/journal/${encodeURIComponent(sessionId)}`;
+        // The codex page of a journal row (j.page_id); the slug is filled in when the page loads.
+        journalUrl(j, tail = '') {
+            return `/codices/p/${encodeURIComponent(j.page_id)}/journal${tail}`;
+        },
+        // The session's name, if its page title has one: "{game}: 2026-03-14 – The Dark Waystone".
+        journalName(j) {
+            let t = j.title || '';
+            const prefix = this.campaign.title + ': ';
+            if (t.startsWith(prefix)) t = t.slice(prefix.length);
+            const m = t.match(/^\d{4}-\d{2}-\d{2} – (.+)$/);
+            return m ? m[1] : '';
         },
         cancelledLabel(c) {
-            return this.formatDate(c.date) + (c.name ? ': ' + c.name : '');
+            const name = this.journalName(c);
+            return this.formatDate(c.date) + (name ? ': ' + name : '');
+        },
+        // Creates the session's journal page (or finds it) and opens its editor.
+        async writeEntry(s) {
+            if (this.busy) return;
+            this.busy = true;
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.campaign.id)}/journal/${encodeURIComponent(s.id)}`, { method: 'POST' });
+                if (response.redirected || !response.headers.get('Content-Type')?.includes('application/json')) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Could not start the entry', 'error');
+                    await this.load();
+                    return;
+                }
+                window.location.href = this.journalUrl({ page_id: data.page.id }, '/edit');
+            } catch (error) {
+                this.showMessage(`Error: ${error.message}`, 'error');
+            } finally {
+                this.busy = false;
+            }
         },
         entryLabel(s) {
             return `Session ${s.number}, ${this.formatHeading(s.date, true)}, ${s.attendees.length} there`;
@@ -503,8 +542,7 @@ window.gamePage = function () {
         },
         async deletePlayed(s) {
             if (this.busy) return;
-            const n = s.journal?.revisions || 0;
-            const entry = s.journal ? ` Its journal entry is deleted too, with ${n} revision${n === 1 ? '' : 's'} of text, including text written by other people.` : '';
+            const entry = s.journal ? ' Its journal page stays in the codex as an ordinary page.' : '';
             const ok = await this.askConfirm({
                 title: 'Delete session',
                 message: `Delete the session of ${this.formatDate(s.date)}?${entry} This cannot be undone.`,

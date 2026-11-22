@@ -77,11 +77,15 @@ type Store interface {
 	CountUnreadNotifications(userID string) (int, error)
 	MarkNotificationRead(userID, id string) error
 	MarkAllNotificationsRead(userID string) error
-	GetJournalSummaries(campaignID string) (map[string]models.JournalSummary, error)
-	GetJournalEntry(sessionID string) (*models.JournalEntry, error)
-	GetJournalRevisions(sessionID string) (entryID string, revs []models.JournalRevision, err error)
+	// SaveJournalRevision writes the legacy journal tables and is only kept for the seed, which
+	// the codex migration then moves into pages.
 	SaveJournalRevision(campaignID, sessionID, entryID string, baseRevision int, rev models.JournalRevision, keepRevisions int) (models.JournalSaveResult, error)
-	DeleteJournalEntry(sessionID string) error
+	GetJournalPages(campaignID string) (map[string]models.JournalPage, error)
+	GetJournalPageID(sessionID string) (string, error)
+	CountLegacyJournal(campaignID string) (int, error)
+	EnsureJournalFolder(campaignID, codexID, userID string) (folderID, template string, err error)
+	CreateJournalPage(campaignID string, p models.Page, base, body string, x models.NewPageExtras) (pageID string, created bool, err error)
+	RenameJournalFolder(campaignID, oldTitle, newTitle string) error
 	CreateCharacter(c models.Character) error
 	GetCharacter(id string) (*models.Character, error)
 	GetCharactersByOwner(ownerID string) ([]models.Character, error)
