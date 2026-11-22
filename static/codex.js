@@ -8,6 +8,7 @@
 // Past this many cells the LCS matrix would be too big for the browser, so a large rewrite is
 // shown (and merged) as one removal plus one addition.
 const MAX_LCS_CELLS = 4e6;
+const CODEX_LIST_PAGE = 5; // rows per page in the short lists (Recent changes, Wanted pages)
 
 // Word-level LCS diff. Long unchanged stretches collapse to a marker.
 function diffWords(a, b) {
@@ -302,6 +303,33 @@ function codexMarkdown(body, lookup, canCreate = true, images = null, lists = nu
     });
 }
 
+// The writing guide's examples: codexMarkdown with a few made-up pages, a stand-in picture and a
+// live list over made-up pages, so nothing here depends on the codex being viewed.
+const CODEX_HELP_PAGES = ['The Old Mill', 'The Gilded Stag', 'Brindle the Innkeeper', 'Mara Voss'];
+const CODEX_HELP_ALIASES = { 'the mill': 'The Old Mill', 'old mill': 'The Old Mill', inn: 'The Gilded Stag' };
+function codexHelpHtml(src) {
+    const lookup = (text) => {
+        const t = codexNorm(text);
+        const title = CODEX_HELP_PAGES.find((p) => codexNorm(p) === t) || CODEX_HELP_ALIASES[t];
+        return title ? { id: 'example', title } : null;
+    };
+    const images = (name) => ({ name, url: '/static/img/favicon.svg', width: 64, height: 64 });
+    const ctx = {
+        pages: [
+            { id: 'h1', title: 'Brindle the Innkeeper', folder_id: 'fp', tag_ids: ['tn'], kind: 'lore', created_at: '2026-01-02T10:00:00Z', updated_at: '2026-03-01T10:00:00Z' },
+            { id: 'h2', title: 'Mara Voss', folder_id: 'fp', tag_ids: ['tn'], kind: 'lore', created_at: '2026-01-05T10:00:00Z', updated_at: '2026-02-01T10:00:00Z' },
+            { id: 'h3', title: 'The Gilded Stag', folder_id: 'fi', tag_ids: [], kind: 'lore', created_at: '2026-01-09T10:00:00Z', updated_at: '2026-04-01T10:00:00Z' },
+            { id: 'h4', title: 'The Old Mill', folder_id: 'fl', tag_ids: [], kind: 'lore', created_at: '2026-01-11T10:00:00Z', updated_at: '2026-02-20T10:00:00Z' },
+            { id: 'h5', title: 'Timeline of the War', folder_id: '', tag_ids: [], kind: 'timeline', created_at: '2026-01-20T10:00:00Z', updated_at: '2026-01-25T10:00:00Z' }
+        ],
+        tags: [{ id: 'tn', name: 'npc' }],
+        folders: [{ id: 'fp', name: 'People', parent_id: '' }, { id: 'fl', name: 'Places', parent_id: '' }, { id: 'fi', name: 'Inns', parent_id: 'fl' }],
+        cur: '',
+        back: new Set()
+    };
+    return codexMarkdown(src, lookup, true, images, (spec) => codexLiveList(spec, ctx));
+}
+
 // Save as template, "Headings only": the page's ## and ### lines (as the renderer reads them: up
 // to 3 leading spaces, a space or tab after the hashes, some text), one blank line apart. "" when
 // there are none.
@@ -312,10 +340,10 @@ function codexHeadingsOnly(body) {
 
 // The / menu in the page editor: snippets, then each template's headings (templates with none are left out).
 const CODEX_SNIPPETS = [
-    { label: 'Person', detail: 'Name, role, wants, lives in', keys: 'npc character', text: '**Name:** \n**Role:** \n**Wants:** \n**Lives in:** [[ ]]', cursor: 10 },
+    { label: 'Person', detail: 'Name, role, wants, lives in', keys: 'npc character', text: '**Name:** \n**Role:** \n**Wants:** \n**Lives in:** [[ ]]', cursor: 10, sample: '**Name:** Brindle\n**Role:** Innkeeper\n**Wants:** A quiet winter\n**Lives in:** [[The Gilded Stag]]' },
     { label: 'Callout', detail: 'A quoted note that stands out', keys: 'quote note', text: '> **Note:** ' },
     { label: 'Loot list', detail: 'A heading and three bullets', keys: 'rewards', text: '## Loot and rewards\n\n- \n- \n- ' },
-    { label: 'Live list', detail: 'Pages by tag, kept up to date', keys: 'tag', text: '{{list tag: links:here}}', cursor: 11 },
+    { label: 'Live list', detail: 'Pages by tag, kept up to date', keys: 'tag', text: '{{list tag: links:here}}', cursor: 11, sample: '{{list tag:npc}}' },
     { label: 'Divider', detail: 'A rule across the page', keys: 'rule line hr', text: '---' }
 ];
 function codexSlashItems(templates, today) {
@@ -674,7 +702,10 @@ window.codexPage = function () {
         notesLoading: false,
         notesError: '',
         confirmDialog: { open: false, eyebrow: '', title: '', message: '', confirmLabel: '', danger: true, resolve: null },
+        pageWidth: 'thin', // page screen reading width: thin, medium or wide (kept in localStorage)
         home: null,
+        pagers: { homeRecent: 0, recent: 0, wanted: 0 }, // current page of each short list
+        pagerId: '',
         codex: null,
         pageData: null,
         toc: [],
@@ -769,6 +800,10 @@ window.codexPage = function () {
                 window.location.href = '/login.html';
                 return;
             }
+            try {
+                const w = localStorage.getItem('codex-page-width');
+                if (w === 'medium' || w === 'wide') this.pageWidth = w;
+            } catch (e) { /* storage blocked: stay thin */ }
             this.route = this.parseRoute();
             if (!this.route) {
                 this.route = { screen: 'home', id: '' };
@@ -807,7 +842,7 @@ window.codexPage = function () {
             this.showArrivalMessage();
         },
 
-        // /codices, /codices/c/{id}[/slug], /codices/c/{id}/graph, /codices/c/{id}/inbox, /codices/p/{id}/{slug}[/edit|/history]
+        // /codices, /codices/help, /codices/c/{id}[/slug], /codices/c/{id}/graph, /codices/c/{id}/inbox, /codices/p/{id}/{slug}[/edit|/history]
         // A last segment "graph" or "inbox" straight after the codex id is always that screen, so
         // the codex's own links never carry a slug.
         // Returns null for a malformed URL.
@@ -818,6 +853,7 @@ window.codexPage = function () {
             } catch (error) {
                 return null;
             }
+            if (parts[1] === 'help' && parts.length === 2) return { screen: 'help', id: '' };
             if (parts[1] === 'c' && parts[2]) {
                 const tail = parts.length === 4 ? parts[3] : '';
                 return { screen: tail === 'graph' || tail === 'inbox' ? tail : 'codex', id: parts[2] };
@@ -831,6 +867,19 @@ window.codexPage = function () {
 
         get screen() {
             return this.route.screen;
+        },
+        // The screens that look across all codices (search and the picker cover every codex).
+        get acrossCodices() {
+            return this.screen === 'home' || this.screen === 'help';
+        },
+        // The writing guide: the sections with each example rendered through the real page renderer.
+        get helpSections() {
+            return CODEX_HELP.map((sec) => {
+                const examples = sec.snippets
+                    ? CODEX_SNIPPETS.map((s) => ({ src: s.text, note: s.label + ': ' + s.detail, sample: s.sample }))
+                    : sec.examples;
+                return { ...sec, examples: examples.map((ex) => ({ ...ex, html: codexHelpHtml(ex.sample || ex.src) })) };
+            });
         },
         // The screens that show the codex itself rather than a page.
         get onCodexScreen() {
@@ -869,6 +918,7 @@ window.codexPage = function () {
         },
         get crumbs() {
             const s = this.screen;
+            if (s === 'help') return [{ label: 'Writing guide', href: '' }];
             if (s === 'codex' && this.codex) return [{ label: this.codex.codex.name, href: '' }];
             if (s === 'graph' && this.codex) return [{ label: this.codex.codex.name, href: '/codices/c/' + encodeURIComponent(this.codex.codex.id) }, { label: 'Graph', href: '' }];
             if (s === 'inbox' && this.codex) return [{ label: this.codex.codex.name, href: '/codices/c/' + encodeURIComponent(this.codex.codex.id) }, { label: 'Inbox', href: '' }];
@@ -886,10 +936,48 @@ window.codexPage = function () {
             return [...list, { label: this.page.title, href: this.pageUrl(this.page) }, { label: s === 'edit' ? 'Edit' : 'History', href: '' }];
         },
 
+        setPageWidth(w) {
+            this.pageWidth = w;
+            try { localStorage.setItem('codex-page-width', w); } catch (e) { /* not saved */ }
+        },
+
+        // Short lists on the homes and in the side panel show CODEX_LIST_PAGE rows at a time.
+        pageLast(list) {
+            return Math.max(0, Math.ceil(list.length / CODEX_LIST_PAGE) - 1);
+        },
+        pageCur(list, key) {
+            return Math.min(this.pagers[key], this.pageLast(list)); // a shrunk list never shows an empty page
+        },
+        pagedSlice(list, key) {
+            const from = this.pageCur(list, key) * CODEX_LIST_PAGE;
+            return list.slice(from, from + CODEX_LIST_PAGE);
+        },
+        pageRange(list, key) {
+            const from = this.pageCur(list, key) * CODEX_LIST_PAGE;
+            return (from + 1) + '–' + Math.min(from + CODEX_LIST_PAGE, list.length) + ' of ' + list.length;
+        },
+        pagerAtEnd(list, key) {
+            return this.pageCur(list, key) >= this.pageLast(list);
+        },
+        turnPage(list, key, d) {
+            this.pagers[key] = Math.max(0, Math.min(this.pageLast(list), this.pageCur(list, key) + d));
+        },
+
         async load() {
             const seq = ++this.loadSeq; // an older response must not overwrite a newer one
             try {
                 const r = this.route;
+                if (r.screen === 'help') {
+                    document.title = 'Waystone - Writing guide';
+                    this.notFound = false;
+                    this.loadError = '';
+                    this.loadCodexList().catch(() => {}); // the picker and search cover every codex
+                    return;
+                }
+                if (r.id !== this.pagerId) {
+                    this.pagerId = r.id;
+                    this.pagers = { homeRecent: 0, recent: 0, wanted: 0 };
+                }
                 const url = r.screen === 'home' ? '/api/codices'
                     : r.screen === 'codex' || r.screen === 'graph' || r.screen === 'inbox' ? `/api/codices/c/${encodeURIComponent(r.id)}`
                     : `/api/codices/pages/${encodeURIComponent(r.id)}`;
@@ -1424,10 +1512,10 @@ window.codexPage = function () {
             return this.screen !== 'home' && !this.onCodexScreen && this.page ? this.page.id : '';
         },
         get pickLabel() {
-            return this.screen === 'home' ? 'All codices' : this.currentCodexName || 'Switch codex';
+            return this.acrossCodices ? 'All codices' : this.currentCodexName || 'Switch codex';
         },
         get searchPlaceholder() {
-            return this.screen === 'home' ? 'Search all codices' : this.currentCodexName ? 'Search ' + this.currentCodexName : 'Search this codex';
+            return this.acrossCodices ? 'Search all codices' : this.currentCodexName ? 'Search ' + this.currentCodexName : 'Search this codex';
         },
         // The graph screen: fetches the codex's graph and hands it to codex-graph.js to draw.
         async loadGraph() {
@@ -1810,7 +1898,7 @@ window.codexPage = function () {
         },
         // Titles and aliases of all visible codices, fetched once on Home; elsewhere the codex payload is searched.
         async ensureSearchTitles() {
-            if (this.screen !== 'home' || this.searchKey) return; // other screens search the codex payload
+            if (!this.acrossCodices || this.searchKey) return; // other screens search the codex payload
             this.searchKey = '*';
             this.searchLoading = true;
             try {
@@ -1829,7 +1917,7 @@ window.codexPage = function () {
             if (!q) return [];
             const names = new Map((this.allCodices || []).map((c) => [c.id, c.name]));
             const out = [];
-            for (const t of this.screen === 'home' ? this.searchTitles : this.titles) {
+            for (const t of this.acrossCodices ? this.searchTitles : this.titles) {
                 const title = codexNorm(t.title);
                 let score = title.startsWith(q) ? 0 : title.includes(q) ? 1 : -1;
                 let via = '';
@@ -1844,7 +1932,7 @@ window.codexPage = function () {
                     }
                 }
                 if (score < 0) continue;
-                const meta = [via ? 'also ' + via : '', this.screen === 'home' ? names.get(t.codex_id) || '' : ''].filter(Boolean).join(' · ');
+                const meta = [via ? 'also ' + via : '', this.acrossCodices ? names.get(t.codex_id) || '' : ''].filter(Boolean).join(' · ');
                 out.push({ id: t.id, title: t.title, score, meta });
             }
             out.sort((a, b) => a.score - b.score || (codexNorm(a.title) < codexNorm(b.title) ? -1 : 1));

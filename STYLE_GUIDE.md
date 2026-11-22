@@ -182,7 +182,7 @@ Wordmark left, nav centre, then the theme toggle, the inbox and the user menu, a
 
 **Phones.** Row 1 is the logo (28px), the icons and the avatar with the name hidden; row 2 is the nav (19px). That is about 90px in all, instead of the old 190px. The theme toggle stays visible.
 
-The logo mark is the standing-stone from the mock-ups: a tapered stone with a downward rune, on a ground line. It is the `--stone-mark` mask in `styles.css`, coloured by `currentColor`, next to the wordmark (and above it on the login page). Unread inbox count: a 19px `--rubric` circle with 13px `--bg` text.
+The logo mark is the standing-stone from the mock-ups: a tapered stone with a downward rune, on a ground line. It is the `--stone-mark` mask in `styles.css`, coloured by `currentColor`, next to the wordmark (and above it on the login page). Unread inbox count: a 19px `--rubric` circle with 13px `--bg` text. The inbox panel header has an "Only unread" checkbox (on until turned off, kept in localStorage) next to "Mark all read", and a footer with "‹ Newer", the range and "Older ›" shows 10 notifications at a time.
 
 ### Page title
 
@@ -199,7 +199,7 @@ Greeting h1 "Well met, {name}" (blackletter W), a one-line subtitle that sums up
 
 - **At the table now** (above everything, directly under the greeting): one card per Confirmed, non-manual session between its start and end in a game the viewer plays, runs or follows. It is the only filled block on the page: `--verdigris` with `--bg` text (5.9:1 in parchment, 7.7:1 in candlelight). It carries a "● In session" marker (so the state never relies on colour), the game title as a link, "Began 18:00 CET, ends 22:00 · 1h 20m left", the DM, the accepted players as avatars and the viewer's reply.
 - **Left column:** `§ Awaits thy reply`, red-letter date cards (rubric month, big day number and weekday; game title; time range with zone; "proposed by ♛ X"; "N of M have replied"; Aye / Perhaps / Nay posting to the session's `/responses` endpoint), then `§ The road ahead`, ledger rows of Confirmed sessions only: date, time, game and the viewer's reply. One card per **poll** (`/api/agenda` groups suggestions by `poll_id`): the first date's red-letter day, the game, "3 dates, proposed by ♛ X" and a `.rl-date` per date (date, time range, Aye / Perhaps / Nay with the viewer's answer selected). A poll of one date reads like a single suggestion. The card stays until every upcoming date is answered; once answered, or if the viewer is its DM, it stays on the game page and calendar.
-- **Right column:** `§ Thy games` rows (role and status, "All games", "N open to join"), `§ Codices` (a link to the codices index, `/codices`), `§ Roads yet to open` (a small dashed Chat stone, not clickable) and a line pointing to Discord.
+- **Right column:** `§ Thy games` rows (role and status, "All games", "N open to join"), and a line pointing to Discord.
 - A user with no games and nothing pending sees the introduction text and a "See the games" link instead.
 - Suggested sessions are availability requests: only a game's players and DM see them. Followers see Confirmed sessions only. Manual, Cancelled, Finished and Cancelled-game sessions are left out.
 

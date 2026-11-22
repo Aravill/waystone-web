@@ -2638,12 +2638,17 @@ func (s *SQLiteStore) CreateNotifications(notifications []models.Notification) e
 	return tx.Commit()
 }
 
-// GetNotifications returns a user's newest notifications first.
-func (s *SQLiteStore) GetNotifications(userID string, limit int) ([]models.Notification, error) {
+// GetNotifications returns a page of a user's notifications, newest first,
+// optionally only the unread ones.
+func (s *SQLiteStore) GetNotifications(userID string, unreadOnly bool, limit, offset int) ([]models.Notification, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	rows, err := s.db.Query(`SELECT id, user_id, type, campaign_id, session_id, actor_id, data, created_at, read_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?`, userID, limit)
+	filter := ""
+	if unreadOnly {
+		filter = " AND read_at = ''"
+	}
+	rows, err := s.db.Query(`SELECT id, user_id, type, campaign_id, session_id, actor_id, data, created_at, read_at FROM notifications WHERE user_id = ?` + filter + ` ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?`, userID, limit, offset)
 	if err != nil {
 		return nil, err
 	}

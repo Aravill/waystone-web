@@ -8,9 +8,13 @@
     <div class="notif-panel" x-show="open" x-cloak>
         <div class="notif-panel-header">
             <span class="notif-panel-title">Notifications</span>
+            <label class="notif-filter"><input type="checkbox" :checked="unreadOnly" @change="setUnreadOnly($event.target.checked)"> Only unread</label>
             <button type="button" class="notif-markall" :disabled="unread === 0" @click="markAllRead()">Mark all read</button>
         </div>
-        <div class="notif-empty" x-show="!loading && items.length === 0">No notifications</div>
+        <div class="notif-empty" x-show="!loading && items.length === 0">
+            <span x-text="unreadOnly ? 'No unread notifications' : 'No notifications'"></span>
+            <button type="button" class="notif-markall" x-show="unreadOnly" @click="setUnreadOnly(false)">Show all</button>
+        </div>
         <ul class="notif-list">
             <template x-for="n in items" :key="n.id">
                 <li class="notif-item" :class="{ 'is-unread': !n.read_at }" @click="openItem(n)">
@@ -19,6 +23,11 @@
                 </li>
             </template>
         </ul>
+        <div class="notif-pager" x-show="page > 0 || hasMore">
+            <button type="button" class="notif-markall" :disabled="page === 0" @click="turn(-1)" aria-label="Newer notifications">‹ Newer</button>
+            <span class="notif-range" x-text="(page * PAGE + 1) + '\u2013' + (page * PAGE + items.length)"></span>
+            <button type="button" class="notif-markall" :disabled="!hasMore" @click="turn(1)" aria-label="Older notifications">Older ›</button>
+        </div>
     </div>
 </div>`;
 
@@ -27,11 +36,18 @@
             open: false,
             items: [],
             unread: 0,
+            unreadOnly: true, // "Only unread" is on until the user turns it off (kept in localStorage)
+            page: 0,
+            hasMore: false,
+            PAGE: 10,
             loading: false,
             _timer: null,
             _counted: false,
 
             init() {
+                try {
+                    this.unreadOnly = localStorage.getItem('waystone-notif-unread') !== '0';
+                } catch (error) { /* storage blocked: keep the default */ }
                 if (this._timer) return;
                 this.refreshCount();
                 this._timer = setInterval(() => {
@@ -67,18 +83,38 @@
             toggle() {
                 this.open = !this.open;
                 if (!this.open) return;
+                this.page = 0;
                 // Mobile panel is position:fixed; anchor it just below the button.
                 this.$root.style.setProperty('--notif-top', this.$refs.btn.getBoundingClientRect().bottom + 8 + 'px');
+                this.load();
+            },
+
+            setUnreadOnly(v) {
+                this.unreadOnly = v;
+                try { localStorage.setItem('waystone-notif-unread', v ? '1' : '0'); } catch (error) { /* not saved */ }
+                this.page = 0;
+                this.load();
+            },
+
+            turn(d) {
+                this.page = Math.max(0, this.page + d);
                 this.load();
             },
 
             async load() {
                 this.loading = true;
                 try {
-                    const response = await fetch('/api/notifications?limit=30');
+                    const response = await fetch(`/api/notifications?limit=${this.PAGE}&offset=${this.page * this.PAGE}` + (this.unreadOnly ? '&unread=1' : ''));
                     if (!response.ok) return;
                     const data = await response.json();
+                    if (this.page > 0 && data.notifications.length === 0) {
+                        // The page emptied (items were read): step back
+                        this.page -= 1;
+                        this.loading = false;
+                        return this.load();
+                    }
                     this.items = data.notifications;
+                    this.hasMore = !!data.has_more;
                     this.unread = data.unread_count;
                 } catch (error) {
                     console.error('Failed to load notifications:', error);
@@ -124,9 +160,14 @@
                 try {
                     const response = await fetch('/api/notifications/read-all', { method: 'POST' });
                     if (!response.ok) return;
+                    this.unread = 0;
+                    if (this.unreadOnly) {
+                        this.page = 0;
+                        await this.load();
+                        return;
+                    }
                     const now = new Date().toISOString();
                     this.items.forEach((n) => { if (!n.read_at) n.read_at = now; });
-                    this.unread = 0;
                 } catch (error) {
                     console.error('Failed to mark notifications read:', error);
                 }

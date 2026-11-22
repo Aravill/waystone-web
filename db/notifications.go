@@ -6,8 +6,8 @@ func CreateNotifications(notifications []models.Notification) error {
 	return GetStore().CreateNotifications(notifications)
 }
 
-func GetNotifications(userID string, limit int) ([]models.Notification, error) {
-	return GetStore().GetNotifications(userID, limit)
+func GetNotifications(userID string, unreadOnly bool, limit, offset int) ([]models.Notification, error) {
+	return GetStore().GetNotifications(userID, unreadOnly, limit, offset)
 }
 
 func CountUnreadNotifications(userID string) (int, error) {
