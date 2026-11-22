@@ -3661,6 +3661,8 @@ a.tl-title:hover {
     flex: none;
     width: auto;
     margin: 0;
+}
+
 /* Live lists: {{list ...}} in a page body, drawn from the codex payload */
 .cx-live {
     margin: 0.25rem 0 1.25rem;
@@ -3722,6 +3724,8 @@ a.tl-title:hover {
 .cx-live-plain {
     padding: 0;
     margin: 0 0 1rem;
+}
+
 /* Mentioned, not linked */
 .cx-box--mentions li > .text-link {
     margin-top: 0.125rem;
