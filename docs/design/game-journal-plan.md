@@ -1,5 +1,7 @@
 # Game journal: implementation plan
 
+> **Superseded.** The journal is now a set of codex pages (one page per played session, in a "{game}: Campaign Journal" folder of the game's codex). See section 5 of `codices-low-friction-plan.md` and the Codices journal bullet in CLAUDE.md. What follows describes the old standalone journal page, which is gone.
+
 **Status:** implemented on `feat/game-journal` on 2026-11-06. Kept as the record of the design decisions.
 
 - **Design source:** `docs/design/mockups/game-journal.html`. Port it, don't redesign it. Its JS holds the behaviour, copy and merge logic.

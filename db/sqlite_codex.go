@@ -124,8 +124,8 @@ func createPageNoteTx(tx *sql.Tx, p models.Page, body, note string) error {
 		return err
 	}
 	now := nowUTC()
-	if _, err := tx.Exec(`INSERT INTO pages (id, kind, codex_id, folder_id, title, author_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.ID, p.Kind, p.CodexID, p.FolderID, p.Title, p.AuthorID, now, now); err != nil {
+	if _, err := tx.Exec(`INSERT INTO pages (id, kind, codex_id, folder_id, session_id, title, author_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.Kind, p.CodexID, p.FolderID, p.SessionID, p.Title, p.AuthorID, now, now); err != nil {
 		return err
 	}
 	for _, a := range aliases {
@@ -151,8 +151,8 @@ func (s *SQLiteStore) GetPage(id string) (*models.Page, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	var p models.Page
-	err := s.db.QueryRow(`SELECT id, kind, codex_id, folder_id, title, author_id, created_at, updated_at FROM pages WHERE id = ?`, id).
-		Scan(&p.ID, &p.Kind, &p.CodexID, &p.FolderID, &p.Title, &p.AuthorID, &p.CreatedAt, &p.UpdatedAt)
+	err := s.db.QueryRow(`SELECT id, kind, codex_id, folder_id, session_id, title, author_id, created_at, updated_at FROM pages WHERE id = ?`, id).
+		Scan(&p.ID, &p.Kind, &p.CodexID, &p.FolderID, &p.SessionID, &p.Title, &p.AuthorID, &p.CreatedAt, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

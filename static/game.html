@@ -125,6 +125,10 @@
                                     <button type="button" class="game-more" x-show="isDM" @click="startRecording()">+ Record a past session</button>
                                 </div>
                                 <p class="panel-empty" x-show="played.length === 0">No sessions played yet.</p>
+                                <p class="entry-none" x-show="journalHint">
+                                    <span>Link a codex in Edit game to keep a journal.</span>
+                                    <span x-show="journalPending > 0" x-text="journalPending + (journalPending === 1 ? ' older journal entry is' : ' older journal entries are') + ' waiting.'"></span>
+                                </p>
                                 <ol class="game-entries" reversed>
                                     <template x-for="s in visibleSessions" :key="s.id">
                                         <li class="game-row" :class="{ 'is-selected': selectedId === s.id }">
@@ -141,17 +145,20 @@
                                                 </span>
                                             </button>
                                             <div class="entry-line">
-                                                <template x-if="s.journal">
-                                                    <a class="entry-link" :href="journalUrl(s.id)" x-text="s.journal.name || 'Unnamed entry'"></a>
+                                                <template x-if="s.journal && s.journal.can_open">
+                                                    <a class="entry-link" :href="journalUrl(s.journal)" x-text="journalName(s.journal) || 'Unnamed entry'"></a>
                                                 </template>
-                                                <template x-if="s.journal">
+                                                <template x-if="s.journal && s.journal.can_open">
                                                     <span class="session-by" x-text="journalByline(s.journal)"></span>
+                                                </template>
+                                                <template x-if="s.journal && !s.journal.can_open">
+                                                    <span class="entry-none" x-text="'Written · in ' + s.journal.codex_name"></span>
                                                 </template>
                                                 <template x-if="!s.journal">
                                                     <span class="entry-none">No entry yet</span>
                                                 </template>
-                                                <template x-if="!s.journal && isMember">
-                                                    <span class="session-by"><a :href="journalUrl(s.id) + '/edit'">✎ Write the entry →</a></span>
+                                                <template x-if="!s.journal && canWriteJournal">
+                                                    <span class="session-by"><button type="button" class="text-link" :disabled="busy" @click="writeEntry(s)">✎ Write the entry →</button></span>
                                                 </template>
                                             </div>
                                         </li>
@@ -159,9 +166,12 @@
                                 </ol>
                                 <button type="button" class="game-more" x-show="played.length > 5" :aria-expanded="showAll" @click="showAll = !showAll" x-text="showAll ? 'Show fewer ↑' : 'Show all ' + played.length + ' sessions ↓'"></button>
                                 <p class="entry-cancelled" x-show="cancelledEntries.length > 0">
-                                    <span>Entries on cancelled sessions:</span>
+                                    <span>Journal pages of cancelled sessions:</span>
                                     <template x-for="c in cancelledEntries" :key="c.session_id">
-                                        <a :href="journalUrl(c.session_id)" x-text="cancelledLabel(c)"></a>
+                                        <span>
+                                            <a x-show="c.can_open" :href="journalUrl(c)" x-text="cancelledLabel(c)"></a>
+                                            <span x-show="!c.can_open" x-text="cancelledLabel(c) + ' (in ' + c.codex_name + ')'"></span>
+                                        </span>
                                     </template>
                                 </p>
                             </section>
@@ -223,23 +233,29 @@
                                             </div>
                                             <div class="panel-session panel-journal">
                                                 <p class="modal-eyebrow">The journal</p>
-                                                <template x-if="s.journal">
+                                                <template x-if="s.journal && s.journal.can_open">
                                                     <div class="panel-journal-entry">
-                                                        <a class="journal-title" :href="journalUrl(s.id)" x-html="journalTitleHtml(campaign.title, s.number, s.journal.name)"></a>
+                                                        <a class="journal-title" :href="journalUrl(s.journal)" x-html="journalTitleHtml(campaign.title, s.number, journalName(s.journal))"></a>
                                                         <p class="journal-excerpt" x-text="journalExcerpt(s.journal.excerpt_source)"></p>
                                                         <p class="session-by" x-text="journalByline(s.journal)"></p>
                                                         <div class="journal-actions">
-                                                            <a class="submit-btn" :href="journalUrl(s.id)">Read the entry</a>
-                                                            <a class="campaign-action-btn" :href="journalUrl(s.id) + '/history'" x-text="'History · ' + s.journal.revisions"></a>
+                                                            <a class="submit-btn" :href="journalUrl(s.journal)">Read the entry</a>
+                                                            <a class="campaign-action-btn" :href="journalUrl(s.journal, '/history')" x-text="'History · ' + s.journal.revisions"></a>
                                                         </div>
+                                                    </div>
+                                                </template>
+                                                <template x-if="s.journal && !s.journal.can_open">
+                                                    <div class="panel-journal-entry">
+                                                        <p class="panel-empty" x-text="'Written · in ' + s.journal.codex_name + '. You cannot open that codex.'"></p>
                                                     </div>
                                                 </template>
                                                 <template x-if="!s.journal">
                                                     <div class="panel-journal-entry">
                                                         <p class="panel-empty">Nobody has written the entry for this session yet.</p>
-                                                        <div class="journal-actions" x-show="isMember">
-                                                            <a class="submit-btn" :href="journalUrl(s.id) + '/edit'">Write the entry</a>
+                                                        <div class="journal-actions" x-show="canWriteJournal">
+                                                            <button type="button" class="submit-btn" :disabled="busy" @click="writeEntry(s)">Write the entry</button>
                                                         </div>
+                                                        <p class="entry-none" x-show="journalHint">Link a codex in Edit game to keep a journal.</p>
                                                     </div>
                                                 </template>
                                             </div>
@@ -496,7 +512,7 @@
     </div>
 
     <script src="/static/notifications.js?v=11"></script>
-    <script src="/campaigns.js?v=63"></script>
+    <script src="/campaigns.js?v=64"></script>
     <script src="/static/characters.js?v=3"></script>
     <script src="/static/game.js?v=15"></script>
 </body>

@@ -778,7 +778,12 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 			incoming++
 		}
 	}
+	session, err := journalSessionPayload(page, users)
+	if err != nil {
+		return nil, http.StatusInternalServerError, "failed to retrieve session"
+	}
 	payload := map[string]interface{}{
+		"session": session,
 		"page": map[string]interface{}{
 			"id": page.ID, "kind": page.Kind, "title": page.Title,
 			"codex": codexCodexRef(codices, page.CodexID), "folder_id": page.FolderID, "folder_path": folderPath, "aliases": page.Aliases, "body": page.Body,

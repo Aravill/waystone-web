@@ -55,7 +55,13 @@ func templateToday() string { return time.Now().UTC().Format("Jan 2, 2006") }
 
 // fillTemplate applies the two placeholders in one pass, so a title that contains "{{date}}" stays as typed.
 func fillTemplate(body, title string) string {
-	return strings.NewReplacer("{{title}}", title, "{{date}}", templateToday()).Replace(body)
+	return fillTemplateOn(body, title, templateToday())
+}
+
+// fillTemplateOn is fillTemplate with a date of the caller's choosing (a journal page uses its
+// session's date).
+func fillTemplateOn(body, title, date string) string {
+	return strings.NewReplacer("{{title}}", title, "{{date}}", date).Replace(body)
 }
 
 func builtinTemplateByID(id string) *builtinTemplate {
@@ -248,11 +254,16 @@ func handleCodexTemplate(w http.ResponseWriter, r *http.Request, id string) {
 // made in (built-in or the codex's own, placeholders applied), or the plain body. ok is false (with
 // the response written) when the template doesn't exist in that codex.
 func pageStart(w http.ResponseWriter, templateID, codexID, title, body string) (string, []string, bool) {
+	return pageStartOn(w, templateID, codexID, title, body, templateToday())
+}
+
+// pageStartOn is pageStart with the date {{date}} stands for.
+func pageStartOn(w http.ResponseWriter, templateID, codexID, title, body, date string) (string, []string, bool) {
 	if templateID == "" {
 		return body, nil, true
 	}
 	if b := builtinTemplateByID(templateID); b != nil {
-		return fillTemplate(b.Body, title), b.Tags, true
+		return fillTemplateOn(b.Body, title, date), b.Tags, true
 	}
 	t, err := db.GetCodexTemplate(templateID)
 	if err != nil {
@@ -267,7 +278,7 @@ func pageStart(w http.ResponseWriter, templateID, codexID, title, body string) (
 	for _, tag := range t.Tags {
 		names = append(names, tag.Name)
 	}
-	return fillTemplate(t.Body, title), names, true
+	return fillTemplateOn(t.Body, title, date), names, true
 }
 
 type pageCopyRequest struct {

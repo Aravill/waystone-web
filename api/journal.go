@@ -1,66 +1,32 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
-	"regexp"
-	"strconv"
 	"strings"
-	"unicode/utf8"
+	"time"
 	"waystone-web/db"
 	"waystone-web/models"
 )
 
-const (
-	maxJournalBodyRunes = 20000
-	maxJournalNameRunes = 80
-	maxJournalNoteRunes = 120
-)
+// The game journal lives in the codex: a session's entry is a page with pages.session_id set (see
+// db/sqlite_journal.go). This file keeps the one write route, the number check and the user
+// helpers the codex code shares.
 
-// journalParagraphBreak splits paragraphs the same way the page's merge does (toParas in journal.js).
-var journalParagraphBreak = regexp.MustCompile(`\n[ \t]*\n`)
-
-// journalSaveRequest is the body for saving an entry. A new entry sends entry_id "" and base_revision 0.
-type journalSaveRequest struct {
-	EntryID      string `json:"entry_id"`
-	BaseRevision int    `json:"base_revision"`
-	Name         string `json:"name"`
-	Body         string `json:"body"`
-	Note         string `json:"note"`
-	MergedWith   int    `json:"merged_with"`
-}
-
-// HandleJournal handles /api/campaigns/{id}/journal/{sid}[/revisions[/{n}/restore]].
+// HandleJournal handles POST /api/campaigns/{id}/journal/{sid}: it starts the session's journal
+// page (or returns the one it already has).
 func HandleJournal(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/campaigns/"), "/")
-	if len(parts) < 3 || parts[1] != "journal" || parts[0] == "" || parts[2] == "" {
+	if len(parts) != 3 || parts[1] != "journal" || parts[0] == "" || parts[2] == "" {
 		writeJSONError(w, http.StatusNotFound, "not found")
 		return
 	}
-	campaignID, sessionID := parts[0], parts[2]
-	switch {
-	case len(parts) == 3 && r.Method == http.MethodGet:
-		handleGetJournal(w, r, campaignID, sessionID)
-	case len(parts) == 3 && r.Method == http.MethodPut:
-		handleSaveJournal(w, r, campaignID, sessionID)
-	case len(parts) == 3 && r.Method == http.MethodDelete:
-		handleDeleteJournal(w, r, campaignID, sessionID)
-	case len(parts) == 4 && parts[3] == "revisions" && r.Method == http.MethodGet:
-		handleGetJournalRevisions(w, r, campaignID, sessionID)
-	case len(parts) == 6 && parts[3] == "revisions" && parts[5] == "restore" && r.Method == http.MethodPost:
-		n, err := strconv.Atoi(parts[4])
-		if err != nil || n < 1 {
-			writeJSONError(w, http.StatusNotFound, "revision not found")
-			return
-		}
-		handleRestoreJournal(w, r, campaignID, sessionID, n)
-	case len(parts) == 3 || (len(parts) == 4 && parts[3] == "revisions") || (len(parts) == 6 && parts[3] == "revisions" && parts[5] == "restore"):
+	if r.Method != http.MethodPost {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
-	default:
-		writeJSONError(w, http.StatusNotFound, "not found")
+		return
 	}
+	handleStartJournal(w, r, parts[0], parts[2])
 }
 
 // loadJournalSession authenticates the caller and loads the campaign and one of its sessions,
@@ -82,6 +48,96 @@ func loadJournalSession(w http.ResponseWriter, r *http.Request, campaignID, sess
 	return campaign, session, userID, true
 }
 
+func journalConflict(w http.ResponseWriter, code, message string) {
+	writeJSON(w, http.StatusConflict, map[string]string{"error": message, "code": code})
+}
+
+func journalPageResult(w http.ResponseWriter, status int, id, codexID string) {
+	writeJSON(w, status, map[string]interface{}{"page": map[string]interface{}{"id": id, "codex_id": codexID}})
+}
+
+func handleStartJournal(w http.ResponseWriter, r *http.Request, campaignID, sessionID string) {
+	campaign, session, userID, ok := loadJournalSession(w, r, campaignID, sessionID)
+	if !ok {
+		return
+	}
+	_, played, err := journalSession(campaign, sessionID)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve sessions")
+		return
+	}
+	if !played {
+		journalConflict(w, "session_not_played", "only a session that has been played can have a journal entry")
+		return
+	}
+	if campaign.CodexID == "" {
+		journalConflict(w, "no_codex", "link a codex to this game to keep a journal")
+		return
+	}
+	rt, err := loadCodexRights(userID)
+	if err != nil {
+		codexServerError(w, "retrieve rights")
+		return
+	}
+	if !rt.canEdit(campaign.CodexID) {
+		writeJSONError(w, http.StatusForbidden, "only someone who can edit the game's codex can write its journal")
+		return
+	}
+	if id, err := db.GetJournalPageID(sessionID); err != nil {
+		codexServerError(w, "retrieve journal page")
+		return
+	} else if id != "" {
+		pageCodex, err := db.GetPageCodexID(id)
+		if err != nil {
+			codexServerError(w, "retrieve journal page")
+			return
+		}
+		journalPageResult(w, http.StatusOK, id, pageCodex)
+		return
+	}
+
+	_, template, err := db.EnsureJournalFolder(campaign.ID, campaign.CodexID, userID)
+	if err != nil {
+		journalStoreError(w, err)
+		return
+	}
+	date := session.Date
+	if t, err := time.Parse("2006-01-02", session.Date); err == nil {
+		date = t.Format("Jan 2, 2006")
+	}
+	base := db.JournalPageBase(campaign.Title, session.Date)
+	body, tags, ok := pageStartOn(w, template, campaign.CodexID, base, "", date)
+	if !ok {
+		return
+	}
+	if tags == nil {
+		tags = []string{}
+	}
+	page := models.Page{ID: db.GenerateUUID(), CodexID: campaign.CodexID, AuthorID: userID, SessionID: sessionID}
+	id, created, err := db.CreateJournalPage(campaign.ID, page, base, body, models.NewPageExtras{TagNames: tags})
+	if err != nil {
+		journalStoreError(w, err)
+		return
+	}
+	status := http.StatusCreated
+	if !created {
+		status = http.StatusOK
+	}
+	journalPageResult(w, status, id, campaign.CodexID)
+}
+
+func journalStoreError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, db.ErrJournalSessionGone):
+		writeJSONError(w, http.StatusNotFound, "session not found")
+	case errors.Is(err, db.ErrCodexNotFound):
+		journalConflict(w, "no_codex", "link a codex to this game to keep a journal")
+	default:
+		log.Printf("journal: %v", err)
+		codexStoreError(w, err, "write the journal page")
+	}
+}
+
 // journalSession reports whether a session has been played and, if so, its number. Numbers are
 // positional (see campaignSessionSummaries), so they are computed here and never stored.
 func journalSession(campaign *models.Campaign, sessionID string) (number int, played bool, err error) {
@@ -95,6 +151,46 @@ func journalSession(campaign *models.Campaign, sessionID string) (number int, pl
 		}
 	}
 	return 0, false, nil
+}
+
+// journalSessionPayload is the `session` object of a journal page's payload (nil for any other
+// page): the game and session it belongs to, the session's number (null unless it was played, and
+// computed now, never stored) and who was at the table.
+func journalSessionPayload(page *models.Page, users map[string]*models.User) (interface{}, error) {
+	if page.SessionID == "" {
+		return nil, nil
+	}
+	session, err := db.GetSessionByID(page.SessionID)
+	if err != nil || session == nil {
+		return nil, err
+	}
+	campaign, err := db.GetCampaignByID(session.CampaignID)
+	if err != nil || campaign == nil {
+		return nil, err
+	}
+	number, played, err := journalSession(campaign, session.ID)
+	if err != nil {
+		return nil, err
+	}
+	var numberValue interface{} // null unless the session was played
+	attendees := []map[string]interface{}{}
+	if played {
+		numberValue = number
+		responses, err := db.GetSessionResponses(session.ID)
+		if err != nil {
+			return nil, err
+		}
+		assignments, err := db.GetCampaignAssignments(campaign.ID)
+		if err != nil {
+			assignments = nil
+		}
+		attendees = playedAttendees(campaign, users, *session, responses, assignments)
+	}
+	return map[string]interface{}{
+		"campaign_id": campaign.ID, "campaign_title": campaign.Title, "session_id": session.ID,
+		"number": numberValue, "date": session.Date, "status": session.Status, "played": played,
+		"attendees": attendees,
+	}, nil
 }
 
 // journalUsers maps every user id (anonymised users included) to its display object.
@@ -125,349 +221,39 @@ func journalUserList(users map[string]*models.User, ids []string) []map[string]i
 	return list
 }
 
-func journalRevisionObject(users map[string]*models.User, rev models.JournalRevision) map[string]interface{} {
+// journalPageObject is the digest of a session's journal page shown on the game page.
+func (v *campaignViewer) journalPageObject(j models.JournalPage) map[string]interface{} {
 	return map[string]interface{}{
-		"number":        rev.Number,
-		"author_id":     rev.AuthorID,
-		"author_user":   journalUser(users, rev.AuthorID),
-		"name":          rev.Name,
-		"body":          rev.Body,
-		"note":          rev.Note,
-		"restored_from": rev.RestoredFrom,
-		"merged_with":   rev.MergedWith,
-		"created_at":    rev.CreatedAt,
-	}
-}
-
-// journalSummaryObject is the digest of an entry shown on the game page.
-func journalSummaryObject(users map[string]*models.User, j models.JournalSummary) map[string]interface{} {
-	return map[string]interface{}{
-		"entry_id":       j.EntryID,
-		"name":           j.Name,
+		"page_id":        j.PageID,
+		"title":          j.Title,
+		"codex_id":       j.CodexID,
+		"codex_name":     v.codices[j.CodexID],
+		"can_open":       v.codexRights.canSee(j.CodexID),
 		"revisions":      j.Revisions,
 		"updated_at":     j.UpdatedAt,
 		"excerpt_source": j.ExcerptSource,
 		"author_id":      j.AuthorID,
-		"author_user":    journalUser(users, j.AuthorID),
+		"author_user":    journalUser(v.users, j.AuthorID),
 		"amender_ids":    j.AmenderIDs,
-		"amender_users":  journalUserList(users, j.AmenderIDs),
+		"amender_users":  journalUserList(v.users, j.AmenderIDs),
 	}
 }
 
-// isCampaignManager reports whether the user is the game's DM or a site admin.
-func isCampaignManager(campaign *models.Campaign, userID string) (bool, error) {
-	if campaign.DM == userID {
-		return true, nil
-	}
-	user, err := db.GetUserByID(userID)
+// redirectOldJournalURL sends /games/{id}/journal/{sid}[/edit|/history] to the session's codex
+// page (or to the game when it has none). 303, not 301: a page can be deleted and written again
+// under a new id.
+func redirectOldJournalURL(w http.ResponseWriter, r *http.Request, parts []string) {
+	target := "/games/" + parts[1]
+	id, err := db.GetJournalPageID(parts[3])
 	if err != nil {
-		return false, err
-	}
-	return user != nil && user.IsAdmin(), nil
-}
-
-func handleGetJournal(w http.ResponseWriter, r *http.Request, campaignID, sessionID string) {
-	campaign, session, userID, ok := loadJournalSession(w, r, campaignID, sessionID)
-	if !ok {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve journal page")
 		return
 	}
-	number, played, err := journalSession(campaign, sessionID)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve sessions")
-		return
-	}
-	manager, err := isCampaignManager(campaign, userID)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve user")
-		return
-	}
-	entry, err := db.GetJournalEntry(sessionID)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve journal entry")
-		return
-	}
-	users, err := journalUsers()
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve users")
-		return
-	}
-	responses, err := db.GetSessionResponses(sessionID)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve sessions")
-		return
-	}
-
-	assignments, err := db.GetCampaignAssignments(campaign.ID)
-	if err != nil {
-		log.Printf("error fetching assignments: %v", err)
-		assignments = nil
-	}
-
-	var numberValue interface{} // null unless the session was played
-	if played {
-		numberValue = number
-	}
-	obj := map[string]interface{}{
-		"session": map[string]interface{}{
-			"id":        session.ID,
-			"number":    numberValue,
-			"played":    played,
-			"status":    session.Status,
-			"date":      session.Date,
-			"time":      session.Time,
-			"duration":  session.Duration,
-			"timezone":  session.Timezone,
-			"manual":    session.Manual,
-			"attendees": playedAttendees(campaign, users, *session, responses, assignments),
-		},
-		"can_edit":   played && hasCampaignSessionAccess(campaign, userID),
-		"can_delete": manager,
-		"entry":      nil,
-	}
-	if entry != nil {
-		// The author leads the scribes; the rest keep their first-revision order.
-		amenders := []string{}
-		scribes := []map[string]interface{}{}
-		for pass := 0; pass < 2; pass++ {
-			for _, c := range entry.Scribes {
-				if (c.UserID == entry.AuthorID) != (pass == 0) {
-					continue
-				}
-				if pass == 1 {
-					amenders = append(amenders, c.UserID)
-				}
-				scribes = append(scribes, map[string]interface{}{"user_id": c.UserID, "user": journalUser(users, c.UserID), "revisions": c.Revisions})
-			}
-		}
-		obj["entry"] = map[string]interface{}{
-			"id":               entry.ID,
-			"session_id":       entry.SessionID,
-			"campaign_id":      entry.CampaignID,
-			"current_revision": entry.Latest.Number,
-			"revision_count":   entry.RevisionCount,
-			"name":             entry.Latest.Name,
-			"body":             entry.Latest.Body,
-			"updated_at":       entry.Latest.CreatedAt,
-			"author_id":        entry.AuthorID,
-			"author_user":      journalUser(users, entry.AuthorID),
-			"amender_ids":      amenders,
-			"amender_users":    journalUserList(users, amenders),
-			"updated_by":       entry.Latest.AuthorID,
-			"updated_by_user":  journalUser(users, entry.Latest.AuthorID),
-			"scribes":          scribes,
+	if id != "" {
+		target = "/codices/p/" + id + "/journal"
+		if len(parts) == 5 {
+			target += "/" + parts[4]
 		}
 	}
-	writeJSON(w, http.StatusOK, obj)
-}
-
-func handleGetJournalRevisions(w http.ResponseWriter, r *http.Request, campaignID, sessionID string) {
-	if _, _, _, ok := loadJournalSession(w, r, campaignID, sessionID); !ok {
-		return
-	}
-	entryID, revs, err := db.GetJournalRevisions(sessionID)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve revisions")
-		return
-	}
-	if entryID == "" || len(revs) == 0 {
-		writeJSONError(w, http.StatusNotFound, "journal entry not found")
-		return
-	}
-	users, err := journalUsers()
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve users")
-		return
-	}
-	list := make([]map[string]interface{}, 0, len(revs))
-	for _, rev := range revs {
-		list = append(list, journalRevisionObject(users, rev))
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"entry_id":         entryID,
-		"current_revision": revs[len(revs)-1].Number,
-		"pruned":           revs[0].Number > 1,
-		"revisions":        list,
-	})
-}
-
-func handleDeleteJournal(w http.ResponseWriter, r *http.Request, campaignID, sessionID string) {
-	campaign, _, userID, ok := loadJournalSession(w, r, campaignID, sessionID)
-	if !ok {
-		return
-	}
-	manager, err := isCampaignManager(campaign, userID)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve user")
-		return
-	}
-	if !manager {
-		writeJSONError(w, http.StatusForbidden, "only the game DM or an admin can delete a journal entry")
-		return
-	}
-	if err := db.DeleteJournalEntry(sessionID); err != nil {
-		if errors.Is(err, db.ErrJournalNotFound) {
-			writeJSONError(w, http.StatusNotFound, err.Error())
-			return
-		}
-		writeJSONError(w, http.StatusInternalServerError, "failed to delete journal entry")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "journal entry deleted"})
-}
-
-func handleSaveJournal(w http.ResponseWriter, r *http.Request, campaignID, sessionID string) {
-	campaign, _, userID, ok := loadJournalSession(w, r, campaignID, sessionID)
-	if !ok {
-		return
-	}
-	if !hasCampaignSessionAccess(campaign, userID) {
-		writeJSONError(w, http.StatusForbidden, "only the game DM and players can write the journal")
-		return
-	}
-	var req journalSaveRequest
-	r.Body = http.MaxBytesReader(w, r.Body, 128<<10)
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	rev, msg := req.normalize()
-	if msg != "" {
-		writeJSONError(w, http.StatusBadRequest, msg)
-		return
-	}
-	rev.AuthorID = userID
-	saveJournalRevision(w, campaign, sessionID, req.EntryID, req.BaseRevision, rev)
-}
-
-func handleRestoreJournal(w http.ResponseWriter, r *http.Request, campaignID, sessionID string, number int) {
-	campaign, _, userID, ok := loadJournalSession(w, r, campaignID, sessionID)
-	if !ok {
-		return
-	}
-	if !hasCampaignSessionAccess(campaign, userID) {
-		writeJSONError(w, http.StatusForbidden, "only the game DM and players can restore a revision")
-		return
-	}
-	var req struct {
-		BaseRevision int `json:"base_revision"`
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.BaseRevision < 1 {
-		writeJSONError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	entryID, revs, err := db.GetJournalRevisions(sessionID)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve revisions")
-		return
-	}
-	var source *models.JournalRevision
-	for i := range revs {
-		if revs[i].Number == number {
-			source = &revs[i]
-		}
-	}
-	if entryID == "" || source == nil {
-		writeJSONError(w, http.StatusNotFound, "revision not found")
-		return
-	}
-	saveJournalRevision(w, campaign, sessionID, entryID, req.BaseRevision, models.JournalRevision{
-		AuthorID: userID, Name: source.Name, Body: source.Body, RestoredFrom: number,
-	})
-}
-
-// saveJournalRevision checks that the session has been played, saves, and writes the response.
-func saveJournalRevision(w http.ResponseWriter, campaign *models.Campaign, sessionID, entryID string, base int, rev models.JournalRevision) {
-	_, played, err := journalSession(campaign, sessionID)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve sessions")
-		return
-	}
-	conflict := func(code, message, entry string, latest map[string]interface{}) {
-		body := map[string]interface{}{"error": message, "code": code, "entry_id": entry, "latest": nil}
-		if latest != nil {
-			body["latest"] = latest
-		}
-		writeJSON(w, http.StatusConflict, body)
-	}
-	if !played {
-		conflict("session_not_played", "only a session that has been played can have a journal entry", entryID, nil)
-		return
-	}
-	result, err := db.SaveJournalRevision(campaign.ID, sessionID, entryID, base, rev)
-	if err != nil {
-		if errors.Is(err, db.ErrJournalSessionGone) {
-			writeJSONError(w, http.StatusNotFound, err.Error())
-			return
-		}
-		writeJSONError(w, http.StatusInternalServerError, "failed to save journal entry")
-		return
-	}
-	users, err := journalUsers()
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve users")
-		return
-	}
-	var latest map[string]interface{}
-	if result.Latest != nil {
-		latest = journalRevisionObject(users, *result.Latest)
-	}
-	switch result.Outcome {
-	case models.JournalStale:
-		conflict("stale_base", "the entry changed while you were editing", result.EntryID, latest)
-	case models.JournalReplaced:
-		conflict("entry_replaced", "the entry was deleted and written again while you were editing", result.EntryID, latest)
-	case models.JournalDeleted:
-		conflict("entry_deleted", "the entry was deleted while you were editing", "", nil)
-	default:
-		status, message, created := http.StatusOK, "no changes to save", false
-		switch result.Outcome {
-		case models.JournalCreated:
-			status, message, created = http.StatusCreated, "entry saved", true
-		case models.JournalSaved:
-			status, message = http.StatusCreated, "revision saved"
-		}
-		writeJSON(w, status, map[string]interface{}{
-			"status":   "success",
-			"message":  message,
-			"created":  created,
-			"entry_id": result.EntryID,
-			"revision": journalRevisionObject(users, result.Revision),
-		})
-	}
-}
-
-// normalize validates the request and returns the revision to save (without author) and a
-// validation message, or "". The body is stored in canonical form: LF line breaks and
-// paragraphs separated by exactly one blank line, so "no change" is an exact comparison.
-func (req *journalSaveRequest) normalize() (models.JournalRevision, string) {
-	var rev models.JournalRevision
-	clean := func(s string) string { return strings.ReplaceAll(s, "\x00", "") }
-	rev.Name = strings.Join(strings.Fields(clean(req.Name)), " ")
-	rev.Note = strings.Join(strings.Fields(clean(req.Note)), " ")
-	body := strings.ReplaceAll(strings.ReplaceAll(clean(req.Body), "\r\n", "\n"), "\r", "\n")
-	var paras []string
-	for _, p := range journalParagraphBreak.Split(body, -1) {
-		if p = strings.TrimSpace(p); p != "" {
-			paras = append(paras, p)
-		}
-	}
-	rev.Body = strings.Join(paras, "\n\n")
-	rev.MergedWith = req.MergedWith
-
-	switch {
-	case rev.Body == "":
-		return rev, "entry text is required"
-	case utf8.RuneCountInString(rev.Body) > maxJournalBodyRunes:
-		return rev, "entry text must be at most 20000 characters"
-	case utf8.RuneCountInString(rev.Name) > maxJournalNameRunes:
-		return rev, "session name must be at most 80 characters"
-	case utf8.RuneCountInString(rev.Note) > maxJournalNoteRunes:
-		return rev, "note must be at most 120 characters"
-	case req.BaseRevision < 0:
-		return rev, "invalid base revision"
-	case req.MergedWith != 0 && req.MergedWith != req.BaseRevision:
-		return rev, "merged_with must be 0 or the base revision"
-	}
-	return rev, ""
+	http.Redirect(w, r, target, http.StatusSeeOther)
 }

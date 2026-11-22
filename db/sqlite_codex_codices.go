@@ -136,7 +136,7 @@ func (s *SQLiteStore) DeleteCodex(id string) error {
 	if _, err := tx.Exec(`DELETE FROM codex_notes WHERE codex_id = ?`, id); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`UPDATE campaigns SET codex_id = '' WHERE codex_id = ?`, id); err != nil {
+	if _, err := tx.Exec(`UPDATE campaigns SET codex_id = '', journal_folder_id = '' WHERE codex_id = ?`, id); err != nil {
 		return err
 	}
 	res, err := tx.Exec(`DELETE FROM codices WHERE id = ?`, id)
@@ -149,30 +149,6 @@ func (s *SQLiteStore) DeleteCodex(id string) error {
 		return ErrCodexNotFound
 	}
 	return tx.Commit()
-}
-
-// SetCampaignCodex points a game at a codex ("" clears it). It is only a label: links don't change.
-func (s *SQLiteStore) SetCampaignCodex(campaignID, codexID string) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	if codexID != "" {
-		var one int
-		if err := s.db.QueryRow(`SELECT 1 FROM codices WHERE id = ?`, codexID).Scan(&one); err == sql.ErrNoRows {
-			return ErrCodexNotFound
-		} else if err != nil {
-			return err
-		}
-	}
-	res, err := s.db.Exec(`UPDATE campaigns SET codex_id = ? WHERE id = ?`, codexID, campaignID)
-	if err != nil {
-		return err
-	}
-	if n, err := res.RowsAffected(); err != nil {
-		return err
-	} else if n == 0 {
-		return ErrCampaignNotFound
-	}
-	return nil
 }
 
 // tableExists and columnExists inspect the schema for the one-off renames below.
