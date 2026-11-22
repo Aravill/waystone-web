@@ -99,8 +99,11 @@
         // The Insert / button: a "/" on a line of its own (a typing event, so the menu opens).
         const insertSlash = (v) => {
             const head = v.state.selection.main.head;
-            const text = (head === v.state.doc.lineAt(head).from ? '' : '\n') + '/';
-            v.dispatch({ changes: { from: head, insert: text }, selection: { anchor: head + text.length }, userEvent: 'input.type', scrollIntoView: true });
+            // On a line of its own: a newline before it unless at a line start, and after it when text follows.
+            const line = v.state.doc.lineAt(head);
+            const text = (head === line.from ? '' : '\n') + '/';
+            const after = head < line.to ? '\n' : '';
+            v.dispatch({ changes: { from: head, insert: text + after }, selection: { anchor: head + text.length }, userEvent: 'input.type', scrollIntoView: true });
             v.focus();
         };
 

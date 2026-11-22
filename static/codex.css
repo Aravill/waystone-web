@@ -174,7 +174,8 @@ button.wikilink {
     text-decoration: underline dashed;
 }
 
-.cm-tooltip {
+.cm-tooltip,
+.codex-page .cm-editor .cm-tooltip { /* beats the library's light base theme (#f5f5f5) */
     border: 1px solid var(--ink);
     background: var(--bg);
     color: var(--ink);
