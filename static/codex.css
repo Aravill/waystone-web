@@ -878,6 +878,25 @@ button.wikilink {
     margin: 0.5rem 0 0;
 }
 
+.cx-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0;
+    padding: 0 0.75rem 0.375rem;
+}
+
+.cx-pager span {
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+.cx-pager .text-link:disabled {
+    color: var(--muted);
+    text-decoration: none;
+    cursor: default;
+}
+
 .cx-nav-foot .text-link {
     min-height: 2rem;
     font-size: 0.875rem;

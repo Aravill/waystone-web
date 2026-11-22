@@ -8,6 +8,7 @@
 // Past this many cells the LCS matrix would be too big for the browser, so a large rewrite is
 // shown (and merged) as one removal plus one addition.
 const MAX_LCS_CELLS = 4e6;
+const CODEX_LIST_PAGE = 5; // rows per page in the short lists (Recent changes, Wanted pages)
 
 // Word-level LCS diff. Long unchanged stretches collapse to a marker.
 function diffWords(a, b) {
@@ -675,6 +676,8 @@ window.codexPage = function () {
         notesError: '',
         confirmDialog: { open: false, eyebrow: '', title: '', message: '', confirmLabel: '', danger: true, resolve: null },
         home: null,
+        pagers: { homeRecent: 0, recent: 0, wanted: 0 }, // current page of each short list
+        pagerId: '',
         codex: null,
         pageData: null,
         toc: [],
@@ -886,10 +889,36 @@ window.codexPage = function () {
             return [...list, { label: this.page.title, href: this.pageUrl(this.page) }, { label: s === 'edit' ? 'Edit' : 'History', href: '' }];
         },
 
+        // Short lists on the homes and in the side panel show CODEX_LIST_PAGE rows at a time.
+        pageLast(list) {
+            return Math.max(0, Math.ceil(list.length / CODEX_LIST_PAGE) - 1);
+        },
+        pageCur(list, key) {
+            return Math.min(this.pagers[key], this.pageLast(list)); // a shrunk list never shows an empty page
+        },
+        pagedSlice(list, key) {
+            const from = this.pageCur(list, key) * CODEX_LIST_PAGE;
+            return list.slice(from, from + CODEX_LIST_PAGE);
+        },
+        pageRange(list, key) {
+            const from = this.pageCur(list, key) * CODEX_LIST_PAGE;
+            return (from + 1) + '–' + Math.min(from + CODEX_LIST_PAGE, list.length) + ' of ' + list.length;
+        },
+        pagerAtEnd(list, key) {
+            return this.pageCur(list, key) >= this.pageLast(list);
+        },
+        turnPage(list, key, d) {
+            this.pagers[key] = Math.max(0, Math.min(this.pageLast(list), this.pageCur(list, key) + d));
+        },
+
         async load() {
             const seq = ++this.loadSeq; // an older response must not overwrite a newer one
             try {
                 const r = this.route;
+                if (r.id !== this.pagerId) {
+                    this.pagerId = r.id;
+                    this.pagers = { homeRecent: 0, recent: 0, wanted: 0 };
+                }
                 const url = r.screen === 'home' ? '/api/codices'
                     : r.screen === 'codex' || r.screen === 'graph' || r.screen === 'inbox' ? `/api/codices/c/${encodeURIComponent(r.id)}`
                     : `/api/codices/pages/${encodeURIComponent(r.id)}`;

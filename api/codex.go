@@ -158,7 +158,7 @@ func HandleCodexHome(w http.ResponseWriter, r *http.Request) {
 }
 
 func codexRecent(codexIDs []string, codices map[string]models.Codex) ([]map[string]interface{}, error) {
-	revs, err := db.GetRecentRevisions(codexIDs, 15)
+	revs, err := db.GetRecentRevisions(codexIDs, 50)
 	if err != nil {
 		return nil, err
 	}

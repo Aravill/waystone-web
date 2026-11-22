@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=81">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
-    <link rel="stylesheet" href="/static/codex.css?v=40">
+    <link rel="stylesheet" href="/static/codex.css?v=41">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -245,10 +245,15 @@
                             <h2 class="section-header">Recent changes</h2>
                             <p class="same" x-show="home.recent.length === 0">Nothing has been written yet.</p>
                             <ul class="recent">
-                                <template x-for="r in home.recent" :key="r.page_id + '-' + r.number">
+                                <template x-for="r in pagedSlice(home.recent, 'homeRecent')" :key="r.page_id + '-' + r.number">
                                     <li x-html="recentHtml(r, true)"></li>
                                 </template>
                             </ul>
+                            <p class="cx-pager" x-show="home.recent.length > CODEX_LIST_PAGE">
+                            <button type="button" class="text-link" :disabled="pagers.homeRecent === 0" @click="turnPage(home.recent, 'homeRecent', -1)" aria-label="Newer changes">‹ Newer</button>
+                            <span x-text="pageRange(home.recent, 'homeRecent')"></span>
+                            <button type="button" class="text-link" :disabled="pagerAtEnd(home.recent, 'homeRecent')" @click="turnPage(home.recent, 'homeRecent', 1)" aria-label="Older changes">Older ›</button>
+                        </p>
                         </section>
                     </div>
                 </template>
@@ -636,12 +641,15 @@
                         <h2>Wanted pages</h2>
                         <p class="cx-box-empty" x-show="codex.wanted.length === 0">Every link in this codex leads somewhere.</p>
                         <ul x-show="codex.wanted.length">
-                            <template x-for="w in codex.wanted.slice(0, screen === 'codex' ? 200 : 10)" :key="w.text">
+                            <template x-for="w in pagedSlice(codex.wanted, 'wanted')" :key="w.text">
                                 <li><button type="button" class="wikilink wikilink--missing" :title="codex.can_edit ? 'No page yet. Click to create.' : 'No page yet.'" @click="openCreatePage(w.text)" x-text="w.text"></button><small class="muted" x-text="'wanted ' + w.count + (w.count === 1 ? ' time' : ' times')"></small></li>
                             </template>
                         </ul>
-                        <p class="cx-box-empty" x-show="screen === 'codex' && codex.wanted.length > 200" x-text="'and ' + (codex.wanted.length - 200) + ' more'"></p>
-                        <p class="cx-box-empty" x-show="screen === 'page' && codex.wanted.length > 10"><a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#wanted'" x-text="'All ' + codex.wanted.length + ' on the codex home'"></a></p>
+                        <p class="cx-pager" x-show="codex.wanted.length > CODEX_LIST_PAGE">
+                            <button type="button" class="text-link" :disabled="pagers.wanted === 0" @click="turnPage(codex.wanted, 'wanted', -1)" aria-label="Previous wanted pages">‹ Previous</button>
+                            <span x-text="pageRange(codex.wanted, 'wanted')"></span>
+                            <button type="button" class="text-link" :disabled="pagerAtEnd(codex.wanted, 'wanted')" @click="turnPage(codex.wanted, 'wanted', 1)" aria-label="Next wanted pages">Next ›</button>
+                        </p>
                     </section>
                 </template>
                 <template x-if="screen === 'codex' && codex">
@@ -649,10 +657,15 @@
                         <h2>Recent changes</h2>
                         <p class="cx-box-empty" x-show="codex.recent.length === 0">Nothing yet.</p>
                         <ul class="recent" x-show="codex.recent.length">
-                            <template x-for="r in codex.recent" :key="r.page_id + '-' + r.number">
+                            <template x-for="r in pagedSlice(codex.recent, 'recent')" :key="r.page_id + '-' + r.number">
                                 <li x-html="recentHtml(r, false)"></li>
                             </template>
                         </ul>
+                        <p class="cx-pager" x-show="codex.recent.length > CODEX_LIST_PAGE">
+                            <button type="button" class="text-link" :disabled="pagers.recent === 0" @click="turnPage(codex.recent, 'recent', -1)" aria-label="Newer changes">‹ Newer</button>
+                            <span x-text="pageRange(codex.recent, 'recent')"></span>
+                            <button type="button" class="text-link" :disabled="pagerAtEnd(codex.recent, 'recent')" @click="turnPage(codex.recent, 'recent', 1)" aria-label="Older changes">Older ›</button>
+                        </p>
                     </section>
                 </template>
             </div>
@@ -1082,6 +1095,6 @@
     <script src="/campaigns.js?v=66"></script>
     <script src="/static/codex-editor.js?v=5"></script>
     <script src="/static/codex-graph.js?v=3"></script>
-    <script src="/static/codex.js?v=33"></script>
+    <script src="/static/codex.js?v=34"></script>
 </body>
 </html>
