@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -244,6 +245,7 @@ func handleCreateSession(w http.ResponseWriter, r *http.Request, campaignID stri
 		Duration:   req.Duration,
 		Timezone:   req.Timezone,
 		Status:     models.SessionSuggested,
+		PollID:     db.GenerateUUID(),
 	}
 	if err := db.SaveSession(session); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to create session")
@@ -302,10 +304,27 @@ func handleUpdateSessionStatus(w http.ResponseWriter, r *http.Request, campaignI
 	switch req.Status {
 	case models.SessionConfirmed:
 		prev := session.Status
-		session.Status = models.SessionConfirmed
-		if err := db.SaveSession(*session); err != nil {
-			writeJSONError(w, http.StatusInternalServerError, "failed to update session")
-			return
+		if prev == models.SessionSuggested {
+			// Confirming a date also removes the other dates of its poll, in one transaction.
+			if start, ok := sessionStart(*session); !ok || !start.After(time.Now()) {
+				writeJSONError(w, http.StatusConflict, "this date has already begun")
+				return
+			}
+			if err := db.ConfirmSession(session.ID); err != nil {
+				if errors.Is(err, db.ErrSessionNotSuggested) {
+					writeJSONError(w, http.StatusConflict, "this date is no longer suggested")
+				} else {
+					writeJSONError(w, http.StatusInternalServerError, "failed to update session")
+				}
+				return
+			}
+			session.Status = models.SessionConfirmed
+		} else {
+			session.Status = models.SessionConfirmed
+			if err := db.SaveSession(*session); err != nil {
+				writeJSONError(w, http.StatusInternalServerError, "failed to update session")
+				return
+			}
 		}
 		if prev != models.SessionConfirmed {
 			notifySessionChange(userID, campaign, *session, models.NotificationSessionConfirmed, string(prev))
@@ -317,11 +336,10 @@ func handleUpdateSessionStatus(w http.ResponseWriter, r *http.Request, campaignI
 		})
 	case models.SessionCancelled:
 		if session.Status == models.SessionSuggested {
-			if err := db.DeleteSession(session.ID); err != nil {
+			if err := withdrawSuggestedDate(userID, campaign, *session); err != nil {
 				writeJSONError(w, http.StatusInternalServerError, "failed to cancel session")
 				return
 			}
-			notifySessionChange(userID, campaign, *session, models.NotificationSessionCancelled, string(models.SessionSuggested))
 			writeJSON(w, http.StatusOK, map[string]interface{}{
 				"status":  "success",
 				"message": "session cancelled and removed successfully",
@@ -377,11 +395,10 @@ func handleDeleteSession(w http.ResponseWriter, r *http.Request, campaignID, ses
 	}
 
 	if session.Status == models.SessionSuggested {
-		if err := db.DeleteSession(sessionID); err != nil {
+		if err := withdrawSuggestedDate(userID, campaign, *session); err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "failed to delete session")
 			return
 		}
-		notifySessionChange(userID, campaign, *session, models.NotificationSessionCancelled, string(models.SessionSuggested))
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"status":  "success",
 			"message": "session deleted successfully",
@@ -433,6 +450,13 @@ func handleSubmitSessionResponse(w http.ResponseWriter, r *http.Request, campaig
 	if !isCampaignPlayer(campaign, userID) {
 		writeJSONError(w, http.StatusForbidden, "only registered game players can respond")
 		return
+	}
+
+	if session.Status == models.SessionSuggested {
+		if start, ok := sessionStart(*session); !ok || !start.After(time.Now()) {
+			writeJSONError(w, http.StatusConflict, "this date has already begun")
+			return
+		}
 	}
 
 	writeSessionResponse(w, r, sessionID, userID)

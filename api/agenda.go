@@ -19,6 +19,16 @@ type agendaItem struct {
 	EndTime  string                 `json:"end_time"` // HH:MM in the session's own timezone
 }
 
+// agendaPoll is one open poll the viewer is a player in: its upcoming dates, each with the viewer's
+// reply, under the game they belong to. A poll without an id (never expected) stands on its own.
+type agendaPoll struct {
+	PollID   string                 `json:"poll_id"`
+	Campaign map[string]interface{} `json:"campaign"`
+	Role     string                 `json:"role"`
+	StartAt  string                 `json:"start_at"` // RFC3339 instant of the poll's first date
+	Sessions []agendaItem           `json:"sessions"`
+}
+
 // HandleAgenda returns what Home shows: sessions in progress, sessions awaiting the viewer's
 // reply, the road ahead, the viewer's games and how many games are open to join (GET /api/agenda).
 func HandleAgenda(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +48,9 @@ func HandleAgenda(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
-	inProgress, awaiting, ahead := []agendaItem{}, []agendaItem{}, []agendaItem{}
+	inProgress, ahead := []agendaItem{}, []agendaItem{}
+	polls := map[string]*agendaPoll{}
+	pollOrder := []string{}
 	games := []map[string]interface{}{}
 	openToJoin := 0
 
@@ -101,8 +113,22 @@ func HandleAgenda(w http.ResponseWriter, r *http.Request) {
 			switch {
 			case session.Status == models.SessionConfirmed && !start.After(now):
 				inProgress = append(inProgress, item)
-			case session.Status == models.SessionSuggested && role == "player" && session.CurrentUserParticipation == "":
-				awaiting = append(awaiting, item)
+			case session.Status == models.SessionSuggested && role == "player":
+				pollID := session.PollID
+				if pollID == "" {
+					pollID = session.ID
+				}
+				key := campaign.ID + "/" + pollID
+				poll := polls[key]
+				if poll == nil {
+					poll = &agendaPoll{PollID: pollID, Campaign: item.Campaign, Role: role, StartAt: item.StartAt}
+					polls[key] = poll
+					pollOrder = append(pollOrder, key)
+				}
+				poll.Sessions = append(poll.Sessions, item)
+				if item.StartAt < poll.StartAt {
+					poll.StartAt = item.StartAt
+				}
 			case session.Status == models.SessionConfirmed:
 				// Other suggestions (already answered, or the viewer's own as DM) need nothing here.
 				ahead = append(ahead, item)
@@ -114,7 +140,19 @@ func HandleAgenda(w http.ResponseWriter, r *http.Request) {
 		sort.SliceStable(items, func(a, b int) bool { return items[a].StartAt < items[b].StartAt })
 	}
 	byStart(inProgress)
-	byStart(awaiting)
+	// A poll stays until the viewer has answered every one of its upcoming dates.
+	awaiting := []agendaPoll{}
+	for _, key := range pollOrder {
+		poll := polls[key]
+		byStart(poll.Sessions)
+		for _, item := range poll.Sessions {
+			if item.CurrentUserParticipation == "" {
+				awaiting = append(awaiting, *poll)
+				break
+			}
+		}
+	}
+	sort.SliceStable(awaiting, func(a, b int) bool { return awaiting[a].StartAt < awaiting[b].StartAt })
 	byStart(ahead)
 	if len(ahead) > 12 {
 		ahead = ahead[:12]

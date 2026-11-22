@@ -35,7 +35,7 @@ func DeleteSession(sessionID string) error {
 	return GetStore().DeleteSession(sessionID)
 }
 
-func GetUnansweredSessions(userID, fromDate string) (map[string]models.UnansweredSessions, error) {
+func GetUnansweredSessions(userID, fromDate string) ([]models.CampaignSession, error) {
 	return GetStore().GetUnansweredSessions(userID, fromDate)
 }
 
@@ -51,4 +51,24 @@ func DeleteManualSession(sessionID string) error {
 // fromDate and toDate (inclusive, YYYY-MM-DD) that have no session_started notification yet.
 func GetUnannouncedConfirmedSessions(fromDate, toDate string) ([]models.CampaignSession, error) {
 	return GetStore().GetUnannouncedConfirmedSessions(fromDate, toDate)
+}
+
+// CreatePollSessions inserts a poll's dates in one transaction; a *DayTakenError refuses them all.
+func CreatePollSessions(sessions []models.CampaignSession) error {
+	return GetStore().CreatePollSessions(sessions)
+}
+
+// GetPollSessions returns the Suggested dates of a poll, past ones included.
+func GetPollSessions(campaignID, pollID string) ([]models.CampaignSession, error) {
+	return GetStore().GetPollSessions(campaignID, pollID)
+}
+
+// DeletePoll removes the Suggested dates of a poll with their replies and returns how many went.
+func DeletePoll(campaignID, pollID string) (int, error) {
+	return GetStore().DeletePoll(campaignID, pollID)
+}
+
+// ConfirmSession confirms a Suggested date and deletes the rest of its poll.
+func ConfirmSession(sessionID string) error {
+	return GetStore().ConfirmSession(sessionID)
 }

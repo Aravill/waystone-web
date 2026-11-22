@@ -111,6 +111,7 @@ func (s *SQLiteStore) initSchema() error {
 		manual INTEGER NOT NULL DEFAULT 0,
 		guests TEXT NOT NULL DEFAULT '[]',
 		dm_absent INTEGER NOT NULL DEFAULT 0,
+		poll_id TEXT NOT NULL DEFAULT '',
 		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
@@ -601,12 +602,20 @@ func (s *SQLiteStore) initSchema() error {
 		{"manual", "INTEGER NOT NULL DEFAULT 0"},
 		{"guests", "TEXT NOT NULL DEFAULT '[]'"},
 		{"dm_absent", "INTEGER NOT NULL DEFAULT 0"},
+		{"poll_id", "TEXT NOT NULL DEFAULT ''"},
 	} {
 		if !sessionCols[col.name] {
 			if _, err := s.db.Exec(`ALTER TABLE campaign_sessions ADD COLUMN ` + col.name + ` ` + col.def); err != nil {
 				return fmt.Errorf("failed to add campaign_sessions.%s column: %w", col.name, err)
 			}
 		}
+	}
+	// Every suggested date without a poll becomes its own one-date poll (idempotent).
+	if _, err := s.db.Exec(`UPDATE campaign_sessions SET poll_id = id WHERE poll_id = '' AND status = 'Suggested' AND manual = 0`); err != nil {
+		return fmt.Errorf("failed to backfill campaign_sessions.poll_id: %w", err)
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_campaign_sessions_poll ON campaign_sessions(campaign_id, poll_id)`); err != nil {
+		return fmt.Errorf("failed to index campaign_sessions.poll_id: %w", err)
 	}
 
 	// Journal entries of games that already have a codex move into it (idempotent).
@@ -1277,7 +1286,7 @@ func (s *SQLiteStore) GetSessionsByMonth(campaignID string, year int, month int)
 	endDate := fmt.Sprintf("%04d-%02d-01", nextYear, nextMonth)
 
 	query := `
-		SELECT id, campaign_id, date, time, duration, status, timezone, manual, guests, dm_absent, created_at, updated_at
+		SELECT id, campaign_id, date, time, duration, status, timezone, manual, guests, dm_absent, created_at, updated_at, poll_id
 		FROM campaign_sessions
 		WHERE campaign_id = ? AND manual = 0 AND date >= ? AND date < ?
 		ORDER BY date ASC, time ASC
@@ -1317,14 +1326,17 @@ func (s *SQLiteStore) SaveSession(session models.CampaignSession) error {
 		session.CreatedAt = now
 	}
 	session.UpdatedAt = now
+	if session.Status == models.SessionSuggested && !session.Manual && session.PollID == "" {
+		session.PollID = session.ID // a lone suggestion is a one-date poll
+	}
 
 	_, err := s.db.Exec(upsertSessionSQL, sessionArgs(session)...)
 	return err
 }
 
 const upsertSessionSQL = `
-	INSERT INTO campaign_sessions (id, campaign_id, date, time, duration, status, timezone, manual, guests, dm_absent, created_at, updated_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO campaign_sessions (id, campaign_id, date, time, duration, status, timezone, manual, guests, dm_absent, created_at, updated_at, poll_id)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
 		date = excluded.date,
 		time = excluded.time,
@@ -1334,7 +1346,8 @@ const upsertSessionSQL = `
 		manual = excluded.manual,
 		guests = excluded.guests,
 		dm_absent = excluded.dm_absent,
-		updated_at = excluded.updated_at
+		updated_at = excluded.updated_at,
+		poll_id = excluded.poll_id
 `
 
 func sessionArgs(session models.CampaignSession) []interface{} {
@@ -1344,7 +1357,7 @@ func sessionArgs(session models.CampaignSession) []interface{} {
 	}
 	guestsJSON, _ := json.Marshal(guests)
 	return []interface{}{session.ID, session.CampaignID, session.Date, session.Time, session.Duration, session.Status,
-		session.Timezone, session.Manual, string(guestsJSON), session.DMAbsent, session.CreatedAt, session.UpdatedAt}
+		session.Timezone, session.Manual, string(guestsJSON), session.DMAbsent, session.CreatedAt, session.UpdatedAt, session.PollID}
 }
 
 // scanSession reads one campaign_sessions row selected in the standard column order.
@@ -1355,7 +1368,7 @@ func scanSession(row interface {
 	var manual, dmAbsent int
 	var guests string
 	if err := row.Scan(&session.ID, &session.CampaignID, &session.Date, &session.Time, &session.Duration,
-		&session.Status, &session.Timezone, &manual, &guests, &dmAbsent, &session.CreatedAt, &session.UpdatedAt); err != nil {
+		&session.Status, &session.Timezone, &manual, &guests, &dmAbsent, &session.CreatedAt, &session.UpdatedAt, &session.PollID); err != nil {
 		return session, err
 	}
 	session.Manual, session.DMAbsent = manual != 0, dmAbsent != 0
@@ -1443,7 +1456,7 @@ func (s *SQLiteStore) GetSessionsByCampaignIDs(campaignIDs []string, fromDate st
 
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(args)-1), ",")
 	query := fmt.Sprintf(`
-		SELECT id, campaign_id, date, time, duration, status, timezone, manual, guests, dm_absent, created_at, updated_at
+		SELECT id, campaign_id, date, time, duration, status, timezone, manual, guests, dm_absent, created_at, updated_at, poll_id
 		FROM campaign_sessions
 		WHERE campaign_id IN (%s) AND date >= ?
 		ORDER BY date ASC, time ASC, id ASC
@@ -1474,7 +1487,7 @@ func (s *SQLiteStore) GetUnannouncedConfirmedSessions(fromDate, toDate string) (
 	defer s.mutex.RUnlock()
 
 	rows, err := s.db.Query(`
-		SELECT id, campaign_id, date, time, duration, status, timezone, manual, guests, dm_absent, created_at, updated_at
+		SELECT id, campaign_id, date, time, duration, status, timezone, manual, guests, dm_absent, created_at, updated_at, poll_id
 		FROM campaign_sessions
 		WHERE status = ? AND manual = 0 AND date >= ? AND date <= ?
 		  AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.type = 'session_started' AND n.session_id = campaign_sessions.id)
@@ -1502,7 +1515,7 @@ func (s *SQLiteStore) GetAcceptedConfirmedSessions(userID string) ([]models.Camp
 	defer s.mutex.RUnlock()
 
 	rows, err := s.db.Query(`
-		SELECT s.id, s.campaign_id, s.date, s.time, s.duration, s.status, s.timezone, s.manual, s.guests, s.dm_absent, s.created_at, s.updated_at
+		SELECT s.id, s.campaign_id, s.date, s.time, s.duration, s.status, s.timezone, s.manual, s.guests, s.dm_absent, s.created_at, s.updated_at, s.poll_id
 		FROM campaign_sessions s JOIN session_responses r ON r.session_id = s.id
 		WHERE r.user_id = ? AND r.participation = ? AND s.status = ?
 	`, userID, models.Accepted, models.SessionConfirmed)
@@ -1573,7 +1586,7 @@ func (s *SQLiteStore) GetSessionByID(sessionID string) (*models.CampaignSession,
 	}
 
 	query := `
-		SELECT id, campaign_id, date, time, duration, status, timezone, manual, guests, dm_absent, created_at, updated_at
+		SELECT id, campaign_id, date, time, duration, status, timezone, manual, guests, dm_absent, created_at, updated_at, poll_id
 		FROM campaign_sessions
 		WHERE id = ?
 	`
@@ -1733,23 +1746,156 @@ func (s *SQLiteStore) DeleteSession(sessionID string) error {
 		return fmt.Errorf("only suggested sessions can be deleted")
 	}
 
-	// Delete the session (cascade will handle session_responses)
-	deleteQuery := `DELETE FROM campaign_sessions WHERE id = ?`
-	result, err := s.db.Exec(deleteQuery, sessionID)
+	// Foreign keys are off, so the replies go by hand.
+	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
-
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM session_responses WHERE session_id = ?`, sessionID); err != nil {
+		return err
+	}
+	result, err := tx.Exec(`DELETE FROM campaign_sessions WHERE id = ?`, sessionID)
+	if err != nil {
+		return err
+	}
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return err
 	}
-
 	if rowsAffected == 0 {
 		return fmt.Errorf("session not found")
 	}
+	return tx.Commit()
+}
 
-	return nil
+// DayTakenError means a poll date falls on a day that already holds a planned session.
+type DayTakenError struct{ Date string }
+
+func (e *DayTakenError) Error() string { return "day already has a session: " + e.Date }
+
+// ErrSessionNotSuggested means a session to confirm is no longer a suggestion.
+var ErrSessionNotSuggested = errors.New("session is not suggested")
+
+// CreatePollSessions inserts the dates of a poll in one transaction, refusing the whole poll
+// with a *DayTakenError if any date falls on a day that already has a session.
+func (s *SQLiteStore) CreatePollSessions(sessions []models.CampaignSession) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	now := time.Now().UTC().Format(time.RFC3339)
+	for _, session := range sessions {
+		var n int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM campaign_sessions WHERE campaign_id = ? AND date = ? AND manual = 0 AND status != ?`,
+			session.CampaignID, session.Date, models.SessionCancelled).Scan(&n); err != nil {
+			return err
+		}
+		if n > 0 {
+			return &DayTakenError{Date: session.Date}
+		}
+		session.CreatedAt, session.UpdatedAt = now, now
+		if _, err := tx.Exec(upsertSessionSQL, sessionArgs(session)...); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// GetPollSessions returns every Suggested date of a poll, past ones included.
+func (s *SQLiteStore) GetPollSessions(campaignID, pollID string) ([]models.CampaignSession, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(`
+		SELECT id, campaign_id, date, time, duration, status, timezone, manual, guests, dm_absent, created_at, updated_at, poll_id
+		FROM campaign_sessions
+		WHERE campaign_id = ? AND poll_id = ? AND status = ? AND manual = 0
+		ORDER BY date ASC, time ASC, id ASC
+	`, campaignID, pollID, models.SessionSuggested)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []models.CampaignSession
+	for rows.Next() {
+		session, err := scanSession(rows)
+		if err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, session)
+	}
+	return sessions, rows.Err()
+}
+
+// deletePollDates removes the Suggested dates of a poll (except exceptID, if set) with their replies.
+func deletePollDates(tx *sql.Tx, campaignID, pollID, exceptID string) (int, error) {
+	const where = `campaign_id = ? AND poll_id = ? AND id != ? AND status = 'Suggested' AND manual = 0`
+	if _, err := tx.Exec(`DELETE FROM session_responses WHERE session_id IN (SELECT id FROM campaign_sessions WHERE `+where+`)`,
+		campaignID, pollID, exceptID); err != nil {
+		return 0, err
+	}
+	res, err := tx.Exec(`DELETE FROM campaign_sessions WHERE `+where, campaignID, pollID, exceptID)
+	if err != nil {
+		return 0, err
+	}
+	n, err := res.RowsAffected()
+	return int(n), err
+}
+
+// DeletePoll removes every Suggested date of a poll with its replies and returns how many dates went.
+func (s *SQLiteStore) DeletePoll(campaignID, pollID string) (int, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	n, err := deletePollDates(tx, campaignID, pollID, "")
+	if err != nil {
+		return 0, err
+	}
+	return n, tx.Commit()
+}
+
+// ConfirmSession confirms a Suggested date and, in the same transaction, deletes the other
+// Suggested dates of its poll (past ones too) with their replies.
+func (s *SQLiteStore) ConfirmSession(sessionID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec(`UPDATE campaign_sessions SET status = ?, updated_at = ? WHERE id = ? AND status = ?`,
+		models.SessionConfirmed, time.Now().UTC().Format(time.RFC3339), sessionID, models.SessionSuggested)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return ErrSessionNotSuggested
+	}
+	var campaignID, pollID string
+	if err := tx.QueryRow(`SELECT campaign_id, poll_id FROM campaign_sessions WHERE id = ?`, sessionID).Scan(&campaignID, &pollID); err != nil {
+		return err
+	}
+	if pollID != "" {
+		if _, err := deletePollDates(tx, campaignID, pollID, sessionID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 var (
@@ -1938,16 +2084,18 @@ func (s *SQLiteStore) CountPendingSignupsForDM(dmID string) (map[string]int, err
 	return counts, rows.Err()
 }
 
-// GetUnansweredSessions returns, per campaign, upcoming suggested sessions the user has not responded to.
-func (s *SQLiteStore) GetUnansweredSessions(userID, fromDate string) (map[string]models.UnansweredSessions, error) {
+// GetUnansweredSessions returns the Suggested dates dated fromDate or later that the user has not
+// replied to. Callers filter by start time and group by poll.
+func (s *SQLiteStore) GetUnansweredSessions(userID, fromDate string) ([]models.CampaignSession, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	rows, err := s.db.Query(
-		`SELECT s.campaign_id, COUNT(*), MIN(s.date) FROM campaign_sessions s
-		WHERE s.status = ? AND s.date >= ?
+	rows, err := s.db.Query(`
+		SELECT s.id, s.campaign_id, s.date, s.time, s.duration, s.status, s.timezone, s.manual, s.guests, s.dm_absent, s.created_at, s.updated_at, s.poll_id
+		FROM campaign_sessions s
+		WHERE s.status = ? AND s.manual = 0 AND s.date >= ?
 		AND NOT EXISTS (SELECT 1 FROM session_responses r WHERE r.session_id = s.id AND r.user_id = ?)
-		GROUP BY s.campaign_id`,
+		ORDER BY s.date ASC, s.time ASC, s.id ASC`,
 		models.SessionSuggested, fromDate, userID,
 	)
 	if err != nil {
@@ -1955,16 +2103,15 @@ func (s *SQLiteStore) GetUnansweredSessions(userID, fromDate string) (map[string
 	}
 	defer rows.Close()
 
-	result := map[string]models.UnansweredSessions{}
+	var sessions []models.CampaignSession
 	for rows.Next() {
-		var campaignID string
-		var u models.UnansweredSessions
-		if err := rows.Scan(&campaignID, &u.Count, &u.FirstDate); err != nil {
+		session, err := scanSession(rows)
+		if err != nil {
 			return nil, err
 		}
-		result[campaignID] = u
+		sessions = append(sessions, session)
 	}
-	return result, rows.Err()
+	return sessions, rows.Err()
 }
 
 // SetCampaignSignUpsOpen manually opens or closes a campaign's sign-ups.

@@ -8,7 +8,8 @@ const (
 	SessionCancelled SessionStatus = "Cancelled"
 )
 
-// UnansweredSessions summarises upcoming suggested sessions a user has not responded to in one campaign.
+// UnansweredSessions summarises the polls in one campaign with an upcoming date the user has not
+// responded to: Count is the number of polls, FirstDate the earliest such date.
 type UnansweredSessions struct {
 	Count     int
 	FirstDate string
@@ -26,6 +27,7 @@ type CampaignSession struct {
 	DeclinedCount            int                 `json:"declined_count,omitempty"`
 	TentativeCount           int                 `json:"tentative_count,omitempty"`
 	PendingCount             int                 `json:"pending_count,omitempty"`
+	PollID                   string              `json:"poll_id"`             // ties the suggested dates of one poll together
 	Manual                   bool                `json:"manual,omitempty"`    // recorded by hand by the DM, chronicle only
 	Guests                   []string            `json:"guests,omitempty"`    // names of non-members who attended a manual session
 	DMAbsent                 bool                `json:"dm_absent,omitempty"` // the DM missed a manual session

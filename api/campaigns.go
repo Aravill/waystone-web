@@ -104,6 +104,40 @@ func sessionSortInstant(s models.CampaignSession) time.Time {
 	return d
 }
 
+// unansweredPolls counts, per campaign, the polls with an upcoming date (start not yet passed) the user
+// has not replied to. A poll without an id (never expected) counts by its own session id.
+func unansweredPolls(userID string, now time.Time) (map[string]models.UnansweredSessions, error) {
+	// Dates are filtered by start time below; a day back covers every timezone.
+	sessions, err := db.GetUnansweredSessions(userID, now.UTC().AddDate(0, 0, -1).Format("2006-01-02"))
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]models.UnansweredSessions{}
+	polls := map[string]bool{}
+	for _, session := range sessions {
+		if session.Manual {
+			continue
+		}
+		if start, ok := sessionStart(session); !ok || !start.After(now) {
+			continue
+		}
+		pollID := session.PollID
+		if pollID == "" {
+			pollID = session.ID
+		}
+		u := result[session.CampaignID]
+		if key := session.CampaignID + "/" + pollID; !polls[key] {
+			polls[key] = true
+			u.Count++
+		}
+		if u.FirstDate == "" || session.Date < u.FirstDate {
+			u.FirstDate = session.Date
+		}
+		result[session.CampaignID] = u
+	}
+	return result, nil
+}
+
 // campaignViewer holds everything needed to enrich campaigns for one viewer.
 type campaignViewer struct {
 	userID         string
@@ -140,7 +174,7 @@ func loadCampaignViewer(r *http.Request, campaigns []models.Campaign) (*campaign
 	if v.pendingSignups, err = db.CountPendingSignupsForDM(v.userID); err != nil {
 		return nil, "failed to retrieve game counts"
 	}
-	if v.unanswered, err = db.GetUnansweredSessions(v.userID, time.Now().UTC().Format("2006-01-02")); err != nil {
+	if v.unanswered, err = unansweredPolls(v.userID, time.Now()); err != nil {
 		return nil, "failed to retrieve game counts"
 	}
 	if v.sessions, err = campaignSessionSummaries(campaigns); err != nil {
@@ -494,6 +528,10 @@ func upcomingSessions(campaign *models.Campaign, v *campaignViewer) ([]upcomingS
 		}
 		start, ok := sessionStart(session)
 		if !ok || !start.Add(time.Duration(session.Duration)*time.Minute).After(now) {
+			continue
+		}
+		// A suggestion whose start has passed has dropped out of its poll.
+		if session.Status == models.SessionSuggested && !start.After(now) {
 			continue
 		}
 		live = append(live, session)
