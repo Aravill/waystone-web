@@ -963,6 +963,7 @@ button.wikilink {
 }
 
 .cx-pager .text-link:disabled {
+    border: none;
     color: var(--muted);
     text-decoration: none;
     cursor: default;
