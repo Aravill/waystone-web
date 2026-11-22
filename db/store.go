@@ -66,6 +66,10 @@ type Store interface {
 	ConfirmSession(sessionID string) error
 	GetPollReminderCandidates(fromDate, toDate string) ([]models.CampaignSession, error)
 	GetPollReminderUserIDs(pollIDs []string) (map[string]map[string]bool, error)
+	GetPollSchedule(campaignID string) (*models.PollSchedule, error)
+	GetPollSchedules() ([]models.PollSchedule, error)
+	SavePollSchedule(schedule models.PollSchedule) error
+	DeletePollSchedule(campaignID string) error
 	SetCampaignSignupStatus(campaignID, userID string, status models.SignupStatus) error
 	WithdrawCampaignSignup(campaignID, userID string) (wasPlayer bool, err error)
 	SetCampaignSignUpsOpen(campaignID string, open bool) error

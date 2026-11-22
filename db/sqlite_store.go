@@ -156,6 +156,18 @@ func (s *SQLiteStore) initSchema() error {
 		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
 
+	CREATE TABLE IF NOT EXISTS poll_schedules (
+		campaign_id TEXT PRIMARY KEY,
+		every_weeks INTEGER NOT NULL,
+		lead_days INTEGER NOT NULL,
+		timezone TEXT NOT NULL,
+		slots TEXT NOT NULL,
+		next_cycle INTEGER NOT NULL DEFAULT 1,
+		paused INTEGER NOT NULL DEFAULT 0,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	);
+
 	CREATE TABLE IF NOT EXISTS campaign_follows (
 		campaign_id TEXT NOT NULL,
 		user_id TEXT NOT NULL,
@@ -2220,6 +2232,9 @@ func (s *SQLiteStore) DeleteCampaign(id string) error {
 	if _, err := tx.Exec(`DELETE FROM notifications WHERE campaign_id = ?`, id); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`DELETE FROM poll_schedules WHERE campaign_id = ?`, id); err != nil {
+		return err
+	}
 	res, err := tx.Exec(`DELETE FROM campaigns WHERE id = ?`, id)
 	if err != nil {
 		return err
@@ -2915,4 +2930,83 @@ func (s *SQLiteStore) GetPollReminderUserIDs(pollIDs []string) (map[string]map[s
 		result[pollID][userID] = true
 	}
 	return result, rows.Err()
+}
+
+const pollScheduleColumns = `campaign_id, every_weeks, lead_days, timezone, slots, next_cycle, paused, created_at, updated_at`
+
+func scanPollSchedule(row interface{ Scan(...interface{}) error }) (*models.PollSchedule, error) {
+	var sc models.PollSchedule
+	var slots string
+	var paused int
+	if err := row.Scan(&sc.CampaignID, &sc.EveryWeeks, &sc.LeadDays, &sc.Timezone, &slots, &sc.NextCycle, &paused, &sc.CreatedAt, &sc.UpdatedAt); err != nil {
+		return nil, err
+	}
+	sc.Paused = paused == 1
+	if err := json.Unmarshal([]byte(slots), &sc.Slots); err != nil {
+		return nil, err
+	}
+	return &sc, nil
+}
+
+// GetPollSchedule returns a game's repeating-poll schedule, or nil if it has none.
+func (s *SQLiteStore) GetPollSchedule(campaignID string) (*models.PollSchedule, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	sc, err := scanPollSchedule(s.db.QueryRow(`SELECT `+pollScheduleColumns+` FROM poll_schedules WHERE campaign_id = ?`, campaignID))
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return sc, err
+}
+
+func (s *SQLiteStore) GetPollSchedules() ([]models.PollSchedule, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(`SELECT ` + pollScheduleColumns + ` FROM poll_schedules ORDER BY campaign_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.PollSchedule
+	for rows.Next() {
+		sc, err := scanPollSchedule(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *sc)
+	}
+	return out, rows.Err()
+}
+
+// SavePollSchedule inserts or replaces a game's schedule, keeping its original created_at.
+func (s *SQLiteStore) SavePollSchedule(sc models.PollSchedule) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	slots, err := json.Marshal(sc.Slots)
+	if err != nil {
+		return err
+	}
+	paused := 0
+	if sc.Paused {
+		paused = 1
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err = s.db.Exec(`
+		INSERT INTO poll_schedules (`+pollScheduleColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(campaign_id) DO UPDATE SET every_weeks = excluded.every_weeks, lead_days = excluded.lead_days,
+			timezone = excluded.timezone, slots = excluded.slots, next_cycle = excluded.next_cycle,
+			paused = excluded.paused, updated_at = excluded.updated_at
+	`, sc.CampaignID, sc.EveryWeeks, sc.LeadDays, sc.Timezone, string(slots), sc.NextCycle, paused, now, now)
+	return err
+}
+
+func (s *SQLiteStore) DeletePollSchedule(campaignID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	_, err := s.db.Exec(`DELETE FROM poll_schedules WHERE campaign_id = ?`, campaignID)
+	return err
 }

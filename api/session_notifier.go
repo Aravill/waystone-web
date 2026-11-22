@@ -11,12 +11,13 @@ import (
 // StartSessionStartNotifier tells a game's players and followers when a confirmed session
 // begins. It runs once now and then every minute until ctx is done. The notifications table
 // is the dedupe (one session_started row per session), so a restart never repeats one.
-// The DM is deliberately not notified. It also runs remindOpenPolls. Errors are logged, never fatal.
+// The DM is deliberately not notified. It also runs remindOpenPolls and postDuePolls. Errors are logged, never fatal.
 func StartSessionStartNotifier(ctx context.Context) {
 	go func() {
 		now := time.Now()
 		notifyStartedSessions(now)
 		remindOpenPolls(now)
+		postDuePolls(now)
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
 		for {
@@ -26,6 +27,7 @@ func StartSessionStartNotifier(ctx context.Context) {
 			case now := <-ticker.C:
 				notifyStartedSessions(now)
 				remindOpenPolls(now)
+				postDuePolls(now)
 			}
 		}
 	}()
