@@ -35,6 +35,8 @@ window.gamePage = function () {
         confirmDialog: { open: false, title: '', message: '', confirmLabel: '', resolve: null },
         picker: { open: false, loading: false, busy: false, characters: [], selected: '', creating: false, form: { name: '' }, error: '' },
         noteDlg: { open: false, text: '', error: '', busy: false }, // a quick note for the game's codex
+        schedule: null, // the game's repeating poll (DM only)
+        ...repeatDialogMixin(),
 
         async init() {
             try {
@@ -56,6 +58,7 @@ window.gamePage = function () {
             window.addEventListener('resize', () => this.measureTale());
             document.addEventListener('keydown', (event) => this.onNoteKey(event));
             await this.load();
+            this.loadSchedule();
             if (new URLSearchParams(location.search).get('updated') === '1') {
                 this.showMessage('Game updated', 'success');
                 history.replaceState(null, '', location.pathname);
@@ -505,6 +508,74 @@ window.gamePage = function () {
         },
         addDateUrl(pollId) {
             return `/games/${encodeURIComponent(this.campaign.id)}/calendar?add=${encodeURIComponent(pollId)}`;
+        },
+
+        // ---- Repeating poll (DM): the schedule line under the panel ----
+        async loadSchedule() {
+            if (!this.isDM) {
+                this.schedule = null;
+                return;
+            }
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.campaign.id)}/poll-schedule`);
+                const data = await response.json();
+                if (response.ok) this.schedule = data.schedule;
+            } catch (error) {
+                console.error('Failed to load the repeating poll:', error);
+            }
+        },
+        // The dialog saved: a schedule can post a poll at once, so the game reloads too.
+        async repeatSaved(schedule) {
+            this.schedule = schedule;
+            await this.load();
+        },
+        async togglePauseSchedule() {
+            const sc = this.schedule;
+            if (this.busy || !sc) return;
+            this.busy = true;
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.campaign.id)}/poll-schedule`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ every_weeks: sc.every_weeks, lead_days: sc.lead_days, paused: !sc.paused })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to change the repeating poll', 'error');
+                    return;
+                }
+                this.schedule = data.schedule;
+                this.showMessage(data.schedule.paused ? 'Repeating poll paused' : 'Repeating poll resumed', 'success');
+                if (!data.schedule.paused) await this.load();
+            } catch (error) {
+                this.showMessage('Error: ' + error.message, 'error');
+            } finally {
+                this.busy = false;
+            }
+        },
+        async stopSchedule() {
+            if (this.busy || !this.schedule) return;
+            const ok = await this.askConfirm({
+                title: 'Stop repeating',
+                message: 'Stop the repeating poll? Polls already posted stay.',
+                confirmLabel: 'Stop repeating'
+            });
+            if (!ok) return;
+            this.busy = true;
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(this.campaign.id)}/poll-schedule`, { method: 'DELETE' });
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    this.showMessage(data.error || 'Failed to stop the repeating poll', 'error');
+                    return;
+                }
+                this.schedule = null;
+                this.showMessage('Repeating poll stopped', 'success');
+            } catch (error) {
+                this.showMessage('Error: ' + error.message, 'error');
+            } finally {
+                this.busy = false;
+            }
         },
 
         startRecording() {

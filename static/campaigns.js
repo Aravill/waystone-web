@@ -427,6 +427,107 @@ function sessionRoster(s, currentUserId) {
         .sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
 }
 
+// Repeating polls: the DM turns an open poll into a schedule (/api/campaigns/{id}/poll-schedule).
+// Shared by the calendar and game pages; each page has the same #repeatDialog markup, a showMessage method,
+// and may define repeatSaved(schedule) to refresh after a save.
+
+// "every week", "every 3 weeks"
+function repeatEveryLabel(weeks) {
+    return weeks === 1 ? 'every week' : `every ${weeks} weeks`;
+}
+
+// "Fri 19:00 · Sat 14:00", or with ends and the zone "Fri 19:00–23:00 · Sat 14:00–19:00 CET". slots: {date, time, duration}.
+function repeatPatternLabel(slots, timezone, full) {
+    const parts = (slots || []).map((s) => {
+        const day = parseDateLocal(s.date).toLocaleDateString('en-US', { weekday: 'short' });
+        return `${day} ${s.time}${full ? '–' + getSessionEndTime(s) : ''}`;
+    });
+    const zone = full && slots?.length ? zoneAbbr(timezone, slots[0].date) : '';
+    return parts.join(' · ') + (zone ? ' ' + zone : '');
+}
+
+// "New poll every week: Fri 19:00 · Sat 14:00. Next posted Mon, Dec 1."
+function repeatLine(schedule) {
+    if (schedule.paused) return 'Repeating poll paused.';
+    const next = schedule.next_post_at ? new Date(schedule.next_post_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+    return `New poll ${repeatEveryLabel(schedule.every_weeks)}: ${repeatPatternLabel(schedule.slots, schedule.timezone)}.` + (next ? ` Next posted ${next}.` : '');
+}
+
+// State and methods for the Repeat dialog; spread into a page component as ...repeatDialogMixin().
+function repeatDialogMixin() {
+    return {
+        repeat: { open: false, campaignId: '', pollId: '', slots: [], timezone: '', every: 1, lead: 14, existing: null, edit: false, busy: false, error: '' },
+
+        repeatLeadOptions() {
+            return [...new Set([7, 10, 14, 21, 28, this.repeat.lead])].sort((a, b) => a - b);
+        },
+        repeatPattern() {
+            return repeatPatternLabel(this.repeat.slots, this.repeat.timezone, true);
+        },
+        repeatReplaces() {
+            return this.repeat.existing ? `${repeatEveryLabel(this.repeat.existing.every_weeks)}, ${repeatPatternLabel(this.repeat.existing.slots, this.repeat.existing.timezone)}` : '';
+        },
+
+        // From an open poll's card: dates are its upcoming dates.
+        async openRepeat(campaignId, pollId, dates) {
+            if (!dates?.length) return;
+            let existing = null;
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/poll-schedule`);
+                const data = await response.json();
+                if (!response.ok) {
+                    this.showMessage(data.error || 'Failed to load the repeating poll', 'error');
+                    return;
+                }
+                existing = data.schedule;
+            } catch (error) {
+                this.showMessage('Error loading the repeating poll: ' + error.message, 'error');
+                return;
+            }
+            const slots = dates.map((d) => ({ date: d.date, time: d.time, duration: Number(d.duration) || 240 }));
+            this.repeat = { open: true, campaignId, pollId, slots, timezone: dates[0].timezone || '', every: 1, lead: 14, existing, edit: false, busy: false, error: '' };
+            this.$nextTick(() => document.querySelector('#repeatDialog select')?.focus());
+        },
+        // From the game panel line: change the numbers only.
+        openRepeatEdit(campaignId, schedule) {
+            this.repeat = { open: true, campaignId, pollId: '', slots: schedule.slots, timezone: schedule.timezone, every: schedule.every_weeks, lead: schedule.lead_days, existing: schedule, edit: true, busy: false, error: '' };
+            this.$nextTick(() => document.querySelector('#repeatDialog select')?.focus());
+        },
+        closeRepeat() {
+            if (!this.repeat.busy) this.repeat.open = false;
+        },
+        async saveRepeat() {
+            const r = this.repeat;
+            if (r.busy) return;
+            r.busy = true;
+            r.error = '';
+            const body = { every_weeks: r.every, lead_days: r.lead };
+            if (r.edit) body.paused = !!r.existing?.paused;
+            else body.poll_id = r.pollId;
+            try {
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(r.campaignId)}/poll-schedule`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    const msg = data.error || 'Failed to save the repeating poll';
+                    r.error = msg.charAt(0).toUpperCase() + msg.slice(1) + (msg.endsWith('.') ? '' : '.');
+                    return;
+                }
+                r.open = false;
+                this.showMessage(r.edit ? 'Repeating poll updated' : 'Repeating poll on', 'success');
+                if (this.repeatSaved) await this.repeatSaved(data.schedule);
+            } catch (error) {
+                r.error = 'Error: ' + error.message;
+            } finally {
+                r.busy = false;
+            }
+        },
+    };
+}
+
 // Campaigns Alpine component
 window.campaignsPage = function () {
     return {

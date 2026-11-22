@@ -105,7 +105,7 @@
                     location.href = '/games/' + encodeURIComponent(n.campaign_id);
                 } else if (n.campaign_id && n.type === 'signup_accepted' && (n.data || {}).characters) {
                     location.href = '/games/' + encodeURIComponent(n.campaign_id) + '?character=1';
-                } else if (n.campaign_id && (n.data || {}).date && ['session_suggested', 'poll_reminder', 'poll_complete'].includes(n.type)) {
+                } else if (n.campaign_id && (n.data || {}).date && ['session_suggested', 'poll_reminder', 'poll_complete', 'poll_posted', 'poll_skipped'].includes(n.type)) {
                     // A poll or suggestion: the calendar, on the month of its first date
                     location.href = '/games/' + encodeURIComponent(n.campaign_id) + '/calendar?date=' + encodeURIComponent(n.data.date);
                 } else if (n.campaign_id) {
@@ -180,6 +180,12 @@
                         return count > 1
                             ? `Everyone has replied to the poll for "${title}"`
                             : `Everyone has replied to the session suggested for "${title}" on ${when}`;
+                    case 'poll_posted':
+                        return `Your repeating poll for "${title}" was posted: ${dayList}`;
+                    case 'poll_skipped':
+                        return d.reason === 'cap'
+                            ? `No poll was posted for "${title}": the game has reached its limit of 999 sessions`
+                            : `No poll was posted for "${title}": ${dayList} ${count === 1 ? 'already has a session' : 'already have sessions'}`;
                     case 'signup_created':
                         return `${actor} signed up for "${title}"`;
                     case 'player_left':

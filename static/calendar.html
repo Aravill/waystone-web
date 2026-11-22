@@ -6,7 +6,7 @@
     <title>Waystone - Calendar</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=8"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=79">
+    <link rel="stylesheet" href="/static/styles.css?v=80">
     <link rel="stylesheet" href="/static/notifications.css?v=10">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -225,6 +225,7 @@
                                             <div class="poll-card-foot panel-dm-actions" x-show="isCurrentUserDM && g.poll">
                                                 <div class="session-actions">
                                                     <button type="button" class="btn-action" @click="addPollDate(g.poll)">+ Add a date</button>
+                                                    <button type="button" class="btn-action" @click="openRepeat(currentCampaignId, g.poll.id, g.poll.dates)">Repeat…</button>
                                                     <button type="button" class="btn-action btn-action-cancel" x-show="g.poll?.multi" @click="requestPollWithdraw(g.poll)">Withdraw poll</button>
                                                 </div>
                                                 <p class="session-status-warning" x-show="g.poll && pendingPollWithdraw === g.poll.id" x-text="g.poll ? getPollWithdrawWarning(g.poll) : ''"></p>
@@ -302,8 +303,48 @@
         </div>
     </div>
 
-    <script src="/static/notifications.js?v=12"></script>
-    <script src="/campaigns.js?v=65"></script>
-    <script src="/static/calendar.js?v=4"></script>
+    <!-- Repeat dialog -->
+    <div id="repeatDialog" class="modal repeat-modal" :class="{ 'modal-open': repeat.open }" role="dialog" aria-modal="true" aria-labelledby="repeatDialogTitle" @click.self="closeRepeat()" @keydown.escape.window="repeat.open && closeRepeat()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title-block"><p class="modal-eyebrow" x-text="currentCampaignTitle"></p>
+                <h2 id="repeatDialogTitle" x-text="repeat.edit ? 'Edit repeating poll' : 'Repeat this poll'"></h2></div>
+                <button type="button" class="modal-close" aria-label="Close" @click="closeRepeat()">&times;</button>
+            </div>
+            <form @submit.prevent="saveRepeat()" class="modal-form">
+                <div class="form-group">
+                    <label for="repeatEvery">Every</label>
+                    <select id="repeatEvery" @change="repeat.every = Number($event.target.value)">
+                        <template x-for="n in [1, 2, 3, 4]" :key="n">
+                            <option :value="n" :selected="n === repeat.every" x-text="n === 1 ? 'week' : n + ' weeks'"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="repeatLead">Post</label>
+                    <select id="repeatLead" @change="repeat.lead = Number($event.target.value)">
+                        <template x-for="n in repeatLeadOptions()" :key="n">
+                            <option :value="n" :selected="n === repeat.lead" x-text="n + ' days ahead'"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="form-group" x-show="!repeat.edit">
+                    <span class="repeat-pattern-label">Pattern</span>
+                    <p class="repeat-pattern" x-text="repeatPattern()"></p>
+                    <span class="form-hint">This is the poll's current dates. Confirming a date removes the others, so set the dates up before you confirm.</span>
+                </div>
+                <p class="form-hint" x-show="repeat.existing && !repeat.edit" x-text="'This replaces the current schedule: ' + repeatReplaces() + '.'"></p>
+                <p class="poll-error" role="alert" x-show="repeat.error" x-text="repeat.error"></p>
+                <div class="modal-actions">
+                    <button type="submit" class="btn-create" :disabled="repeat.busy" x-text="repeat.edit ? 'Save' : 'Repeat'"></button>
+                    <button type="button" class="btn-cancel" :disabled="repeat.busy" @click="closeRepeat()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/notifications.js?v=13"></script>
+    <script src="/campaigns.js?v=66"></script>
+    <script src="/static/calendar.js?v=5"></script>
 </body>
 </html>

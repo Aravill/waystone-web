@@ -46,6 +46,7 @@ window.calendarPage = function () {
         hoverPollId: '',
         hoverDay: '',
         pendingPollWithdraw: '',
+        ...repeatDialogMixin(),
         sessionsMonth: '',
         sessionsLoadSeq: 0,
 
@@ -234,6 +235,11 @@ window.calendarPage = function () {
         async refresh() {
             await Promise.all([this.loadSessions(), this.refreshCampaign()]);
             await this.loadDayResponses();
+        },
+
+        // The Repeat dialog saved: a schedule can post a poll at once.
+        async repeatSaved() {
+            await this.refresh();
         },
 
         // Open polls from the game's upcoming Suggested dates. Letters (A, B, ...) go to polls of several dates
