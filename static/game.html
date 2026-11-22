@@ -62,6 +62,7 @@
                                     <img class="campaign-system-logo" :src="campaign.system_logo_url" :alt="campaign.system" :title="campaign.system">
                                 </template>
                                 <span class="game-kind" x-show="campaign.codex"><span>Codex: </span><a x-show="campaign.codex && campaign.codex.can_open" :href="campaign.codex ? '/codices/c/' + encodeURIComponent(campaign.codex.id) : '#'" x-text="campaign.codex ? campaign.codex.name : ''"></a><span x-show="!(campaign.codex && campaign.codex.can_open)" x-text="campaign.codex ? campaign.codex.name : ''"></span> <button type="button" class="text-link" x-show="canNote" aria-keyshortcuts="N" title="Quick note (N)" @click="openNote()">Quick note</button></span>
+                                <span class="game-kind" x-show="campaign.discord_channel" x-text="campaign.discord_channel ? 'Discord: posts to #' + campaign.discord_channel.name : ''"></span>
                                 <span class="campaign-status-badge" x-text="campaign.status"></span>
                             </div>
                             <h1 class="page-title game-title" x-text="campaign.title"></h1>
@@ -575,7 +576,7 @@
         </div>
     </div>
 
-    <script src="/static/notifications.js?v=14"></script>
+    <script src="/static/notifications.js?v=15"></script>
     <script src="/campaigns.js?v=66"></script>
     <script src="/static/characters.js?v=3"></script>
     <script src="/static/game.js?v=16"></script>

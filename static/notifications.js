@@ -137,7 +137,9 @@
                 }
                 if (n.type === 'character_status' && (n.data || {}).character_id) {
                     location.href = '/characters/' + encodeURIComponent(n.data.character_id);
-                } else if (n.campaign_id && (n.type === 'session_started' || n.type === 'character_assigned' || n.type === 'character_cleared')) {
+                } else if (n.type === 'discord_channel_lost') {
+                    location.href = '/admin/discord';
+                } else if (n.campaign_id && (n.type === 'session_started' || n.type === 'session_reminder' || n.type === 'character_assigned' || n.type === 'character_cleared')) {
                     location.href = '/games/' + encodeURIComponent(n.campaign_id);
                 } else if (n.campaign_id && n.type === 'signup_accepted' && (n.data || {}).characters) {
                     location.href = '/games/' + encodeURIComponent(n.campaign_id) + '?character=1';
@@ -188,6 +190,7 @@
                 return new Date(y, m - 1, day).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
             },
 
+            // Keep in step with discordText in api/discord_text.go (and openItem with discordLink).
             message(n) {
                 const d = n.data || {};
                 const count = parseInt(d.count, 10) || 1;
@@ -247,6 +250,10 @@
                         return `${actor} marked ${d.character_name} as ${d.to_status}`;
                     case 'session_confirmed':
                         return `${actor} confirmed the session for "${title}" on ${when}`;
+                    case 'session_reminder':
+                        return `Reminder: the session of "${title}" is on ${when}`;
+                    case 'discord_channel_lost':
+                        return `The Discord channel of "${title}" is gone. Pick another in Admin › Discord`;
                     default:
                         return `Update for "${title}"`;
                 }

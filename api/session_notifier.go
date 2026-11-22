@@ -11,11 +11,13 @@ import (
 // StartSessionStartNotifier tells a game's players and followers when a confirmed session
 // begins. It runs once now and then every minute until ctx is done. The notifications table
 // is the dedupe (one session_started row per session), so a restart never repeats one.
-// The DM is deliberately not notified. It also runs remindOpenPolls and postDuePolls. Errors are logged, never fatal.
+// The DM is deliberately not notified. It also runs remindUpcomingSessions, remindOpenPolls and
+// postDuePolls. Errors are logged, never fatal.
 func StartSessionStartNotifier(ctx context.Context) {
 	go func() {
 		now := time.Now()
 		notifyStartedSessions(now)
+		remindUpcomingSessions(now)
 		remindOpenPolls(now)
 		postDuePolls(now)
 		ticker := time.NewTicker(time.Minute)
@@ -26,6 +28,7 @@ func StartSessionStartNotifier(ctx context.Context) {
 				return
 			case now := <-ticker.C:
 				notifyStartedSessions(now)
+				remindUpcomingSessions(now)
 				remindOpenPolls(now)
 				postDuePolls(now)
 			}
@@ -64,6 +67,69 @@ func notifyStartedSessions(now time.Time) {
 			"time":     session.Time,
 			"timezone": session.Timezone,
 		})
+	}
+}
+
+// sessionReminderLead is how long before a session's start its reminder goes out.
+const sessionReminderLead = 24 * time.Hour
+
+// remindUpcomingSessions sends a session_reminder 24 hours before each Confirmed, non-manual
+// session of a running game, to its players and followers (not the DM), and queues one channel
+// post. A session confirmed less than 24 hours before it starts gets none: the confirmation was
+// the notice. The notifications table is the dedupe; when nobody is notified, a row with an empty
+// user_id marks the session as done.
+func remindUpcomingSessions(now time.Time) {
+	utc := now.UTC()
+	candidates, err := db.GetUnremindedConfirmedSessions(
+		utc.AddDate(0, 0, -1).Format("2006-01-02"),
+		utc.AddDate(0, 0, 2).Format("2006-01-02"),
+	)
+	if err != nil {
+		log.Printf("session reminder: %v", err)
+		return
+	}
+	campaigns := map[string]*models.Campaign{}
+	for _, session := range candidates {
+		if session.Manual {
+			continue
+		}
+		start, ok := sessionStart(session)
+		if !ok || now.Before(start.Add(-sessionReminderLead)) || !now.Before(start) {
+			continue
+		}
+		if confirmed, ok := parseStoredTime(session.UpdatedAt); ok && confirmed.After(start.Add(-sessionReminderLead)) {
+			continue
+		}
+		campaign, seen := campaigns[session.CampaignID]
+		if !seen {
+			if campaign, err = db.GetCampaignByID(session.CampaignID); err != nil {
+				log.Printf("session reminder: campaign %s: %v", session.CampaignID, err)
+			}
+			campaigns[session.CampaignID] = campaign
+		}
+		if campaign == nil || campaign.Status == models.Finished || campaign.Status == models.Cancelled {
+			continue
+		}
+		data := map[string]string{"date": session.Date, "time": session.Time, "timezone": session.Timezone}
+		n := notify("", withoutID(campaignFollowerIDs(campaign), campaign.DM), models.NotificationSessionReminder, campaign, session.ID, data)
+		if n < 0 {
+			continue // try again next minute
+		}
+		if n == 0 {
+			marker := models.Notification{
+				ID:         db.GenerateUUID(),
+				Type:       models.NotificationSessionReminder,
+				CampaignID: campaign.ID,
+				SessionID:  session.ID,
+				Data:       data,
+				CreatedAt:  now.UTC().Format(time.RFC3339),
+			}
+			if err := db.CreateNotifications([]models.Notification{marker}); err != nil {
+				log.Printf("session reminder marker: %v", err)
+				continue
+			}
+		}
+		postSessionReminder(campaign, session)
 	}
 }
 
@@ -191,15 +257,24 @@ func pollPostedAt(dates []models.CampaignSession) (time.Time, bool) {
 	var earliest time.Time
 	found := false
 	for _, d := range dates {
-		t, err := time.Parse(time.RFC3339, d.CreatedAt)
-		if err != nil {
-			if t, err = time.Parse("2006-01-02 15:04:05", d.CreatedAt); err != nil {
-				continue
-			}
+		t, ok := parseStoredTime(d.CreatedAt)
+		if !ok {
+			continue
 		}
 		if !found || t.Before(earliest) {
 			earliest, found = t, true
 		}
 	}
 	return earliest, found
+}
+
+// parseStoredTime reads a stored timestamp: RFC3339 or SQLite's "2006-01-02 15:04:05" (UTC).
+func parseStoredTime(v string) (time.Time, bool) {
+	if t, err := time.Parse(time.RFC3339, v); err == nil {
+		return t, true
+	}
+	if t, err := time.Parse("2006-01-02 15:04:05", v); err == nil {
+		return t, true
+	}
+	return time.Time{}, false
 }

@@ -24,7 +24,13 @@ module.exports = defineConfig({
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
     },
   ],
-  webServer: {
+  webServer: [
+    {
+      command: 'node e2e/fake-discord.js',
+      url: `http://localhost:${env.DISCORD_PORT}/_health`,
+      reuseExistingServer: false,
+    },
+    {
     command: 'node e2e/serve.js',
     url: `http://localhost:${env.PORT}/login.html`,
     reuseExistingServer: false,
@@ -37,6 +43,12 @@ module.exports = defineConfig({
       SEED_DEMO_DATA: '1',
       BACKUP_DIR: '',
       TRUST_PROXY: '',
+      DISCORD_BOT_TOKEN: 'e2e-bot-token',
+      DISCORD_CLIENT_ID: 'e2e-client',
+      DISCORD_CLIENT_SECRET: 'e2e-secret',
+      PUBLIC_URL: `http://localhost:${env.PORT}`,
+      DISCORD_API_BASE: `http://localhost:${env.DISCORD_PORT}`,
     },
-  },
+    },
+  ],
 });

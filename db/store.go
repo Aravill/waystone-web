@@ -40,6 +40,24 @@ type Store interface {
 	GetSessionsByCampaignIDs(campaignIDs []string, fromDate string) ([]models.CampaignSession, error)
 	GetAcceptedConfirmedSessions(userID string) ([]models.CampaignSession, error)
 	GetUnannouncedConfirmedSessions(fromDate, toDate string) ([]models.CampaignSession, error)
+	GetUnremindedConfirmedSessions(fromDate, toDate string) ([]models.CampaignSession, error)
+	GetDiscordSettings() (models.DiscordSettings, error)
+	SaveDiscordSettings(s models.DiscordSettings) (cleared int, err error)
+	SetCampaignDiscordChannel(campaignID, channelID, channelName string) error
+	ClearLostDiscordChannel(campaignID, channelID string) (bool, error)
+	GetDiscordLink(userID string) (*models.DiscordLink, error)
+	SaveDiscordLink(userID, discordUserID, username string) error
+	GetDiscordLinksForUsers(userIDs []string) (map[string]models.DiscordLink, error)
+	SetDiscordToggles(userID string, sessions, signups, characters bool) error
+	DeleteDiscordLink(userID string) error
+	SetDiscordDMChannel(userID, channelID string) error
+	SetDiscordDMError(userID, msg string) error
+	EnqueueDiscord(rows []models.DiscordOutboxRow) error
+	NextDiscordOutbox(now string) (*models.DiscordOutboxRow, error)
+	DeleteDiscordOutbox(id int64) error
+	UpdateDiscordOutbox(id int64, status string, attempts int, nextAttemptAt, lastError string) error
+	PruneDiscordOutbox(failedBefore string) error
+	GetDiscordOutboxSummary(limit int) (queued int, failures []models.DiscordOutboxRow, err error)
 	GetCalendarToken(userID string) (string, error)
 	SetCalendarToken(userID, token string) error
 	GetUserIDByCalendarToken(token string) (string, error)

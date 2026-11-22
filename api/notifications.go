@@ -25,7 +25,9 @@ func campaignFollowerIDs(c *models.Campaign) []string {
 // notify stores one notification per recipient, skipping "", duplicates and the actor.
 // Errors are logged, never returned: notifications must not fail the main action.
 // campaign may be nil for notifications that belong to no game.
-func notify(actorID string, recipients []string, typ models.NotificationType, campaign *models.Campaign, sessionID string, data map[string]string) {
+// It returns how many notifications were written (0 when there was nobody to tell, -1 when the
+// write failed). After the inbox rows it queues Discord DMs for recipients who linked Discord.
+func notify(actorID string, recipients []string, typ models.NotificationType, campaign *models.Campaign, sessionID string, data map[string]string) int {
 	now := time.Now().UTC().Format(time.RFC3339)
 	seen := map[string]bool{}
 	var batch []models.Notification
@@ -54,11 +56,14 @@ func notify(actorID string, recipients []string, typ models.NotificationType, ca
 		})
 	}
 	if len(batch) == 0 {
-		return
+		return 0
 	}
 	if err := db.CreateNotifications(batch); err != nil {
 		log.Printf("notify %s: %v", typ, err)
+		return -1
 	}
+	queueDiscordDMs(actorID, typ, batch)
+	return len(batch)
 }
 
 // notifySessionChange notifies the campaign's followers about a session event.
@@ -75,6 +80,12 @@ func notifySessionChange(actorID string, campaign *models.Campaign, session mode
 		"timezone": session.Timezone,
 		"was":      was,
 	})
+	switch {
+	case typ == models.NotificationSessionConfirmed:
+		postSessionConfirmed(campaign, session)
+	case typ == models.NotificationSessionCancelled && was == string(models.SessionConfirmed):
+		postSessionCancelled(campaign, session)
+	}
 }
 
 // HandleNotifications handles /api/notifications (GET inbox list).

@@ -130,6 +130,7 @@ func HandleCampaignSignupsOpen(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		notify(userID, recipients, models.NotificationSignupsOpened, campaign, "", nil)
+		postSignupsOpened(campaign)
 	}
 
 	message := "sign-ups closed"

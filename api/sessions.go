@@ -252,6 +252,7 @@ func handleCreateSession(w http.ResponseWriter, r *http.Request, campaignID stri
 		return
 	}
 	notifyPoll(userID, campaign.Players, models.NotificationSessionSuggested, campaign, session, []models.CampaignSession{session}, nil)
+	postNewPoll(campaign, []models.CampaignSession{session})
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

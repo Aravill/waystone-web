@@ -40,6 +40,9 @@ type Campaign struct {
 	SignUpsOpen        bool           `json:"sign_ups_open"`
 	System             string         `json:"system"`
 	CodexID            string         `json:"codex_id"` // codex label; only SetCampaignCodex writes it
+	// Discord channel the game posts to; only SetCampaignDiscordChannel writes them (like CodexID).
+	DiscordChannelID   string `json:"-"`
+	DiscordChannelName string `json:"-"`
 }
 
 // CampaignStatusTransitions maps each status to the statuses reachable from it.

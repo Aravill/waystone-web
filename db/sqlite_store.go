@@ -429,6 +429,32 @@ func (s *SQLiteStore) initSchema() error {
 		updated_by TEXT NOT NULL DEFAULT '',
 		updated_at TEXT NOT NULL
 	);
+	CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '');
+	CREATE TABLE IF NOT EXISTS discord_links (
+		user_id TEXT PRIMARY KEY,
+		discord_user_id TEXT NOT NULL UNIQUE,
+		discord_username TEXT NOT NULL DEFAULT '',
+		dm_channel_id TEXT NOT NULL DEFAULT '',
+		dm_sessions INTEGER NOT NULL DEFAULT 1,
+		dm_signups INTEGER NOT NULL DEFAULT 1,
+		dm_characters INTEGER NOT NULL DEFAULT 1,
+		dm_error TEXT NOT NULL DEFAULT '',
+		dm_error_at TEXT NOT NULL DEFAULT '',
+		linked_at TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS discord_outbox (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		kind TEXT NOT NULL,
+		target TEXT NOT NULL,
+		campaign_id TEXT NOT NULL DEFAULT '',
+		payload TEXT NOT NULL,
+		attempts INTEGER NOT NULL DEFAULT 0,
+		next_attempt_at TEXT NOT NULL,
+		last_error TEXT NOT NULL DEFAULT '',
+		status TEXT NOT NULL DEFAULT 'queued',
+		created_at TEXT NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_discord_outbox_due ON discord_outbox(status, next_attempt_at);
 	CREATE INDEX IF NOT EXISTS idx_timeline_events_page ON timeline_events(page_id, year, month, day);
 	CREATE INDEX IF NOT EXISTS idx_timeline_events_linked ON timeline_events(linked_page_id);
 	CREATE INDEX IF NOT EXISTS idx_pages_codex ON pages(codex_id);
@@ -487,6 +513,16 @@ func (s *SQLiteStore) initSchema() error {
 	if !cols["codex_id"] {
 		if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN codex_id TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("failed to add campaigns.codex_id column: %w", err)
+		}
+	}
+	if !cols["discord_channel_id"] {
+		if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN discord_channel_id TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("failed to add campaigns.discord_channel_id column: %w", err)
+		}
+	}
+	if !cols["discord_channel_name"] {
+		if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN discord_channel_name TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("failed to add campaigns.discord_channel_name column: %w", err)
 		}
 	}
 
@@ -653,7 +689,7 @@ func (s *SQLiteStore) GetAllCampaigns() ([]models.Campaign, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	rows, err := s.db.Query("SELECT id, title, status, type, system, codex_id, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns ORDER BY id")
+	rows, err := s.db.Query("SELECT id, title, status, type, system, codex_id, discord_channel_id, discord_channel_name, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -672,6 +708,8 @@ func (s *SQLiteStore) GetAllCampaigns() ([]models.Campaign, error) {
 			&campaign.Type,
 			&campaign.System,
 			&campaign.CodexID,
+		&campaign.DiscordChannelID,
+		&campaign.DiscordChannelName,
 			&campaign.Summary,
 			&campaign.Description,
 			&playersJSON,
@@ -714,7 +752,8 @@ func (s *SQLiteStore) SaveCampaign(campaign models.Campaign) error {
 		signUpsOpen = 1
 	}
 
-	// codex_id is deliberately not written here: only SetCampaignCodex changes it, so the
+	// codex_id (SetCampaignCodex) and discord_channel_id/name (SetCampaignDiscordChannel) are
+	// deliberately not written here: only those change them, so the
 	// many callers that save a campaign read-modify-write can't clobber it.
 	query := `
 	INSERT INTO campaigns (id, title, status, type, system, summary, description, players, dm, desired_player_count, sign_ups_open)
@@ -762,7 +801,7 @@ func (s *SQLiteStore) GetCampaignByID(id string) (*models.Campaign, error) {
 	var playersJSON string
 	var signUpsOpen int
 
-	query := `SELECT id, title, status, type, system, codex_id, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns WHERE id = ?`
+	query := `SELECT id, title, status, type, system, codex_id, discord_channel_id, discord_channel_name, summary, description, players, dm, desired_player_count, sign_ups_open FROM campaigns WHERE id = ?`
 	err := s.db.QueryRow(query, id).Scan(
 		&campaign.ID,
 		&campaign.Title,
@@ -770,6 +809,8 @@ func (s *SQLiteStore) GetCampaignByID(id string) (*models.Campaign, error) {
 		&campaign.Type,
 		&campaign.System,
 		&campaign.CodexID,
+			&campaign.DiscordChannelID,
+			&campaign.DiscordChannelName,
 		&campaign.Summary,
 		&campaign.Description,
 		&playersJSON,
@@ -1176,10 +1217,13 @@ func (s *SQLiteStore) AnonymizeUser(id string) error {
 		return ErrUserNotFound
 	}
 
-	for _, table := range []string{"campaign_signups", "campaign_follows", "calendar_tokens", "password_invites", "notifications", "user_rights", "codex_access", "codex_notes"} {
+	for _, table := range []string{"campaign_signups", "campaign_follows", "calendar_tokens", "password_invites", "notifications", "user_rights", "codex_access", "codex_notes", "discord_links"} {
 		if _, err := tx.Exec(`DELETE FROM `+table+` WHERE user_id = ?`, id); err != nil {
 			return err
 		}
+	}
+	if _, err := tx.Exec(`DELETE FROM discord_outbox WHERE kind = 'dm' AND target = ?`, id); err != nil {
+		return err
 	}
 	// Characters stay (owner shows as "Deleted user"); the user leaves every game, so end the assignments.
 	if err := endUserAssignments(tx, ``, id, time.Now().UTC().Format(time.RFC3339)); err != nil {
@@ -1983,6 +2027,7 @@ var (
 	ErrCharacterAssigned    = errors.New("character has an active assignment")
 	ErrCharacterMismatch    = errors.New("character is not the user's or is in another system")
 	ErrNotPlayer            = errors.New("user is not a player of this game")
+	ErrDiscordAccountTaken  = errors.New("discord account is linked to another user")
 )
 
 func (s *SQLiteStore) CreateCampaignSignup(signup models.CampaignSignup) error {
@@ -2255,7 +2300,7 @@ func (s *SQLiteStore) SetCampaignStatus(id string, status models.CampaignStatus)
 	return nil
 }
 
-// DeleteCampaign removes a campaign with its sessions, session responses, sign-ups, character assignments and notifications.
+// DeleteCampaign removes a campaign with its sessions, session responses, sign-ups, character assignments, notifications and queued Discord posts.
 // The foreign_keys pragma is not enabled, so ON DELETE CASCADE does not fire and the
 // cascade is done by hand.
 func (s *SQLiteStore) DeleteCampaign(id string) error {
@@ -2294,6 +2339,9 @@ func (s *SQLiteStore) DeleteCampaign(id string) error {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM poll_schedules WHERE campaign_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM discord_outbox WHERE campaign_id = ? AND status = 'queued'`, id); err != nil {
 		return err
 	}
 	res, err := tx.Exec(`DELETE FROM campaigns WHERE id = ?`, id)
