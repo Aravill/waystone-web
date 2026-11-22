@@ -43,6 +43,7 @@ func main() {
 	// image upload (25MB) extends its own deadlines.
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%s", port),
+		Handler:           api.RevalidateUnversioned(http.DefaultServeMux),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,

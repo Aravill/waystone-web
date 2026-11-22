@@ -2013,6 +2013,15 @@ html:has(dialog.cx-lightbox[open]) {
     font-size: 1.25rem;
 }
 
+/* Boxes with a bar, a fill or a rule end at a floated picture's margin instead of running under it. */
+.codex-page .codex-text h3,
+.codex-page .codex-text blockquote,
+.codex-page .codex-text pre,
+.codex-page .codex-text hr,
+.codex-page .codex-text .cx-live {
+    display: flow-root;
+}
+
 .codex-page .codex-text > :first-child {
     margin-top: 0;
 }
