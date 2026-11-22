@@ -258,7 +258,8 @@ function codexLiveList(spec, ctx) {
 // returns a picture of the page ({name, url, width, height}) or null. Links and pictures are swapped
 // for placeholders before rendering so the Markdown renderer never sees them. A placeholder holds
 // spaces, which a Markdown link URL can't, so one inside "(...)" is never swallowed into an href.
-// A paragraph made only of pictures becomes a figure; two or more in a row become a gallery.
+// Lines made only of pictures are their own paragraph (text right above or below doesn't join them):
+// one picture becomes a figure, two or more in a row a gallery.
 // A line that is only --- becomes a rule (<hr>), here and not in the shared renderer.
 // A {{list ...}} line is swapped the same way for a live list: lists(spec) returns its HTML, and with
 // no lists callback (old revisions, template previews) it shows as a plain "Live list: ..." line.
@@ -276,7 +277,7 @@ function codexMarkdown(body, lookup, canCreate = true, images = null, lists = nu
     }).replace(CODEX_LINK_RE, (m, t, label) => {
         found.push({ text: t.trim(), label: label && label.replace(/\u0002 \d+ \u0002/g, '') });
         return `\u0001 ${found.length - 1} \u0001`;
-    });
+    }).replace(/^(?:[ \t]*(?:\u0002 \d+ \u0002[ \t]*)+(?:\n|$))+/gm, (run) => `\n${run}\n`); // picture-only lines stand as their own paragraph
     const pic = (i, kind, lone) => {
         const p = pics[Number(i)];
         return p ? codexPicHtml(images ? images(p.name) : null, p.name, p.caption, kind, lone ? { size: p.size, align: p.align, n: Number(i), editable } : null) : '';
