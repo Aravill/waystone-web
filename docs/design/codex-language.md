@@ -28,7 +28,8 @@ the text the app writes into pages. The interface stays English.
   - Czech tags: sezení, npc, sídlo, místo, událost, frakce, předmět, historie. A codex switched later can
     have both `event` and `událost`; merging is by hand.
 - **Dates** (`{{date}}`, Today's date, the quick note stamp, a journal page's date, also in a codex's own
-  templates): `Nov 23, 2026` or `23. 11. 2026`.
+  templates): `Nov 23, 2026` or `23. 11. 2026`. The Czech one has no-break spaces, and the page renderer never takes such a date
+  at the start of a line (hand-typed ones too) for a numbered list.
 - **/ menu**: the list is a control, so its labels and search words stay English; the text it inserts is in the
   codex's language. Template rows use the template's name ("Sezení headings") and are also found by
   the built-in's English name.

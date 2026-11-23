@@ -87,10 +87,11 @@ func codexLanguage(w http.ResponseWriter, codexID string) (string, bool) {
 	return codex.Language, true
 }
 
-// codexDate writes a date in a codex's language.
+// codexDate writes a date in a codex's language. The Czech one has no-break spaces: it stays on one line,
+// and at the start of a line "23. 11. 2026" isn't taken for a numbered list by the editor.
 func codexDate(t time.Time, lang string) string {
 	if lang == models.LangCzech {
-		return t.Format("2. 1. 2006")
+		return t.Format("2.\u00a01.\u00a02006")
 	}
 	return t.Format("Jan 2, 2006")
 }

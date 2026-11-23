@@ -411,9 +411,9 @@ function codexHeadingsOnly(body) {
 // (docs/design/codex-language.md). The interface stays English.
 const CODEX_LANGUAGES = [{ id: 'en', name: 'English' }, { id: 'cs', name: 'Czech' }];
 
-// A day as the codex's language writes it (the server's codexDate).
+// A day as the codex's language writes it (the server's codexDate, no-break spaces included).
 function codexDay(date, lang) {
-    if (lang === 'cs') return `${date.getDate()}. ${date.getMonth() + 1}. ${date.getFullYear()}`;
+    if (lang === 'cs') return `${date.getDate()}.\u00a0${date.getMonth() + 1}.\u00a0${date.getFullYear()}`;
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
@@ -596,7 +596,7 @@ const codexPeekCache = {};
 
 // A few plain lines from the start of a page, for the link preview card.
 function codexPlainExcerpt(body, max = 220) {
-    const text = String(body || '').split('\n').map((l) => l.trim()).filter((l) => l && l !== '---' && !/^#{1,6}\s/.test(l) && !/^\{\{list(?:[ \t][^{}]*)?\}\}$/.test(l)).map((l) => l.replace(/^([-*+]|\d+\.|>)\s+/, '')).join(' ')
+    const text = String(body || '').split('\n').map((l) => l.trim()).filter((l) => l && l !== '---' && !/^#{1,6}\s/.test(l) && !/^\{\{list(?:[ \t][^{}]*)?\}\}$/.test(l)).map((l) => l.replace(/^([-*+]|\d+\.(?!\s\d{1,2}\.\s\d{4}\b)|>)\s+/, '')).join(' ')
         .replace(CODEX_IMAGE_RE, '')
         .replace(CODEX_LINK_RE, (m, t, label) => label || t)
         .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')

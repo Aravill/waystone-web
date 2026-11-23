@@ -291,7 +291,7 @@ test.describe('Codices language', () => {
       await page.waitForURL(/\/edit$/);
       pageId = page.url().match(/\/p\/([^/]+)\//)[1];
       const { page: made } = await (await editor.get(`/api/codices/pages/${pageId}`)).json();
-      expect(made.body).toMatch(/^\*\*Datum:\*\* \d{1,2}\. \d{1,2}\. \d{4}\n/);
+      expect(made.body).toMatch(/^\*\*Datum:\*\* \d{1,2}\.\u00a0\d{1,2}\.\u00a0\d{4}\n/);
 
       // Built-in names are taken in both languages.
       for (const taken of ['Postava', 'Character']) {
