@@ -198,7 +198,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .bk-face > svg { position: absolute; left: calc(-10 * var(--u)); top: calc(-10 * var(--u)); width: calc(238 * var(--u)); height: calc(340 * var(--u)); }
 .bk-face--in { transform: rotateY(180deg); }
 
-/* title plate: same box on every binding */
+/* title plate: same box on every binding. Lettered in the title face (decided: IM Fell, not Barlow) */
 .bk-title {
     position: absolute;
     left: calc(36 * var(--u)); top: calc(60 * var(--u));
@@ -208,7 +208,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
     text-align: center;
 }
 .bk-title span { font-family: var(--font-title); font-size: calc(var(--fs) * var(--u)); line-height: 1.08; text-wrap: balance; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; }
-.app[data-lettering="barlow"] .bk-title span { font-family: var(--font-display); line-height: 1.05; }
 @container app (max-width: 600px) {
     /* Small covers: never below 13px. */
     .bk-title { padding: 0 1px; }
@@ -258,7 +257,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 <div class="mock-bar" role="group" aria-label="Mock-up controls">
     <strong>Mock-up</strong>
     <label>Theme <select id="m-theme"><option value="">System</option><option value="light">Parchment</option><option value="dark">Candlelight</option></select></label>
-    <label>Lettering <select id="m-lettering"><option value="fell">IM Fell</option><option value="barlow">Barlow</option></select></label>
     <label>Books <select id="m-books"><option value="all">Open on hover</option><option value="open">All open</option><option value="none">No codices</option></select></label>
     <label>Screen <select id="m-width"><option value="full">Desktop</option><option value="phone">Phone</option></select></label>
     <label>Motion <select id="m-motion"><option value="on">On</option><option value="off">Reduced</option></select></label>
@@ -487,7 +485,6 @@ const noHover = window.matchMedia('(hover: none)');
 function render() {
     const theme = val('m-theme'), books = val('m-books');
     if (theme) document.documentElement.dataset.theme = theme;
-    app.dataset.lettering = val('m-lettering');
     app.dataset.width = val('m-width');
     app.toggleAttribute('data-touch', noHover.matches || val('m-width') === 'phone');
     app.toggleAttribute('data-still', val('m-motion') === 'off');
