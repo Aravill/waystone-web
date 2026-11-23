@@ -1061,6 +1061,7 @@
                         </div>
                         <label class="cx-check" x-show="pageData.tags.length"><input type="checkbox" x-model="dlg.copyTags"><span x-text="'Copy its tags (' + pageData.tags.map((t) => t.name).join(', ') + ')'"></span></label>
                         <label class="cx-check" x-show="pageData.images.length"><input type="checkbox" x-model="dlg.copyImages"><span><span x-text="'Copy its ' + countLabel(pageData.images.length, 'image')"></span> <small>The files are duplicated, so each page keeps its own.</small></span></label>
+                        <label class="cx-check" x-show="pageData.attachments.length"><input type="checkbox" x-model="dlg.copyAttachments"><span><span x-text="'Copy attachments too (' + countLabel(pageData.attachments.length, 'file') + ', ' + codexFileSize(pageData.attachments.reduce((n, a) => n + a.size, 0)) + ')'"></span> <small>The files are duplicated, so each page keeps its own.</small></span></label>
                         <p class="hint">The copy starts its own history at revision 1. Aliases are not copied, and [[links]] stay as written and point at pages of the codex it goes to.</p>
                     </div>
                 </template>
@@ -1209,6 +1210,6 @@
     <script src="/static/codex-editor.js?v=6"></script>
     <script src="/static/codex-graph.js?v=3"></script>
     <script src="/static/codex-help.js?v=3"></script>
-    <script src="/static/codex.js?v=40"></script>
+    <script src="/static/codex.js?v=41"></script>
 </body>
 </html>

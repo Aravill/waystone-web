@@ -2776,7 +2776,7 @@ window.codexPage = function () {
             const chars = Array.from(this.page.title);
             const title = chars.slice(0, 120 - ' (copy)'.length).join('') + ' (copy)';
             const folderId = codexId === this.page.codex.id && folders.some((f) => f.id === this.page.folder_id) ? this.page.folder_id : '';
-            this.dlg = { type: 'copyPage', title: chars.length + ' (copy)'.length <= 120 ? this.page.title + ' (copy)' : title, codexId, folders, folderId, copyTags: true, copyImages: true, error: '', busy: false };
+            this.dlg = { type: 'copyPage', title: chars.length + ' (copy)'.length <= 120 ? this.page.title + ' (copy)' : title, codexId, folders, folderId, copyTags: true, copyImages: true, copyAttachments: false, error: '', busy: false };
             this.focusDlg();
         },
         async submitCopyPage(d) {
@@ -2786,7 +2786,7 @@ window.codexPage = function () {
                 return;
             }
             const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/copy`, 'POST',
-                { title, codex_id: d.codexId, folder_id: d.folderId || '', copy_tags: d.copyTags, copy_images: d.copyImages });
+                { title, codex_id: d.codexId, folder_id: d.folderId || '', copy_tags: d.copyTags, copy_images: d.copyImages, copy_attachments: d.copyAttachments });
             if (response.status === 201) {
                 this.saved = true;
                 window.location.href = codexPageUrl({ id: data.page.id, title }) + '?copied=1';
