@@ -28,6 +28,16 @@ window.adminDiscordPage = function () {
                 return;
             }
             await this.load();
+            // The "channel is gone" notification's link
+            const gameId = new URLSearchParams(location.search).get('game');
+            const row = this.data.games.findIndex((g) => g.id === gameId);
+            if (row >= 0) {
+                this.$nextTick(() => {
+                    const select = document.querySelectorAll('.dc-game tr[data-game] select')[row];
+                    select?.scrollIntoView({ block: 'center' });
+                    select?.focus({ preventScroll: true });
+                });
+            }
         },
 
         async load() {

@@ -17,9 +17,11 @@
         </div>
         <ul class="notif-list">
             <template x-for="n in items" :key="n.id">
-                <li class="notif-item" :class="{ 'is-unread': !n.read_at }" @click="openItem(n)">
-                    <div class="notif-msg" x-text="message(n)"></div>
-                    <div class="notif-time" x-text="timeAgo(n.created_at)"></div>
+                <li>
+                    <a class="notif-item" :class="{ 'is-unread': !n.read_at }" :href="n.url" @click="seen(n)" @auxclick="$event.button === 1 && seen(n)">
+                        <span class="notif-msg" x-text="message(n)"></span>
+                        <span class="notif-time" x-text="timeAgo(n.created_at)"></span>
+                    </a>
                 </li>
             </template>
         </ul>
@@ -30,6 +32,19 @@
         </div>
     </div>
 </div>`;
+
+    // A page opened through a notification's link (?notif={id}, from the inbox or a Discord DM) marks it
+    // read, however it was opened, and drops the id from the address bar.
+    function readFromUrl() {
+        const url = new URL(location.href);
+        const id = url.searchParams.get('notif');
+        if (!id) return null;
+        url.searchParams.delete('notif');
+        history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+        return fetch('/api/notifications/' + encodeURIComponent(id) + '/read', { method: 'POST' })
+            .catch((error) => console.error('Failed to mark notification read:', error));
+    }
+    const reading = readFromUrl();
 
     window.notificationsInbox = function () {
         return {
@@ -44,18 +59,19 @@
             _timer: null,
             _counted: false,
 
-            init() {
+            async init() {
                 try {
                     this.unreadOnly = localStorage.getItem('waystone-notif-unread') !== '0';
                 } catch (error) { /* storage blocked: keep the default */ }
                 if (this._timer) return;
-                this.refreshCount();
                 this._timer = setInterval(() => {
                     if (!document.hidden) this.refreshCount();
                 }, 60000);
                 document.addEventListener('visibilitychange', () => {
                     if (!document.hidden) this.refreshCount();
                 });
+                await reading; // so the first count leaves out the notification that was just opened
+                this.refreshCount();
             },
 
             async refreshCount() {
@@ -123,39 +139,12 @@
                 }
             },
 
-            async openItem(n) {
-                if (!n.read_at) {
-                    try {
-                        const response = await fetch('/api/notifications/' + encodeURIComponent(n.id) + '/read', { method: 'POST' });
-                        if (response.ok) {
-                            n.read_at = new Date().toISOString();
-                            this.unread = Math.max(0, this.unread - 1);
-                        }
-                    } catch (error) {
-                        console.error('Failed to mark notification read:', error);
-                    }
-                }
-                if (n.type === 'character_status' && (n.data || {}).character_id) {
-                    location.href = '/characters/' + encodeURIComponent(n.data.character_id);
-                } else if (n.type === 'discord_channel_lost') {
-                    location.href = '/admin/discord';
-                } else if (n.campaign_id && (n.type === 'session_started' || n.type === 'session_reminder' || n.type === 'character_assigned' || n.type === 'character_cleared')) {
-                    location.href = '/games/' + encodeURIComponent(n.campaign_id);
-                } else if (n.campaign_id && n.type === 'signup_accepted' && (n.data || {}).characters) {
-                    location.href = '/games/' + encodeURIComponent(n.campaign_id) + '?character=1';
-                } else if (n.campaign_id && (n.data || {}).date && ['session_suggested', 'poll_reminder', 'poll_complete', 'poll_posted', 'poll_skipped'].includes(n.type)) {
-                    // A poll or suggestion: the calendar, on the month of its first date
-                    location.href = '/games/' + encodeURIComponent(n.campaign_id) + '/calendar?date=' + encodeURIComponent(n.data.date);
-                } else if (n.campaign_id) {
-                    const anchor = 'campaign-' + n.campaign_id;
-                    const target = location.pathname === '/campaigns' ? document.getElementById(anchor) : null;
-                    if (target) {
-                        target.scrollIntoView({ block: 'start' });
-                        this.open = false;
-                    } else {
-                        location.href = '/campaigns#' + encodeURIComponent(anchor);
-                    }
-                }
+            // The page the link opens marks the notification read (see readFromUrl); this only keeps
+            // the list and the badge in step when it opens in another tab.
+            seen(n) {
+                if (n.read_at) return;
+                n.read_at = new Date().toISOString();
+                this.unread = Math.max(0, this.unread - 1);
             },
 
             async markAllRead() {
@@ -190,7 +179,7 @@
                 return new Date(y, m - 1, day).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
             },
 
-            // Keep in step with discordText in api/discord_text.go (and openItem with discordLink).
+            // Keep in step with discordText in api/discord_text.go. Links come from the server (notificationTarget).
             message(n) {
                 const d = n.data || {};
                 const count = parseInt(d.count, 10) || 1;

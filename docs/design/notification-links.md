@@ -34,7 +34,7 @@ Channel posts use the same function: session confirmed, cancelled and reminder a
   - A poll that is gone: the calendar on `date` with "This poll is no longer open."
   - A session that is gone: "This session is no longer on the calendar."
   - A cancelled session is still on the calendar, marked cancelled.
-  - Someone who is neither the DM nor a player (a follower, a removed player, somebody in the Discord channel) is sent on to the game page with the same parameters.
+  - Someone who is neither the DM nor a player (a follower, a removed player, somebody in the Discord channel) is sent on to the game page with the same `poll` or `session`.
 - **Game page** takes `poll`, `session` (from the calendar), `company` and `character`, and drops them from the address bar once handled. A session that the viewer can see is selected in the panel. Otherwise: "Only the game's DM and players can see its polls." or "That session isn't shown here. It may have been cancelled, or only the game's DM and players can see it."
 - **Deleted game or character:** the page already says it may have been deleted. The sign-ups dialog of a game that is gone or no longer yours shows the existing "Game not found or you can't open that dialog".
 - Everything is in the query string, never after `#`, so a logged-out click survives the login (`?next=`).
