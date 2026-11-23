@@ -1139,6 +1139,14 @@ window.codexPage = function () {
         countLabel(n, word) {
             return `${n} ${word}${n === 1 ? '' : 's'}`;
         },
+        bookHtml(w) {
+            return codexBookHtml(w, {
+                url: '/codices/c/' + encodeURIComponent(w.id),
+                pageUrl: codexPageUrl,
+                date: (iso) => this.shortDate(iso),
+                pages: this.countLabel(w.page_count, 'page'),
+            });
+        },
         shortDate(iso) {
             return new Date(iso).toLocaleDateString('default', { day: 'numeric', month: 'short' });
         },
