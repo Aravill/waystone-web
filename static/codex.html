@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=82">
     <link rel="stylesheet" href="/static/notifications.css?v=12">
-    <link rel="stylesheet" href="/static/codex.css?v=48">
+    <link rel="stylesheet" href="/static/codex.css?v=49">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -98,6 +98,7 @@
                             <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#wanted'">Wanted pages <span class="cx-count" x-text="codex.wanted.length"></span></a>
                             <a :href="'/codices/c/' + encodeURIComponent(codex.codex.id) + '#recent'">Recent changes</a>
                             <a :href="graphUrl()" :aria-current="screen === 'graph' ? 'page' : null">Graph view</a>
+                            <a :href="attachmentsUrl()" :aria-current="screen === 'attachments' ? 'page' : null">Attachments</a>
                             <a :href="inboxUrl()" x-show="codex.can_edit || screen === 'inbox'" :aria-current="screen === 'inbox' ? 'page' : null">Inbox <span class="cx-badge" x-show="noteCount > 0" x-text="noteCount"></span></a>
                             <a href="#templates" id="cxTemplatesLink" @click.prevent="openTemplates()">Templates</a>
                             <a href="/codices/help">Writing guide</a>
@@ -109,7 +110,7 @@
 
         <main class="cx-main" :inert="navOpen ? '' : null">
             <!-- Recently opened pages of this codex -->
-            <nav class="cx-tabs" x-show="screen !== 'home' && screen !== 'help' && (tabs.length || screen === 'graph' || screen === 'inbox')" x-cloak aria-label="Recently opened pages">
+            <nav class="cx-tabs" x-show="screen !== 'home' && screen !== 'help' && (tabs.length || screen === 'graph' || screen === 'inbox' || screen === 'attachments')" x-cloak aria-label="Recently opened pages">
                 <template x-for="t in tabs" :key="t.id">
                     <span class="cx-tab" :class="{ on: t.id === currentPageId }">
                         <a :href="pageUrl(t)" :aria-current="t.id === currentPageId ? 'page' : null" x-text="t.title"></a>
@@ -118,6 +119,7 @@
                 </template>
                 <span class="cx-tab on" x-show="screen === 'graph'"><a :href="graphUrl()" aria-current="page">Graph</a></span>
                 <span class="cx-tab on" x-show="screen === 'inbox'"><a :href="inboxUrl()" aria-current="page">Inbox</a></span>
+                <span class="cx-tab on" x-show="screen === 'attachments'"><a :href="attachmentsUrl()" aria-current="page">Attachments</a></span>
             </nav>
 
             <div class="cx-inner">
@@ -165,6 +167,31 @@
                                         <button type="button" class="cx-act" x-show="canEdit" @click="openQuickNote(n)">Edit</button>
                                         <button type="button" class="text-link" @click="deleteNote(n)">Delete</button>
                                     </div>
+                                </li>
+                            </template>
+                        </ul>
+                    </section>
+                </template>
+
+                <!-- Attachments: every file on the pages of this codex -->
+                <template x-if="screen === 'attachments' && codex">
+                    <section aria-labelledby="filesTitle">
+                        <header class="cx-head">
+                            <div class="cx-head-text">
+                                <h1 class="cx-title" id="filesTitle" tabindex="-1">Attachments</h1>
+                            </div>
+                        </header>
+                        <p class="cx-sub" x-show="files.length" x-text="countLabel(files.length, 'file') + ' · ' + codexFileSize(filesTotal)"></p>
+                        <p class="same" x-show="filesLoading">Loading the files...</p>
+                        <p class="same" x-show="filesError" role="alert" x-text="filesError"></p>
+                        <p class="inbox-empty" x-show="!filesLoading && !filesError && files.length === 0">No files are attached to any page.</p>
+                        <ul class="cx-files" x-show="files.length">
+                            <template x-for="f in files" :key="f.id">
+                                <li>
+                                    <a class="cx-file" :href="f.url" :target="f.inline ? '_blank' : null" :rel="f.inline ? 'noopener' : null" :download="f.inline ? null : f.name" x-text="f.name"></a>
+                                    <a class="cx-files-page" :href="pageUrl(f.page)" x-text="f.page.title"></a>
+                                    <span class="cx-files-size" x-text="codexFileSize(f.size)"></span>
+                                    <span class="cx-files-date" x-text="formatStamp(f.created_at)"></span>
                                 </li>
                             </template>
                         </ul>
@@ -1182,6 +1209,6 @@
     <script src="/static/codex-editor.js?v=6"></script>
     <script src="/static/codex-graph.js?v=3"></script>
     <script src="/static/codex-help.js?v=3"></script>
-    <script src="/static/codex.js?v=39"></script>
+    <script src="/static/codex.js?v=40"></script>
 </body>
 </html>

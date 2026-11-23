@@ -822,6 +822,7 @@ button.wikilink {
 .cx-shell--edit,
 .cx-shell--history,
 .cx-shell--inbox,
+.cx-shell--attachments,
 .cx-shell--graph {
     grid-template-columns: 17rem minmax(0, 1fr);
     grid-template-areas: "nav main";
@@ -1107,6 +1108,56 @@ button.wikilink {
 
 .note-a .text-link {
     margin-left: auto;
+}
+
+/* Attachments screen */
+.cx-files {
+    margin: 1rem 0 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--line);
+}
+
+.cx-files li {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) 5rem 11rem;
+    gap: 0.25rem 1rem;
+    align-items: baseline;
+    padding: 0.5rem 0.75rem;
+    overflow-wrap: anywhere;
+}
+
+.cx-files li + li {
+    border-top: 1px solid var(--cx-soft);
+}
+
+.cx-files-size,
+.cx-files-date {
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.cx-files-size {
+    text-align: right;
+}
+
+@media (max-width: 600px) {
+    .cx-files li {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .cx-files .cx-file,
+    .cx-files .cx-files-page {
+        grid-column: 1 / -1;
+    }
+
+    .cx-files-size {
+        text-align: left;
+    }
+
+    .cx-files-date {
+        text-align: right;
+    }
 }
 
 .inbox-empty {
@@ -1402,7 +1453,8 @@ button.wikilink {
 }
 
 .cx-shell--edit .cx-inner,
-.cx-shell--history .cx-inner {
+.cx-shell--history .cx-inner,
+.cx-shell--attachments .cx-inner {
     max-width: 68rem;
 }
 
@@ -2410,6 +2462,7 @@ html:has(dialog.cx-lightbox[open]) {
     .cx-shell--edit,
     .cx-shell--history,
     .cx-shell--inbox,
+    .cx-shell--attachments,
     .cx-shell--graph {
         grid-template-columns: 15.5rem minmax(0, 1fr);
     }
@@ -2480,6 +2533,7 @@ html:has(dialog.cx-lightbox[open]) {
     .cx-shell--codex,
     .cx-shell--edit,
     .cx-shell--history,
+    .cx-shell--attachments,
     .cx-shell--graph {
         display: block;
     }

@@ -1,4 +1,4 @@
-// Codices page: /codices (home), /codices/c/{id} (codex), /codices/c/{id}/graph (graph), /codices/c/{id}/inbox (inbox),
+// Codices page: /codices (home), /codices/c/{id} (codex), /codices/c/{id}/graph (graph), /codices/c/{id}/inbox (inbox), /codices/c/{id}/attachments (attachments),
 // /codices/p/{id}/{slug}[/edit|/history] (page).
 // Relies on campaigns.js (escapeHtml, renderMarkdown, journalByline, userAvatarHtml) and
 // codex-editor.js (createCodexEditor). One component picks the screen
@@ -767,6 +767,10 @@ window.codexPage = function () {
         treeDrag: null, // { kind: 'page' | 'folder', id } being dragged
         springId: '',
         springTimer: null,
+        files: [], // the Attachments screen: every file on the codex's pages, newest first
+        filesTotal: 0,
+        filesLoading: false,
+        filesError: '',
         notes: [], // the inbox: the viewer's own quick notes of this codex, newest first
         notesLoading: false,
         notesError: '',
@@ -915,8 +919,8 @@ window.codexPage = function () {
             this.showArrivalMessage();
         },
 
-        // /codices, /codices/help, /codices/c/{id}[/slug], /codices/c/{id}/graph, /codices/c/{id}/inbox, /codices/p/{id}/{slug}[/edit|/history]
-        // A last segment "graph" or "inbox" straight after the codex id is always that screen, so
+        // /codices, /codices/help, /codices/c/{id}[/slug], /codices/c/{id}/graph, /codices/c/{id}/inbox, /codices/c/{id}/attachments, /codices/p/{id}/{slug}[/edit|/history]
+        // A last segment "graph", "inbox" or "attachments" straight after the codex id is always that screen, so
         // the codex's own links never carry a slug.
         // Returns null for a malformed URL.
         parseRoute() {
@@ -929,7 +933,7 @@ window.codexPage = function () {
             if (parts[1] === 'help' && parts.length === 2) return { screen: 'help', id: '' };
             if (parts[1] === 'c' && parts[2]) {
                 const tail = parts.length === 4 ? parts[3] : '';
-                return { screen: tail === 'graph' || tail === 'inbox' ? tail : 'codex', id: parts[2] };
+                return { screen: tail === 'graph' || tail === 'inbox' || tail === 'attachments' ? tail : 'codex', id: parts[2] };
             }
             if (parts[1] === 'p' && parts[2]) {
                 const tail = parts[4] || '';
@@ -956,7 +960,10 @@ window.codexPage = function () {
         },
         // The screens that show the codex itself rather than a page.
         get onCodexScreen() {
-            return this.screen === 'codex' || this.screen === 'graph' || this.screen === 'inbox';
+            return this.screen === 'codex' || this.screen === 'graph' || this.screen === 'inbox' || this.screen === 'attachments';
+        },
+        attachmentsUrl() {
+            return '/codices/c/' + encodeURIComponent(this.currentCodexId) + '/attachments';
         },
         inboxUrl() {
             return '/codices/c/' + encodeURIComponent(this.currentCodexId) + '/inbox';
@@ -995,6 +1002,7 @@ window.codexPage = function () {
             if (s === 'codex' && this.codex) return [{ label: this.codex.codex.name, href: '' }];
             if (s === 'graph' && this.codex) return [{ label: this.codex.codex.name, href: '/codices/c/' + encodeURIComponent(this.codex.codex.id) }, { label: 'Graph', href: '' }];
             if (s === 'inbox' && this.codex) return [{ label: this.codex.codex.name, href: '/codices/c/' + encodeURIComponent(this.codex.codex.id) }, { label: 'Inbox', href: '' }];
+            if (s === 'attachments' && this.codex) return [{ label: this.codex.codex.name, href: '/codices/c/' + encodeURIComponent(this.codex.codex.id) }, { label: 'Attachments', href: '' }];
             if (!this.page) return [];
             const codexHref = '/codices/c/' + encodeURIComponent(this.page.codex.id);
             const list = [{ label: this.page.codex.name, href: '/codices/c/' + encodeURIComponent(this.page.codex.id) }];
@@ -1052,7 +1060,7 @@ window.codexPage = function () {
                     this.pagers = { homeRecent: 0, recent: 0, wanted: 0 };
                 }
                 const url = r.screen === 'home' ? '/api/codices'
-                    : r.screen === 'codex' || r.screen === 'graph' || r.screen === 'inbox' ? `/api/codices/c/${encodeURIComponent(r.id)}`
+                    : r.screen === 'codex' || r.screen === 'graph' || r.screen === 'inbox' || r.screen === 'attachments' ? `/api/codices/c/${encodeURIComponent(r.id)}`
                     : `/api/codices/pages/${encodeURIComponent(r.id)}`;
                 const { response, data } = await this.send(url, 'GET');
                 if (response.status === 401) {
@@ -1075,7 +1083,7 @@ window.codexPage = function () {
                     this.home = data;
                     this.allCodices = data.codices;
                     document.title = 'Waystone - Codices';
-                } else if (r.screen === 'codex' || r.screen === 'graph' || r.screen === 'inbox') {
+                } else if (r.screen === 'codex' || r.screen === 'graph' || r.screen === 'inbox' || r.screen === 'attachments') {
                     codexLoadOpenState(data.codex.id);
                     if (!this.folderRevealed) {
                         this.folderRevealed = true;
@@ -1083,9 +1091,10 @@ window.codexPage = function () {
                     }
                     this.codex = data;
                     this.syncTabs(data);
-                    document.title = 'Waystone - ' + data.codex.name + (r.screen === 'graph' ? ' graph' : r.screen === 'inbox' ? ' inbox' : '');
+                    document.title = 'Waystone - ' + data.codex.name + (r.screen === 'graph' ? ' graph' : r.screen === 'inbox' ? ' inbox' : r.screen === 'attachments' ? ' attachments' : '');
                     if (r.screen === 'graph') await this.loadGraph();
                     else if (r.screen === 'inbox') await this.loadInbox();
+                    else if (r.screen === 'attachments') await this.loadAttachments();
                     else this.$nextTick(() => this.scrollToFolder());
                 } else {
                     if (r.screen === 'edit' && !data.can_edit) {
@@ -1899,6 +1908,24 @@ window.codexPage = function () {
                 this.notesError = 'Could not load your inbox: ' + error.message;
             } finally {
                 this.notesLoading = false;
+            }
+        },
+        // The Attachments screen: every file on the pages of this codex (read-only).
+        async loadAttachments() {
+            this.filesLoading = true;
+            this.filesError = '';
+            try {
+                const { response, data } = await this.send(`/api/codices/c/${encodeURIComponent(this.route.id)}/attachments`, 'GET');
+                if (!response.ok) {
+                    this.filesError = response.status === 401 ? 'Your login has expired. Log in again, then reload.' : this.sentence(data.error || 'Could not load the files');
+                    return;
+                }
+                this.files = data.attachments;
+                this.filesTotal = data.total_size;
+            } catch (error) {
+                this.filesError = 'Could not load the files: ' + error.message;
+            } finally {
+                this.filesLoading = false;
             }
         },
         noteWhen(n) {
