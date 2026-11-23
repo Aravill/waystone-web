@@ -55,6 +55,16 @@ test('link, pick a channel, confirm a session: channel post and DM', async ({ pa
         expect.stringMatching(new RegExp(`^${CHANNEL}\\|.*Age of Sojourn.*session confirmed`)),
         expect.stringMatching(new RegExp(`^dm-${DISCORD_USER}\\|.*confirmed the session for`)),
       ]));
+
+    // Both open the session on the calendar; the DM's button also carries the player's own notification.
+    const sent = await (await fetch(`${FAKE}/_messages`)).json();
+    const button = (re) => sent.find((m) => re.test(m.channel_id) && m.content.includes('confirmed')).components[0].components[0];
+    const path = `http://localhost:${env.PORT}/games/${id}/calendar?date=${dateFromToday(3)}&session=${sessionId}`;
+    expect(button(/^7/)).toEqual({ type: 2, style: 5, label: 'Open the session', url: path });
+    const { notifications } = await (await testy.get('/api/notifications?limit=50')).json();
+    const own = notifications.find((n) => n.session_id === sessionId && n.type === 'session_confirmed');
+    expect(button(/^dm-/).url).toBe(`${path}&notif=${own.id}`);
+    expect(own.url).toBe(button(/^dm-/).url.replace(/^https?:\/\/[^/]+/, ''));
   } finally {
     if (sessionId) await admin.delete(`/api/campaigns/${id}/sessions/${sessionId}`);
     await admin.put(`/api/admin/discord/games/${id}`, { data: { channel_id: '' } });
