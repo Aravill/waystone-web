@@ -699,36 +699,28 @@ func (s *SQLiteStore) MovePage(id, codexID string) error {
 }
 
 // DeletePage removes a page with everything attached to it and returns the image files (map
-// and page pictures) to delete from disk. Links and pins that pointed at it turn missing.
-func (s *SQLiteStore) DeletePage(id string) ([]string, error) {
+// and page pictures) and the attachment files to delete from disk. Links and pins that pointed at it turn missing.
+func (s *SQLiteStore) DeletePage(id string) (files, attachments []string, err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	tx, err := s.db.Begin()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer tx.Rollback()
 	codex, title, err := pageCodex(tx, id)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := unlinkTimelineEventsTx(tx, id, title); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	var files []string
-	rows, err := tx.Query(`SELECT file FROM map_images WHERE page_id = ? AND file != '' UNION SELECT file FROM page_images WHERE page_id = ?`, id, id)
-	if err != nil {
-		return nil, err
+	if files, err = queryFiles(tx, `SELECT file FROM map_images WHERE page_id = ? AND file != '' UNION SELECT file FROM page_images WHERE page_id = ?`, id, id); err != nil {
+		return nil, nil, err
 	}
-	for rows.Next() {
-		var f string
-		if err := rows.Scan(&f); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		files = append(files, f)
+	if attachments, err = queryFiles(tx, `SELECT file FROM page_attachments WHERE page_id = ?`, id); err != nil {
+		return nil, nil, err
 	}
-	rows.Close()
 	for _, q := range []string{
 		`DELETE FROM page_revisions WHERE page_id = ?`,
 		`DELETE FROM page_contributors WHERE page_id = ?`,
@@ -738,17 +730,18 @@ func (s *SQLiteStore) DeletePage(id string) ([]string, error) {
 		`DELETE FROM map_pin_events WHERE map_page_id = ?`,
 		`DELETE FROM map_images WHERE page_id = ?`,
 		`DELETE FROM page_images WHERE page_id = ?`,
+		`DELETE FROM page_attachments WHERE page_id = ?`,
 		`DELETE FROM page_tags WHERE page_id = ?`,
 		`DELETE FROM timeline_events WHERE page_id = ?`,
 		`DELETE FROM timeline_calendars WHERE page_id = ?`,
 		`DELETE FROM pages WHERE id = ?`,
 	} {
 		if _, err := tx.Exec(q, id); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	if err := resolveCodexLinks(tx, codex); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return files, tx.Commit()
+	return files, attachments, tx.Commit()
 }

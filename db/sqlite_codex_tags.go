@@ -311,30 +311,25 @@ func uniqueImageName(taken map[string]bool, name string) string {
 func (s *SQLiteStore) AddPageImage(img models.PageImage) (models.PageImage, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	if _, _, err := pageCodex(s.db, img.PageID); err != nil {
-		return img, err
-	}
-	rows, err := s.db.Query(`SELECT name FROM page_images WHERE page_id = ?`, img.PageID)
+	tx, err := s.db.Begin()
 	if err != nil {
 		return img, err
 	}
-	taken := map[string]bool{}
-	for rows.Next() {
-		var n string
-		if err := rows.Scan(&n); err != nil {
-			rows.Close()
-			return img, err
-		}
-		taken[NormName(n)] = true
+	defer tx.Rollback()
+	if _, _, err := pageCodex(tx, img.PageID); err != nil {
+		return img, err
 	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
+	// Names are shared with attachments (both are written ![[name]]).
+	taken, err := pageFileNames(tx, img.PageID)
+	if err != nil {
 		return img, err
 	}
 	img.Name = uniqueImageName(taken, img.Name)
-	_, err = s.db.Exec(`INSERT INTO page_images (`+pageImageColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '')`,
-		img.ID, img.PageID, img.Name, img.File, img.Width, img.Height, img.UploadedBy, img.CreatedAt)
-	return img, err
+	if _, err := tx.Exec(`INSERT INTO page_images (`+pageImageColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '')`,
+		img.ID, img.PageID, img.Name, img.File, img.Width, img.Height, img.UploadedBy, img.CreatedAt); err != nil {
+		return img, err
+	}
+	return img, tx.Commit()
 }
 
 // RemovePageImage takes a picture out of the page's list (soft: the row and file stay so old

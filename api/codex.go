@@ -1053,12 +1053,13 @@ func handleDeletePage(w http.ResponseWriter, r *http.Request, id string) {
 	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
-	files, err := db.DeletePage(id)
+	files, attachments, err := db.DeletePage(id)
 	if err != nil {
 		codexStoreError(w, err, "delete page")
 		return
 	}
 	removeCodexFiles(files)
+	removeAttachmentFiles(attachments)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
