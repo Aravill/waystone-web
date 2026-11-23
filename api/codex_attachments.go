@@ -145,7 +145,12 @@ func receiveAttachment(w http.ResponseWriter, r *http.Request, ext string) (file
 	}
 	if !attachmentContentOK(tmp, size, ext) {
 		db.DiscardUpload(tmp)
-		attachmentCodeError(w, http.StatusBadRequest, "content_mismatch", "the file is empty or is not what its extension says")
+		msg := "the file is empty or is not what its extension says"
+		switch ext {
+		case ".docx", ".xlsx", ".pptx":
+			msg += "; a password-protected file has to be put in a .zip first"
+		}
+		attachmentCodeError(w, http.StatusBadRequest, "content_mismatch", msg)
 		return "", 0, false
 	}
 	file = db.GenerateUUID()
