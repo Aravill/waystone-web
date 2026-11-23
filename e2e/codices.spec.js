@@ -263,6 +263,59 @@ test.describe('Codices templates and copying', () => {
   });
 });
 
+test.describe('Codices language', () => {
+  test('a Czech codex has Czech templates and dates, and can be switched to English', async ({ page }) => {
+    const editor = await apiAs('roy');
+    const name = `E2E Kodex ${Date.now()}`;
+    let codexId = '';
+    let pageId = '';
+    try {
+      await loginAs(page, 'roy');
+      await page.goto('/codices');
+      await page.getByRole('button', { name: /New codex/ }).first().click();
+      const dlg = page.getByRole('dialog');
+      await dlg.getByLabel('Name').fill(name);
+      await dlg.getByRole('button', { name: 'Create codex' }).click();
+      await expect(dlg).toContainText('Choose a language.');
+      await dlg.getByLabel('Language').selectOption({ label: 'Czech' });
+      await dlg.getByRole('button', { name: 'Create codex' }).click();
+      await page.waitForURL(/\/codices\/c\/[^/]+$/);
+      codexId = page.url().split('/').pop();
+      await expect(page.locator('.cx-head .cx-kicker').filter({ visible: true })).toHaveText('Czech');
+
+      await page.getByRole('button', { name: '+ New page' }).first().click();
+      await page.getByRole('radio', { name: /Sezení/ }).click();
+      await expect(page.locator('.cx-np-tags')).toHaveText('Adds tags: sezení');
+      await page.getByLabel('Title').fill('E2E sezení');
+      await page.getByLabel('Title').press('Enter');
+      await page.waitForURL(/\/edit$/);
+      pageId = page.url().match(/\/p\/([^/]+)\//)[1];
+      const { page: made } = await (await editor.get(`/api/codices/pages/${pageId}`)).json();
+      expect(made.body).toMatch(/^\*\*Datum:\*\* \d{1,2}\.\u00a0\d{1,2}\.\u00a0\d{4}\n/);
+
+      // Built-in names are taken in both languages.
+      for (const taken of ['Postava', 'Character']) {
+        const res = await editor.post(`/api/codices/c/${codexId}/templates`, { data: { name: taken, description: '', body: 'x', tags: [] } });
+        expect(res.status(), taken).toBe(409);
+      }
+
+      await page.goto(`/codices/c/${codexId}`);
+      await page.getByRole('button', { name: 'Edit codex' }).click();
+      await expect(dlg.getByLabel('Language')).toHaveValue('cs');
+      await dlg.getByLabel('Language').selectOption({ label: 'English' });
+      await dlg.getByRole('button', { name: 'Save' }).click();
+      await expect(page.getByRole('status')).toHaveText('Codex saved');
+      await page.getByRole('button', { name: '+ New page' }).first().click();
+      await expect(page.getByRole('radio', { name: /Session/ })).toBeVisible();
+      await expect(page.getByRole('radio', { name: /Sezení/ })).toHaveCount(0);
+    } finally {
+      if (pageId) await editor.delete(`/api/codices/pages/${pageId}`);
+      if (codexId) await editor.delete(`/api/codices/c/${codexId}`);
+      await editor.dispose();
+    }
+  });
+});
+
 test.describe('Codices folder default templates', () => {
   let editor;
   let codex;

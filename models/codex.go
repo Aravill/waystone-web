@@ -15,10 +15,21 @@ type Codex struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Language    string `json:"language"` // LangEnglish or LangCzech
 	CreatedBy   string `json:"created_by"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }
+
+// A codex's language decides the language of its built-in templates and of the text written into its
+// pages (docs/design/codex-language.md).
+const (
+	LangEnglish = "en"
+	LangCzech   = "cs"
+)
+
+// ValidLanguage tells whether a codex can have this language.
+func ValidLanguage(l string) bool { return l == LangEnglish || l == LangCzech }
 
 // Folder organises the pages of one codex into a nested tree. It is for sorting only: links,
 // titles and aliases ignore it.

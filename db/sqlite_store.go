@@ -268,6 +268,7 @@ func (s *SQLiteStore) initSchema() error {
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL COLLATE NOCASE UNIQUE,
 		description TEXT NOT NULL DEFAULT '',
+		language TEXT NOT NULL DEFAULT 'en',
 		created_by TEXT NOT NULL,
 		created_at TEXT NOT NULL,
 		updated_at TEXT NOT NULL
@@ -587,6 +588,13 @@ func (s *SQLiteStore) initSchema() error {
 	if folderHasTemplate == 0 {
 		if _, err := s.db.Exec(`ALTER TABLE codex_folders ADD COLUMN default_template TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("failed to add codex_folders.default_template column: %w", err)
+		}
+	}
+	if has, err := s.columnExists("codices", "language"); err != nil {
+		return fmt.Errorf("failed to inspect codices table: %w", err)
+	} else if !has {
+		if _, err := s.db.Exec(`ALTER TABLE codices ADD COLUMN language TEXT NOT NULL DEFAULT 'en'`); err != nil {
+			return fmt.Errorf("failed to add codices.language column: %w", err)
 		}
 	}
 	var charHasCodexURL int

@@ -329,6 +329,7 @@
                     <div>
                         <header class="cx-head">
                             <div class="cx-head-text">
+                                <p class="cx-kicker" x-show="codex.codex.language !== 'en'" x-text="languageName(codex.codex.language)"></p>
                                 <h1 class="cx-title" tabindex="-1" x-text="codex.codex.name"></h1>
                             </div>
                             <div class="cx-actions">
@@ -1097,6 +1098,14 @@
                             <input type="text" id="dName" maxlength="80" x-model="dlg.name" x-ref="dlgFocus">
                         </div>
                         <div class="form-group">
+                            <label for="dLang">Language</label>
+                            <select id="dLang" x-model="dlg.language">
+                                <option value="" disabled x-show="!dlg.codex">Choose a language</option>
+                                <template x-for="l in CODEX_LANGUAGES" :key="l.id"><option :value="l.id" x-text="l.name" :selected="l.id === dlg.language"></option></template>
+                            </select>
+                            <p class="hint" x-text="dlg.codex ? 'For the built-in templates, dates and other text put into new pages. What is already written stays as it is.' : 'For the built-in templates, dates and other text put into new pages. You can change it later.'"></p>
+                        </div>
+                        <div class="form-group">
                             <label for="dDesc">Description (optional)</label>
                             <textarea id="dDesc" rows="6" x-model="dlg.description"></textarea>
                             <p class="hint">Formatting works as on pages. Shown at the top of the codex.</p>
@@ -1195,11 +1204,11 @@
     </div>
 
     <script src="/static/notifications.js?v=15"></script>
-    <script src="/campaigns.js?v=67"></script>
-    <script src="/static/codex-editor.js?v=7"></script>
+    <script src="/campaigns.js?v=68"></script>
+    <script src="/static/codex-editor.js?v=8"></script>
     <script src="/static/codex-graph.js?v=4"></script>
-    <script src="/static/codex-help.js?v=4"></script>
+    <script src="/static/codex-help.js?v=5"></script>
     <script src="/static/codex-books.js?v=1"></script>
-    <script src="/static/codex.js?v=43"></script>
+    <script src="/static/codex.js?v=44"></script>
 </body>
 </html>

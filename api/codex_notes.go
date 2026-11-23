@@ -168,8 +168,8 @@ func handleDeleteNote(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 // noteSignature is the line that opens an appended note: the date and who wrote it, in italics.
-func noteSignature(name string) string {
-	return "_" + time.Now().UTC().Format("Jan 2, 2006") + " · " + name + "_"
+func noteSignature(name, lang string) string {
+	return "_" + codexToday(lang) + " · " + name + "_"
 }
 
 // handleAppendNote adds the note to the end of a page of its codex (a revision noted "Added a
@@ -208,7 +208,11 @@ func handleAppendNote(w http.ResponseWriter, r *http.Request, id string) {
 	if !ok {
 		return
 	}
-	rev, err := db.AppendNoteToPage(id, userID, req.PageID, noteSignature(name)+"\n"+text, maxPageBodyRunes)
+	lang, ok := codexLanguage(w, note.CodexID)
+	if !ok {
+		return
+	}
+	rev, err := db.AppendNoteToPage(id, userID, req.PageID, noteSignature(name, lang)+"\n"+text, maxPageBodyRunes)
 	if err != nil {
 		codexNoteError(w, err, "add note")
 		return

@@ -34,9 +34,16 @@ func cutRunes(s string, n int) string {
 	return strings.TrimSpace(string([]rune(s)[:n]))
 }
 
+// journalFolderTails is what a journal folder is called after "{game}: ", by the codex's language
+// (codexJournalPrefix in static/codex.js knows the same names).
+var journalFolderTails = map[string]string{
+	models.LangEnglish: "Campaign Journal",
+	models.LangCzech:   "Deník tažení",
+}
+
 // journalFolderName is the generated folder name for a game: "{game}: Campaign Journal", the game
 // part cut to 62 characters with "/" written as "-", plus " (n)" from the second try on.
-func journalFolderName(game string, n int) string {
+func journalFolderName(game, lang string, n int) string {
 	suffix := ""
 	if n > 1 {
 		suffix = fmt.Sprintf(" (%d)", n)
@@ -51,7 +58,7 @@ func journalFolderName(game string, n int) string {
 	if g == "" {
 		g = "Game"
 	}
-	return g + ": Campaign Journal" + suffix
+	return g + ": " + journalFolderTails[lang] + suffix
 }
 
 // journalPageBase is a journal page's title before it is made unique: "{game}: {date}", plus
@@ -114,9 +121,15 @@ func ensureJournalFolderTx(tx *sql.Tx, campaignID, codexID, userID string) (mode
 			return models.Folder{}, err
 		}
 	}
+	var lang string
+	if err := tx.QueryRow(`SELECT language FROM codices WHERE id = ?`, codexID).Scan(&lang); err == sql.ErrNoRows {
+		return models.Folder{}, ErrCodexNotFound
+	} else if err != nil {
+		return models.Folder{}, err
+	}
 	name := ""
 	for n := 1; ; n++ {
-		name = journalFolderName(game, n)
+		name = journalFolderName(game, lang, n)
 		if free, err := siblingNameFree(tx, codexID, "", name, ""); err != nil {
 			return models.Folder{}, err
 		} else if free {
@@ -293,8 +306,8 @@ func (s *SQLiteStore) CountLegacyJournal(campaignID string) (int, error) {
 }
 
 // RenameJournalFolder renames the game's journal folder after the game was renamed, but only while
-// it still has the generated name for the old title and the new name is free next to it. Page
-// titles never change.
+// it still has the generated name for the old title (in either language; it keeps the one it was made
+// in) and the new name is free next to it. Page titles never change.
 func (s *SQLiteStore) RenameJournalFolder(campaignID, oldTitle, newTitle string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -319,8 +332,13 @@ func (s *SQLiteStore) RenameJournalFolder(campaignID, oldTitle, newTitle string)
 	if err != nil {
 		return err
 	}
-	name := journalFolderName(newTitle, 1)
-	if f.Name != journalFolderName(oldTitle, 1) || name == f.Name {
+	name := ""
+	for lang := range journalFolderTails {
+		if f.Name == journalFolderName(oldTitle, lang, 1) {
+			name = journalFolderName(newTitle, lang, 1)
+		}
+	}
+	if name == "" || name == f.Name {
 		return nil
 	}
 	if free, err := siblingNameFree(tx, f.CodexID, f.ParentID, name, f.ID); err != nil {

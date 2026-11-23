@@ -178,7 +178,7 @@ func handleCodexFolderRoutes(w http.ResponseWriter, r *http.Request, parts []str
 			codexFolderError(w, db.ErrFolderNotFound, "retrieve folder")
 			return
 		}
-		if t := *req.DefaultTemplate; t != "" && builtinTemplateByID(t) == nil {
+		if t := *req.DefaultTemplate; t != "" && builtinTemplateByID(t, models.LangEnglish) == nil { // the ids are the same in every language
 			ct, err := db.GetCodexTemplate(t)
 			if err != nil {
 				codexServerError(w, "retrieve template")

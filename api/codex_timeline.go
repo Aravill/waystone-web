@@ -220,13 +220,17 @@ func handleCreateTimelineEvent(w http.ResponseWriter, r *http.Request, id string
 	}
 	var page interface{}
 	if req.CreatePage {
-		b := builtinTemplateByID("builtin:event")
+		lang, ok := codexLanguage(w, codexID)
+		if !ok {
+			return
+		}
+		b := builtinTemplateByID("builtin:event", lang)
 		p := models.Page{ID: db.GenerateUUID(), Kind: models.PageLore, CodexID: codexID, Title: e.Title, AuthorID: userID}
-		if p.FolderID, err = eventsFolderID(codexID); err != nil {
+		if p.FolderID, err = eventsFolderID(codexID, lang); err != nil {
 			codexServerError(w, "retrieve folders")
 			return
 		}
-		if e, err = db.CreateTimelineEventWithPage(e, p, fillTemplate(b.Body, e.Title), models.NewPageExtras{TagNames: b.Tags}); err != nil {
+		if e, err = db.CreateTimelineEventWithPage(e, p, fillTemplate(b.Body, e.Title, codexToday(lang)), models.NewPageExtras{TagNames: b.Tags}); err != nil {
 			codexTimelineError(w, err, "create event")
 			return
 		}
@@ -243,16 +247,22 @@ func handleCreateTimelineEvent(w http.ResponseWriter, r *http.Request, id string
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"event": map[string]interface{}{"id": e.ID}, "page": page, "timeline": payload})
 }
 
-// eventsFolderID is the codex's top-level folder named "Events" ("" = top level when there is none).
-// A page made for an event never creates the folder.
-func eventsFolderID(codexID string) (string, error) {
+// eventsFolderID is the codex's top-level folder named "Events" or "Události", the one in the codex's
+// language first ("" = top level when there is none). A page made for an event never creates the folder.
+func eventsFolderID(codexID, lang string) (string, error) {
 	folders, err := db.GetFolders(codexID)
 	if err != nil {
 		return "", err
 	}
-	for _, f := range folders {
-		if f.ParentID == "" && db.NormName(f.Name) == "events" {
-			return f.ID, nil
+	names := []string{"events", "události"}
+	if lang == models.LangCzech {
+		names = []string{"události", "events"}
+	}
+	for _, name := range names {
+		for _, f := range folders {
+			if f.ParentID == "" && db.NormName(f.Name) == name {
+				return f.ID, nil
+			}
 		}
 	}
 	return "", nil

@@ -132,7 +132,7 @@ type Store interface {
 	GetCodices() ([]models.Codex, error)
 	GetCodex(id string) (*models.Codex, error)
 	CreateCodex(w models.Codex, creatorGetsEdit bool) error
-	UpdateCodex(id, name, description string) error
+	UpdateCodex(id, name, description, language string) error
 	DeleteCodex(id string) error
 	SetCampaignCodex(campaignID, codexID string) error
 	GetUserRights(userID string) ([]string, error)

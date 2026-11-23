@@ -66,8 +66,8 @@ func GetCodex(id string) (*models.Codex, error) { return GetStore().GetCodex(id)
 func CreateCodex(w models.Codex, creatorGetsEdit bool) error {
 	return GetStore().CreateCodex(w, creatorGetsEdit)
 }
-func UpdateCodex(id, name, description string) error {
-	return GetStore().UpdateCodex(id, name, description)
+func UpdateCodex(id, name, description, language string) error {
+	return GetStore().UpdateCodex(id, name, description, language)
 }
 func DeleteCodex(id string) error { return GetStore().DeleteCodex(id) }
 func SetCampaignCodex(campaignID, codexID string) error {

@@ -1421,7 +1421,8 @@ function renderMarkdown(text) {
             .replace(/(^|[^\w])_([^_\s][^_\n]*?)_(?!\w)/g, '$1<em>$2</em>');
         return out.replace(/\0(\d+)\0/g, (m, i) => links[Number(i)]);
     };
-    const LIST_RE = /^([ \t]*)([-*]|\d+\.)\s+(.*)$/;
+    // A Czech date at the start of a line (23. 11. 2026) is text, not item 23.
+    const LIST_RE = /^([ \t]*)([-*]|\d+\.(?!\s\d{1,2}\.\s\d{4}\b))\s+(.*)$/;
     const kindOf = (l) => LIST_RE.test(l) ? 'list' : /^&gt;\s?/.test(l) ? 'quote' : 'text';
     // Lists nest by indentation, to any depth: two spaces or a tab more than the level above open a new one.
     const renderList = (lines) => {
