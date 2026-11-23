@@ -87,7 +87,8 @@ func discordGroup(typ models.NotificationType) string {
 }
 
 // queueDiscordDMs mirrors a just-written batch of inbox notifications into the outbox, one DM per
-// recipient who linked Discord and has the type's group on. The text is rendered once.
+// recipient who linked Discord and has the type's group on. The text is rendered once; the link is
+// each recipient's own, so opening it marks their notification read.
 func queueDiscordDMs(actorID string, typ models.NotificationType, batch []models.Notification) {
 	group := discordGroup(typ)
 	if !discordEnabled() || group == "" || len(batch) == 0 {
@@ -111,7 +112,8 @@ func queueDiscordDMs(actorID string, typ models.NotificationType, batch []models
 			actor = u.DisplayName()
 		}
 	}
-	payload := string(discordPayload(discordText(batch[0], actor), "", discordLink(batch[0])))
+	text := discordText(batch[0], actor)
+	_, label := notificationTarget(batch[0])
 	now := time.Now().UTC().Format(time.RFC3339)
 	var rows []models.DiscordOutboxRow
 	for _, n := range batch {
@@ -127,7 +129,8 @@ func queueDiscordDMs(actorID string, typ models.NotificationType, batch []models
 			continue
 		}
 		rows = append(rows, models.DiscordOutboxRow{
-			Kind: "dm", Target: n.UserID, CampaignID: n.CampaignID, Payload: payload,
+			Kind: "dm", Target: n.UserID, CampaignID: n.CampaignID,
+			Payload:       string(discordPayload(text, discordButtonFor(label, notificationURL(n)))),
 			NextAttemptAt: now, CreatedAt: now,
 		})
 	}
@@ -143,7 +146,8 @@ func queueDiscordDMs(actorID string, typ models.NotificationType, batch []models
 
 // postToChannel queues one post to the game's Discord channel. It skips games without a channel,
 // events the admin switched off, and (but for the status change itself) finished or cancelled games.
-func postToChannel(campaign *models.Campaign, event, text, link string) {
+// n is the inbox notification the post stands for: it decides the link (notificationTarget).
+func postToChannel(campaign *models.Campaign, event, text string, n models.Notification) {
 	if !discordEnabled() || campaign == nil || campaign.DiscordChannelID == "" {
 		return
 	}
@@ -165,10 +169,12 @@ func postToChannel(campaign *models.Campaign, event, text, link string) {
 	if !on {
 		return
 	}
+	n.CampaignID = campaign.ID
+	path, label := notificationTarget(n)
 	now := time.Now().UTC().Format(time.RFC3339)
 	row := models.DiscordOutboxRow{
 		Kind: "channel", Target: campaign.DiscordChannelID, CampaignID: campaign.ID,
-		Payload:       string(discordPayload(text, "", link)),
+		Payload:       string(discordPayload(text, discordButtonFor(label, path))),
 		NextAttemptAt: now, CreatedAt: now,
 	}
 	if err := db.EnqueueDiscord([]models.DiscordOutboxRow{row}); err != nil {
@@ -178,14 +184,18 @@ func postToChannel(campaign *models.Campaign, event, text, link string) {
 	wakeDiscord()
 }
 
-func gameLink(c *models.Campaign) string { return discordURL("/games/" + c.ID) }
+// sessionNotification is the notification of a session event that a channel post stands for.
+func sessionNotification(typ models.NotificationType, s models.CampaignSession) models.Notification {
+	return models.Notification{Type: typ, SessionID: s.ID, Data: sessionData(s)}
+}
 
 func postSessionConfirmed(c *models.Campaign, s models.CampaignSession) {
 	if s.Manual {
 		return
 	}
 	postToChannel(c, models.DiscordEventSessionConfirmed,
-		"**"+mdEscape(c.Title)+"**: session confirmed for "+discordWhen(sessionData(s)), gameLink(c))
+		"**"+mdEscape(c.Title)+"**: session confirmed for "+discordWhen(sessionData(s)),
+		sessionNotification(models.NotificationSessionConfirmed, s))
 }
 
 func postSessionCancelled(c *models.Campaign, s models.CampaignSession) {
@@ -193,7 +203,8 @@ func postSessionCancelled(c *models.Campaign, s models.CampaignSession) {
 		return
 	}
 	postToChannel(c, models.DiscordEventSessionCancelled,
-		"**"+mdEscape(c.Title)+"**: the session on "+discordWhen(sessionData(s))+" was cancelled", gameLink(c))
+		"**"+mdEscape(c.Title)+"**: the session on "+discordWhen(sessionData(s))+" was cancelled",
+		sessionNotification(models.NotificationSessionCancelled, s))
 }
 
 func postNewPoll(c *models.Campaign, dates []models.CampaignSession) {
@@ -205,23 +216,27 @@ func postNewPoll(c *models.Campaign, dates []models.CampaignSession) {
 	for _, d := range dates {
 		b.WriteString("\n• " + discordWhen(sessionData(d)))
 	}
-	postToChannel(c, models.DiscordEventNewPoll, b.String(), discordURL("/games/"+c.ID+"/calendar?date="+dates[0].Date))
+	postToChannel(c, models.DiscordEventNewPoll, b.String(),
+		sessionNotification(models.NotificationSessionSuggested, dates[0]))
 }
 
 func postSessionReminder(c *models.Campaign, s models.CampaignSession) {
 	postToChannel(c, models.DiscordEventSessionReminder,
-		"**"+mdEscape(c.Title)+"**: next session "+discordWhen(sessionData(s)), gameLink(c))
+		"**"+mdEscape(c.Title)+"**: next session "+discordWhen(sessionData(s)),
+		sessionNotification(models.NotificationSessionReminder, s))
 }
 
 func postSignupsOpened(c *models.Campaign) {
-	postToChannel(c, models.DiscordEventSignupsOpened, "**"+mdEscape(c.Title)+"**: sign-ups are open", gameLink(c))
+	postToChannel(c, models.DiscordEventSignupsOpened, "**"+mdEscape(c.Title)+"**: sign-ups are open",
+		models.Notification{Type: models.NotificationSignupsOpened})
 }
 
 func postStatusChanged(c *models.Campaign, from, to models.CampaignStatus) {
 	postToChannel(c, models.DiscordEventStatusChanged,
-		"**"+mdEscape(c.Title)+"** moved from "+mdEscape(string(from))+" to "+mdEscape(string(to)), gameLink(c))
+		"**"+mdEscape(c.Title)+"** moved from "+mdEscape(string(from))+" to "+mdEscape(string(to)),
+		models.Notification{Type: models.NotificationCampaignStatus})
 }
 
 func sessionData(s models.CampaignSession) map[string]string {
-	return map[string]string{"date": s.Date, "time": s.Time, "timezone": s.Timezone}
+	return map[string]string{"date": s.Date, "time": s.Time, "timezone": s.Timezone, "poll_id": s.PollID}
 }

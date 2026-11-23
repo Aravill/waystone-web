@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -156,48 +155,32 @@ func discordText(n models.Notification, actor string) string {
 	return "Update for " + title
 }
 
-// discordLink is where a notification's message points, mirroring openItem in
-// static/notifications.js. It is "" without PUBLIC_URL.
-func discordLink(n models.Notification) string {
-	d := n.Data
-	cid := url.PathEscape(n.CampaignID)
-	switch {
-	case n.Type == models.NotificationCharacterStatus && d["character_id"] != "":
-		return discordURL("/characters/" + url.PathEscape(d["character_id"]))
-	case n.Type == models.NotificationDiscordChannelLost:
-		return discordURL("/admin/discord")
-	case n.CampaignID == "":
-		return discordURL("/")
-	case n.Type == models.NotificationSessionStarted, n.Type == models.NotificationSessionReminder,
-		n.Type == models.NotificationCharacterAssigned, n.Type == models.NotificationCharacterCleared:
-		return discordURL("/games/" + cid)
-	case n.Type == models.NotificationSignupAccepted && d["characters"] != "":
-		return discordURL("/games/" + cid + "?character=1")
-	case d["date"] != "" && (n.Type == models.NotificationSessionSuggested || n.Type == models.NotificationPollReminder ||
-		n.Type == models.NotificationPollComplete || n.Type == models.NotificationPollPosted || n.Type == models.NotificationPollSkipped):
-		return discordURL("/games/" + cid + "/calendar?date=" + url.QueryEscape(d["date"]))
-	}
-	return discordURL("/games/" + cid)
+// discordButton is a message's link button; with an empty url the message carries none.
+type discordButton struct{ label, url string }
+
+// discordButtonFor builds the button for a path under PUBLIC_URL.
+func discordButtonFor(label, path string) discordButton {
+	return discordButton{label: label, url: discordURL(path)}
 }
 
-const discordEmbedColor = 0x8E2A1E // --rubric
-
-// discordPayload builds a message: the text, plus one embed that carries the link. Mentions are off.
-func discordPayload(text, title, link string) []byte {
+// discordPayload builds a message: the text, plus a link button (component type 2, style 5), which
+// needs no gateway and no interactions endpoint. Mentions are off.
+func discordPayload(text string, button discordButton) []byte {
 	if r := []rune(text); len(r) > 2000 {
 		text = string(r[:2000])
 	}
-	if title == "" {
-		title = "Waystone"
-	}
-	embed := map[string]interface{}{"title": title, "color": discordEmbedColor}
-	if link != "" {
-		embed["url"] = link
-	}
-	b, _ := json.Marshal(map[string]interface{}{
+	msg := map[string]interface{}{
 		"content":          text,
-		"embeds":           []interface{}{embed},
 		"allowed_mentions": map[string]interface{}{"parse": []string{}},
-	})
+	}
+	if button.url != "" {
+		msg["components"] = []interface{}{map[string]interface{}{
+			"type": 1,
+			"components": []interface{}{map[string]interface{}{
+				"type": 2, "style": 5, "label": button.label, "url": button.url,
+			}},
+		}}
+	}
+	b, _ := json.Marshal(msg)
 	return b
 }

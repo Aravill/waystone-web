@@ -106,7 +106,7 @@ func HandleProfileDiscordTest(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value("user_id").(string)
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	err := sendDM(ctx, userID, discordPayload("Test message from Waystone. DMs work.", "Waystone", discordURL("/profile")))
+	err := sendDM(ctx, userID, discordPayload("Test message from Waystone. DMs work.", discordButtonFor("Open your profile", "/profile")))
 	switch {
 	case err == nil:
 		writeJSON(w, http.StatusOK, map[string]string{"status": "success"})

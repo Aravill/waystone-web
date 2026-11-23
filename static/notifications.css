@@ -135,12 +135,14 @@
 }
 
 .notif-item {
+    display: block;
     padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--line);
     border-left: 2px solid transparent;
     color: var(--muted);
     font-size: 0.875rem;
-    cursor: pointer;
+    text-decoration: none;
+    outline-offset: -3px;
     overflow-wrap: anywhere;
     transition: background-color 0.15s;
 }
@@ -153,6 +155,11 @@
 
 .notif-item:hover {
     background: var(--folio);
+}
+
+.notif-msg,
+.notif-time {
+    display: block;
 }
 
 .notif-time {

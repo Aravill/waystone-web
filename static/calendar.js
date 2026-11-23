@@ -96,9 +96,17 @@ window.calendarPage = function () {
                 document.title = 'Waystone - ' + (data.title || 'Game') + ' calendar';
                 // The sessions API only answers the DM and the players (403 for anyone else).
                 this.forbidden = !this.isCurrentUserDM && !(data.players || []).includes(this.currentUserId);
-                if (this.forbidden) return;
                 const params = new URLSearchParams(location.search);
-                await this.openCalendar(params.get('date') || data.first_unanswered_session_date || '');
+                const pollId = params.get('poll') || '', sessionId = params.get('session') || '';
+                if (this.forbidden) {
+                    // A notification's or Discord post's link: the game page shows what this viewer may see.
+                    if (pollId || sessionId) {
+                        location.replace('/games/' + encodeURIComponent(this.currentCampaignId) + (pollId ? '?poll=' + encodeURIComponent(pollId) : '?session=' + encodeURIComponent(sessionId)));
+                    }
+                    return;
+                }
+                if (pollId || sessionId) await this.openLinked(pollId, sessionId, params.get('date') || '');
+                else await this.openCalendar(params.get('date') || data.first_unanswered_session_date || '');
                 // "+ Add a date" on the game page lands here with ?add={pollId}
                 const addTo = params.get('add');
                 if (addTo && this.isCurrentUserDM && this.pollInfo[addTo]) this.addPollDate(this.pollInfo[addTo]);
@@ -125,6 +133,29 @@ window.calendarPage = function () {
             if (focus) {
                 await this.selectDay(focus);
             }
+        },
+
+        // A notification's link: opens on the poll's first upcoming date, on the session a settled poll became,
+        // or on the session's day. date is the day the notification was about, for when it is gone.
+        async openLinked(pollId, sessionId, date) {
+            const is = (s) => pollId ? s.poll_id === pollId : s.id === sessionId;
+            const upcoming = (this.campaign?.upcoming_sessions || []).filter(is)
+                .sort((a, b) => `${a.date} ${a.time || ''}`.localeCompare(`${b.date} ${b.time || ''}`))[0];
+            await this.openCalendar(upcoming?.date || date);
+            if (upcoming && this.sessions.some((s) => s.id === upcoming.id)) return this.showLinked(upcoming.id);
+            // Played, cancelled or past: the month's list has it
+            const other = this.sessions.filter(is).sort((a, b) => (a.status === 'Cancelled') - (b.status === 'Cancelled'))[0];
+            if (other) {
+                if (other.date !== date) await this.selectDay(this.parseDateLocal(other.date));
+                return this.showLinked(other.id);
+            }
+            if (this.sessionsMonth) this.showMessage(pollId ? 'This poll is no longer open.' : 'This session is no longer on the calendar.', 'error');
+        },
+
+        // A day can hold several sessions: bring the linked one into view in the panel.
+        showLinked(id) {
+            if (this.getSelectedDaySessions().length < 2) return;
+            this.$nextTick(() => document.querySelector(`.panel-session[data-session="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest' }));
         },
 
         generateCalendarDays() {

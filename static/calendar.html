@@ -7,7 +7,7 @@
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=85">
-    <link rel="stylesheet" href="/static/notifications.css?v=12">
+    <link rel="stylesheet" href="/static/notifications.css?v=13">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body x-data="calendarPage()">
@@ -175,7 +175,7 @@
                                         <div class="poll-card" :class="{ 'is-poll': g.poll?.multi, 'awaits-reply': pollGroupAwaitsMe(g) }">
                                             <p class="poll-card-head" x-show="g.poll?.multi" x-text="g.poll ? pollHeading(g.poll) : ''"></p>
                                             <template x-for="s in g.sessions" :key="s.id">
-                                                <div class="panel-session" :class="{ 'awaits-reply': !g.poll?.multi && awaitsMe(s), 'is-current': !!g.poll?.multi && s.id === g.selectedId }">
+                                                <div class="panel-session" :data-session="s.id" :class="{ 'awaits-reply': !g.poll?.multi && awaitsMe(s), 'is-current': !!g.poll?.multi && s.id === g.selectedId }">
                                                     <div class="panel-session-head">
                                                         <span class="panel-session-time"><span x-show="g.poll?.multi" x-text="formatAgendaDate(s) + ' · '"></span><span x-text="getSessionTimeRangeZone(s)"></span></span>
                                                         <span class="panel-status-tag" :class="`chip-${s.status}`" x-text="s.status"></span>
@@ -343,8 +343,8 @@
         </div>
     </div>
 
-    <script src="/static/notifications.js?v=15"></script>
+    <script src="/static/notifications.js?v=16"></script>
     <script src="/campaigns.js?v=68"></script>
-    <script src="/static/calendar.js?v=5"></script>
+    <script src="/static/calendar.js?v=6"></script>
 </body>
 </html>

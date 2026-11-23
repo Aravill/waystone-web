@@ -68,6 +68,33 @@ window.gamePage = function () {
                 history.replaceState(null, '', location.pathname);
                 if (this.isPlayer && this.acceptsCharacters) this.openPicker();
             }
+            if (this.campaign) this.openLinked(new URLSearchParams(location.search));
+        },
+
+        // Notification links: ?company=1 shows the company; ?session= and ?poll= come from the calendar, which
+        // sends on anyone who is neither the DM nor a player.
+        openLinked(params) {
+            const sessionId = params.get('session'), pollId = params.get('poll');
+            if (!sessionId && !pollId && params.get('company') !== '1') return;
+            history.replaceState(null, '', location.pathname);
+            if (!sessionId && !pollId) {
+                this.showCompany();
+                this.revealPanel();
+                return;
+            }
+            const is = (s) => pollId ? s.poll_id === pollId : s.id === sessionId;
+            const ahead = this.upcoming.find(is);
+            const index = ahead || pollId ? -1 : this.played.findIndex(is);
+            if (ahead) {
+                this.pick(this.rowIdFor(ahead));
+            } else if (index >= 0) {
+                if (index >= 5) this.showAll = true;
+                this.pick(sessionId);
+            } else {
+                this.showMessage(pollId && !this.isMember ? "Only the game's DM and players can see its polls."
+                    : pollId ? 'This poll is no longer open.'
+                    : "That session isn't shown here. It may have been cancelled, or only the game's DM and players can see it.", 'error');
+            }
         },
 
         async load() {

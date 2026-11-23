@@ -185,7 +185,7 @@ Wordmark left, nav centre, then the theme toggle, the inbox and the user menu, a
 
 **Phones.** Row 1 is the logo (28px), the icons and the avatar with the name hidden; row 2 is the nav (19px). That is about 90px in all, instead of the old 190px. The theme toggle stays visible.
 
-The logo mark is the standing-stone from the mock-ups: a tapered stone with a downward rune, on a ground line. It is the `--stone-mark` mask in `styles.css`, coloured by `currentColor`, next to the wordmark (and above it on the login page). Unread inbox count: a 19px `--rubric` circle with 13px `--bg` text. The inbox panel header has an "Only unread" checkbox (on until turned off, kept in localStorage) next to "Mark all read", and a footer with "‹ Newer", the range and "Older ›" shows 10 notifications at a time.
+The logo mark is the standing-stone from the mock-ups: a tapered stone with a downward rune, on a ground line. It is the `--stone-mark` mask in `styles.css`, coloured by `currentColor`, next to the wordmark (and above it on the login page). Unread inbox count: a 19px `--rubric` circle with 13px `--bg` text. The inbox panel header has an "Only unread" checkbox (on until turned off, kept in localStorage) next to "Mark all read", and a footer with "‹ Newer", the range and "Older ›" shows 10 notifications at a time. Each row is a link (`a.notif-item`, no underline) to the place of its event.
 
 ### Page title
 
