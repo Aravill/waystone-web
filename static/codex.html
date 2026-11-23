@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=82">
     <link rel="stylesheet" href="/static/notifications.css?v=12">
-    <link rel="stylesheet" href="/static/codex.css?v=46">
+    <link rel="stylesheet" href="/static/codex.css?v=47">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -644,6 +644,29 @@
                                 </template>
                             </ul>
                         </section>
+                        <section class="cx-box cx-box--files" aria-label="Attachments" x-show="pageData.attachments.length || canEdit">
+                            <h2>Attachments · <span x-text="pageData.attachments.length"></span></h2>
+                            <p class="cx-box-empty" x-show="pageData.attachments.length === 0">No files yet.</p>
+                            <ul x-show="pageData.attachments.length">
+                                <template x-for="a in pageData.attachments" :key="a.id">
+                                    <li>
+                                        <a class="cx-file" :href="a.url" :target="a.inline ? '_blank' : null" :rel="a.inline ? 'noopener' : null" :download="a.inline ? null : a.name" x-text="a.name"></a>
+                                        <small class="muted"><span x-text="codexFileSize(a.size)"></span> · added by <span x-text="a.uploaded_by_user.display_name"></span> · <span x-text="shortDate(a.created_at)"></span></small>
+                                        <span class="cx-file-acts" x-show="canEdit">
+                                            <button type="button" class="text-link" :disabled="attach.busy" :aria-label="'Replace ' + a.name" @click="startReplace(a)">Replace</button>
+                                            <button type="button" class="text-link" :disabled="attach.busy" :aria-label="'Remove ' + a.name" @click="removeAttachment(a)">Remove</button>
+                                        </span>
+                                    </li>
+                                </template>
+                            </ul>
+                            <div class="cx-file-busy" x-show="attach.busy">
+                                <progress max="100" :value="attach.pct" aria-label="Upload progress"></progress>
+                                <p class="hint" role="status" x-text="attach.text"></p>
+                            </div>
+                            <p class="cx-box-actions" x-show="canEdit"><button type="button" class="text-link" :disabled="attach.busy" @click="$refs.attachInput.click()">Add files</button></p>
+                            <input type="file" multiple hidden x-ref="attachInput" @change="onAttachFiles($event)" tabindex="-1" aria-hidden="true">
+                            <input type="file" hidden x-ref="attachReplaceInput" @change="onReplaceFile($event)" tabindex="-1" aria-hidden="true">
+                        </section>
                         <section class="cx-box cx-box--local" aria-label="Local graph" x-show="localGraph">
                             <h2>Local graph</h2>
                             <a class="local-graph" :href="graphUrl(page.id)" aria-label="Open the graph view">
@@ -1147,6 +1170,6 @@
     <script src="/static/codex-editor.js?v=6"></script>
     <script src="/static/codex-graph.js?v=3"></script>
     <script src="/static/codex-help.js?v=2"></script>
-    <script src="/static/codex.js?v=37"></script>
+    <script src="/static/codex.js?v=38"></script>
 </body>
 </html>

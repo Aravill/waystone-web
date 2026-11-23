@@ -4051,6 +4051,33 @@ a.tl-title:hover {
     padding: 0.375rem 0.75rem 0;
 }
 
+/* Attachments box */
+.cx-box--files li > .text-link {
+    margin-top: 0.125rem;
+    margin-right: 0.75rem;
+}
+
+.cx-box--files .cx-file-acts {
+    display: block;
+}
+
+.cx-box--files .cx-file-busy {
+    padding: 0.5rem 0.75rem 0;
+}
+
+.cx-box--files .cx-file-busy .hint {
+    margin: 0.25rem 0 0;
+}
+
+.cx-box--files progress {
+    width: 100%;
+    accent-color: var(--rubric);
+}
+
+.cx-box--files .cx-box-actions {
+    padding-bottom: 0.5rem;
+}
+
 /* Create the missing pages after a save */
 .cx-cm-list {
     list-style: none;

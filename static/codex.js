@@ -97,6 +97,44 @@ const CODEX_USER_RE = /@\[([^\[\]\n]{1,100})\]\(([\w-]{1,64})\)/g;
 // regex; the leading "!" makes it a picture, so pictures are swapped out before links.
 const CODEX_IMAGE_RE = /!\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{0,200}))?\]\]/g;
 
+// Files that can be attached to a page (the server's allow-list), and the same plus the picture types.
+// An embed ![[name.pdf]] of one of these that matches no attachment reads "Attachment removed".
+const CODEX_FILE_EXT_RE = /\.(pdf|docx?|xlsx?|pptx?|od[tsp]|txt|md|csv|zip|mp3)$/i;
+const CODEX_ATTACH_RE = /\.(pdf|docx?|xlsx?|pptx?|od[tsp]|txt|md|csv|zip|mp3|png|jpe?g|webp|gif)$/i;
+const CODEX_ATTACH_MAX = 100 << 20;
+
+// 512 B, 14 KB, 3.2 MB
+function codexFileSize(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return Math.round(n / 1024) + ' KB';
+    return (n / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Sends a file as the raw request body with progress (the one place that is not fetch: fetch cannot
+// report upload progress). Resolves {status, data} (status 401 when the login has expired, as send()
+// reports it); rejects on a network error or when it takes longer than 16 minutes.
+function codexUpload(method, url, file, onProgress) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open(method, url);
+        xhr.timeout = 16 * 60 * 1000;
+        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+        xhr.setRequestHeader('X-File-Name', encodeURIComponent(file.name || 'file'));
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+        };
+        xhr.onload = () => {
+            let data = {};
+            try { data = JSON.parse(xhr.responseText); } catch (e) { /* not JSON */ }
+            const login = xhr.responseURL && new URL(xhr.responseURL).pathname.includes('login');
+            resolve({ status: login ? 401 : xhr.status, data });
+        };
+        xhr.onerror = () => reject(new Error('the connection failed'));
+        xhr.ontimeout = () => reject(new Error('it took too long'));
+        xhr.send(file);
+    });
+}
+
 // ![[name|OPTIONS|caption]]: OPTIONS is a first segment made only of the keywords below (any case),
 // otherwise everything after the name is the caption. The last keyword of each kind wins; defaults
 // are medium and right. Options matter only for a picture alone in its paragraph.
@@ -739,6 +777,7 @@ window.codexPage = function () {
         lightbox: { url: '', caption: '', meta: '' },
         uploading: '', // status text while a batch uploads
         uploadJobs: 0,
+        attach: { busy: false, text: '', pct: 0, replaceId: '' }, // the page's Attachments box
         dragOver: false,
         // Editor
         draft: null,
@@ -844,7 +883,7 @@ window.codexPage = function () {
                 if (this.screen === 'edit' && this.hasFiles(event)) this.onDrop(event);
             });
             window.addEventListener('beforeunload', (event) => {
-                if (this.isDirty || this.uploading) {
+                if (this.isDirty || this.uploading || this.attach.busy) {
                     event.preventDefault();
                     event.returnValue = '';
                 }
@@ -3376,6 +3415,116 @@ window.codexPage = function () {
             }
         },
 
+        // ---- Attachments (the box on the page) ----
+        // Sends one file (POST to add, PUT to replace) and returns the attachment, or null after
+        // reporting why not. stop.now is set when the rest of a batch is pointless.
+        async attachSend(method, url, file, stop) {
+            this.attach.pct = 0;
+            try {
+                const { status, data } = await codexUpload(method, url, file, (p) => { this.attach.pct = p; });
+                if (status === 401) {
+                    this.showMessage('Your login has expired. Log in again in another tab, then try again.', 'error');
+                    stop.now = true;
+                    return null;
+                }
+                if (status >= 200 && status < 300 && data.attachment) return data.attachment;
+                if (data.code === 'page_deleted') {
+                    this.showMessage('This page was deleted.', 'error');
+                    stop.now = true;
+                    await this.load();
+                } else if (data.code === 'attachment_not_found') {
+                    this.pageData.attachments = this.pageData.attachments.filter((x) => x.id !== this.attach.replaceId);
+                    this.showMessage('That file was already removed.', 'info');
+                } else {
+                    this.showMessage(`${file.name}: ${this.sentence(data.error || 'upload failed')}`, 'error');
+                }
+            } catch (error) {
+                this.showMessage(`Could not upload ${file.name}: ${error.message}.`, 'error');
+            }
+            return null;
+        },
+        async onAttachFiles(event) {
+            const files = Array.from(event.target.files);
+            event.target.value = '';
+            if (!files.length || this.attach.busy) return;
+            this.attach.busy = true;
+            const pageId = this.page.id;
+            const stop = { now: false };
+            try {
+                for (const [i, file] of files.entries()) {
+                    if (stop.now) break;
+                    if (!CODEX_ATTACH_RE.test(file.name)) {
+                        this.showMessage(`${file.name}: this type of file can't be attached.`, 'error');
+                        continue;
+                    }
+                    if (file.size > CODEX_ATTACH_MAX) {
+                        this.showMessage(`${file.name} is larger than 100 MB.`, 'error');
+                        continue;
+                    }
+                    this.attach.text = `Uploading ${file.name}${files.length > 1 ? ` (${i + 1} of ${files.length})` : ''}`;
+                    const a = await this.attachSend('POST', `/api/codices/pages/${encodeURIComponent(pageId)}/attachments`, file, stop);
+                    if (a && this.page && this.page.id === pageId) this.pageData.attachments = [...this.pageData.attachments, a];
+                }
+            } finally {
+                this.attach.busy = false;
+                this.attach.text = '';
+            }
+        },
+        startReplace(a) {
+            this.attach.replaceId = a.id;
+            this.$refs.attachReplaceInput.click();
+        },
+        async onReplaceFile(event) {
+            const file = event.target.files[0];
+            event.target.value = '';
+            const cur = this.pageData.attachments.find((x) => x.id === this.attach.replaceId);
+            if (!file || !cur || this.attach.busy) return;
+            const ext = (n) => (String(n).match(/\.[^.]*$/) || [''])[0].toLowerCase();
+            if (ext(file.name) !== ext(cur.name)) {
+                this.showMessage(`The new file must be a ${ext(cur.name)} file.`, 'error');
+                return;
+            }
+            if (file.size > CODEX_ATTACH_MAX) {
+                this.showMessage(`${file.name} is larger than 100 MB.`, 'error');
+                return;
+            }
+            this.attach.busy = true;
+            this.attach.text = `Replacing ${cur.name}`;
+            const pageId = this.page.id;
+            try {
+                const a = await this.attachSend('PUT', `/api/codices/pages/${encodeURIComponent(pageId)}/attachments/${encodeURIComponent(cur.id)}`, file, { now: false });
+                if (a && this.page && this.page.id === pageId) {
+                    this.pageData.attachments = this.pageData.attachments.map((x) => (x.id === a.id ? a : x));
+                    this.showMessage(`Replaced ${a.name}`, 'success');
+                }
+            } finally {
+                this.attach.busy = false;
+                this.attach.text = '';
+            }
+        },
+        async removeAttachment(a) {
+            if (this.attach.busy) return;
+            const ok = await this.askConfirm({
+                eyebrow: 'Attachment',
+                title: `Remove “${a.name}”?`,
+                message: 'This deletes the file for good; it is not in the backups. Links to it will read “attachment removed”.',
+                confirmLabel: 'Remove file',
+                danger: true
+            });
+            if (!ok) return;
+            try {
+                const { response, data } = await this.send(`/api/codices/pages/${encodeURIComponent(this.page.id)}/attachments/${encodeURIComponent(a.id)}`, 'DELETE');
+                if (!response.ok && response.status !== 404) {
+                    this.showMessage(response.status === 401 ? 'Your login has expired. Log in again in another tab, then try again.' : this.sentence(data.error || 'Could not remove the file'), 'error');
+                    return;
+                }
+                this.pageData.attachments = this.pageData.attachments.filter((x) => x.id !== a.id);
+                this.showMessage('File removed', 'success');
+            } catch (error) {
+                this.showMessage('Could not remove the file: ' + error.message, 'error');
+            }
+        },
+
         // ---- Delete ----
         async deletePage() {
             if (this.busy) return;
@@ -3385,7 +3534,8 @@ window.codexPage = function () {
                 title: `Delete “${p.title}”?`,
                 message: `This deletes the page and all ${p.revision_count} of its revisions. It cannot be undone. Links to it become missing links.` +
                     (this.isTimeline ? ` Its ${this.countLabel(this.tlEvents.length, 'event')} go with it.` : '') +
-                    ((this.pageData.on_timelines || []).length ? ' Events that point at it stay on their timelines as plain events.' : ''),
+                    ((this.pageData.on_timelines || []).length ? ' Events that point at it stay on their timelines as plain events.' : '') +
+                    (this.pageData.attachments.length ? ` Its ${this.countLabel(this.pageData.attachments.length, 'attachment')} ${this.pageData.attachments.length === 1 ? 'is' : 'are'} deleted too.` : ''),
                 confirmLabel: 'Delete page',
                 danger: true
             });
