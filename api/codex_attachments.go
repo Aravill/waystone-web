@@ -344,3 +344,31 @@ func handleAttachmentFile(w http.ResponseWriter, r *http.Request, id string) {
 	h.Set("ETag", strconv.Quote(a.File))
 	http.ServeContent(w, r, "", fi.ModTime(), f)
 }
+
+// handleCodexAttachments lists every attachment on the codex's pages, newest first, with the page each is on and
+// the total size.
+func handleCodexAttachments(w http.ResponseWriter, r *http.Request, codexID string) {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkCodex(w, codexID, false) {
+		return
+	}
+	list, err := db.GetCodexAttachments(codexID)
+	if err != nil {
+		codexServerError(w, "retrieve attachments")
+		return
+	}
+	users, err := journalUsers()
+	if err != nil {
+		codexServerError(w, "retrieve users")
+		return
+	}
+	out := []map[string]interface{}{}
+	var total int64
+	for _, a := range list {
+		o := attachmentObject(users, a.PageAttachment)
+		o["page"] = map[string]string{"id": a.PageID, "title": a.PageTitle}
+		out = append(out, o)
+		total += a.Size
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"attachments": out, "total_size": total})
+}
