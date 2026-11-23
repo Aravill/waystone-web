@@ -61,6 +61,8 @@ type Store interface {
 	GetCalendarToken(userID string) (string, error)
 	SetCalendarToken(userID, token string) error
 	GetUserIDByCalendarToken(token string) (string, error)
+	TouchCalendarToken(token string) error
+	GetCalendarLinks() (map[string]models.CalendarLink, error)
 	IssuePasswordInvite(userID, tokenHash string, expiresAt time.Time) error
 	GetPasswordInvite(tokenHash string) (userID string, expiresAt time.Time, err error)
 	DeletePasswordInvite(userID string) error

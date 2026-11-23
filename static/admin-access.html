@@ -8,24 +8,15 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=82">
     <link rel="stylesheet" href="/static/notifications.css?v=12">
+    <link rel="stylesheet" href="/static/admin.css?v=1">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
     <style>
-        [x-cloak] { display: none !important; }
-        .admin-subnav { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; color: var(--muted); }
-        .admin-subnav a { color: var(--ink); }
-        .admin-subnav a[aria-current="page"] { color: var(--rubric); text-decoration: none; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-        th, td { text-align: left; padding: 0.625rem 0.5rem; vertical-align: middle; }
-        th { color: var(--muted); border-bottom: 1px solid var(--ink); font-size: 0.875rem; font-weight: 500; }
-        tbody tr { border-bottom: 1px solid var(--line); }
-        tbody tr:hover { background: var(--folio); }
         .access-user { white-space: nowrap; }
         @media (max-width: 480px) { .access-user { white-space: normal; } }
         .access-note { color: var(--muted); font-size: 0.8125rem; }
         .access-check { text-align: center; width: 5rem; }
         .access-check input { margin: 0; width: 1.125rem; height: 1.125rem; accent-color: var(--ink); }
         .access-grid td select { width: auto; min-width: 5.5rem; }
-        .admin-empty { padding: 1.25rem 0.5rem; color: var(--muted); text-align: center; }
     </style>
 </head>
 <body x-data="adminAccessPage()">
@@ -52,8 +43,12 @@
     </div>
 
     <main class="container">
-        <nav class="admin-subnav" aria-label="Admin sections">
-            <a href="/admin/users">Users</a><span aria-hidden="true">&middot;</span><a href="/admin/access" aria-current="page">Access rights</a><span aria-hidden="true">&middot;</span><a href="/admin/discord">Discord</a>
+        <nav class="admin-tabs" aria-label="Admin sections">
+            <a href="/admin/users">Users</a>
+            <a href="/admin/access" aria-current="page">Access rights</a>
+            <a href="/admin/systems">Systems</a>
+            <a href="/admin/integrations">Integrations</a>
+            <a href="/admin/discord">Discord</a>
         </nav>
         <h1 class="page-title"><span class="drop-cap">A</span>ccess rights</h1>
         <p class="form-hint" style="margin-bottom: 1rem;">Admins always have every right and aren't listed.</p>

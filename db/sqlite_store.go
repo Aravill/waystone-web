@@ -120,7 +120,8 @@ func (s *SQLiteStore) initSchema() error {
 	CREATE TABLE IF NOT EXISTS calendar_tokens (
 		user_id TEXT PRIMARY KEY,
 		token TEXT NOT NULL UNIQUE,
-		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		last_read_at TEXT NOT NULL DEFAULT ''
 	);
 
 	DROP TABLE IF EXISTS guest_tokens;
@@ -595,6 +596,15 @@ func (s *SQLiteStore) initSchema() error {
 	if charHasCodexURL == 0 {
 		if _, err := s.db.Exec(`ALTER TABLE characters ADD COLUMN codex_url TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("failed to add characters.codex_url column: %w", err)
+		}
+	}
+	var tokenHasLastRead int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('calendar_tokens') WHERE name = 'last_read_at'`).Scan(&tokenHasLastRead); err != nil {
+		return fmt.Errorf("failed to inspect calendar_tokens table: %w", err)
+	}
+	if tokenHasLastRead == 0 {
+		if _, err := s.db.Exec(`ALTER TABLE calendar_tokens ADD COLUMN last_read_at TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("failed to add calendar_tokens.last_read_at column: %w", err)
 		}
 	}
 	if err := s.rescueUnsortedPages(); err != nil {
@@ -1684,7 +1694,7 @@ func (s *SQLiteStore) SetCalendarToken(userID, token string) error {
 	_, err := s.db.Exec(`
 		INSERT INTO calendar_tokens (user_id, token, created_at)
 		VALUES (?, ?, ?)
-		ON CONFLICT(user_id) DO UPDATE SET token = excluded.token, created_at = excluded.created_at
+		ON CONFLICT(user_id) DO UPDATE SET token = excluded.token, created_at = excluded.created_at, last_read_at = ''
 	`, userID, token, time.Now().UTC().Format(time.RFC3339))
 	return err
 }
@@ -1702,6 +1712,39 @@ func (s *SQLiteStore) GetUserIDByCalendarToken(token string) (string, error) {
 		return "", nil
 	}
 	return userID, err
+}
+
+// TouchCalendarToken records that a calendar app read the feed, at most once an hour.
+func (s *SQLiteStore) TouchCalendarToken(token string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	now := time.Now().UTC()
+	_, err := s.db.Exec(`UPDATE calendar_tokens SET last_read_at = ? WHERE token = ? AND last_read_at < ?`,
+		now.Format(time.RFC3339), token, now.Add(-time.Hour).Format(time.RFC3339))
+	return err
+}
+
+// GetCalendarLinks returns every user's calendar link by user id, without the token.
+func (s *SQLiteStore) GetCalendarLinks() (map[string]models.CalendarLink, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	rows, err := s.db.Query(`SELECT user_id, created_at, last_read_at FROM calendar_tokens`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]models.CalendarLink{}
+	for rows.Next() {
+		var userID string
+		var l models.CalendarLink
+		if err := rows.Scan(&userID, &l.CreatedAt, &l.LastReadAt); err != nil {
+			return nil, err
+		}
+		out[userID] = l
+	}
+	return out, rows.Err()
 }
 
 func (s *SQLiteStore) GetSessionByID(sessionID string) (*models.CampaignSession, error) {
