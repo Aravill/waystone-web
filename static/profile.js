@@ -71,8 +71,13 @@ window.profilePage = function() {
                 failed: ['Could not connect Discord. Try again.', 'error'],
                 off: ["Discord isn't set up.", 'error']
             };
-            if (texts[result]) this.showMessage(texts[result][0], texts[result][1]);
-            this.discordOffer = result === 'linked';
+            if (result === 'linked' && this.discord && this.discord.linked) {
+                // The dialog says it's connected; a toast would cover its buttons on phones.
+                this.discordOffer = true;
+                this.$nextTick(() => this.$refs.discordImportBtn?.focus());
+            } else if (texts[result]) {
+                this.showMessage(texts[result][0], texts[result][1]);
+            }
             this.integrationsOpen = true;
             params.delete('discord');
             const qs = params.toString();
@@ -117,7 +122,6 @@ window.profilePage = function() {
 
         // Right after linking: copy the Discord display name and/or picture into the profile.
         async importDiscord() {
-            if (!this.discordImport.name && !this.discordImport.avatar) { this.discordOffer = false; return; }
             this.discordImporting = true;
             try {
                 const res = await fetch('/api/profile/discord/import', {
@@ -133,6 +137,10 @@ window.profilePage = function() {
             } finally {
                 this.discordImporting = false;
             }
+        },
+
+        closeDiscordOffer() {
+            if (!this.discordImporting) this.discordOffer = false;
         },
 
         async testDiscord() {

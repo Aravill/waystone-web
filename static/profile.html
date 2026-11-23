@@ -204,15 +204,6 @@
                         <template x-if="discord && discord.linked">
                             <div>
                                 <p>Connected as <strong x-text="'@' + discord.username"></strong></p>
-                                <div class="profile-subblock" x-show="discordOffer">
-                                    <p class="form-hint">Use your Discord details on Waystone?</p>
-                                    <label class="check-label"><input type="checkbox" x-model="discordImport.name"> Display name (<span x-text="discord.username"></span>)</label>
-                                    <label class="check-label"><input type="checkbox" x-model="discordImport.avatar"> Profile picture</label>
-                                    <div class="profile-actions">
-                                        <button type="button" class="campaign-link-button" :disabled="discordImporting" @click="importDiscord()">Use them</button>
-                                        <button type="button" class="campaign-link-button" @click="discordOffer = false">No thanks</button>
-                                    </div>
-                                </div>
                                 <p class="form-hint" x-show="discord.in_guild === true">You are in the server.</p>
                                 <p class="form-hint" x-show="discord.in_guild === false">
                                     Join the server to get DMs.
@@ -257,6 +248,27 @@
         </div>
     </div>
 
+    <!-- Copy from Discord Modal: opens once, right after linking -->
+    <div id="discordImportModal" class="modal confirm-modal" :class="{ 'modal-open': discordOffer }" @click.self="closeDiscordOffer()" @keydown.escape.window="closeDiscordOffer()" role="dialog" aria-modal="true" aria-labelledby="discordImportTitle">
+        <div class="modal-content confirm-modal-content">
+            <div class="modal-header">
+                <h2 id="discordImportTitle">Use your Discord details?</h2>
+                <button type="button" class="modal-close" @click="closeDiscordOffer()" aria-label="Close">&times;</button>
+            </div>
+            <form @submit.prevent="importDiscord()" class="modal-form">
+                <p class="confirm-modal-message">Discord is connected. Pick what to copy to your Waystone profile.</p>
+                <div>
+                    <label class="check-label"><input type="checkbox" x-model="discordImport.name"> <span x-text="'Display name (' + (discord?.username || '') + ')'"></span></label>
+                    <label class="check-label"><input type="checkbox" x-model="discordImport.avatar"> Profile picture</label>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="submit-btn" x-ref="discordImportBtn" :disabled="discordImporting || (!discordImport.name && !discordImport.avatar)">Use them</button>
+                    <button type="button" class="btn-cancel" :disabled="discordImporting" @click="closeDiscordOffer()">No thanks</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Confirm Modal -->
     <div id="confirmModal" class="modal confirm-modal" :class="{ 'modal-open': confirmDialog.open }" @click.self="closeConfirm(false)" @keydown.escape.window="confirmDialog.open && closeConfirm(false)" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
         <div class="modal-content confirm-modal-content">
@@ -277,6 +289,6 @@
     <script src="/static/notifications.js?v=15"></script>
     <script src="/campaigns.js?v=66"></script>
     <script src="/static/characters.js?v=3"></script>
-    <script src="profile.js?v=15"></script>
+    <script src="profile.js?v=16"></script>
 </body>
 </html>
