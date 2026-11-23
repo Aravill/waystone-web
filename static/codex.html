@@ -6,9 +6,9 @@
     <title>Waystone - Codices</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=8"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=83">
+    <link rel="stylesheet" href="/static/styles.css?v=84">
     <link rel="stylesheet" href="/static/notifications.css?v=12">
-    <link rel="stylesheet" href="/static/codex.css?v=49">
+    <link rel="stylesheet" href="/static/codex.css?v=50">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -292,19 +292,16 @@
                             </div>
                         </header>
                         <p class="cx-sub">Codices hold pages. A page links to others in its codex with [[double brackets]]. <a href="/codices/help">Writing guide</a></p>
-                        <section class="codex-section">
-                            <h2 class="section-header">Codices</h2>
-                            <p class="same" x-show="home.codices.length === 0" x-text="home.can_create ? 'No codices yet. Make a codex first.' : 'No codices to show yet.'"></p>
-                            <div class="codex-cards">
-                                <template x-for="w in home.codices" :key="w.id">
-                                    <a class="codex-card" :href="'/codices/c/' + encodeURIComponent(w.id)">
-                                        <span class="codex-card-name" x-text="w.name"></span>
-                                        <span class="codex-card-excerpt" x-text="w.excerpt || 'No description yet.'"></span>
-                                        <span class="codex-card-meta" x-text="countLabel(w.page_count, 'page')"></span>
-                                    </a>
-                                </template>
-                            </div>
-                        </section>
+                        <p class="same" x-show="home.codices.length === 0 && !home.can_create">No codices to show yet.</p>
+                        <ul class="codex-shelf" aria-label="Codices" x-show="home.codices.length > 0 || home.can_create">
+                            <template x-if="home.codices.length === 0">
+                                <li><button type="button" class="codex-blank" @click="openCreateCodex()">Make the first codex</button></li>
+                            </template>
+                            <template x-for="w in home.codices" :key="w.id">
+                                <li class="codex-book" x-html="bookHtml(w)"></li>
+                            </template>
+                        </ul>
+                        <svg width="0" height="0" class="codex-book-defs" aria-hidden="true"><defs><filter id="book-shadow" x="-20%" y="-20%" width="150%" height="150%" color-interpolation-filters="sRGB"><feDropShadow dx="4" dy="8" stdDeviation="6"/></filter></defs></svg>
                         <section class="codex-section">
                             <h2 class="section-header">Recent changes</h2>
                             <p class="same" x-show="home.recent.length === 0">Nothing has been written yet.</p>
@@ -1210,6 +1207,7 @@
     <script src="/static/codex-editor.js?v=6"></script>
     <script src="/static/codex-graph.js?v=3"></script>
     <script src="/static/codex-help.js?v=3"></script>
-    <script src="/static/codex.js?v=41"></script>
+    <script src="/static/codex-books.js?v=1"></script>
+    <script src="/static/codex.js?v=42"></script>
 </body>
 </html>

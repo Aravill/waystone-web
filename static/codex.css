@@ -72,43 +72,463 @@ button.wikilink {
 }
 
 /* Codex cards */
-.codex-cards {
+/* The shelf: Codices home books (static/codex-books.js). Sizes are in --u, so the art scales as one and its
+   hairlines stay 1px. Spec: CODEX_BOOK_DESIGN_GUIDE.md. */
+.codex-shelf {
+    --u: 1px;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, calc(266 * var(--u)));
+    gap: 4rem 5rem;
+    list-style: none;
+    margin: 0;
+    padding: 3.25rem 0 2rem;
 }
 
-.codex-card {
-    display: grid;
-    align-content: start;
-    gap: 0.5rem;
-    padding: 1rem 1.25rem;
-    border: 1px solid var(--line);
-    color: var(--ink);
-    text-decoration: none;
+/* No room left of the column for the first cover to swing into: step the shelf in. */
+@media (max-width: 1180px) {
+    .codex-shelf {
+        padding-left: 4.75rem;
+        column-gap: 4.5rem;
+    }
 }
 
-.codex-card:hover,
-.codex-card:focus-visible {
-    background: var(--folio);
-    border-color: var(--ink);
+@media (min-width: 601px) and (max-width: 820px) {
+    .codex-shelf {
+        justify-content: center;
+    }
 }
 
-.codex-card-name {
-    font-family: var(--font-display);
-    font-size: 1.5rem;
-    line-height: 1.2;
+/* Phones: two smaller books a row, no hover. */
+@media (max-width: 600px) {
+    .codex-shelf {
+        --u: .62px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 2.25rem 1rem;
+        padding: 2rem 0 2.5rem;
+        justify-items: center;
+    }
 }
 
-.codex-card-excerpt {
+.codex-book {
+    position: relative;
+    width: calc(266 * var(--u));
+}
+
+.codex-book:hover, .codex-book:focus-within {
+    z-index: 3;
+}
+
+.codex-book-meta {
+    display: block;
+    width: calc(236 * var(--u));
+    margin: calc(48 * var(--u)) 0 0;
     color: var(--muted);
-    font-size: 0.9375rem;
+    font-size: .8125rem;
+    text-align: center;
+}
+
+/* The book */
+.book {
+    --board: color-mix(in srgb, var(--dye) var(--bk-dye-mix), var(--bk-dye-ground));   /* --dye comes from the codex */
+    --tool: color-mix(in srgb, var(--bk-tool) 62%, var(--board));   /* opaque: translucent lines stack where pieces meet */
+    --edge: color-mix(in srgb, var(--ink) 40%, var(--bk-paper));
+    --stroke: var(--tool);
+    position: relative;
+    width: calc(236 * var(--u));
+    height: calc(320 * var(--u));
+    perspective: calc(1600 * var(--u));
+    perspective-origin: 14% 46%;
+}
+
+.book svg {
+    display: block;
+    overflow: visible;
+    fill: none;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.book svg * {
+    vector-effect: non-scaling-stroke;
+}
+
+.book svg path, .book svg circle, .book svg rect {
+    transition: stroke .25s;
+}
+
+.bk-body {
+    position: absolute;
+    left: calc(-20 * var(--u));
+    top: calc(-20 * var(--u));
+    width: calc(320 * var(--u));
+    height: calc(420 * var(--u));
+    pointer-events: none;
+}
+
+.bk-hit {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+}
+
+/* The ring is drawn above the swung cover and leaves. */
+.bk-hit:focus-visible {
+    outline: none;
+}
+
+.book:has(.bk-hit:focus-visible)::after {
+    content: '';
+    position: absolute;
+    z-index: 7;
+    inset: calc(-8 * var(--u)) calc(-34 * var(--u)) calc(-24 * var(--u)) calc(-8 * var(--u));
+    border: 2px solid var(--rubric);
+    pointer-events: none;
+}
+
+.bk-leaf, .bk-fly, .bk-cover, .bk-turn {
+    position: absolute;
+    pointer-events: none;
+}
+
+/* The cover and the loose leaves share one 3D space, so the browser sorts them by depth: the cover is on
+   top while closed and behind the leaves once it has swung past them. */
+.bk-turn {
+    inset: 0;
+    z-index: 5;
+    transform-style: preserve-3d;
+}
+
+/* board pieces */
+.f-board {
+    fill: var(--board);
+    stroke: var(--stroke);
+}
+
+.f-paper {
+    fill: var(--bk-paper);
+    stroke: var(--edge);
+}
+
+.f-plate {
+    fill: var(--bg);
+    stroke: color-mix(in srgb, var(--ink) 60%, var(--bg));
+}
+
+.s-tool {
+    stroke: var(--stroke);
+}
+
+.s-soft {
+    stroke: color-mix(in srgb, var(--stroke) 60%, var(--board));
+}
+
+.s-edge {
+    stroke: var(--edge);
+}
+
+.f-dot {
+    fill: var(--stroke);
+    stroke: none;
+}
+
+/* the first leaf: plain flat HTML, so its text stays crisp */
+.bk-leaf {
+    z-index: 2;
+    left: calc(22 * var(--u));
+    top: calc(6 * var(--u));
+    width: calc(207 * var(--u));
+    height: calc(308 * var(--u));
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px 14px 12px 20px;
+    font-size: .8125rem;
+    line-height: 1.45;
+    visibility: hidden;
+    transition: visibility 0s .45s;
+}
+
+.bk-leaf-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    line-height: 1.1;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
     overflow-wrap: anywhere;
 }
 
-.codex-card-meta {
+.bk-leaf-text {
+    margin: 0;
     color: var(--muted);
-    font-size: 0.8125rem;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    overflow: hidden;
+}
+
+.bk-leaf-latest {
+    margin: auto 0 0;
+    padding: 8px 0 0;
+    border-top: 1px solid var(--line);
+    list-style: none;
+}
+
+.bk-leaf-latest li {
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+}
+
+.bk-leaf-latest a {
+    pointer-events: auto;
+    min-width: 0;
+    padding: 2px 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bk-leaf-latest span {
+    flex: none;
+    padding: 2px 0;
+    color: var(--muted);
+}
+
+.bk-leaf-text + .bk-leaf-foot {
+    margin-top: auto;
+}
+
+.bk-leaf-foot {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+    font-weight: 600;
+}
+
+/* loose leaves that lift behind the cover */
+.bk-fly {
+    left: calc(20 * var(--u));
+    top: calc(5 * var(--u));
+    width: calc(210 * var(--u));
+    height: calc(310 * var(--u));
+    background: var(--bk-paper);
+    border: 1px solid var(--edge);
+    transform-origin: 0 50%;
+    transition: transform .5s cubic-bezier(.4, 0, .3, 1);
+}
+
+/* the cover: front face with the plate, back face with the pastedown */
+.bk-cover {
+    left: calc(18 * var(--u));
+    top: 0;
+    width: calc(218 * var(--u));
+    height: calc(320 * var(--u));
+    transform-style: preserve-3d;
+    transform: translateZ(1px);
+    transform-origin: 0 50%;
+    transition: transform .5s cubic-bezier(.4, 0, .3, 1);
+}
+
+.bk-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+.bk-face > svg {
+    position: absolute;
+    left: calc(-10 * var(--u));
+    top: calc(-10 * var(--u));
+    width: calc(238 * var(--u));
+    height: calc(340 * var(--u));
+}
+
+.bk-face--in {
+    transform: rotateY(180deg);
+}
+
+/* title plate: same box on every binding */
+.bk-title {
+    position: absolute;
+    left: calc(36 * var(--u));
+    top: calc(60 * var(--u));
+    width: calc(146 * var(--u));
+    height: calc(116 * var(--u));
+    display: grid;
+    place-items: center;
+    padding: 0 calc(6 * var(--u));
+    text-align: center;
+}
+
+.bk-title span {
+    font-family: var(--font-title);
+    font-size: calc(var(--fs) * var(--u));
+    line-height: 1.08;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    overflow: hidden;
+}
+
+@media (max-width: 600px) {
+    /* Small covers: never below 13px. */
+    .bk-title {
+        padding: 0 1px;
+    }
+
+    .bk-title span {
+        font-size: max(13px, calc(var(--fs) * var(--u)));
+        line-height: 1.02;
+    }
+}
+
+/* fastenings and hanging pieces */
+.bk-strap {
+    position: absolute;
+    z-index: 6;
+    pointer-events: none;
+    transform-origin: 100% 50%;
+    transition: transform .28s .32s ease-out;
+}
+
+.bk-strap svg {
+    width: 100%;
+    height: 100%;
+}
+
+.bk-cord path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset .25s .35s, stroke .25s;
+}
+
+.bk-hang {
+    transform-box: fill-box;
+    transform-origin: 50% 0;
+}
+
+/* Hover and focus, where the leaf has room to be read */
+@media (min-width: 601px) {
+    .book:is(.is-open, :has(:focus-visible)) {
+        --stroke: var(--bk-tool);
+    }
+
+    .book:is(.is-open, :has(:focus-visible)) .bk-leaf {
+        visibility: visible;
+        transition: visibility 0s .1s;
+    }
+
+    .book:is(.is-open, :has(:focus-visible)) .bk-strap {
+        transform: rotateY(150deg);
+        transition: transform .24s ease-in;
+    }
+
+    .book:is(.is-open, :has(:focus-visible)) .bk-cord path {
+        stroke-dashoffset: 1;
+        transition: stroke-dashoffset .25s, stroke .25s;
+    }
+
+    .book:is(.is-open, :has(:focus-visible)) .bk-cover {
+        transform: rotateY(-111deg);
+        transition: transform .75s .14s cubic-bezier(.3, .1, .2, 1);
+    }
+
+    .book:is(.is-open, :has(:focus-visible)) .bk-fly--1 {
+        transform: rotateY(-104deg);
+        transition: transform .85s .2s cubic-bezier(.3, .1, .2, 1);
+    }
+
+    .book:is(.is-open, :has(:focus-visible)) .bk-fly--2 {
+        transform: rotateY(-97deg);
+        transition: transform .95s .28s cubic-bezier(.3, .1, .2, 1);
+    }
+
+    .book:is(.is-open, :has(:focus-visible)) .bk-hang {
+        animation: bk-swing 1.8s ease-out;
+    }
+}
+
+@keyframes bk-swing {
+    0%, 100% { transform: rotate(0); }
+    15% { transform: rotate(-9deg); }
+    40% { transform: rotate(6deg); }
+    65% { transform: rotate(-3deg); }
+    85% { transform: rotate(1.5deg); }
+}
+
+/* A touch lifts the cover while the codex loads */
+.book.is-pressed .bk-cover {
+    transform: rotateY(-38deg);
+}
+
+.book.is-pressed .bk-fly {
+    transform: rotateY(-20deg);
+}
+
+/* Reduced motion: the cover gives way to the leaf at once */
+@media (prefers-reduced-motion: reduce) {
+    .book *, .book:is(.is-open, :has(:focus-visible)) * {
+        transition: none !important;
+        animation: none !important;
+    }
+
+    .book.is-pressed :is(.bk-cover, .bk-fly) {
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) and (min-width: 601px) {
+    .book:is(.is-open, :has(:focus-visible)) :is(.bk-cover, .bk-fly, .bk-strap, .bk-cord) {
+        transform: none;
+        opacity: 0;
+    }
+}
+
+/* An empty shelf */
+.codex-blank {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 236px;
+    max-width: 100%;
+    height: 320px;
+    padding: 1.5rem;
+    background: none;
+    border: 1px dashed var(--ctl);
+    color: var(--muted);
+    font-family: var(--font-title);
+    font-size: 1.5rem;
+    line-height: 1.15;
+    text-align: center;
+    cursor: pointer;
+}
+
+.codex-blank::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 18px;
+    border-left: 1px dashed var(--line);
+}
+
+.codex-blank:hover {
+    border-color: var(--ink);
+    color: var(--ink);
+}
+
+.codex-book-defs {
+    position: absolute;
+}
+
+.codex-book-defs feDropShadow {
+    flood-color: var(--shadow);
 }
 
 /* Editor */
@@ -561,6 +981,13 @@ button.wikilink {
     --cx-soft: color-mix(in srgb, var(--ink) 16%, transparent);
     --cx-hover: color-mix(in srgb, var(--ink) 9%, transparent);
     --cx-top-h: 3.5rem;
+    /* books: leather dyes, how much of a dye survives the theme, the tooling, the leaves */
+    --bk-dye-1: #46545C; --bk-dye-2: #5B4634; --bk-dye-3: #5A4450; --bk-dye-4: #4F5B42;
+    --bk-dye-5: #8A6642; --bk-dye-6: #6E5B3A; --bk-dye-7: #3C4761; --bk-dye-8: #5F5A55;
+    --bk-dye-mix: 100%;
+    --bk-dye-ground: #16120E;
+    --bk-tool: #F2EAD8;
+    --bk-paper: #F8F2E4;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -569,6 +996,9 @@ button.wikilink {
         --cx-bar-text: #E8DCC4;
         --cx-bar-line: rgba(232, 220, 196, 0.2);
         --cx-bar-fill: #2A231B;
+        --bk-dye-mix: 58%;
+        --bk-tool: #E8DCC4;
+        --bk-paper: #1D1812;
     }
 }
 
@@ -577,6 +1007,9 @@ button.wikilink {
     --cx-bar-text: #E8DCC4;
     --cx-bar-line: rgba(232, 220, 196, 0.2);
     --cx-bar-fill: #2A231B;
+    --bk-dye-mix: 58%;
+    --bk-tool: #E8DCC4;
+    --bk-paper: #1D1812;
 }
 
 /* Top bar */

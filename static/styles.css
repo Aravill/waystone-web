@@ -175,6 +175,16 @@
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* The Latin Extended letters IM Fell lacks, composed from its own letters and accents (tools/fell). */
+@font-face {
+    font-family: 'Waystone Fell';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('vendor/fonts/ws-fell-400-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-021B;
+}
+
 @font-face {
     font-family: 'UnifrakturMaguntia';
     font-style: normal;
@@ -196,7 +206,7 @@
     --font-text: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
     --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
-    --font-title: 'IM Fell English SC', serif;
+    --font-title: 'IM Fell English SC', 'Waystone Fell', serif;
     --font-black: 'UnifrakturMaguntia', serif;
     /* Standing-stone brand mark, used as a CSS mask so it follows currentColor */
     --stone-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 56'%3E%3Cg fill='none' stroke='black' stroke-width='3'%3E%3Cpath d='M8 54L10 14Q22 0 34 14L36 54Z'/%3E%3Cpath d='M22 18V42M16 26L22 32L28 26'/%3E%3Cpath d='M2 54H42'/%3E%3C/g%3E%3C/svg%3E");

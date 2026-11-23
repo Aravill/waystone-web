@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Codex Books</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;1,400&family=Barlow+Condensed:wght@600&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
+<style>
+/* Codex books mock-up (built; CODEX_BOOK_DESIGN_GUIDE.md is the spec): the Codices home, with each codex a
+   bound book instead of a card.
+   Siblings of the game banners (BANNER_DESIGN_GUIDE.md): line art on one flat fill, a soft shadow,
+   a dyed leather (decided: dyed, not one plain fill), a binding and an emblem picked from the codex id, and fixed anchors on every binding.
+   Hover or keyboard focus undoes the fastening and swings the cover; the first leaf holds what the
+   card showed (excerpt, page count) plus the two pages changed last. Text never moves.
+   All book sizes are in --u, so the art scales uniformly and its hairlines stay 1px. */
+
+/* ---------- tokens (STYLE_GUIDE.md) ---------- */
+:root {
+    --bg: #F2EAD8; --folio: #E6DBC2; --ink: #2B241C; --muted: #6B5E4B;
+    --line: rgba(43, 36, 28, 0.4); --ctl: rgba(43, 36, 28, 0.64);
+    --rubric: #8E2A1E; --shadow: rgba(43, 36, 28, 0.24);
+    --cx-bar: #2B241C; --cx-bar-text: #F2EAD8; --cx-bar-accent: #D9735C;
+    --cx-bar-line: rgba(242, 234, 216, 0.22); --cx-bar-fill: #3A3128;
+    --cx-hover: color-mix(in srgb, var(--ink) 9%, transparent);
+    /* new for the books */
+    --paper: #F8F2E4;                   /* leaves */
+    --dye-mix: 100%;                    /* how much of a dye survives in this theme */
+    --dye-ground: #16120E;
+    --dye-line: #F2EAD8;
+    --font-text: 'Inter', system-ui, sans-serif;
+    --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    --font-title: 'IM Fell English SC', serif;
+    color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+        --line: rgba(232, 220, 196, 0.3); --ctl: rgba(232, 220, 196, 0.5);
+        --rubric: #D9735C; --shadow: rgba(0, 0, 0, 0.7);
+        --cx-bar: #0C0A07; --cx-bar-text: #E8DCC4; --cx-bar-line: rgba(232, 220, 196, 0.2); --cx-bar-fill: #2A231B;
+        --paper: #1D1812; --dye-mix: 58%; --dye-line: #E8DCC4;
+        color-scheme: dark;
+    }
+}
+:root[data-theme="dark"] {
+    --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+    --line: rgba(232, 220, 196, 0.3); --ctl: rgba(232, 220, 196, 0.5);
+    --rubric: #D9735C; --shadow: rgba(0, 0, 0, 0.7);
+    --cx-bar: #0C0A07; --cx-bar-text: #E8DCC4; --cx-bar-line: rgba(232, 220, 196, 0.2); --cx-bar-fill: #2A231B;
+    --paper: #1D1812; --dye-mix: 58%; --dye-line: #E8DCC4;
+    color-scheme: dark;
+}
+
+/* ---------- base ---------- */
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-text); font-size: 1rem; line-height: 1.55; overflow-x: hidden; }
+a { color: var(--rubric); text-underline-offset: 4px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--rubric); outline-offset: 2px; }
+
+/* ---------- mock-up controls (not part of the design) ---------- */
+.mock-bar { position: relative; z-index: 60; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 16px; background: #2b2b2b; color: #eee; font: 13px/1.4 Inter, sans-serif; }
+.mock-bar label { display: inline-flex; align-items: center; gap: 6px; color: #bbb; }
+.mock-bar select { background: #1c1c1c; color: #eee; border: 1px solid #666; padding: 4px 6px; font: inherit; }
+.mock-bar :focus-visible { outline-color: #fff; }
+
+/* ---------- site header and top bar (as shipped, shortened) ---------- */
+.app { container: app / inline-size; background: var(--bg); min-height: 100vh; overflow-x: clip; }
+.app[data-width="phone"] { width: 390px; max-width: 100%; margin: 16px auto; outline: 1px solid var(--line); overflow: hidden; }
+.site { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; max-width: 74rem; margin: 0 auto; padding: 22px max(24px, env(safe-area-inset-right, 0px)) 16px max(24px, env(safe-area-inset-left, 0px)); }
+.site-rule { border-bottom: 3px double var(--ink); }
+.logo { font-family: 'UnifrakturMaguntia', serif; font-size: 34px; color: var(--ink); text-decoration: none; line-height: 1.1; }
+.nav { display: flex; flex-wrap: wrap; gap: 4px 28px; }
+.nav a { font-family: var(--font-title); font-size: 21px; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; padding: 4px 0; }
+.nav a:hover, .nav a[aria-current] { color: var(--ink); }
+.nav a[aria-current] { border-bottom-color: var(--rubric); }
+.avatar { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); background: var(--folio); font-family: var(--font-display); }
+.cx-top { display: flex; align-items: center; gap: .75rem; min-height: 3.5rem; margin-top: 1rem; padding: .5rem 1rem; background: var(--cx-bar); color: var(--cx-bar-text); border-bottom: 2px solid var(--cx-bar-accent); }
+.cx-brand { font-family: var(--font-display); font-size: 1.25rem; letter-spacing: .06em; color: inherit; text-decoration: none; }
+.cx-pick { min-height: 2.5rem; padding: 0 .75rem; background: none; border: 1px solid var(--cx-bar-line); font-size: .875rem; white-space: nowrap; }
+.cx-search { flex: 1 1 auto; min-width: 0; max-width: 30rem; margin-left: auto; }
+.cx-search input { width: 100%; height: 2.5rem; padding: 0 .75rem; background: var(--cx-bar-fill); color: var(--cx-bar-text); border: 1px solid var(--cx-bar-line); font: inherit; font-size: .875rem; }
+.cx-search input::placeholder { color: color-mix(in srgb, var(--cx-bar-text) 70%, transparent); }
+.cx-inner { max-width: 64rem; margin: 0 auto; padding-block: 1.25rem 4rem; padding-left: max(2rem, env(safe-area-inset-left, 0px)); padding-right: max(2rem, env(safe-area-inset-right, 0px)); }
+.cx-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .5rem 1rem; padding-bottom: .5rem; border-bottom: 2px solid var(--rubric); }
+.cx-title { margin: 0; font-family: var(--font-display); font-size: clamp(1.9rem, 1.4rem + 2vw, 2.75rem); font-weight: 400; line-height: 1.1; }
+.cx-act { min-height: 2.25rem; padding: 0 .75rem; background: var(--rubric); border: 1px solid var(--rubric); color: var(--bg); font-size: .875rem; font-weight: 600; }
+.cx-act:hover { filter: brightness(1.1); }
+.cx-sub { margin: .5rem 0 0; color: var(--muted); font-size: .875rem; }
+.section-header { margin: 0 0 .5rem; font-family: var(--font-display); font-size: 25px; font-weight: 400; line-height: 1.2; }
+.section-header::before { content: '§ '; color: var(--rubric); }
+.recent { list-style: none; margin: 0; padding: 0; font-size: .9375rem; }
+.recent li { padding: .5rem 0; border-bottom: 1px solid var(--line); }
+.muted { color: var(--muted); }
+
+/* ---------- the shelf ---------- */
+.shelf {
+    --u: 1px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, calc(266 * var(--u)));
+    gap: 4rem 5rem;
+    list-style: none;
+    margin: 0;
+    padding: 3.25rem 0 4rem;
+}
+/* No room left of the column for the first cover to swing into: step the shelf in. */
+@container app (max-width: 1180px) { .shelf { padding-left: 4.75rem; column-gap: 4.5rem; } }
+@container app (max-width: 820px) and (min-width: 601px) { .shelf { justify-content: center; } }
+/* Phones: two smaller books a row, no hover. */
+@container app (max-width: 600px) {
+    .site { padding: 12px 16px 10px; }
+    .logo { font-size: 28px; }
+    .nav { order: 3; width: 100%; gap: 4px 16px; }
+    .nav a { font-size: 19px; }
+    .cx-pick { display: none; }
+    .cx-inner { padding-left: max(1rem, env(safe-area-inset-left, 0px)); padding-right: max(1rem, env(safe-area-inset-right, 0px)); }
+    .shelf { --u: .62px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2.25rem 1rem; padding: 2rem 0 2.5rem; justify-items: center; }
+}
+.codex-book { position: relative; width: calc(266 * var(--u)); }
+.codex-book:hover, .codex-book:focus-within { z-index: 3; }
+.codex-book-meta { display: block; width: calc(236 * var(--u)); margin: calc(48 * var(--u)) 0 0; color: var(--muted); font-size: .8125rem; text-align: center; }
+
+/* ---------- the book ---------- */
+.book {
+    --board: color-mix(in srgb, var(--dye) var(--dye-mix), var(--dye-ground));   /* --dye comes from the codex */
+    --tool: color-mix(in srgb, var(--dye-line) 62%, var(--board));   /* opaque: translucent lines stack where pieces meet */
+    --edge: color-mix(in srgb, var(--ink) 40%, var(--paper));
+    --stroke: var(--tool);
+    position: relative;
+    width: calc(236 * var(--u));
+    height: calc(320 * var(--u));
+    perspective: calc(1600 * var(--u));
+    perspective-origin: 14% 46%;
+}
+.book svg { display: block; overflow: visible; fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.book svg * { vector-effect: non-scaling-stroke; }
+.book svg path, .book svg circle, .book svg rect { transition: stroke .25s; }
+.bk-body { position: absolute; left: calc(-20 * var(--u)); top: calc(-20 * var(--u)); width: calc(320 * var(--u)); height: calc(420 * var(--u)); pointer-events: none; }
+.bk-hit { position: absolute; inset: 0; z-index: 1; }
+/* The ring is drawn above the swung cover and leaves. */
+.bk-hit:focus-visible { outline: none; }
+.book:has(.bk-hit:focus-visible)::after { content: ''; position: absolute; z-index: 7; inset: calc(-8 * var(--u)) calc(-34 * var(--u)) calc(-24 * var(--u)) calc(-8 * var(--u)); border: 2px solid var(--rubric); pointer-events: none; }
+.bk-leaf, .bk-fly, .bk-cover, .bk-turn { position: absolute; pointer-events: none; }
+/* The cover and the loose leaves share one 3D space, so the browser sorts them by depth: the cover is on
+   top while closed and behind the leaves once it has swung past them. */
+.bk-turn { inset: 0; z-index: 5; transform-style: preserve-3d; }
+
+/* board pieces */
+.f-board { fill: var(--board); stroke: var(--stroke); }
+.f-paper { fill: var(--paper); stroke: var(--edge); }
+.f-plate { fill: var(--bg); stroke: color-mix(in srgb, var(--ink) 60%, var(--bg)); }
+.s-tool { stroke: var(--stroke); }
+.s-soft { stroke: color-mix(in srgb, var(--stroke) 60%, var(--board)); }
+.s-edge { stroke: var(--edge); }
+.f-dot { fill: var(--stroke); stroke: none; }
+
+/* the first leaf: plain flat HTML, so its text stays crisp */
+.bk-leaf {
+    z-index: 2;
+    left: calc(22 * var(--u)); top: calc(6 * var(--u));
+    width: calc(207 * var(--u)); height: calc(308 * var(--u));
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 16px 14px 12px 20px;
+    font-size: .8125rem; line-height: 1.45;
+    visibility: hidden;
+    transition: visibility 0s .45s;
+}
+.bk-leaf-title { margin: 0; font-family: var(--font-display); font-size: 1.25rem; line-height: 1.1; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.bk-leaf-text { margin: 0; color: var(--muted); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; }
+.bk-leaf-latest { margin: auto 0 0; padding: 8px 0 0; border-top: 1px solid var(--line); list-style: none; }
+.bk-leaf-latest li { display: flex; gap: 8px; justify-content: space-between; }
+.bk-leaf-latest a { pointer-events: auto; min-width: 0; padding: 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bk-leaf-latest span { flex: none; padding: 2px 0; color: var(--muted); }
+.bk-leaf-foot { display: flex; justify-content: flex-end; margin: 0; padding-top: 8px; border-top: 1px solid var(--line); }
+.bk-leaf-foot b { font-weight: 600; }
+
+/* loose leaves that lift behind the cover */
+.bk-fly {
+    left: calc(20 * var(--u)); top: calc(5 * var(--u));
+    width: calc(210 * var(--u)); height: calc(310 * var(--u));
+    background: var(--paper); border: 1px solid var(--edge);
+    transform-origin: 0 50%;
+    transition: transform .5s cubic-bezier(.4, 0, .3, 1);
+}
+
+/* the cover: front face with the plate, back face with the pastedown */
+.bk-cover {
+    left: calc(18 * var(--u)); top: 0;
+    width: calc(218 * var(--u)); height: calc(320 * var(--u));
+    transform-style: preserve-3d;
+    transform: translateZ(1px);
+    transform-origin: 0 50%;
+    transition: transform .5s cubic-bezier(.4, 0, .3, 1);
+}
+.bk-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.bk-face > svg { position: absolute; left: calc(-10 * var(--u)); top: calc(-10 * var(--u)); width: calc(238 * var(--u)); height: calc(340 * var(--u)); }
+.bk-face--in { transform: rotateY(180deg); }
+
+/* title plate: same box on every binding. Lettered in the title face (decided: IM Fell, not Barlow) */
+.bk-title {
+    position: absolute;
+    left: calc(36 * var(--u)); top: calc(60 * var(--u));
+    width: calc(146 * var(--u)); height: calc(116 * var(--u));
+    display: grid; place-items: center;
+    padding: 0 calc(6 * var(--u));
+    text-align: center;
+}
+.bk-title span { font-family: var(--font-title); font-size: calc(var(--fs) * var(--u)); line-height: 1.08; text-wrap: balance; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; }
+@container app (max-width: 600px) {
+    /* Small covers: never below 13px. */
+    .bk-title { padding: 0 1px; }
+    .bk-title span { font-size: max(13px, calc(var(--fs) * var(--u))); line-height: 1.02; }
+}
+
+/* fastenings and hanging pieces */
+.bk-strap { position: absolute; z-index: 6; pointer-events: none; transform-origin: 100% 50%; transition: transform .28s .32s ease-out; }
+.bk-strap svg { width: 100%; height: 100%; }
+.bk-cord path { stroke-dasharray: 1; stroke-dashoffset: 0; transition: stroke-dashoffset .25s .35s, stroke .25s; }
+.bk-cord-end { transform-box: fill-box; transform-origin: 50% 0; }
+.bk-hang { transform-box: fill-box; transform-origin: 50% 0; }
+
+/* ---------- hover, focus, press ---------- */
+.book:is(.is-open, :focus-within) { --stroke: var(--dye-line); }
+.book:is(.is-open, :focus-within) .bk-leaf { visibility: visible; transition: visibility 0s .1s; }
+.book:is(.is-open, :focus-within) .bk-strap { transform: rotateY(150deg); transition: transform .24s ease-in; }
+.book:is(.is-open, :focus-within) .bk-cord path { stroke-dashoffset: 1; transition: stroke-dashoffset .25s, stroke .25s; }
+.book:is(.is-open, :focus-within) .bk-cover { transform: rotateY(-111deg); transition: transform .75s .14s cubic-bezier(.3, .1, .2, 1); }
+.book:is(.is-open, :focus-within) .bk-fly--1 { transform: rotateY(-104deg); transition: transform .85s .2s cubic-bezier(.3, .1, .2, 1); }
+.book:is(.is-open, :focus-within) .bk-fly--2 { transform: rotateY(-97deg); transition: transform .95s .28s cubic-bezier(.3, .1, .2, 1); }
+.book:is(.is-open, :focus-within) .bk-hang { animation: bk-swing 1.8s ease-out; }
+@keyframes bk-swing { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(-9deg); } 40% { transform: rotate(6deg); } 65% { transform: rotate(-3deg); } 85% { transform: rotate(1.5deg); } }
+
+/* ---------- no hover: the leaf is never shown, a press lifts the cover ---------- */
+.app[data-touch] .bk-leaf { visibility: hidden; }
+.app[data-touch] .book:focus-within:not(.is-open) :is(.bk-cover, .bk-fly, .bk-strap) { transform: none; }
+.app[data-touch] .book.is-open .bk-cover { transform: rotateY(-38deg); }
+.app[data-touch] .book.is-open :is(.bk-fly--1, .bk-fly--2) { transform: rotateY(-20deg); }
+
+/* ---------- reduced motion: the cover gives way to the leaf at once ---------- */
+@media (prefers-reduced-motion: reduce) {
+    .book *, .book:is(.is-open, :focus-within) * { transition: none !important; animation: none !important; }
+    .book:is(.is-open, :focus-within) :is(.bk-cover, .bk-fly, .bk-strap, .bk-cord) { transform: none; opacity: 0; }
+}
+.app[data-still] .book *, .app[data-still] .book:is(.is-open, :focus-within) * { transition: none !important; animation: none !important; }
+.app[data-still] .book:is(.is-open, :focus-within) :is(.bk-cover, .bk-fly, .bk-strap, .bk-cord) { transform: none; opacity: 0; }
+
+/* ---------- an empty shelf ---------- */
+.blank { position: relative; width: 236px; height: 320px; display: grid; place-items: center; padding: 24px; border: 1px dashed var(--ctl); color: var(--muted); text-align: center; background: none; }
+.blank::before { content: ''; position: absolute; inset: 0 auto 0 18px; border-left: 1px dashed var(--line); }
+.blank:hover { border-color: var(--ink); color: var(--ink); }
+.blank span { font-family: var(--font-title); font-size: 24px; line-height: 1.15; }
+</style>
+</head>
+<body>
+<div class="mock-bar" role="group" aria-label="Mock-up controls">
+    <strong>Mock-up</strong>
+    <label>Theme <select id="m-theme"><option value="">System</option><option value="light">Parchment</option><option value="dark">Candlelight</option></select></label>
+    <label>Books <select id="m-books"><option value="all">Open on hover</option><option value="open">All open</option><option value="none">No codices</option></select></label>
+    <label>Screen <select id="m-width"><option value="full">Desktop</option><option value="phone">Phone</option></select></label>
+    <label>Motion <select id="m-motion"><option value="on">On</option><option value="off">Reduced</option></select></label>
+</div>
+
+<div class="app" id="app">
+    <div class="site-rule"><header class="site">
+        <a class="logo" href="#">Waystone</a>
+        <nav class="nav" aria-label="Main"><a href="#">Home</a><a href="#">Games</a><a href="#">Characters</a><a href="#" aria-current="page">Codices</a></nav>
+        <span class="avatar" aria-hidden="true">R</span>
+    </header></div>
+    <div class="cx-top">
+        <a class="cx-brand" href="#">Codices</a>
+        <button type="button" class="cx-pick">All codices ▾</button>
+        <div class="cx-search"><input type="search" id="q" aria-label="Search all codices" placeholder="Search all codices"></div>
+    </div>
+    <main class="cx-inner">
+        <header class="cx-head">
+            <h1 class="cx-title">Codices</h1>
+            <button type="button" class="cx-act">+ New codex</button>
+        </header>
+        <p class="cx-sub">Codices hold pages. A page links to others in its codex with [[double brackets]]. <a href="#">Writing guide</a></p>
+        <ul class="shelf" id="shelf"></ul>
+        <section id="recent">
+            <h2 class="section-header">Recent changes</h2>
+            <ul class="recent">
+                <li><a href="#">The Salt Court</a><span class="muted"> · revision 14 by Roy · The Drowned Coast · Nov 22</span></li>
+                <li><a href="#">Ferrymen of the Lower Reach</a><span class="muted"> · revision 2 by Testy · The Drowned Coast · Nov 21</span></li>
+                <li><a href="#">Hollow Court, seating</a><span class="muted"> · revision 6 by Adam · Notes on the Hollow Court · Nov 20</span></li>
+                <li><a href="#">Year of the Two Moons</a><span class="muted"> · revision 1 by Simon · Age of Sojourn · Nov 18</span></li>
+            </ul>
+        </section>
+    </main>
+</div>
+
+<!-- shared by every book -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <filter id="book-shadow" x="-20%" y="-20%" width="150%" height="150%" color-interpolation-filters="sRGB"><feDropShadow dx="4" dy="8" stdDeviation="6" style="flood-color: var(--shadow)"/></filter>
+</defs></svg>
+
+<script>
+// Example codices. `binding`, `emblem` and `dye` would be picked from the codex id, as bannerVariant() does.
+const CODICES = [
+    { id: 'a', name: 'The Drowned Coast', pages: 142, excerpt: 'Salt towns, tide-priests and what the sea took back. Everything the party has learned between Harrowmouth and the Lower Reach.', latest: [['The Salt Court', 'Nov 22'], ['Ferrymen of the Lower Reach', 'Nov 21']], binding: 0, emblem: 'ship', dye: '#46545C' },
+    { id: 'b', name: 'Age of Sojourn', pages: 264, excerpt: 'The long history of the pilgrim peoples, from the first waystones to the present year.', latest: [['Year of the Two Moons', 'Nov 18'], ['Waystones', 'Nov 15']], binding: 3, emblem: 'star', dye: '#5B4634' },
+    { id: 'c', name: 'Notes on the Hollow Court', pages: 38, excerpt: 'Who sits where, who owes whom, and which of them are already dead.', latest: [['Hollow Court, seating', 'Nov 20'], ['The Empty Chair', 'Nov 9']], binding: 2, emblem: 'eye', dye: '#5A4450' },
+    { id: 'd', name: 'Karsk', pages: 61, excerpt: 'A mountain hold and its seven gates.', latest: [['Fourth Gate', 'Nov 12'], ['Oda Ironbraid', 'Nov 12']], binding: 1, emblem: 'mountain', dye: '#4F5B42' },
+    { id: 'e', name: 'A Field Almanac of the Nine Lesser Kingdoms', pages: 117, excerpt: 'Roads, tolls, harvests and weather, kingdom by kingdom, kept by the company of the Lantern since they left Pell.', latest: [['Tolls on the Amber Road', 'Nov 8'], ['Pell', 'Nov 2']], binding: 0, emblem: 'key', dye: '#8A6642' },
+    { id: 'f', name: 'Brackwater', pages: 1, excerpt: '', latest: [['First impressions', 'Oct 30']], binding: 1, emblem: 'tree', dye: '#6E5B3A' },
+];
+
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const r1 = (n) => Math.round(n * 10) / 10;
+const pagesLabel = (n) => n + (n === 1 ? ' page' : ' pages');
+
+// Thickness of the text block: grows with the page count and stops at 26.
+const depth = (pages) => Math.round(5 + Math.min(21, Math.sqrt(pages) * 1.5));
+
+// Emblems: 48 x 48, centred on the cover's lower field at (109, 244).
+const EMBLEMS = {
+    ship: 'M8 30H40L35 39H13ZM24 30V7M24 9C34 13 36 20 34 26H24M24 12C17 15 14 20 14 26H24M5 44Q11 40 17 44T29 44T41 44',
+    star: 'M24 4L28 20L44 24L28 28L24 44L20 28L4 24L20 20ZM24 14V34M14 24H34M12 12L19 19M36 12L29 19M12 36L19 29M36 36L29 29',
+    eye: 'M4 24Q24 6 44 24Q24 42 4 24ZM24 16A8 8 0 1 0 24 32A8 8 0 1 0 24 16ZM24 21A3 3 0 1 0 24 27A3 3 0 1 0 24 21ZM24 4V9M11 8L14 12M37 8L34 12M24 39V44M11 40L14 36M37 40L34 36',
+    mountain: 'M4 40L18 12L25 26L30 18L44 40ZM14 20L18 23L22 20M27 23L30 25L33 23M10 44H38',
+    key: 'M24 4A8 8 0 1 0 24 20A8 8 0 1 0 24 4ZM24 9A3 3 0 1 0 24 15A3 3 0 1 0 24 9ZM24 20V44M24 34H33V40M24 29H30M20 23H28',
+    tree: 'M24 44V22M24 34L14 26M24 30L34 22M24 26L18 18M24 5C33 5 38 11 36 17C41 20 40 28 34 29C30 33 27 31 24 32C21 31 18 33 14 29C8 28 7 20 12 17C10 11 15 5 24 5ZM15 44H33',
+};
+
+// Covers: 218 x 320, hinge at x 0. Anchors shared by all of them: plate 36-182 x 60-176, emblem at (109, 244).
+const PLATE = `<path class="f-plate" d="M36 60H182V176H36Z"/><path class="s-soft" d="M40 64H178V172H40Z"/>`
+    + [[36, 60], [182, 60], [36, 176], [182, 176]].map(([x, y]) => `<circle class="f-board" cx="${x}" cy="${y}" r="3"/>`).join('');
+const PLAIN = 'M0 0H214Q218 0 218 4V316Q218 320 214 320H0Z';
+// Mirrors a top-left corner piece into all four corners.
+const corners = (d, cls) => [[1, 1, 0, 0], [-1, 1, 218, 0], [1, -1, 0, 320], [-1, -1, 218, 320]]
+    .map(([sx, sy, tx, ty]) => `<g transform="translate(${tx} ${ty}) scale(${sx} ${sy})">${d}</g>`).join('');
+
+function lattice() {
+    // Diagonal fillets inside x 24-194, y 200-296, left open around the emblem.
+    let d = '';
+    const x0 = 22, x1 = 196, y0 = 196, y1 = 298, step = 34;
+    for (let c = x0 - (y1 - y0); c < x1; c += step) {
+        // down-right: x = c + (y - y0)
+        let ya = y0 + Math.max(0, x0 - c), yb = y0 + Math.min(y1 - y0, x1 - c);
+        if (yb > ya) d += `M${c + ya - y0} ${ya}L${c + yb - y0} ${yb}`;
+        // down-left: mirrored
+        if (yb > ya) d += `M${218 - (c + ya - y0)} ${ya}L${218 - (c + yb - y0)} ${yb}`;
+    }
+    return `<path class="s-soft" d="${d}"/>`;
+}
+
+function zigzag() {
+    let d = 'M16 16';
+    for (let x = 16; x < 202; x += 6) d += `l3 5l3 -5`;
+    let e = 'M16 304';
+    for (let x = 16; x < 202; x += 6) e += 'l3 -5l3 5';
+    return d + e;
+}
+
+const BINDINGS = [
+    // 0 Clasped: metal corner-pieces that stand proud of the boards, a boss ring, two strap clasps.
+    {
+        outline: PLAIN,
+        art: `<path class="s-tool" d="M12 12H206V308H12Z"/><path class="s-soft" d="M16 16H202V304H16Z"/>`
+            + `<path class="s-soft" d="M16 190H202M16 194H202"/>`
+            + corners(`<path class="f-board" d="M-3 -3H44Q40 10 30 12Q34 24 24 24Q24 34 12 30Q10 40 -3 44Z"/><circle class="s-tool" cx="13" cy="13" r="7"/><circle class="s-soft" cx="13" cy="13" r="3"/><circle class="f-dot" cx="34" cy="3" r="1.3"/><circle class="f-dot" cx="3" cy="34" r="1.3"/>`)
+            + `<circle class="s-soft" cx="109" cy="244" r="37"/><circle class="s-tool" cx="109" cy="244" r="34"/>`,
+        straps: [88, 218],
+    },
+    // 1 Diapered: a tooled roll, a lattice in the lower field, leather ties, one ribbon.
+    {
+        outline: 'M0 0H214Q218 0 218 4V262L215 268L218 272V316Q218 320 214 320H0Z',
+        art: `<path class="s-tool" d="M11 11H207V309H11Z"/><path class="s-soft" d="${zigzag()}"/><path class="s-soft" d="M16 27H202M16 293H202"/>`
+            + lattice()
+            + `<path class="f-board" d="M109 204L149 244L109 284L69 244Z"/><path class="s-soft" d="M109 209L144 244L109 279L74 244Z"/>`
+            + `<path class="s-soft" d="M186 40L192 34M190 44L198 36"/><circle class="f-dot" cx="30" cy="188" r="1"/><circle class="f-dot" cx="35" cy="184" r=".8"/>`,
+        ties: [110, 210],
+        ribbon: [118],
+    },
+    // 2 Wrapped: limp vellum with an uneven edge, tackets at the spine, a cord wound round it.
+    {
+        outline: 'M0 1Q40 -2 78 1T150 0T212 2Q219 3 218 10Q215 48 218 86T217 168Q220 214 217 250T218 310Q219 320 211 319Q170 322 128 318T50 320T0 319Z',
+        art: `<path class="s-soft" d="M12 16Q90 12 204 16Q201 160 204 304Q110 308 12 304"/>`
+            + `<path class="s-tool" d="M8 40V52M14 40V52M8 96V108M14 96V108M8 212V224M14 212V224M8 268V280M14 268V280"/>`
+            + `<path class="s-soft" d="M196 22Q188 30 190 44M26 290Q34 284 46 288M198 262Q192 270 196 284"/>`,
+        cord: true,
+    },
+    // 3 Arcaded: a pointed arch with tracery over the plate, a quatrefoil, a chipped corner, two ribbons.
+    {
+        outline: 'M0 0H214Q218 0 218 4V292L213 297L211 304L203 308L199 314L191 320H0Z',
+        art: `<path class="s-tool" d="M12 12H206V286M184 308H12V12"/>`
+            + `<path class="s-soft" d="M206 286L203 292L196 298L190 302L184 308"/>`
+            + `<path class="s-tool" d="M22 298V66Q26 34 109 20Q192 34 196 66V286"/><path class="s-soft" d="M27 298V68Q32 40 109 27Q186 40 191 68V284"/>`
+            + `<path class="s-soft" d="M20 20Q34 20 38 34Q24 38 20 52ZM198 20Q184 20 180 34Q194 38 198 52Z"/>`
+            + `<path class="s-soft" d="M27 190H191M27 194H191"/>`
+            + `<path class="s-soft" d="M109 196A24 24 0 0 1 133 220A24 24 0 0 1 157 244A24 24 0 0 1 133 268A24 24 0 0 1 109 292A24 24 0 0 1 85 268A24 24 0 0 1 61 244A24 24 0 0 1 85 220A24 24 0 0 1 109 196Z"/>`
+            + `<circle class="s-tool" cx="109" cy="244" r="33"/>`,
+        ribbon: [92, 108],
+    },
+];
+
+// Everything under the cover: shadow, back board, text block, spine, the top leaf, ribbons.
+function bodySvg(c, b) {
+    const dx = depth(c.pages), dy = r1(dx * .55), n = Math.max(2, Math.round(dx / 2.6));
+    let leaves = '';
+    for (let k = 1; k < n; k++) {
+        const ox = r1(dx * k / n), oy = r1(dy * k / n);
+        leaves += `M${230 + ox} ${5 + oy}V${315 + oy}H${12 + ox}`;
+    }
+    const bands = [44, 104, 206, 266];
+    const spine = 'M20 0H9Q1 0 0 8' + bands.map((y) => `V${y}C-6 ${y + 1} -6 ${y + 11} 0 ${y + 12}`).join('') + 'V312Q1 320 9 320H20Z';
+    const ribs = (b.ribbon || []).map((x, i) => {
+        const y = 315 + dy, len = 18 + i * 7;
+        return `<g class="bk-hang"><path class="f-board" d="M${x} ${y - 4}Q${x - 2} ${y + len / 2} ${x + 1} ${y + len}L${x + 5} ${y + len - 5}L${x + 9} ${y + len + 1}Q${x + 6} ${y + len / 2} ${x + 8} ${y - 4}"/></g>`;
+    }).join('');
+    const ties = (b.ties || []).map((y) => `<g class="bk-hang"><path class="s-tool" d="M${236 + dx} ${y + dy}q9 3 7 14q-3 12 3 24M${236 + dx} ${y + dy}q4 6 1 16q-4 10 0 17"/></g>`).join('');
+    return `<svg class="bk-body" viewBox="-20 -20 320 420" aria-hidden="true">
+        <path class="f-board" filter="url(#book-shadow)" d="M9 0H${232}L${236 + dx} ${dy}V${316 + dy}Q${236 + dx} ${321 + dy} ${231 + dx} ${321 + dy}H${9 + dx}Q${2 + dx / 2} ${321 + dy / 2} 0 312V8Z"/>
+        <path class="f-board" d="M${dx + 2} ${dy}H${232 + dx}Q${236 + dx} ${dy} ${236 + dx} ${dy + 4}V${316 + dy}Q${236 + dx} ${320 + dy} ${232 + dx} ${320 + dy}H${9 + dx}Q${1 + dx} ${319 + dy} ${dx} ${312 + dy}Z"/>
+        <path class="f-board" d="M0 312Q1 320 9 320H20L${20 + dx} ${320 + dy}H${9 + dx}Q${3 + dx / 2} ${320 + dy / 2} 0 312Z"/>
+        ${ribs}
+        <path class="f-paper" d="M12 315H230V5L${230 + dx} ${5 + dy}V${315 + dy}H${12 + dx}Z"/>
+        <path class="s-edge" d="${leaves}"/>
+        <path class="f-paper" d="M16 5H230V315H16Z"/>
+        <path class="f-board" d="${spine}"/>
+        <path class="s-tool" d="${bands.map((y) => `M-4 ${y + 2}H20M-4 ${y + 10}H20`).join('')}"/>
+        <path class="s-soft" d="M15 2V318"/>
+        ${ties}
+    </svg>`;
+}
+
+function coverHtml(c, b) {
+    const n = c.name.length, longest = Math.max(...c.name.split(/\s+/).map((w) => w.length));
+    const fs = Math.min(n <= 8 ? 40 : n <= 18 ? 31 : n <= 28 ? 25 : 19, Math.floor(250 / longest));
+    const cord = b.cord ? `<g class="bk-cord"><path class="s-tool" pathLength="1" d="M0 198Q60 194 109 198T217 196"/><path class="s-tool" pathLength="1" d="M0 204Q50 207 109 203T217 204"/></g>
+        <g class="bk-hang"><path class="f-board" d="M170 193Q178 190 186 194Q190 201 185 207Q177 211 170 206Q166 199 170 193Z"/><path class="s-tool" d="M170 195Q178 202 186 206M171 206Q177 198 185 195M174 208Q170 224 175 240M182 208Q187 222 183 250"/><path class="f-board" d="M180 250H187L189 266Q183 270 178 266Z"/></g>` : '';
+    return `<div class="bk-cover">
+        <div class="bk-face bk-face--out">
+            <svg viewBox="-10 -10 238 340" aria-hidden="true">
+                <path class="f-board" d="${b.outline}"/>
+                <path class="s-soft" d="M5 0V320"/>
+                ${b.art}${PLATE}
+                <path class="s-tool" transform="translate(85 220)" d="${EMBLEMS[c.emblem]}"/>
+                ${cord}
+            </svg>
+            <div class="bk-title" style="--fs:${fs}"><span>${esc(c.name)}</span></div>
+        </div>
+        <div class="bk-face bk-face--in">
+            <svg viewBox="-10 -10 238 340" aria-hidden="true">
+                <path class="f-board" transform="translate(218 0) scale(-1 1)" d="${b.outline}"/>
+                <path class="f-paper" d="M16 14H214V306H16Z"/>
+                <path class="s-tool" d="M0 0L16 14M0 320L16 306"/>
+                <path class="s-edge" d="M78 112H152V208H78ZM82 116H148V204H82Z"/>
+                <path class="s-edge" transform="translate(91 136)" d="${EMBLEMS[c.emblem]}"/>
+            </svg>
+        </div>
+    </div>`;
+}
+
+// Strap clasps hinge on the back board and fold over the cover's edge.
+function strapsHtml(c, b) {
+    const dx = depth(c.pages), dy = dx * .55;
+    return (b.straps || []).map((y) => `<div class="bk-strap" style="left:calc(206 * var(--u));top:calc(${y} * var(--u));width:calc(${32 + dx} * var(--u));height:calc(${22 + dy} * var(--u))">
+        <svg viewBox="0 0 ${32 + dx} ${22 + dy}" aria-hidden="true"><path class="f-board" d="M8 1H31L${31 + dx} ${dy + 1}V${dy + 19}L31 19H8L1 10Z"/><path class="s-soft" d="M31 1V19M12 4H27M12 16H27"/><circle class="s-tool" cx="14" cy="10" r="3"/></svg></div>`).join('');
+}
+
+function bookHtml(c) {
+    const b = BINDINGS[c.binding];
+    return `<li class="codex-book"><article class="book" style="--dye:${c.dye}">
+        ${bodySvg(c, b)}
+        <a class="bk-hit" href="#" aria-label="${esc(c.name)}, ${pagesLabel(c.pages)}"></a>
+        <div class="bk-leaf">
+            <p class="bk-leaf-title" aria-hidden="true">${esc(c.name)}</p>
+            <p class="bk-leaf-text">${esc(c.excerpt || 'No description yet.')}</p>
+            <ul class="bk-leaf-latest" aria-label="Changed last">${c.latest.map(([t, d]) => `<li><a href="#" title="${esc(t)}">${esc(t)}</a><span>${d}</span></li>`).join('')}</ul>
+            <p class="bk-leaf-foot" aria-hidden="true"><b>Open codex</b></p>
+        </div>
+        <div class="bk-turn"><div class="bk-fly bk-fly--2"></div><div class="bk-fly bk-fly--1"></div>${coverHtml(c, b)}</div>
+        ${strapsHtml(c, b)}
+    </article><span class="codex-book-meta">${pagesLabel(c.pages)}</span></li>`;
+}
+
+const app = document.getElementById('app'), shelf = document.getElementById('shelf');
+const val = (id) => document.getElementById(id).value;
+const noHover = window.matchMedia('(hover: none)');
+
+function render() {
+    const theme = val('m-theme'), books = val('m-books');
+    if (theme) document.documentElement.dataset.theme = theme;
+    app.dataset.width = val('m-width');
+    app.toggleAttribute('data-touch', noHover.matches || val('m-width') === 'phone');
+    app.toggleAttribute('data-still', val('m-motion') === 'off');
+    document.getElementById('recent').hidden = books === 'none';
+    shelf.innerHTML = books === 'none'
+        ? '<li><button type="button" class="blank"><span>Make the first codex</span></button></li>'
+        : CODICES.map(bookHtml).join('');
+    if (books === 'open') shelf.querySelectorAll('.book').forEach((b) => b.classList.add('is-open'));
+}
+document.querySelectorAll('.mock-bar select').forEach((s) => s.addEventListener('change', render));
+
+// Opens on a mouse over the closed book's own rectangle. A short wait keeps a passing pointer from
+// riffling the whole shelf. The swung cover takes no pointer, so it never holds the book open.
+let timer = 0;
+const always = () => val('m-books') === 'open';
+shelf.addEventListener('pointerover', (e) => {
+    const b = e.target.closest('.book');
+    if (!b || e.pointerType !== 'mouse' || app.hasAttribute('data-touch') || b.contains(e.relatedTarget)) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => b.classList.add('is-open'), 90);
+});
+shelf.addEventListener('pointerout', (e) => {
+    const b = e.target.closest('.book');
+    if (!b || b.contains(e.relatedTarget) || always()) return;
+    clearTimeout(timer);
+    b.classList.remove('is-open');
+});
+// Touch: the press lifts the cover while the page changes.
+shelf.addEventListener('pointerdown', (e) => { const b = e.target.closest('.book'); if (b && app.hasAttribute('data-touch')) b.classList.add('is-open'); });
+['pointerup', 'pointercancel'].forEach((t) => window.addEventListener(t, () => { if (app.hasAttribute('data-touch') && !always()) shelf.querySelectorAll('.is-open').forEach((b) => b.classList.remove('is-open')); }));
+// Links go nowhere here. A mouse click must not leave focus behind, or the book would stay open.
+document.addEventListener('click', (e) => { const a = e.target.closest('a[href="#"]'); if (a) { e.preventDefault(); if (e.detail) a.blur(); } });
+render();
+</script>
+</body>
+</html>
