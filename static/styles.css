@@ -185,7 +185,7 @@
 }
 
 :root {
-    --bg: #F2EAD8; --folio: #E6DBC2; --ink: #2B241C; --muted: #6B5E4B;
+    --bg: #F2EAD8; --cloth: #F2EAD8; --folio: #E6DBC2; --ink: #2B241C; --muted: #6B5E4B;
     --line: rgba(43, 36, 28, 0.4);
     --ctl: rgba(43, 36, 28, 0.64);
     --rubric: #8E2A1E; --verdigris: #355E52; --ochre: #7A5A12;
@@ -204,7 +204,7 @@
 
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-        --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+        --bg: #16120E; --cloth: #160D0D; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
         --line: rgba(232, 220, 196, 0.3);
         --ctl: rgba(232, 220, 196, 0.5);
         --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
@@ -216,7 +216,7 @@
 }
 
 :root[data-theme="dark"] {
-    --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+    --bg: #16120E; --cloth: #160D0D; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
     --line: rgba(232, 220, 196, 0.3);
     --ctl: rgba(232, 220, 196, 0.5);
     --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
@@ -1078,7 +1078,7 @@ select option {
 }
 
 .banner-outline {
-    fill: var(--bg);
+    fill: var(--cloth);
     stroke: var(--line);
     stroke-width: 1;
     stroke-linejoin: round;

@@ -11,11 +11,12 @@ All coordinates are px on a 360px-wide card, origin at the card's top-left.
 
 ## Look
 
-- **Lined, but liberal.** Hairline strokes only, no fills, textures or shading. Silhouettes are free and asymmetric: curved cuts, off-centre notches and points, uneven tails and tongues.
+- **Lined, but liberal.** Hairline strokes only, no fills beyond the cloth colour, no textures or shading. Silhouettes are free and asymmetric: curved cuts, off-centre notches and points, uneven tails and tongues.
 - **Decoration breaks the silhouette.** Tassels, charms and bells hang below; tears, cuts, chips, nicks, dog-ears, frayed edges and stitched repairs eat into it. Wear is drawn as lines (stitches, cracks, loose threads), never as texture.
 - **The content area stays calm.** All of that lives at the edges and in the top and bottom zones; text never sits on an ornament.
 - **Colours:** outline `--line`, ornaments and inner lines `--muted`, medallion ring `--ink`. Tokens only, so both themes work unchanged.
-- **Drop shadow:** the one exception to "no shading". Each banner casts a soft shadow down and to the right, so it reads as cloth hanging in front of the page. The outline path is filled with `--bg` (same as the page, so the banner still looks lined) and carries an SVG `feDropShadow` (dx 4, dy 8, blur 6). Hanging ornaments get a tighter one (dx 2, dy 4, blur 1.5). The colour is a `--shadow` token: `rgba(43,36,28,0.24)` on parchment, `rgba(0,0,0,0.7)` on candlelight. The shadow moves with the cloth; text casts none. Use an SVG filter, not CSS `drop-shadow()` on the SVG element, which would shadow every line inside it.
+- **Cloth colour:** the outline is filled with the `--cloth` token: a faint red-brown `#160D0D` on candlelight, the same as `--bg` on parchment. The medallion keeps `--bg`.
+- **Drop shadow:** the one exception to "no shading". Each banner casts a soft shadow down and to the right, so it reads as cloth hanging in front of the page. The outline path is filled with `--cloth` and carries an SVG `feDropShadow` (dx 4, dy 8, blur 6). Hanging ornaments get a tighter one (dx 2, dy 4, blur 1.5). The colour is a `--shadow` token: `rgba(43,36,28,0.24)` on parchment, `rgba(0,0,0,0.7)` on candlelight. The shadow moves with the cloth; text casts none. The filters set `color-interpolation-filters="sRGB"`: the default linear RGB rounds dark colours differently in each browser (the cloth came out reddish in Chrome and plain `--bg` in Firefox). Use an SVG filter, not CSS `drop-shadow()` on the SVG element, which would shadow every line inside it.
 
 ---
 
