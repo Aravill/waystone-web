@@ -9,7 +9,7 @@
 <style>
 /* Codex books mock-up: the Codices home, with each codex a bound book instead of a card.
    Siblings of the game banners (BANNER_DESIGN_GUIDE.md): line art on one flat fill, a soft shadow,
-   a binding and an emblem picked from the codex id, and fixed anchors on every binding.
+   a dyed leather (decided: dyed, not one plain fill), a binding and an emblem picked from the codex id, and fixed anchors on every binding.
    Hover or keyboard focus undoes the fastening and swings the cover; the first leaf holds what the
    card showed (excerpt, page count) plus the two pages changed last. Text never moves.
    All book sizes are in --u, so the art scales uniformly and its hairlines stay 1px. */
@@ -23,7 +23,6 @@
     --cx-bar-line: rgba(242, 234, 216, 0.22); --cx-bar-fill: #3A3128;
     --cx-hover: color-mix(in srgb, var(--ink) 9%, transparent);
     /* new for the books */
-    --leather: #E4D6B8;                 /* board fill, as --cloth is for banners */
     --paper: #F8F2E4;                   /* leaves */
     --dye-mix: 100%;                    /* how much of a dye survives in this theme */
     --dye-ground: #16120E;
@@ -39,7 +38,7 @@
         --line: rgba(232, 220, 196, 0.3); --ctl: rgba(232, 220, 196, 0.5);
         --rubric: #D9735C; --shadow: rgba(0, 0, 0, 0.7);
         --cx-bar: #0C0A07; --cx-bar-text: #E8DCC4; --cx-bar-line: rgba(232, 220, 196, 0.2); --cx-bar-fill: #2A231B;
-        --leather: #251811; --paper: #1D1812; --dye-mix: 58%; --dye-line: #E8DCC4;
+        --paper: #1D1812; --dye-mix: 58%; --dye-line: #E8DCC4;
         color-scheme: dark;
     }
 }
@@ -48,7 +47,7 @@
     --line: rgba(232, 220, 196, 0.3); --ctl: rgba(232, 220, 196, 0.5);
     --rubric: #D9735C; --shadow: rgba(0, 0, 0, 0.7);
     --cx-bar: #0C0A07; --cx-bar-text: #E8DCC4; --cx-bar-line: rgba(232, 220, 196, 0.2); --cx-bar-fill: #2A231B;
-    --leather: #251811; --paper: #1D1812; --dye-mix: 58%; --dye-line: #E8DCC4;
+    --paper: #1D1812; --dye-mix: 58%; --dye-line: #E8DCC4;
     color-scheme: dark;
 }
 
@@ -125,8 +124,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ---------- the book ---------- */
 .book {
-    --board: var(--leather);
-    --tool: color-mix(in srgb, var(--ink) 52%, var(--board));   /* opaque: translucent lines stack where pieces meet */
+    --board: color-mix(in srgb, var(--dye) var(--dye-mix), var(--dye-ground));   /* --dye comes from the codex */
+    --tool: color-mix(in srgb, var(--dye-line) 62%, var(--board));   /* opaque: translucent lines stack where pieces meet */
     --edge: color-mix(in srgb, var(--ink) 40%, var(--paper));
     --stroke: var(--tool);
     position: relative;
@@ -151,7 +150,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* board pieces */
 .f-board { fill: var(--board); stroke: var(--stroke); }
 .f-paper { fill: var(--paper); stroke: var(--edge); }
-.f-plate { fill: var(--bg); stroke: var(--stroke); }
+.f-plate { fill: var(--bg); stroke: color-mix(in srgb, var(--ink) 60%, var(--bg)); }
 .s-tool { stroke: var(--stroke); }
 .s-soft { stroke: color-mix(in srgb, var(--stroke) 60%, var(--board)); }
 .s-edge { stroke: var(--edge); }
@@ -224,8 +223,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .bk-hang { transform-box: fill-box; transform-origin: 50% 0; }
 
 /* ---------- hover, focus, press ---------- */
-.book:is(.is-open, :focus-within) { --stroke: var(--ink); }
-.app[data-dye="on"] .book:is(.is-open, :focus-within) { --stroke: var(--dye-line); }
+.book:is(.is-open, :focus-within) { --stroke: var(--dye-line); }
 .book:is(.is-open, :focus-within) .bk-leaf { visibility: visible; transition: visibility 0s .1s; }
 .book:is(.is-open, :focus-within) .bk-strap { transform: rotateY(150deg); transition: transform .24s ease-in; }
 .book:is(.is-open, :focus-within) .bk-cord path { stroke-dashoffset: 1; transition: stroke-dashoffset .25s, stroke .25s; }
@@ -234,13 +232,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .book:is(.is-open, :focus-within) .bk-fly--2 { transform: rotateY(-97deg); transition: transform .95s .28s cubic-bezier(.3, .1, .2, 1); }
 .book:is(.is-open, :focus-within) .bk-hang { animation: bk-swing 1.8s ease-out; }
 @keyframes bk-swing { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(-9deg); } 40% { transform: rotate(6deg); } 65% { transform: rotate(-3deg); } 85% { transform: rotate(1.5deg); } }
-
-/* ---------- dyed leathers (proposed; Plain keeps the one --leather fill) ---------- */
-.app[data-dye="on"] .book {
-    --board: color-mix(in srgb, var(--dye) var(--dye-mix), var(--dye-ground));
-    --tool: color-mix(in srgb, var(--dye-line) 62%, var(--board));
-}
-.app[data-dye="on"] .f-plate { stroke: color-mix(in srgb, var(--ink) 60%, var(--bg)); }
 
 /* ---------- no hover: the leaf is never shown, a press lifts the cover ---------- */
 .app[data-touch] .bk-leaf { visibility: hidden; }
@@ -267,7 +258,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 <div class="mock-bar" role="group" aria-label="Mock-up controls">
     <strong>Mock-up</strong>
     <label>Theme <select id="m-theme"><option value="">System</option><option value="light">Parchment</option><option value="dark">Candlelight</option></select></label>
-    <label>Leather <select id="m-dye"><option value="on">Dyed</option><option value="off">Plain</option></select></label>
     <label>Lettering <select id="m-lettering"><option value="fell">IM Fell</option><option value="barlow">Barlow</option></select></label>
     <label>Books <select id="m-books"><option value="all">Open on hover</option><option value="open">All open</option><option value="none">No codices</option></select></label>
     <label>Screen <select id="m-width"><option value="full">Desktop</option><option value="phone">Phone</option></select></label>
@@ -497,7 +487,6 @@ const noHover = window.matchMedia('(hover: none)');
 function render() {
     const theme = val('m-theme'), books = val('m-books');
     if (theme) document.documentElement.dataset.theme = theme;
-    app.dataset.dye = val('m-dye');
     app.dataset.lettering = val('m-lettering');
     app.dataset.width = val('m-width');
     app.toggleAttribute('data-touch', noHover.matches || val('m-width') === 'phone');

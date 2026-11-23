@@ -19,7 +19,7 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 | `ux-game-calendar.dc.html` | The game page as a normal page, Ahead as ledger rows and the calendar (board 3). Its two-number calendar cells are superseded: the cells keep the four-column tally (see Session replies) |
 | `modals.html` | Modal redesign (built): every dialog in the app in the folio-banded sheet, filled field cells and one button order, with a Today toggle for comparison |
 | `timeline.html` | Timeline pages (built): the Alternating layout B, sticky year boxes, gap notes, Jump to and On the timeline boxes, the Add event, page type and Calendar dialogs. Layout A (Ledger) was not chosen |
-| `codex-books.html` | Proposed, not built: the Codices home with each codex a bound book that opens on hover (four bindings, dyed or plain leather) |
+| `codex-books.html` | Proposed, not built: the Codices home with each codex a bound book that opens on hover (four bindings; dyed leather, one muted dye per codex, is settled, one plain fill for every book was not chosen) |
 
 ## Design Philosophy
 
