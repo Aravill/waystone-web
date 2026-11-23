@@ -1405,7 +1405,9 @@ function escapeHtml(text) {
 // *italic*/_italic_, [text](url), "- " / "1. " lists (also right after a text line), "#" headings
 // (rendered as h3/h4) and "> " quotes. Every pattern is bounded, so rendering stays linear.
 function renderMarkdown(text) {
-    const src = escapeHtml(String(text || '').replace(/\0/g, '').replace(/\r\n?/g, '\n'));
+    // A blank line before an indented list line stays inside the list.
+    const src = escapeHtml(String(text || '').replace(/\0/g, '').replace(/\r\n?/g, '\n'))
+        .replace(/^([ \t]*(?:[-*]|\d+\.)[ \t].*)\n(?:[ \t]*\n)+(?=(?:\t| {2,})[ \t]*(?:[-*]|\d+\.)[ \t])/gm, '$1\n');
     const inline = (line) => {
         const links = [];
         let out = line.replace(/\[([^\[\]\n]{1,300})\]\(((?:[^()\s]|\([^()\s]*\)){1,2000})\)/g, (m, label, url) => {
@@ -1419,18 +1421,48 @@ function renderMarkdown(text) {
             .replace(/(^|[^\w])_([^_\s][^_\n]*?)_(?!\w)/g, '$1<em>$2</em>');
         return out.replace(/\0(\d+)\0/g, (m, i) => links[Number(i)]);
     };
-    const kindOf = (l) => /^[-*]\s+/.test(l) ? 'ul' : /^\d+\.\s+/.test(l) ? 'ol' : /^&gt;\s?/.test(l) ? 'quote' : 'text';
-    const strip = { ul: /^[-*]\s+/, ol: /^\d+\.\s+/, quote: /^&gt;\s?/ };
+    const LIST_RE = /^([ \t]*)([-*]|\d+\.)\s+(.*)$/;
+    const kindOf = (l) => LIST_RE.test(l) ? 'list' : /^&gt;\s?/.test(l) ? 'quote' : 'text';
+    // Lists nest by indentation, to any depth: two spaces or a tab more than the level above open a new one.
+    const renderList = (lines) => {
+        const open = []; // the levels open around the current item, outermost first
+        let out = '';
+        const close = () => { out += `</li></${open.pop().tag}>`; };
+        for (const line of lines) {
+            const [, space, mark, text] = line.match(LIST_RE);
+            const at = space.replace(/\t/g, '    ').length;
+            const tag = mark.length > 1 ? 'ol' : 'ul';
+            while (open.length > 1 && at < open[open.length - 2].at + 2) close();
+            const top = open[open.length - 1];
+            if (top && at < top.at + 2) {
+                top.at = at;
+                if (top.tag === tag) {
+                    out += '</li>';
+                } else { // the same level changes its kind
+                    close();
+                    open.push({ at, tag });
+                    out += `<${tag}>`;
+                }
+            } else {
+                open.push({ at, tag });
+                out += `<${tag}>`;
+            }
+            out += `<li>${inline(text)}`;
+        }
+        while (open.length) close();
+        return out;
+    };
     // A run of lines of one kind becomes one element, so a list may follow a text line directly.
     const renderRun = (kind, lines) => {
         if (kind === 'text') return `<p>${lines.map(inline).join('<br>')}</p>`;
-        const items = lines.map((l) => inline(l.replace(strip[kind], '')));
-        if (kind === 'quote') return '<blockquote>' + items.join('<br>') + '</blockquote>';
-        return `<${kind}>` + items.map((i) => `<li>${i}</li>`).join('') + `</${kind}>`;
+        if (kind === 'list') return renderList(lines);
+        return '<blockquote>' + lines.map((l) => inline(l.replace(/^&gt;\s?/, ''))).join('<br>') + '</blockquote>';
     };
-    const blocks = src.split(/\n[ \t]*\n/).map((b) => b.trim()).filter(Boolean);
+    // Only the line breaks and trailing space go: a list's own indentation counts.
+    const blocks = src.split(/\n[ \t]*\n/).map((b) => b.replace(/^(?:[ \t]*\n)+/, '').trimEnd()).filter(Boolean);
     return blocks.map((block) => {
         let lines = block.split('\n');
+        if (kindOf(lines[0]) !== 'list') lines[0] = lines[0].trimStart();
         let out = '';
         const head = lines[0].match(/^(#{1,3})\s+(.*)$/);
         if (head) {

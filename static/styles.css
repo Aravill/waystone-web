@@ -3109,6 +3109,11 @@ select option {
     padding-left: 1.5rem;
 }
 
+.game-text li > ul,
+.game-text li > ol {
+    margin-bottom: 0;
+}
+
 .game-text blockquote {
     padding-left: 1rem;
     border-left: 1px solid var(--ink);

@@ -775,7 +775,7 @@ window.codexPage = function () {
         notesLoading: false,
         notesError: '',
         confirmDialog: { open: false, eyebrow: '', title: '', message: '', confirmLabel: '', danger: true, resolve: null },
-        pageWidth: 'thin', // page screen reading width: thin, medium or wide (kept in localStorage)
+        pageWidth: 'thin', // width of every screen: thin, medium or wide (kept in localStorage)
         home: null,
         pagers: { homeRecent: 0, recent: 0, wanted: 0 }, // current page of each short list
         pagerId: '',
@@ -1020,6 +1020,7 @@ window.codexPage = function () {
         setPageWidth(w) {
             this.pageWidth = w;
             try { localStorage.setItem('codex-page-width', w); } catch (e) { /* not saved */ }
+            this.$nextTick(() => document.dispatchEvent(new Event('codex-width'))); // the graph refits
         },
 
         // Short lists on the homes and in the side panel show CODEX_LIST_PAGE rows at a time.

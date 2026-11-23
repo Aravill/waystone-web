@@ -1166,6 +1166,50 @@ button.wikilink {
     color: var(--muted);
 }
 
+/* Page width, for every screen */
+.cx-widthpick {
+    display: flex;
+    flex: none;
+}
+
+.cx-widthpick button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.5rem;
+    padding: 0 0.625rem;
+    background: none;
+    border: 1px solid var(--cx-bar-line);
+    color: inherit;
+    font: inherit;
+    font-size: 0.8125rem;
+    cursor: pointer;
+}
+
+.cx-widthpick button + button {
+    margin-left: -1px;
+}
+
+.cx-widthpick button:hover {
+    background: var(--cx-bar-fill);
+}
+
+.cx-widthpick button[aria-pressed="true"] {
+    position: relative;
+    border-color: var(--cx-bar-accent);
+    color: var(--cx-bar-accent);
+}
+
+.cx-widthpick svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 .cx-search {
     position: relative;
     flex: 1 1 auto;
@@ -1874,62 +1918,47 @@ button.wikilink {
     font-weight: 600;
 }
 
+/* --cx-thin is the screen's own width; the width picker in the top bar widens every screen. */
 .cx-inner {
-    max-width: 52rem;
+    --cx-thin: 52rem;
+    max-width: var(--cx-thin);
     margin: 0 auto;
     padding: 1.25rem 2rem 4rem;
 }
 
 .cx-shell--home .cx-inner,
 .cx-shell--help .cx-inner {
-    max-width: 64rem;
+    --cx-thin: 64rem;
 }
 
 .cx-shell--edit .cx-inner,
 .cx-shell--history .cx-inner,
 .cx-shell--attachments .cx-inner {
-    max-width: 68rem;
+    --cx-thin: 68rem;
 }
 
 .cx-shell--graph .cx-inner {
-    max-width: 90rem;
+    --cx-thin: 90rem;
 }
 
-.cx-shell--page.cx-width--medium .cx-inner {
-    max-width: max(52rem, 75%);
+.cx-width--medium .cx-inner {
+    max-width: max(var(--cx-thin), 75%);
 }
 
-.cx-shell--page.cx-width--wide .cx-inner {
+.cx-width--wide .cx-inner {
     max-width: none;
 }
 
-.cx-shell--page:is(.cx-width--medium, .cx-width--wide) .codex-text :is(p, ul, ol, blockquote) {
+.cx-shell:is(.cx-width--medium, .cx-width--wide) .codex-text :is(p, ul, ol, blockquote),
+.cx-shell:is(.cx-width--medium, .cx-width--wide) .cx-help-intro {
     max-width: none;
 }
 
-.cx-subrow {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0 1rem;
-}
-
-.cx-widthpick {
-    display: flex;
-    gap: 0.375rem;
-    margin: 0.5rem 0;
-}
-
-.cx-widthpick .cx-act {
-    min-height: 2rem;
-    padding: 0 0.625rem;
-    font-size: 0.8125rem;
-}
-
-.cx-widthpick .cx-act[aria-pressed="true"] {
-    border-color: var(--rubric);
-    color: var(--rubric);
+/* Wide: the first book of a row still needs room for its cover */
+@media (min-width: 601px) {
+    .cx-width--wide .codex-shelf {
+        padding-left: 4.75rem;
+    }
 }
 
 .cx-crumb {
@@ -2642,6 +2671,11 @@ html:has(dialog.cx-lightbox[open]) {
     margin: 0 0 0.875rem;
 }
 
+.codex-page .codex-text li > ul,
+.codex-page .codex-text li > ol {
+    margin-bottom: 0;
+}
+
 .codex-page .codex-text > p:first-child {
     font-size: 1.03rem;
 }
@@ -2886,6 +2920,10 @@ html:has(dialog.cx-lightbox[open]) {
 
 /* Medium widths: the side panel stacks under the article */
 @media (max-width: 1180px) {
+    .cx-widthpick span {
+        display: none;
+    }
+
     .cx-shell--page,
     .cx-shell--codex {
         grid-template-columns: 15.5rem minmax(0, 1fr);

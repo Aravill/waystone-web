@@ -162,6 +162,27 @@
             return true;
         };
 
+        // Tab and Shift-Tab move the selected list lines a level (two spaces) in or out. Elsewhere Tab leaves
+        // the editor as usual, and after Escape it does so in a list too.
+        const indentList = (v, out) => {
+            const { doc, selection } = v.state;
+            const { from, to } = selection.main;
+            const changes = [];
+            let found = false;
+            for (let n = doc.lineAt(from).number; n <= doc.lineAt(to).number; n++) {
+                const line = doc.line(n);
+                if (!/^[ \t]*(?:[-*]|\d+\.)[ \t]/.test(line.text)) continue;
+                found = true;
+                if (!out) changes.push({ from: line.from, insert: '  ' });
+                else {
+                    const cut = line.text.match(/^(?:\t| {1,2})?/)[0].length;
+                    if (cut) changes.push({ from: line.from, to: line.from + cut });
+                }
+            }
+            if (changes.length) v.dispatch({ changes, userEvent: out ? 'delete.dedent' : 'input.indent' });
+            return found;
+        };
+
         const view = new EditorView({
             parent: el,
             state: EditorState.create({
@@ -177,7 +198,7 @@
                     placeholder('Write about it. Link other pages with [[Title]], mention people with @.'),
                     EditorView.lineWrapping,
                     EditorView.contentAttributes.of({ 'aria-label': 'The page', 'aria-multiline': 'true' }),
-                    keymap.of([{ key: 'Mod-k', run: (v) => linkSelection(v) }, ...completionKeymap, ...historyKeymap, ...defaultKeymap]),
+                    keymap.of([{ key: 'Mod-k', run: (v) => linkSelection(v) }, { key: 'Tab', run: (v) => indentList(v, false), shift: (v) => indentList(v, true) }, ...completionKeymap, ...historyKeymap, ...defaultKeymap]),
                     EditorView.updateListener.of((u) => { if (u.docChanged) onChange(u.state.doc.toString()); })
                 ]
             })
