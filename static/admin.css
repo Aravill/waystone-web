@@ -22,6 +22,8 @@
 .admin-tabs a:hover { color: var(--ink); }
 .admin-tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--rubric); font-weight: 500; }
 .admin-tabs a:focus-visible { outline-offset: -2px; }
+/* All five fit a 375px phone */
+@media (max-width: 480px) { .admin-tabs { gap: 0.75rem; font-size: 0.8125rem; } }
 
 [x-cloak] { display: none !important; }
 /* Action buttons: secondary by default (label.action-btn is hit by the global label rule) */

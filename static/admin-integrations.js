@@ -61,7 +61,7 @@ window.adminIntegrationsPage = function () {
             const d = u.discord;
             if (!d) return { label: '—', tone: 'muted', note: '' };
             const name = '@' + d.username;
-            if (d.dm_error) return { label: '✗ ' + name, tone: 'danger', note: 'DMs don\'t arrive since ' + this.formatTime(d.dm_error_at) };
+            if (d.dm_error) return { label: '✗ ' + name, tone: 'danger', note: 'DMs failing since ' + this.formatTime(d.dm_error_at) };
             return {
                 label: '● ' + name,
                 tone: 'ok',
