@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Systems - Waystone</title>
+    <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+    <script src="/static/theme.js?v=8"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=82">
+    <link rel="stylesheet" href="/static/notifications.css?v=12">
+    <link rel="stylesheet" href="/static/admin.css?v=1">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
+</head>
+<body x-data="adminSystemsPage()">
+    <div class="header">
+        <div class="header-left">
+            <a href="/" class="logo">Waystone</a>
+        </div>
+        <nav class="nav-bar" aria-label="Main">
+            <a href="/" class="nav-item" data-page="dashboard">Home</a>
+            <a href="/campaigns" class="nav-item" data-page="campaigns">Games</a>
+            <a href="/characters" class="nav-item" data-page="characters">Characters</a>
+            <a href="/codices" class="nav-item" data-page="codex" data-codex hidden>Codices</a>
+            <a href="/admin/users" class="nav-item active" aria-current="page" data-page="admin-users" x-show="isAdmin">Admin</a>
+        </nav>
+        <div class="header-right">
+            <details class="user-menu">
+                <summary><span class="user-menu-avatar" aria-hidden="true" x-text="(displayName || '?').charAt(0).toUpperCase()"></span><span class="user-menu-name" x-text="displayName"></span><span class="user-menu-caret" aria-hidden="true">&#9662;</span></summary>
+                <div class="user-menu-panel">
+                    <a href="/profile">Profile</a>
+                    <button type="button" @click="logout()">Log out</button>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <main class="container">
+        <nav class="admin-tabs" aria-label="Admin sections">
+            <a href="/admin/users">Users</a>
+            <a href="/admin/access">Access rights</a>
+            <a href="/admin/systems" aria-current="page">Systems</a>
+            <a href="/admin/discord">Discord</a>
+        </nav>
+        <h1 class="page-title"><span class="drop-cap">S</span>ystems</h1>
+
+        <!-- Message area -->
+        <div x-show="messageVisible" x-text="messageText" role="status"
+            :class="messageType === 'error' ? 'message error' : 'message success'"
+            style="display: none;"></div>
+
+        <section class="card" style="overflow-x: auto;">
+            <form @submit.prevent="addSystem()" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem;">
+                <input type="text" x-model="newSystemName" placeholder="system name" required maxlength="64" style="flex: 1;">
+                <input type="file" x-ref="newSystemLogo" accept="image/png,image/jpeg,image/webp,image/gif">
+                <button type="submit" :disabled="loading" class="submit-btn">Add</button>
+            </form>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Logo</th>
+                        <th>Name</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="s in systems" :key="s.id">
+                        <tr>
+                            <td>
+                                <img x-show="s.logo_url" :src="s.logo_url || ''" :alt="s.name" style="height: 2rem; max-width: 6rem; object-fit: contain;">
+                                <span x-show="!s.logo_url" class="admin-tag admin-tag--muted">—</span>
+                            </td>
+                            <td x-text="s.name"></td>
+                            <td>
+                                <div style="display: flex; gap: 0.375rem; flex-wrap: wrap;">
+                                    <button @click="renameSystem(s)" class="action-btn">Rename</button>
+                                    <label class="action-btn" style="cursor: pointer;">Logo<input type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif" @change="uploadLogo(s.id, $event.target.files[0]); $event.target.value = ''"></label>
+                                    <button x-show="s.logo_url" @click="removeLogo(s.id)" class="action-btn danger">Remove logo</button>
+                                    <button @click="confirmAction('Delete system', 'Delete ' + s.name + '? games using it keep the name as plain text.', () => deleteSystem(s.id))" class="action-btn danger">Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="systems.length === 0">
+                        <td colspan="3" class="admin-empty">no systems yet</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Confirm modal -->
+        <div x-cloak x-show="confirmModal.visible" class="modal-overlay">
+            <div class="card" style="max-width: 25rem; width: 90%; text-align: center;">
+                <h3 x-text="confirmModal.title" style="margin-bottom: 0.75rem;"></h3>
+                <p x-text="confirmModal.message" class="form-hint" style="margin-bottom: 1.5rem;"></p>
+                <div style="display: flex; gap: 0.75rem; justify-content: center;">
+                    <button @click="confirmModal.onConfirm(); confirmModal.visible = false" class="action-btn danger">Confirm</button>
+                    <button @click="confirmModal.visible = false" class="action-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/notifications.js?v=15"></script>
+    <script src="/admin-systems.js?v=1"></script>
+</body>
+</html>

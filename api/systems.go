@@ -156,6 +156,16 @@ func HandleSystemRoutes(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// HandleAdminSystemsPage serves admin-systems.html (server-side admin gate).
+func HandleAdminSystemsPage(w http.ResponseWriter, r *http.Request) {
+	caller, err := getAdminCaller(r)
+	if err != nil || caller == nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	http.ServeFile(w, r, "./static/admin-systems.html")
+}
+
 // HandleAdminSystems handles /api/admin/systems (GET list, POST create).
 func HandleAdminSystems(w http.ResponseWriter, r *http.Request) {
 	caller, err := getAdminCaller(r)

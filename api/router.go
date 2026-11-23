@@ -155,6 +155,7 @@ func RegisterRoutes() {
 	// Admin page
 	http.Handle("/admin/users", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminUsersPage)))
 	http.Handle("/admin/access", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminAccessPage)))
+	http.Handle("/admin/systems", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminSystemsPage)))
 	http.Handle("/admin/discord", middleware.AuthMiddleware(http.HandlerFunc(HandleAdminDiscordPage)))
 	http.Handle("/admin", middleware.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
@@ -177,6 +178,9 @@ func RegisterRoutes() {
 	})
 	http.HandleFunc("/admin-access.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/admin-access.js")
+	})
+	http.HandleFunc("/admin-systems.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/admin-systems.js")
 	})
 	http.HandleFunc("/admin-discord.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/admin-discord.js")
