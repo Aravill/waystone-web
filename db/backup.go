@@ -94,7 +94,7 @@ func snapshotDB(tmp, final string) error {
 
 // mirrorUploads copies Codex map images that are not yet in the mirror directory, or whose size
 // differs (a broken earlier copy). Uploaded files never change (their names are random), so a
-// same-sized copy is already backed up. Only files named like uploads are mirrored. It never deletes from the mirror: images of deleted pages stay until you clear them by hand.
+// same-sized copy is already backed up. Only files named like uploads are mirrored, directly in the upload directory: sub-directories (the attachments folder) are deliberately not. It never deletes from the mirror: images of deleted pages stay until you clear them by hand.
 func mirrorUploads(mirror string) {
 	src, err := UploadDir()
 	if err != nil {
