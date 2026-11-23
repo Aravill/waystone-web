@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -102,6 +103,19 @@ func codexExcerpt(s string) string {
 	return s
 }
 
+// codexLatestPages returns the two pages of each codex that changed last, newest first (for its book).
+func codexLatestPages(pages []models.PageListItem) map[string][]map[string]interface{} {
+	sorted := append([]models.PageListItem(nil), pages...)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].UpdatedAt > sorted[j].UpdatedAt })
+	out := map[string][]map[string]interface{}{}
+	for _, p := range sorted {
+		if len(out[p.CodexID]) < 2 {
+			out[p.CodexID] = append(out[p.CodexID], map[string]interface{}{"id": p.ID, "title": p.Title, "updated_at": p.UpdatedAt})
+		}
+	}
+	return out
+}
+
 // HandleCodexHome serves GET /api/codices: the codices and recent changes.
 func HandleCodexHome(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -126,14 +140,19 @@ func HandleCodexHome(w http.ResponseWriter, r *http.Request) {
 	for _, p := range pages {
 		pageCount[p.CodexID]++
 	}
+	latest := codexLatestPages(pages)
 	out := make([]map[string]interface{}, 0, len(list))
 	for _, wd := range list {
 		if !rt.canSee(wd.ID) {
 			continue
 		}
+		if latest[wd.ID] == nil {
+			latest[wd.ID] = []map[string]interface{}{}
+		}
 		out = append(out, map[string]interface{}{
 			"id": wd.ID, "name": wd.Name, "excerpt": codexExcerpt(wd.Description),
 			"page_count": pageCount[wd.ID], "can_edit": rt.canEdit(wd.ID),
+			"latest": latest[wd.ID],
 		})
 	}
 	var visible []string // nil = every codex (admins)
