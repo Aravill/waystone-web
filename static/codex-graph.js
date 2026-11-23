@@ -446,6 +446,10 @@
             if (e.key === 'Escape' && root.isConnected && !card.hidden) select(null);
         });
 
+        on(document, 'codex-width', () => {
+            if (root.isConnected) fit();
+        });
+
         applyFilters();
         applyView();
         fit();

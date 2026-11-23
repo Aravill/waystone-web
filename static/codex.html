@@ -6,9 +6,9 @@
     <title>Waystone - Codices</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=8"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=84">
+    <link rel="stylesheet" href="/static/styles.css?v=85">
     <link rel="stylesheet" href="/static/notifications.css?v=12">
-    <link rel="stylesheet" href="/static/codex.css?v=50">
+    <link rel="stylesheet" href="/static/codex.css?v=51">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -65,10 +65,15 @@
                 <p class="cx-pick-note" x-show="searchResults.length === 0" x-text="searchLoading || (!acrossCodices && !codex) ? 'Searching...' : 'No page matches.'"></p>
             </div>
         </div>
+        <div class="cx-widthpick" role="group" aria-label="Page width">
+            <button type="button" aria-label="Thin" title="Thin pages" :aria-pressed="pageWidth === 'thin' ? 'true' : 'false'" @click="setPageWidth('thin')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6l6 6-6 6M20 6l-6 6 6 6"/></svg><span>Thin</span></button>
+            <button type="button" aria-label="Medium" title="Medium pages" :aria-pressed="pageWidth === 'medium' ? 'true' : 'false'" @click="setPageWidth('medium')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h7M14 12h7"/></svg><span>Medium</span></button>
+            <button type="button" aria-label="Wide" title="Wide pages" :aria-pressed="pageWidth === 'wide' ? 'true' : 'false'" @click="setPageWidth('wide')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6"/></svg><span>Wide</span></button>
+        </div>
         <button type="button" class="cx-note" x-show="canNote" x-cloak aria-label="Quick note" aria-keyshortcuts="N" title="Quick note (N)" @click="openQuickNote()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M9 12h6M12 9v6"/></svg><span>Note</span><kbd aria-hidden="true">N</kbd></button>
     </div>
 
-    <div class="cx-shell" :class="{ ['cx-shell--' + screen]: true, ['cx-width--' + pageWidth]: screen === 'page', 'nav-open': navOpen, 'nav-anim': navAnim }" @keydown.escape.window="navOpen && closeNav()">
+    <div class="cx-shell" :class="{ ['cx-shell--' + screen]: true, ['cx-width--' + pageWidth]: true, 'nav-open': navOpen, 'nav-anim': navAnim }" @keydown.escape.window="navOpen && closeNav()">
         <div class="cx-scrim" @click="closeNav()"></div>
 
         <!-- Left nav: the folder tree. A drawer on phones. -->
@@ -427,20 +432,7 @@
                                 </div>
                             </div>
                         </header>
-                        <div class="cx-subrow" x-show="screen === 'page'">
-                            <p class="cx-sub" x-text="isTimeline ? tlSummary : 'Revision ' + page.current_revision + ' · last edited by ' + page.updated_by_user.display_name + ' ' + formatStamp(page.updated_at)"></p>
-                            <div class="cx-widthpick" role="group" aria-label="Page width">
-                                <button type="button" class="cx-act" :aria-pressed="pageWidth === 'thin'" @click="setPageWidth('thin')">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6l6 6-6 6M20 6l-6 6 6 6"/></svg>Thin
-                                </button>
-                                <button type="button" class="cx-act" :aria-pressed="pageWidth === 'medium'" @click="setPageWidth('medium')">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h7M14 12h7"/></svg>Medium
-                                </button>
-                                <button type="button" class="cx-act" :aria-pressed="pageWidth === 'wide'" @click="setPageWidth('wide')">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6"/></svg>Wide
-                                </button>
-                            </div>
-                        </div>
+                        <p class="cx-sub" x-show="screen === 'page'" x-text="isTimeline ? tlSummary : 'Revision ' + page.current_revision + ' · last edited by ' + page.updated_by_user.display_name + ' ' + formatStamp(page.updated_at)"></p>
                         <dl class="cx-jmeta" x-show="journal && screen === 'page'">
                             <div><dt>Played</dt><dd x-text="journal ? parseDateLocal(journal.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : ''"></dd></div>
                             <div><dt>At the table</dt><dd x-text="journalWho"></dd></div>
@@ -1203,11 +1195,11 @@
     </div>
 
     <script src="/static/notifications.js?v=15"></script>
-    <script src="/campaigns.js?v=66"></script>
-    <script src="/static/codex-editor.js?v=6"></script>
-    <script src="/static/codex-graph.js?v=3"></script>
-    <script src="/static/codex-help.js?v=3"></script>
+    <script src="/campaigns.js?v=67"></script>
+    <script src="/static/codex-editor.js?v=7"></script>
+    <script src="/static/codex-graph.js?v=4"></script>
+    <script src="/static/codex-help.js?v=4"></script>
     <script src="/static/codex-books.js?v=1"></script>
-    <script src="/static/codex.js?v=42"></script>
+    <script src="/static/codex.js?v=43"></script>
 </body>
 </html>
