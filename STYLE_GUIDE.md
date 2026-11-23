@@ -19,7 +19,7 @@ The visual conventions for Waystone Web. Every page and feature follows them. Re
 | `ux-game-calendar.dc.html` | The game page as a normal page, Ahead as ledger rows and the calendar (board 3). Its two-number calendar cells are superseded: the cells keep the four-column tally (see Session replies) |
 | `modals.html` | Modal redesign (built): every dialog in the app in the folio-banded sheet, filled field cells and one button order, with a Today toggle for comparison |
 | `timeline.html` | Timeline pages (built): the Alternating layout B, sticky year boxes, gap notes, Jump to and On the timeline boxes, the Add event, page type and Calendar dialogs. Layout A (Ledger) was not chosen |
-| `codex-books.html` | Proposed, not built: the Codices home with each codex a bound book that opens on hover (four bindings; dyed leather, one muted dye per codex, is settled, one plain fill for every book was not chosen; cover titles are in the title face, IM Fell, not Barlow) |
+| `codex-books.html` | The Codices home with each codex a bound book that opens on hover (built), see `CODEX_BOOK_DESIGN_GUIDE.md` |
 
 ## Design Philosophy
 
@@ -107,7 +107,7 @@ Five families, vendored as woff2 under `static/vendor/fonts/` (SIL Open Font Lic
 | Role | Family | Use for |
 |------|--------|---------|
 | Text (`--font-text`) | `'Inter', system-ui, sans-serif` (400, 400 italic, 500, 600) | Everything by default: body, labels, buttons, badges, inputs, dates |
-| Title (`--font-title`) | `'IM Fell English SC', serif` | Page titles (`.page-title`, h1) and the main navigation (`.nav-item`) |
+| Title (`--font-title`) | `'IM Fell English SC', 'Waystone Fell', serif` | Page titles (`.page-title`, h1), the main navigation (`.nav-item`) and codex book covers. Waystone Fell holds the Latin Extended letters IM Fell lacks, composed from it by `tools/fell` |
 | Display (`--font-display`) | `'Barlow Condensed', 'Arial Narrow', sans-serif` (one 600 file, declared for 400–700 so nothing gets faux bold) | Card titles, modal titles, section headings, the month name, Codices titles |
 | Mono (`--font-mono`) | `'IBM Plex Mono', 'Courier New', monospace` | Only where Markdown is written: the journal editor and its conflict text, the Codices editor and template text |
 | Blackletter | `'UnifrakturMaguntia', serif` | The "Waystone" wordmark and the drop cap on fixed page titles. Never for a whole word other than the brand, never below 32px |
@@ -238,7 +238,7 @@ Each played session can have one entry, written in the game description's Markdo
 
 ### Codices
 
-The Codices index (`/codices`) is the lore wiki, built on the journal's page styles (`<body class="journal-page codex-page">` plus `codex.css`). A codex is a folder of pages: a page lives in exactly one codex (there is no Unsorted folder), and a `[[Title]]` link only reaches pages of its own codex. Home shows codex cards (name, excerpt, page count) and recent changes, with "Make a codex first." while there are none; a codex page (`/codices/c/{id}`) lists its folder tree and pages (a flat list while filtering), **Wanted pages** (link targets nobody has written yet) and recent changes.
+The Codices index (`/codices`) is the lore wiki, built on the journal's page styles (`<body class="journal-page codex-page">` plus `codex.css`). A codex is a folder of pages: a page lives in exactly one codex (there is no Unsorted folder), and a `[[Title]]` link only reaches pages of its own codex. Home shows each codex as a bound book (see `CODEX_BOOK_DESIGN_GUIDE.md`) and recent changes, with a dashed blank book, "Make the first codex", while there are none; a codex page (`/codices/c/{id}`) lists its folder tree and pages (a flat list while filtering), **Wanted pages** (link targets nobody has written yet) and recent changes.
 
 **Layout (`.cx-*` in `codex.css`):** below the site header sits a dark **top bar** (the guide's ink on parchment, a deeper brown on candlelight, with a `--cx-bar-accent` underline): the Codices label, a codex picker ("Switch codex"; "All codices" on Home) and search over titles and aliases (`/` focuses it; Enter opens the first hit). Codex and page screens are a three-column shell: the **folder tree** in a `--folio` left nav (current page marked with a rubric edge, a "This codex" group with Codex home, Tags, Wanted pages and Recent changes), the main column, and a right **side panel** of boxes with dark headers (Outline, Linked from, Wanted pages; the codex screen shows Wanted pages and Recent changes). A strip of **page tabs** (last six pages of the codex, kept in localStorage) tops the main column. A page has the title, one action row (Read, shown only in Edit and History to go back to the article; Edit; History; and a **More** menu for Rename, Aliases, Change folder, Move, Copy page…, Calendar… (timelines only), Save as template… (articles only), Delete; only what the viewer may use), a Properties list, then the article, whose `##` headings are banded with `--folio` and a rubric edge. Hovering an existing link with a mouse shows a **preview card**. Edit and History use the nav and the wide main column without the side panel. Below 1180px the side panel stacks under the article (the article gets a Contents box in place of the Outline); below 900px the nav becomes a **drawer** opened from the top bar (it only animates after the first open).
 
