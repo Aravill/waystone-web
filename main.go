@@ -41,7 +41,7 @@ func main() {
 
 	// Timeouts guard against slow clients holding connections open. ReadTimeout
 	// covers the largest upload (1MB avatar); no handler streams responses. The map
-	// image upload (25MB) extends its own deadlines.
+	// image upload (25MB) extends its own deadlines, and so do attachments (100MB: upload, download, copy page).
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%s", port),
 		Handler:           api.RevalidateUnversioned(http.DefaultServeMux),

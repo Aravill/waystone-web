@@ -279,6 +279,12 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 		} else if len(parts) != 2 {
 			writeJSONError(w, http.StatusNotFound, "not found")
 		}
+	case "attachments":
+		if (len(parts) == 2 || len(parts) == 3) && method(http.MethodGet, http.MethodHead) {
+			handleAttachmentFile(w, r, parts[1])
+		} else if len(parts) != 2 && len(parts) != 3 {
+			writeJSONError(w, http.StatusNotFound, "not found")
+		}
 	default:
 		writeJSONError(w, http.StatusNotFound, "not found")
 	}
@@ -683,7 +689,7 @@ func handleCodexPageRoutes(w http.ResponseWriter, r *http.Request, parts []strin
 		}
 	default:
 		if !handleCodexMapRoutes(w, r, id, rest, method) && !handleCodexPictureRoutes(w, r, id, rest, method) &&
-			!handleCodexTimelineRoutes(w, r, id, rest, method) {
+			!handleCodexAttachmentRoutes(w, r, id, rest, method) && !handleCodexTimelineRoutes(w, r, id, rest, method) {
 			writeJSONError(w, http.StatusNotFound, "not found")
 		}
 	}
@@ -822,6 +828,9 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 	payload["tags"] = codexTagObjects(tags, false)
 	if err := codexAddPicturePayload(payload, id); err != nil {
 		return nil, http.StatusInternalServerError, "failed to retrieve images"
+	}
+	if err := codexAddAttachmentPayload(payload, id); err != nil {
+		return nil, http.StatusInternalServerError, "failed to retrieve attachments"
 	}
 	if err := codexAddMapPayload(payload, page); err != nil {
 		return nil, http.StatusInternalServerError, "failed to retrieve map"
