@@ -254,6 +254,10 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 			if method(http.MethodGet) {
 				handleCodexGraph(w, r, parts[1])
 			}
+		case len(parts) == 3 && parts[2] == "attachments":
+			if method(http.MethodGet) {
+				handleCodexAttachments(w, r, parts[1])
+			}
 		case len(parts) == 3 && parts[2] == "templates":
 			if method(http.MethodGet, http.MethodPost) {
 				handleCodexTemplates(w, r, parts[1])
@@ -277,6 +281,12 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 		if len(parts) == 2 && method(http.MethodGet) {
 			handleCodexFile(w, r, parts[1])
 		} else if len(parts) != 2 {
+			writeJSONError(w, http.StatusNotFound, "not found")
+		}
+	case "attachments":
+		if (len(parts) == 2 || len(parts) == 3) && method(http.MethodGet, http.MethodHead) {
+			handleAttachmentFile(w, r, parts[1])
+		} else if len(parts) != 2 && len(parts) != 3 {
 			writeJSONError(w, http.StatusNotFound, "not found")
 		}
 	default:
@@ -683,7 +693,7 @@ func handleCodexPageRoutes(w http.ResponseWriter, r *http.Request, parts []strin
 		}
 	default:
 		if !handleCodexMapRoutes(w, r, id, rest, method) && !handleCodexPictureRoutes(w, r, id, rest, method) &&
-			!handleCodexTimelineRoutes(w, r, id, rest, method) {
+			!handleCodexAttachmentRoutes(w, r, id, rest, method) && !handleCodexTimelineRoutes(w, r, id, rest, method) {
 			writeJSONError(w, http.StatusNotFound, "not found")
 		}
 	}
@@ -822,6 +832,9 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 	payload["tags"] = codexTagObjects(tags, false)
 	if err := codexAddPicturePayload(payload, id); err != nil {
 		return nil, http.StatusInternalServerError, "failed to retrieve images"
+	}
+	if err := codexAddAttachmentPayload(payload, id); err != nil {
+		return nil, http.StatusInternalServerError, "failed to retrieve attachments"
 	}
 	if err := codexAddMapPayload(payload, page); err != nil {
 		return nil, http.StatusInternalServerError, "failed to retrieve map"
@@ -1053,12 +1066,13 @@ func handleDeletePage(w http.ResponseWriter, r *http.Request, id string) {
 	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
-	files, err := db.DeletePage(id)
+	files, attachments, err := db.DeletePage(id)
 	if err != nil {
 		codexStoreError(w, err, "delete page")
 		return
 	}
 	removeCodexFiles(files)
+	removeAttachmentFiles(attachments)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 

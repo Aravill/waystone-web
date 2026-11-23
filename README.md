@@ -227,6 +227,8 @@ The application uses **SQLite** (embedded SQL database) to store campaigns, user
 ### Backups
 Snapshots are written to `./backups` on the host (daily, newest `BACKUP_KEEP` kept). A local copy does not survive disk loss, so copy `./backups` off the server regularly (e.g. an `rsync`/`rclone` cron job).
 
+Codex attachments (files attached to pages, in the `attachments` sub-folder of the upload directory) are not part of `./backups`: copy the data volume as well if you want to keep them. After a restore from a snapshot, a page may list an attachment whose file is gone; its download is a 404 until someone removes or replaces it.
+
 To restore: stop the app (`docker compose --profile prod stop waystone-web`), copy a snapshot over `waystone.db` in the `waystone-data` volume (`/root/data/waystone.db` in the container), then start it again.
 
 ### Initial Data

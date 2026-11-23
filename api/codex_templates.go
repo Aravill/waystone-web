@@ -287,6 +287,8 @@ type pageCopyRequest struct {
 	FolderID   string `json:"folder_id"`
 	CopyTags   bool   `json:"copy_tags"`
 	CopyImages bool   `json:"copy_images"`
+
+	CopyAttachments bool `json:"copy_attachments"`
 }
 
 // handleCopyPage copies a page (See on its codex) into a codex the user can edit: a new page with
@@ -353,7 +355,7 @@ func handleCopyPage(w http.ResponseWriter, r *http.Request, id string) {
 		codexStoreError(w, err, "copy page")
 		return
 	}
-	var newFiles []string
+	var newFiles, newAttachments []string
 	if req.CopyImages {
 		if x.Images, x.CoverImageID, newFiles, err = duplicatePictures(id, src.Body, userID); err != nil {
 			removeCodexFiles(newFiles)
@@ -362,8 +364,20 @@ func handleCopyPage(w http.ResponseWriter, r *http.Request, id string) {
 			return
 		}
 	}
+	if req.CopyAttachments {
+		// Copying up to 100 MB per file needs more than the server-wide write timeout.
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(attachmentTimeout))
+		if x.Attachments, newAttachments, err = duplicateAttachments(id, userID); err != nil {
+			removeCodexFiles(newFiles)
+			removeAttachmentFiles(newAttachments)
+			log.Printf("codex copy page: %v", err)
+			codexServerError(w, "copy the attachments")
+			return
+		}
+	}
 	if err := db.CreatePageWith(page, src.Body, x); err != nil {
 		removeCodexFiles(newFiles)
+		removeAttachmentFiles(newAttachments)
 		codexStoreError(w, err, "copy page")
 		return
 	}
@@ -423,4 +437,58 @@ func duplicatePictures(pageID, body, userID string) ([]models.PageImage, string,
 		}
 	}
 	return out, cover, files, nil
+}
+
+// duplicateAttachments copies the files of a page's attachments under new random names and returns the new rows
+// (same names and sizes, new ids, uploaded by the copier now) and the new file names. An attachment whose file is
+// gone is left out. On error it returns the files made so far, which the caller removes.
+func duplicateAttachments(pageID, userID string) ([]models.PageAttachment, []string, error) {
+	all, err := db.GetPageAttachments(pageID)
+	if err != nil {
+		return nil, nil, err
+	}
+	dir, err := db.AttachmentDir()
+	if err != nil {
+		return nil, nil, err
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	var out []models.PageAttachment
+	var files []string
+	for _, a := range all {
+		if !db.AttachmentFileRe.MatchString(a.File) {
+			continue
+		}
+		src, err := os.Open(filepath.Join(dir, a.File))
+		if os.IsNotExist(err) {
+			log.Printf("codex copy page: attachment file %s is missing, not copied", a.File)
+			continue
+		}
+		if err != nil {
+			return out, files, err
+		}
+		file, err := copyAttachmentFile(src)
+		src.Close()
+		if err != nil {
+			return out, files, fmt.Errorf("copy %s: %w", a.File, err)
+		}
+		files = append(files, file)
+		n := a
+		n.ID, n.File, n.UploadedBy, n.CreatedAt = db.GenerateUUID(), file, userID, now
+		out = append(out, n)
+	}
+	return out, files, nil
+}
+
+// copyAttachmentFile stores a copy of src in the attachments directory under a new random name.
+func copyAttachmentFile(src io.Reader) (string, error) {
+	tmp, err := db.CreateAttachmentTemp()
+	if err != nil {
+		return "", err
+	}
+	if _, err := io.Copy(tmp, src); err != nil {
+		db.DiscardUpload(tmp)
+		return "", err
+	}
+	file := db.GenerateUUID()
+	return file, db.CommitUpload(tmp, file)
 }

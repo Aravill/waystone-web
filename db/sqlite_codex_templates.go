@@ -51,6 +51,12 @@ func createPageWithTx(tx *sql.Tx, p models.Page, body string, x models.NewPageEx
 			return err
 		}
 	}
+	for _, a := range x.Attachments {
+		if _, err := tx.Exec(`INSERT INTO page_attachments (`+pageAttachmentColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			a.ID, p.ID, a.Name, a.File, a.Size, a.UploadedBy, a.CreatedAt); err != nil {
+			return err
+		}
+	}
 	if x.CoverImageID != "" {
 		if _, err := tx.Exec(`UPDATE pages SET cover_image_id = ? WHERE id = ?`, x.CoverImageID, p.ID); err != nil {
 			return err

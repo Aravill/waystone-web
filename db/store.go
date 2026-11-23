@@ -164,7 +164,7 @@ type Store interface {
 	SetFolderTemplate(id, templateID string) error
 	DeleteFolder(id string) (pages, folders int, err error)
 	SetPageFolder(pageID, folderID string) error
-	DeletePage(id string) ([]string, error)
+	DeletePage(id string) (images, attachments []string, err error)
 	GetCodexTags(codexID string) ([]models.CodexTag, error)
 	GetCodexPageTags(codexID string) (map[string][]string, error)
 	GetCodexGraph(codexID string) ([]models.GraphPage, []models.GraphLink, error)
@@ -192,6 +192,12 @@ type Store interface {
 	AddPageImage(img models.PageImage) (models.PageImage, error)
 	RemovePageImage(pageID, imageID string) error
 	SetPageCover(pageID, imageID string) error
+	GetPageAttachments(pageID string) ([]models.PageAttachment, error)
+	GetCodexAttachments(codexID string) ([]models.CodexAttachment, error)
+	GetAttachment(id string) (models.PageAttachment, string, error)
+	AddPageAttachment(a models.PageAttachment) (models.PageAttachment, error)
+	ReplacePageAttachment(pageID, id, file string, size int64, userID string) (models.PageAttachment, string, error)
+	RemovePageAttachment(pageID, id string) (string, error)
 	GetMapImages(pageID string) ([]models.MapImage, error)
 	AddMapImage(img models.MapImage) error
 	RestoreMapImage(pageID, imageID, userID string) (models.MapImage, error)

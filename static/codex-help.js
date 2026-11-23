@@ -53,6 +53,16 @@ const CODEX_HELP = [
         ]
     },
     {
+        id: 'attachments',
+        title: 'Attached files',
+        intro: '<p>Files such as rulebooks, handouts and sheets are added in the Attachments box on a page (people with Edit only; PDF, images, Word, Excel, PowerPoint, OpenDocument, txt, md, csv, zip and mp3, up to 100 MB each). Write <code>![[rules.pdf]]</code> to link one in the text: it shows the name and the size. Words after the name become the label. PDFs and images open in the browser, everything else downloads.</p>' +
+            '<p>A file name can only be used once on a page, pictures included. If the file has been removed, the text says "Attachment removed" with its name; uploading a file of that name again brings the link back.</p>',
+        examples: [
+            { src: 'Read ![[rules.pdf]] before the first session.', note: 'A file link' },
+            { src: 'Read ![[rules.pdf|Player rules]] before the first session.', note: 'With a label' }
+        ]
+    },
+    {
         id: 'lists',
         title: 'Live lists',
         intro: '<p>A line of its own made of <code>{{list ...}}</code> shows a box of matching pages that stays up to date as the codex changes. Options are <code>key:value</code> pairs (put a value in "quotes" if it has spaces), and with none the list shows every page. The page itself is left out. Lists are drawn when the page is shown, so they add no links, backlinks or graph lines.</p>' +

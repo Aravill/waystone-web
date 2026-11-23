@@ -15,31 +15,32 @@ const (
 )
 
 var (
-	ErrCodexNotFound     = errors.New("codex not found")
-	ErrCodexNameTaken    = errors.New("a codex with that name already exists")
-	ErrCodexInUse        = errors.New("codex still has pages")
-	ErrFolderNotFound    = errors.New("folder not found")
-	ErrFolderNameTaken   = errors.New("a folder with that name already exists here")
-	ErrFolderCycle       = errors.New("a folder can't go inside itself")
-	ErrParentNotFound    = errors.New("parent folder not found")
-	ErrFolderTooDeep     = errors.New("folders can nest up to 10 levels")
-	ErrPageNotFound      = errors.New("page not found")
-	ErrNoMap             = errors.New("the page has no map")
-	ErrPinNotFound       = errors.New("pin not found")
-	ErrPinEventNotFound  = errors.New("pin event not found")
-	ErrPinEventUndone    = errors.New("pin change already undone")
-	ErrImageNotFound     = errors.New("image not found")
-	ErrTagNotFound       = errors.New("tag not found")
-	ErrTagNameTaken      = errors.New("a tag with that name already exists in this codex")
-	ErrTemplateNotFound  = errors.New("template not found")
-	ErrTemplateNameTaken = errors.New("a template with that name already exists in this codex")
-	ErrRevisionNotFound  = errors.New("revision not found")
-	ErrNotTimeline       = errors.New("the page is not a timeline")
-	ErrEventNotFound     = errors.New("event not found")
-	ErrNoteNotFound      = errors.New("note not found")
-	ErrInboxFull         = errors.New("your inbox is full")
-	ErrNoteTooLong       = errors.New("the page would be too long")
-	ErrLinkNotInCodex    = errors.New("the linked page is not in this codex")
+	ErrCodexNotFound      = errors.New("codex not found")
+	ErrCodexNameTaken     = errors.New("a codex with that name already exists")
+	ErrCodexInUse         = errors.New("codex still has pages")
+	ErrFolderNotFound     = errors.New("folder not found")
+	ErrFolderNameTaken    = errors.New("a folder with that name already exists here")
+	ErrFolderCycle        = errors.New("a folder can't go inside itself")
+	ErrParentNotFound     = errors.New("parent folder not found")
+	ErrFolderTooDeep      = errors.New("folders can nest up to 10 levels")
+	ErrPageNotFound       = errors.New("page not found")
+	ErrNoMap              = errors.New("the page has no map")
+	ErrPinNotFound        = errors.New("pin not found")
+	ErrPinEventNotFound   = errors.New("pin event not found")
+	ErrPinEventUndone     = errors.New("pin change already undone")
+	ErrImageNotFound      = errors.New("image not found")
+	ErrAttachmentNotFound = errors.New("attachment not found")
+	ErrTagNotFound        = errors.New("tag not found")
+	ErrTagNameTaken       = errors.New("a tag with that name already exists in this codex")
+	ErrTemplateNotFound   = errors.New("template not found")
+	ErrTemplateNameTaken  = errors.New("a template with that name already exists in this codex")
+	ErrRevisionNotFound   = errors.New("revision not found")
+	ErrNotTimeline        = errors.New("the page is not a timeline")
+	ErrEventNotFound      = errors.New("event not found")
+	ErrNoteNotFound       = errors.New("note not found")
+	ErrInboxFull          = errors.New("your inbox is full")
+	ErrNoteTooLong        = errors.New("the page would be too long")
+	ErrLinkNotInCodex     = errors.New("the linked page is not in this codex")
 )
 
 // NameConflict is another page in the same codex that already has a title or alias.
@@ -120,8 +121,10 @@ func SetFolderTemplate(id, templateID string) error {
 func DeleteFolder(id string) (pages, folders int, err error) { return GetStore().DeleteFolder(id) }
 func SetPageFolder(pageID, folderID string) error            { return GetStore().SetPageFolder(pageID, folderID) }
 
-// DeletePage returns the map image files the caller should remove from disk.
-func DeletePage(id string) ([]string, error) { return GetStore().DeletePage(id) }
+// DeletePage returns the image files (map images and pictures) and the attachment files the caller should remove from disk.
+func DeletePage(id string) (images, attachments []string, err error) {
+	return GetStore().DeletePage(id)
+}
 
 func GetCodexTags(codexID string) ([]models.CodexTag, error) { return GetStore().GetCodexTags(codexID) }
 func GetCodexPageTags(codexID string) (map[string][]string, error) {
@@ -180,6 +183,33 @@ func RemovePageImage(pageID, imageID string) error {
 	return GetStore().RemovePageImage(pageID, imageID)
 }
 func SetPageCover(pageID, imageID string) error { return GetStore().SetPageCover(pageID, imageID) }
+
+func GetPageAttachments(pageID string) ([]models.PageAttachment, error) {
+	return GetStore().GetPageAttachments(pageID)
+}
+func GetCodexAttachments(codexID string) ([]models.CodexAttachment, error) {
+	return GetStore().GetCodexAttachments(codexID)
+}
+
+// GetAttachment returns the row and the id of the codex its page is in ("" when there is none).
+func GetAttachment(id string) (models.PageAttachment, string, error) {
+	return GetStore().GetAttachment(id)
+}
+
+// AddPageAttachment stores the row; a.Name is made unique among the page's pictures and attachments and returned.
+func AddPageAttachment(a models.PageAttachment) (models.PageAttachment, error) {
+	return GetStore().AddPageAttachment(a)
+}
+
+// ReplacePageAttachment points the row at a new file and returns the row and the old file to delete.
+func ReplacePageAttachment(pageID, id, file string, size int64, userID string) (models.PageAttachment, string, error) {
+	return GetStore().ReplacePageAttachment(pageID, id, file, size, userID)
+}
+
+// RemovePageAttachment deletes the row and returns its file to delete.
+func RemovePageAttachment(pageID, id string) (string, error) {
+	return GetStore().RemovePageAttachment(pageID, id)
+}
 
 func GetMapImages(pageID string) ([]models.MapImage, error) { return GetStore().GetMapImages(pageID) }
 func AddMapImage(img models.MapImage) error                 { return GetStore().AddMapImage(img) }

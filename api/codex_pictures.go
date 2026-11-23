@@ -17,6 +17,14 @@ const maxPictureNameRunes = 80
 // pictureName turns an uploaded file name into the name a page refers to it by in ![[name|caption]]:
 // no path, letters, digits, spaces and - _ . only (so no [ ] |), at most 80 characters.
 func pictureName(raw string) string {
+	if name := cleanFileName(raw); name != "" {
+		return name
+	}
+	return "image"
+}
+
+// cleanFileName is pictureName's cleaning without the fallback: it returns "" when nothing is left.
+func cleanFileName(raw string) string {
 	if i := strings.LastIndexAny(raw, `/\`); i >= 0 {
 		raw = raw[i+1:]
 	}
@@ -33,9 +41,6 @@ func pictureName(raw string) string {
 			ext = ""
 		}
 		name = string(r[:maxPictureNameRunes-len([]rune(ext))]) + ext
-	}
-	if name == "" {
-		return "image"
 	}
 	return name
 }

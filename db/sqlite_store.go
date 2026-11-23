@@ -394,6 +394,15 @@ func (s *SQLiteStore) initSchema() error {
 		created_at TEXT NOT NULL,
 		removed_at TEXT NOT NULL DEFAULT ''
 	);
+	CREATE TABLE IF NOT EXISTS page_attachments (
+		id TEXT PRIMARY KEY,
+		page_id TEXT NOT NULL,
+		name TEXT NOT NULL,
+		file TEXT NOT NULL,
+		size INTEGER NOT NULL,
+		uploaded_by TEXT NOT NULL,
+		created_at TEXT NOT NULL
+	);
 	CREATE TABLE IF NOT EXISTS codex_templates (
 		id TEXT PRIMARY KEY,
 		codex_id TEXT NOT NULL,
@@ -464,6 +473,7 @@ func (s *SQLiteStore) initSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_page_tags_tag ON page_tags(tag_id);
 	CREATE INDEX IF NOT EXISTS idx_page_images_page ON page_images(page_id);
 	CREATE INDEX IF NOT EXISTS idx_page_images_file ON page_images(file);
+	CREATE INDEX IF NOT EXISTS idx_page_attachments_page ON page_attachments(page_id);
 	CREATE INDEX IF NOT EXISTS idx_map_images_file ON map_images(file);
 	CREATE INDEX IF NOT EXISTS idx_codex_folders_parent ON codex_folders(codex_id, parent_id);
 	CREATE INDEX IF NOT EXISTS idx_page_links_to ON page_links(to_page_id);

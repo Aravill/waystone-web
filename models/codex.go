@@ -213,6 +213,24 @@ type PageImage struct {
 	RemovedAt  string `json:"removed_at"`
 }
 
+// PageAttachment is a file attached to a page (the file itself lives in the attachments directory).
+// Replace keeps the row and its id and swaps File, Size, UploadedBy and CreatedAt.
+type PageAttachment struct {
+	ID         string `json:"id"`
+	PageID     string `json:"page_id"`
+	Name       string `json:"name"`
+	File       string `json:"file"`
+	Size       int64  `json:"size"`
+	UploadedBy string `json:"uploaded_by"`
+	CreatedAt  string `json:"created_at"`
+}
+
+// CodexAttachment is a page attachment with the title of the page it is on, for the codex-wide list.
+type CodexAttachment struct {
+	PageAttachment
+	PageTitle string `json:"page_title"`
+}
+
 // CodexTemplate is a page template that belongs to one codex. Tags are the tags a page made from
 // it gets (they exist in the codex).
 type CodexTemplate struct {
@@ -234,6 +252,7 @@ type NewPageExtras struct {
 	Note         string
 	TagNames     []string
 	Images       []PageImage
+	Attachments  []PageAttachment
 	CoverImageID string
 	Calendar     *TimelineCalendar // timeline pages: the copied calendar
 	Events       []TimelineEvent   // timeline pages: the copied events (ids are replaced)
