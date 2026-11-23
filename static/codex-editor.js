@@ -108,7 +108,7 @@
         // The / menu: "/" at a line start or after whitespace, then up to 20 word characters, filtered on the
         // label and keys. from is after the "/" (so the library leaves the filtering to us) and apply takes the "/" too.
         const slashMenu = (ctx) => {
-            const m = ctx.matchBefore(/\/[\w-]{0,20}/);
+            const m = ctx.matchBefore(/\/[\p{L}\w-]{0,20}/u);
             if (!m || !slash || (m.from > 0 && !/\s/.test(ctx.state.doc.sliceString(m.from - 1, m.from)))) return null;
             const q = m.text.slice(1).toLowerCase();
             const options = [];

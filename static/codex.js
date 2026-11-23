@@ -407,21 +407,32 @@ function codexHeadingsOnly(body) {
     return out.length ? out.join('\n\n') + '\n\n' : '';
 }
 
+// A codex's languages: the one it has decides its built-in templates and the text written into its pages
+// (docs/design/codex-language.md). The interface stays English.
+const CODEX_LANGUAGES = [{ id: 'en', name: 'English' }, { id: 'cs', name: 'Czech' }];
+
+// A day as the codex's language writes it (the server's codexDate).
+function codexDay(date, lang) {
+    if (lang === 'cs') return `${date.getDate()}. ${date.getMonth() + 1}. ${date.getFullYear()}`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 // The / menu in the page editor: snippets, then each template's headings (templates with none are left out).
+// Labels and search words are English in every codex; cs is what is inserted in a Czech one.
 const CODEX_SNIPPETS = [
-    { label: 'Person', detail: 'Name, role, wants, lives in', keys: 'npc character', text: '**Name:** \n**Role:** \n**Wants:** \n**Lives in:** [[ ]]', cursor: 10, sample: '**Name:** Brindle\n**Role:** Innkeeper\n**Wants:** A quiet winter\n**Lives in:** [[The Gilded Stag]]' },
-    { label: 'Callout', detail: 'A quoted note that stands out', keys: 'quote note', text: '> **Note:** ' },
-    { label: 'Loot list', detail: 'A heading and three bullets', keys: 'rewards', text: '## Loot and rewards\n\n- \n- \n- ' },
+    { label: 'Person', detail: 'Name, role, wants, lives in', keys: 'npc character', text: '**Name:** \n**Role:** \n**Wants:** \n**Lives in:** [[ ]]', cursor: 10, cs: { text: '**Jméno:** \n**Role:** \n**Touží po:** \n**Žije v:** [[ ]]', cursor: 11 }, sample: '**Name:** Brindle\n**Role:** Innkeeper\n**Wants:** A quiet winter\n**Lives in:** [[The Gilded Stag]]' },
+    { label: 'Callout', detail: 'A quoted note that stands out', keys: 'quote note', text: '> **Note:** ', cs: { text: '> **Poznámka:** ' } },
+    { label: 'Loot list', detail: 'A heading and three bullets', keys: 'rewards', text: '## Loot and rewards\n\n- \n- \n- ', cs: { text: '## Kořist a odměny\n\n- \n- \n- ' } },
     { label: 'Live list', detail: 'Pages by tag, kept up to date', keys: 'tag', text: '{{list tag: links:here}}', cursor: 11, sample: '{{list tag:npc}}' },
     { label: 'Divider', detail: 'A rule across the page', keys: 'rule line hr', text: '---' }
 ];
-function codexSlashItems(templates, today) {
+function codexSlashItems(templates, today, lang) {
     const snippets = [...(today ? [{ label: "Today's date", detail: today, keys: 'date', text: today }] : []), ...CODEX_SNIPPETS]
-        .map((s) => ({ ...s, section: 'Snippets' }));
+        .map((s) => ({ ...s, ...(s[lang] || {}), section: 'Snippets' }));
     const heads = [];
     for (const t of templates) {
         const text = codexHeadingsOnly(t.body);
-        if (text) heads.push({ label: t.name + ' headings', detail: t.by ? 'this codex' : '', section: 'Template headings', text });
+        if (text) heads.push({ label: t.name + ' headings', detail: t.by ? 'this codex' : '', keys: t.by ? '' : t.id.replace('builtin:', ''), section: 'Template headings', text });
     }
     return [...snippets, ...heads];
 }
@@ -701,10 +712,10 @@ function codexTlHtml(events, cal, opts) {
     return html;
 }
 
-// A page in a journal folder ("{game}: Campaign Journal") drops its "{game}: " prefix, so the folder reads as a list of dates.
+// A page in a journal folder ("{game}: Campaign Journal", "{game}: Deník tažení") drops its "{game}: " prefix, so the folder reads as a list of dates.
 function codexJournalPrefix(folderName) {
-    const tail = 'Campaign Journal';
-    return folderName.endsWith(': ' + tail) ? folderName.slice(0, folderName.length - tail.length) : '';
+    const tail = ['Campaign Journal', 'Deník tažení'].find((t) => folderName.endsWith(': ' + t));
+    return tail ? folderName.slice(0, folderName.length - tail.length) : '';
 }
 
 function codexPageItemHtml(p, currentId, canDrag = false, prefix = '') {
@@ -793,7 +804,7 @@ window.codexPage = function () {
         codexChoices: [],
         codicesLoaded: false, // codexChoices was read from the server (it may be legitimately empty)
         dlg: { type: '' },
-        tplBuiltin: null, // the built-in templates and the day {{date}} stands for, from the server (once)
+        tplBuiltin: null, // the built-in templates and the day {{date}} stands for, in the codex's language (kept per codex)
         // Tags and pictures
         tagFilter: '', // ?tag=name on the codex screen: list only the pages with that tag
         lightbox: { url: '', caption: '', meta: '' },
@@ -1985,7 +1996,7 @@ window.codexPage = function () {
         get addNotePreview() {
             const d = this.dlg;
             if (d.type !== 'addToPage') return '';
-            const day = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const day = codexDay(new Date(), this.codex ? this.codex.codex.language : 'en');
             return `_${day} · ${this.displayName}_\n${d.note.body}`;
         },
         async submitAddToPage(d) {
@@ -2632,12 +2643,12 @@ window.codexPage = function () {
         },
 
         // ---- Templates ----
-        // The built-in templates (kept after the first load) then the codex's own, as one list.
+        // The built-in templates in the codex's language (kept after the first load) then the codex's own, as one list.
         async loadTemplates(codexId) {
-            if (!this.tplBuiltin) {
-                const { response, data } = await this.send('/api/codices/templates/builtin', 'GET');
+            if (!this.tplBuiltin || this.tplBuiltin.codexId !== codexId) {
+                const { response, data } = await this.send('/api/codices/templates/builtin?codex=' + encodeURIComponent(codexId), 'GET');
                 if (!response.ok) throw new Error(data.error || 'request failed');
-                this.tplBuiltin = data;
+                this.tplBuiltin = { ...data, codexId };
             }
             const { response, data } = await this.send(`/api/codices/c/${encodeURIComponent(codexId)}/templates`, 'GET');
             if (!response.ok) throw new Error(data.error || 'request failed');
@@ -2885,13 +2896,16 @@ window.codexPage = function () {
                 this.showMessage('Could not delete the folder: ' + error.message, 'error');
             }
         },
+        languageName(id) {
+            return (CODEX_LANGUAGES.find((l) => l.id === id) || { name: '' }).name;
+        },
         openCreateCodex() {
-            this.dlg = { type: 'codex', codex: null, name: '', description: '', error: '', busy: false };
+            this.dlg = { type: 'codex', codex: null, name: '', description: '', language: '', error: '', busy: false };
             this.focusDlg();
         },
         openEditCodex() {
             const w = this.codex.codex;
-            this.dlg = { type: 'codex', codex: w, name: w.name, description: w.description, error: '', busy: false };
+            this.dlg = { type: 'codex', codex: w, name: w.name, description: w.description, language: w.language, error: '', busy: false };
             this.focusDlg();
         },
         openRename() {
@@ -2958,7 +2972,7 @@ window.codexPage = function () {
             else if (response.status === 404) d.error = this.sentence(data.error || 'That no longer exists');
             else if (data.code === 'name_taken') d.error = this.conflictText(data);
             else if (data.code === 'folder_name_taken') d.error = 'A folder with that name already exists there.';
-            else if (data.code === 'template_name_taken') d.error = 'A template with that name already exists in this codex.';
+            else if (data.code === 'template_name_taken') d.error = this.sentence(data.error);
             else d.error = this.sentence(data.error || 'Request failed');
         },
         async submitCreatePage(d) {
@@ -3107,7 +3121,11 @@ window.codexPage = function () {
                 d.error = 'Give the codex a name.';
                 return;
             }
-            const body = { name, description: d.description };
+            if (!d.language) {
+                d.error = 'Choose a language.';
+                return;
+            }
+            const body = { name, description: d.description, language: d.language };
             const { response, data } = d.codex
                 ? await this.send(`/api/codices/c/${encodeURIComponent(d.codex.id)}`, 'PUT', body)
                 : await this.send('/api/codices', 'POST', body);
@@ -3118,6 +3136,7 @@ window.codexPage = function () {
                 this.codexChoices = [];
                 this.codicesLoaded = false;
                 this.allCodices = null;
+                this.tplBuiltin = null; // the language may have changed
                 await this.load();
                 this.showMessage('Codex saved', 'success');
             } else if (data.code === 'codex_name_taken') {
@@ -3670,7 +3689,7 @@ window.codexPage = function () {
             // The / menu's template headings; if they can't load, the snippets still work.
             let templates = [];
             try { templates = await this.loadTemplates(this.currentCodexId); } catch (error) { console.error('Templates for the / menu:', error); }
-            const today = this.tplBuiltin ? this.tplBuiltin.today : '';
+            const { today, language } = this.tplBuiltin || { today: '', language: 'en' };
             try {
                 this.editor = await window.createCodexEditor(this.$refs.editorHost, {
                     doc: () => this.draft.body,
@@ -3678,7 +3697,7 @@ window.codexPage = function () {
                     users: () => this.users || [],
                     onChange: (value) => { this.draft.body = value; this.queueDraft(); },
                     onNotice: (text) => this.showMessage(text, 'info'),
-                    slash: () => codexSlashItems(templates, today)
+                    slash: () => codexSlashItems(templates, today, language)
                 });
                 this.editorReady = !!this.editor;
             } catch (error) {

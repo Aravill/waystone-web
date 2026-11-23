@@ -86,6 +86,7 @@ const CODEX_HELP = [
         id: 'templates',
         title: 'Templates',
         intro: '<p>A new page can start from a template: nine built-in ones (Session, Character, Settlement and so on) and any your codex has saved. Choose one in the New page dialog. Two placeholders are filled in once, when the page is made: <code>{{title}}</code> becomes the page\'s title and <code>{{date}}</code> the day, written like "Nov 22, 2026". Nothing else in braces changes.</p>' +
+            '<p>The codex\'s language (Edit codex) decides the language of the built-in templates and how dates are written: a Czech codex gets "Sezení" and "22. 11. 2026". It changes new text only.</p>' +
             '<ul><li>To make a template, use "Save as template" in a page\'s More menu, or Templates in the codex\'s left nav (people with Edit only).</li>' +
             '<li>A folder can start its new pages from a template: open the folder\'s menu and choose "New pages start from…". Pages made inside it, or in its sub-folders, preselect that template.</li></ul>',
         examples: [
@@ -95,7 +96,7 @@ const CODEX_HELP = [
     {
         id: 'menu',
         title: 'The / menu',
-        intro: '<p>While writing, type <code>/</code> at the start of a line or after a space to open a menu of snippets, then keep typing to narrow it down and press Enter. The Insert / button above the editor opens the same menu. Below are the snippets, with what each puts in the page. The menu also offers today\'s date and, for every template that has <code>##</code> headings, "{template name} headings", which inserts just those headings.</p>',
+        intro: '<p>While writing, type <code>/</code> at the start of a line or after a space to open a menu of snippets, then keep typing to narrow it down and press Enter. The Insert / button above the editor opens the same menu. Below are the snippets, with what each puts in the page. The menu also offers today\'s date and, for every template that has <code>##</code> headings, "{template name} headings", which inserts just those headings. The menu is always in English; in a Czech codex the text it inserts is Czech.</p>',
         snippets: true,
         examples: []
     },
