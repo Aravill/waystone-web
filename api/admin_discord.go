@@ -316,7 +316,7 @@ func testGameChannel(w http.ResponseWriter, r *http.Request, campaign *models.Ca
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	payload := discordPayload("**"+mdEscape(campaign.Title)+"**: test message from Waystone", "", gameLink(campaign))
+	payload := discordPayload("**"+mdEscape(campaign.Title)+"**: test message from Waystone", discordButtonFor("Open the game", "/games/"+campaign.ID))
 	if err := discordConf().client.SendMessage(ctx, campaign.DiscordChannelID, payload); err != nil {
 		msg := "Discord didn't accept the message"
 		if de, ok := err.(*discord.Error); ok && de.Message != "" {

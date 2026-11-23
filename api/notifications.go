@@ -169,6 +169,7 @@ func HandleNotifications(w http.ResponseWriter, r *http.Request) {
 			"data":        n.Data,
 			"created_at":  n.CreatedAt,
 			"read_at":     n.ReadAt,
+			"url":         notificationURL(n),
 		}
 		if actor, ok := userMap[n.ActorID]; ok && actor != nil {
 			item["actor_user"] = userDisplayObject(actor)
