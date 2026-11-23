@@ -16,7 +16,13 @@
         .access-note { color: var(--muted); font-size: 0.8125rem; }
         .access-check { text-align: center; width: 5rem; }
         .access-check input { margin: 0; width: 1.125rem; height: 1.125rem; accent-color: var(--ink); }
-        .access-grid td select { width: auto; min-width: 5.5rem; }
+        .access-grid td select { width: 8rem; min-height: 2.5rem; padding: 0.25rem 0.5rem; border: 1px dashed var(--muted); color: var(--muted); cursor: pointer; }
+        .access-grid td select[data-level="see"] { border: 1px solid var(--ochre); color: var(--ochre); background: color-mix(in srgb, var(--ochre) 10%, var(--bg)); font-weight: 500; }
+        .access-grid td select[data-level="edit"] { border: 1px solid var(--verdigris); color: var(--bg); background: var(--verdigris); font-weight: 600; }
+        /* No See Codices: the level is kept but has no effect */
+        .access-grid tr.is-off td select[data-level] { border-color: var(--muted); color: var(--muted); background: none; }
+        .access-grid td select:focus { outline: 2px solid var(--rubric); outline-offset: 2px; }
+        .access-grid select option { font-weight: 400; }
     </style>
 </head>
 <body x-data="adminAccessPage()">
@@ -99,7 +105,7 @@
                 </thead>
                 <tbody>
                     <template x-for="u in users" :key="u.id">
-                        <tr>
+                        <tr :class="{ 'is-off': !hasRight(u, 'codices.see') }">
                             <td class="access-user">
                                 <span x-text="u.display_name"></span>
                                 <span class="access-note" x-text="u.username"></span>
@@ -108,8 +114,8 @@
                             </td>
                             <template x-for="c in codices" :key="c.id">
                                 <td>
-                                    <select :value="level(c.id, u.id)" :aria-label="c.name + ': ' + u.display_name" @change="setLevel(c, u, $event)">
-                                        <option value="none">None</option>
+                                    <select :value="level(c.id, u.id)" :data-level="level(c.id, u.id)" :aria-label="c.name + ': ' + u.display_name" @change="setLevel(c, u, $event)">
+                                        <option value="none">No access</option>
                                         <option value="see">See</option>
                                         <option value="edit">Edit</option>
                                     </select>
