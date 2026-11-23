@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -118,6 +119,9 @@ func HandleCalendarFeed(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if r.Method == http.MethodGet {
 		_, _ = w.Write([]byte(body))
+		if err := db.TouchCalendarToken(token); err != nil {
+			log.Printf("touch calendar token: %v", err)
+		}
 	}
 }
 

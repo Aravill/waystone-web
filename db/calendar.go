@@ -17,3 +17,11 @@ func SetCalendarToken(userID, token string) error {
 func GetUserIDByCalendarToken(token string) (string, error) {
 	return GetStore().GetUserIDByCalendarToken(token)
 }
+
+func TouchCalendarToken(token string) error {
+	return GetStore().TouchCalendarToken(token)
+}
+
+func GetCalendarLinks() (map[string]models.CalendarLink, error) {
+	return GetStore().GetCalendarLinks()
+}
