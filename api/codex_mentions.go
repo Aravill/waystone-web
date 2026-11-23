@@ -17,6 +17,7 @@ const (
 
 var (
 	snippetLinkRe   = regexp.MustCompile(`\[\[(?:[^\[\]\n|]*\|)?([^\[\]\n]*)\]\]`)
+	snippetUserRe   = regexp.MustCompile(`@\[([^\[\]\n]*)\]\([^()\n]*\)`)
 	snippetMarkerRe = regexp.MustCompile(`[#*>~]+|` + "`" + `|\[\[|\]\]|!\[|\]\([^)]*\)?`)
 )
 
@@ -44,6 +45,7 @@ func firstRunes(s string, n int) string {
 
 // snippetBefore is the plain text before a mention, cut at a word start with "…" when shortened.
 func snippetBefore(s string) string {
+	s = snippetUserRe.ReplaceAllString(s, "@$1")
 	cut := lastRunes(s, mentionContext)
 	if len(cut) < len(s) {
 		if i := strings.IndexAny(cut, " \t\n"); i >= 0 {
@@ -56,6 +58,7 @@ func snippetBefore(s string) string {
 
 // snippetAfter is the plain text after a mention, cut at a word end with "…" when shortened.
 func snippetAfter(s string) string {
+	s = snippetUserRe.ReplaceAllString(s, "@$1")
 	cut := firstRunes(s, mentionContext)
 	if len(cut) < len(s) {
 		if i := strings.LastIndexAny(cut, " \t\n"); i >= 0 {

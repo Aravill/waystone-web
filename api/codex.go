@@ -217,6 +217,12 @@ func HandleCodexRoutes(w http.ResponseWriter, r *http.Request) {
 		} else if len(parts) != 1 {
 			writeJSONError(w, http.StatusNotFound, "not found")
 		}
+	case "users":
+		if len(parts) == 1 && method(http.MethodGet) {
+			handleCodexUsers(w, r)
+		} else if len(parts) != 1 {
+			writeJSONError(w, http.StatusNotFound, "not found")
+		}
 	case "c":
 		switch {
 		case len(parts) == 2 && method(http.MethodGet, http.MethodPut, http.MethodDelete):
@@ -565,6 +571,9 @@ func handleCreatePage(w http.ResponseWriter, r *http.Request) {
 		}
 		body += note.Body
 	}
+	if body, ok = linkUserMentions(w, body); !ok {
+		return
+	}
 	if utf8.RuneCountInString(body) > maxPageBodyRunes {
 		writeJSONError(w, http.StatusBadRequest, "body is too long")
 		return
@@ -839,6 +848,9 @@ func handleSavePage(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	req.Note = strings.TrimSpace(req.Note)
+	if req.Body, ok = linkUserMentions(w, req.Body); !ok {
+		return
+	}
 	if req.BaseRevision < 1 || utf8.RuneCountInString(req.Body) > maxPageBodyRunes || utf8.RuneCountInString(req.Note) > maxPageNoteRunes {
 		writeJSONError(w, http.StatusBadRequest, "invalid page body or note")
 		return

@@ -384,3 +384,37 @@ func LinkMentions(body, title string, names []string) (string, int) {
 	}
 	return body, len(ms)
 }
+
+var usernameRe = regexp.MustCompile(`@[A-Za-z0-9_-]{2,}`)
+
+// LinkUsernames replaces each @username in body with links[username in lower case]; unknown names
+// stay. The @ must follow a line start, whitespace or opening punctuation (so no emails), the name
+// must end there, and masked spans (see mentionMask) are skipped.
+func LinkUsernames(body string, links map[string]string) string {
+	mask := mentionMask(body)
+	var out strings.Builder
+	last := 0
+	for _, m := range usernameRe.FindAllStringIndex(body, -1) {
+		start, end := m[0], m[1]
+		if before, _ := utf8.DecodeLastRuneInString(body[:start]); start > 0 && !unicode.IsSpace(before) && !strings.ContainsRune("(\"'*_“‘—–>,;", before) {
+			continue
+		}
+		// A trailing _ or - may belong to the text around the name (_@roy_), so it is tried without too.
+		link := links[strings.ToLower(body[start+1:end])]
+		for link == "" && (body[end-1] == '_' || body[end-1] == '-') {
+			end--
+			link = links[strings.ToLower(body[start+1:end])]
+		}
+		if link == "" || mask[start] || strings.HasPrefix(body[end:], "@") {
+			continue
+		}
+		if after, _ := utf8.DecodeRuneInString(body[end:]); end < len(body) && after != '_' && isMentionWordRune(after) {
+			continue
+		}
+		out.WriteString(body[last:start])
+		out.WriteString(link)
+		last = end
+	}
+	out.WriteString(body[last:])
+	return out.String()
+}

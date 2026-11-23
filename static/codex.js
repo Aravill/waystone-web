@@ -90,6 +90,9 @@ function diffHtml(segs) {
 // Mirrors wikiLinkRe in db/codex_links.go.
 const CODEX_LINK_RE = /\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{1,200}))?\]\]/g;
 
+// @[Name](userId): a mention of a user. The id is the reference; the name is only what it was when written.
+const CODEX_USER_RE = /@\[([^\[\]\n]{1,100})\]\(([\w-]{1,64})\)/g;
+
 // ![[name]] and ![[name|caption]] embed a picture uploaded to the page. Same shape as the link
 // regex; the leading "!" makes it a picture, so pictures are swapped out before links.
 const CODEX_IMAGE_RE = /!\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{0,200}))?\]\]/g;
@@ -264,7 +267,9 @@ function codexLiveList(spec, ctx) {
 // A line that is only --- becomes a rule (<hr>), here and not in the shared renderer.
 // A {{list ...}} line is swapped the same way for a live list: lists(spec) returns its HTML, and with
 // no lists callback (old revisions, template previews) it shows as a plain "Live list: ..." line.
-function codexMarkdown(body, lookup, canCreate = true, images = null, lists = null, editable = false) {
+// A user mention links to the profile under the user's current name; users is the list from
+// /api/codices/users (null: not loaded, so the written name), and a deleted user is plain text.
+function codexMarkdown(body, lookup, canCreate = true, images = null, lists = null, editable = false, users = null) {
     const found = [];
     const pics = [];
     const specs = [];
@@ -277,6 +282,9 @@ function codexMarkdown(body, lookup, canCreate = true, images = null, lists = nu
         return `\u0002 ${pics.length - 1} \u0002`;
     }).replace(CODEX_LINK_RE, (m, t, label) => {
         found.push({ text: t.trim(), label: label && label.replace(/\u0002 \d+ \u0002/g, '') });
+        return `\u0001 ${found.length - 1} \u0001`;
+    }).replace(CODEX_USER_RE, (m, name, id) => {
+        found.push({ user: id, text: name });
         return `\u0001 ${found.length - 1} \u0001`;
     }).replace(/^(?:[ \t]*(?:\u0002 \d+ \u0002[ \t]*)+(?:\n|$))+/gm, (run) => `\n${run}\n`); // picture-only lines stand as their own paragraph
     const pic = (i, kind, lone) => {
@@ -295,6 +303,11 @@ function codexMarkdown(body, lookup, canCreate = true, images = null, lists = nu
     }).replace(/\u0002 (\d+) \u0002/g, (m, i) => pic(i, 'inline')).replace(/\u0001 (\d+) \u0001/g, (m, i) => {
         const l = found[Number(i)];
         if (!l) return '';
+        if (l.user) {
+            const u = users ? users.find((x) => x.id === l.user) : { display_name: l.text };
+            if (!u) return escapeHtml('@' + l.text);
+            return `<a class="cx-user" href="/profile?user_id=${encodeURIComponent(l.user)}">@${escapeHtml(u.display_name)}</a>`;
+        }
         const shown = escapeHtml(l.label || l.text);
         if (!lookup) return `<span class="wikilink wikilink--plain">${shown}</span>`;
         const target = lookup(l.text);
@@ -327,7 +340,7 @@ function codexHelpHtml(src) {
         cur: '',
         back: new Set()
     };
-    return codexMarkdown(src, lookup, true, images, (spec) => codexLiveList(spec, ctx));
+    return codexMarkdown(src, lookup, true, images, (spec) => codexLiveList(spec, ctx), false, [{ id: 'roy', display_name: 'Roy' }]);
 }
 
 // Save as template, "Headings only": the page's ## and ### lines (as the renderer reads them: up
@@ -758,6 +771,8 @@ window.codexPage = function () {
         graphFrom: null, // the page the graph was opened from (?from=), if it is in this codex
         graphSummary: '',
         localGraph: false,
+        users: null, // who can be @mentioned, see loadUsers
+
         // Mentioned, not linked: plain mentions of this page elsewhere in the codex
         mentions: { loaded: false, total: 0, list: [], can_edit: false, busy: false, progress: '' },
         mentionSeq: 0,
@@ -811,6 +826,7 @@ window.codexPage = function () {
                 this.loading = false;
                 return;
             }
+            this.loadUsers();
             this.tagFilter = (new URLSearchParams(location.search).get('tag') || '').trim();
             document.addEventListener('keydown', (event) => this.onGlobalKey(event));
             document.addEventListener('click', (event) => this.onImageClick(event));
@@ -1052,7 +1068,7 @@ window.codexPage = function () {
             return renderMarkdown(text);
         },
         codexMarkdown(body, lookup) {
-            return codexMarkdown(body, lookup, true, this.imageLookup);
+            return codexMarkdown(body, lookup, true, this.imageLookup, null, false, this.users);
         },
         countLabel(n, word) {
             return `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -1427,7 +1443,7 @@ window.codexPage = function () {
             return (spec) => codexLiveList(spec, ctx);
         },
         get bodyHtml() {
-            return this.page ? codexMarkdown(this.page.body, this.linkLookup, this.canEdit, this.imageLookup, this.listRenderer, this.canEdit) : '';
+            return this.page ? codexMarkdown(this.page.body, this.linkLookup, this.canEdit, this.imageLookup, this.listRenderer, this.canEdit, this.users) : '';
         },
         // Pages that link here by [[link]]; map pins are not shown.
         get linkedFrom() {
@@ -1486,7 +1502,7 @@ window.codexPage = function () {
             this.tocActive = active;
         },
         get previewHtml() {
-            return this.draft ? codexMarkdown(this.draft.body, this.titleLookup, true, this.imageLookup, this.listRenderer) : '';
+            return this.draft ? codexMarkdown(this.draft.body, this.titleLookup, true, this.imageLookup, this.listRenderer, false, this.users) : '';
         },
         // Pages of the current codex (from the codex payload loadNav fetched), for previews and the editor.
         get titles() {
@@ -1646,6 +1662,16 @@ window.codexPage = function () {
             }
         },
         // The tree and the side panel need the codex's own payload on the page screens too.
+        // Everyone who can be mentioned, for the editor's @ list and the names shown; without it
+        // mentions still link, under the name they were written with.
+        async loadUsers() {
+            try {
+                const { response, data } = await this.send('/api/codices/users', 'GET');
+                if (response.ok) this.users = data;
+            } catch (error) {
+                console.error('Failed to load the users:', error);
+            }
+        },
         async loadNav(page) {
             const seq = ++this.navSeq;
             try {
@@ -2542,7 +2568,7 @@ window.codexPage = function () {
             if (!t.body) return '<p class="cx-tpl-empty">An empty page.</p>';
             // An empty [[ ]] shows as a dotted "…" so it reads as a blank to fill in.
             const text = this.fillTpl(t.body, this.dlg.title.trim() || 'Untitled').replace(/\[\[\s*\]\]/g, '[[…]]');
-            return codexMarkdown(text, null, false, null);
+            return codexMarkdown(text, null, false, null, null, false, this.users);
         },
         // Arrow keys move through the template cards like a radio group.
         onTplKey(event) {
@@ -3437,6 +3463,7 @@ window.codexPage = function () {
                 this.editor = await window.createCodexEditor(this.$refs.editorHost, {
                     doc: () => this.draft.body,
                     titles: () => this.titles,
+                    users: () => this.users || [],
                     onChange: (value) => { this.draft.body = value; this.queueDraft(); },
                     onNotice: (text) => this.showMessage(text, 'info'),
                     slash: () => codexSlashItems(templates, today)

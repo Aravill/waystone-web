@@ -204,7 +204,11 @@ func handleAppendNote(w http.ResponseWriter, r *http.Request, id string) {
 	if u, err := db.GetUserByID(userID); err == nil && u != nil {
 		name = u.DisplayName()
 	}
-	rev, err := db.AppendNoteToPage(id, userID, req.PageID, noteSignature(name)+"\n"+note.Body, maxPageBodyRunes)
+	text, ok := linkUserMentions(w, note.Body)
+	if !ok {
+		return
+	}
+	rev, err := db.AppendNoteToPage(id, userID, req.PageID, noteSignature(name)+"\n"+text, maxPageBodyRunes)
 	if err != nil {
 		codexNoteError(w, err, "add note")
 		return
