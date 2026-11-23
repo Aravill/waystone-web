@@ -31,6 +31,14 @@ const CODEX_HELP = [
         ]
     },
     {
+        id: 'people',
+        title: 'Mentioning people',
+        intro: '<p>Type <code>@</code> in the editor and pick a user, or write their whole username, like <code>@roy</code>. It becomes a mention that keeps pointing at the same person whatever they call themselves later, and readers see their current name. Click it to open their profile. The <code>@</code> must be at the start of a line or after a space. Nobody is notified.</p>',
+        examples: [
+            { src: 'The map was drawn by @[Roy](roy).', note: 'A mention as the text keeps it, with the id of the user in round brackets' }
+        ]
+    },
+    {
         id: 'pictures',
         title: 'Pictures',
         intro: '<p>Add a picture with the Add image button above the editor, by dropping a file on it or by pasting one (PNG, JPEG, WebP or GIF, up to 25 MB). The editor inserts <code>![[name]]</code> for you. Write the embed by hand to place a picture that is already on the page.</p>' +

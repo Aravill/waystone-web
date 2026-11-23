@@ -19,14 +19,17 @@
     // [[Title]] and [[Title|label]] (mirrors wikiLinkRe in db/codex_links.go) and ![[picture]] or
     // ![[picture|caption]], where the caption may be empty.
     const LINK_RE = /!?\[\[([^\[\]\n|]{1,200})(?:\|([^\[\]\n]{0,200}))?\]\]/g;
+    // @[Name](userId), a mention of a user (mirrors CODEX_USER_RE in codex.js).
+    const USER_RE = /(@\[[^\[\]\n]{1,100}\])(\([\w-]{1,64}\))/g;
     const norm = (s) => String(s || '').trim().split(/\s+/).join(' ').toLowerCase();
 
-    // createCodexEditor(el, { doc, titles, onChange, onNotice, slash }) mounts the editor in el and resolves to
+    // createCodexEditor(el, { doc, titles, users, onChange, onNotice, slash }) mounts the editor in el and resolves to
     // { view, linkSelection }. doc is the text, or a function returning it (read after the library has loaded, so
-    // text typed meanwhile in the fallback box is kept). titles() returns [{ title, aliases }] for this codex; onChange(text) gets every edit;
+    // text typed meanwhile in the fallback box is kept). titles() returns [{ title, aliases }] for this codex;
+    // users() returns [{ id, username, display_name, label }] for the @ list; onChange(text) gets every edit;
     // onNotice(text) hears why Ctrl+K did nothing. slash() returns the / menu items
     // [{ label, detail, section, keys, text, cursor }]; text replaces the "/word", cursor is the caret offset in it (default: its end).
-    window.createCodexEditor = async function (el, { doc, titles, onChange, onNotice, slash }) {
+    window.createCodexEditor = async function (el, { doc, titles, users, onChange, onNotice, slash }) {
         await loadScriptOnce('/static/vendor/codemirror.bundle.js?v=1');
         const { EditorView, EditorState, keymap, Decoration, ViewPlugin, MatchDecorator, placeholder, drawSelection,
             history, defaultKeymap, historyKeymap, markdown, autocompletion, completionKeymap,
@@ -62,6 +65,33 @@
             constructor(view) { this.decorations = decorator.createDeco(view); }
             update(u) { this.decorations = decorator.updateDeco(u, this.decorations); }
         }, { decorations: (v) => v.decorations });
+
+        const userDecorator = new MatchDecorator({
+            regexp: USER_RE,
+            decorate: (add, from, to, m) => {
+                add(from, from + m[1].length, Decoration.mark({ class: 'cm-usermention' }));
+                add(from + m[1].length, to, Decoration.mark({ class: 'cm-usermention-id' }));
+            }
+        });
+        const userMentions = ViewPlugin.fromClass(class {
+            constructor(view) { this.decorations = userDecorator.createDeco(view); }
+            update(u) { this.decorations = userDecorator.updateDeco(u, this.decorations); }
+        }, { decorations: (v) => v.decorations });
+
+        // After "@" at a line start, whitespace or opening punctuation (so not in an email; mirrors LinkUsernames in
+        // db/codex_links.go): users by username or name, inserted as "@[Name](id)". Never inside a "[[".
+        const userMenu = (ctx) => {
+            const m = ctx.matchBefore(/@[\p{L}\p{N}_-]{0,32}/u);
+            if (!m || !users || ctx.matchBefore(/\[\[[^\[\]\n]*/)) return null;
+            if (m.from > 0 && !/[\s("'*_“‘—–>,;]/.test(ctx.state.doc.sliceString(m.from - 1, m.from))) return null;
+            const q = m.text.slice(1).toLowerCase();
+            const starts = (u) => u.username.toLowerCase().startsWith(q);
+            const options = users()
+                .filter((u) => u.username.toLowerCase().includes(q) || u.display_name.toLowerCase().includes(q))
+                .sort((a, b) => starts(b) - starts(a) || a.username.localeCompare(b.username))
+                .map((u) => ({ label: '@' + u.username, detail: u.display_name, apply: `@[${u.label}](${u.id})` }));
+            return options.length ? { from: m.from, options, filter: false } : null;
+        };
 
         // After "[[": titles insert "Title]]", aliases insert "Title|alias]]".
         const complete = (ctx) => {
@@ -142,8 +172,9 @@
                     markdown(),
                     syntaxHighlighting(highlight),
                     wikilinks,
-                    autocompletion({ override: [complete, slashMenu], icons: false }),
-                    placeholder('Write about it. Link other pages with [[Title]].'),
+                    userMentions,
+                    autocompletion({ override: [complete, slashMenu, userMenu], icons: false }),
+                    placeholder('Write about it. Link other pages with [[Title]], mention people with @.'),
                     EditorView.lineWrapping,
                     EditorView.contentAttributes.of({ 'aria-label': 'The page', 'aria-multiline': 'true' }),
                     keymap.of([{ key: 'Mod-k', run: (v) => linkSelection(v) }, ...completionKeymap, ...historyKeymap, ...defaultKeymap]),
