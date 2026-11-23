@@ -101,12 +101,16 @@ func handleStartJournal(w http.ResponseWriter, r *http.Request, campaignID, sess
 		journalStoreError(w, err)
 		return
 	}
+	lang, ok := codexLanguage(w, campaign.CodexID)
+	if !ok {
+		return
+	}
 	date := session.Date
 	if t, err := time.Parse("2006-01-02", session.Date); err == nil {
-		date = t.Format("Jan 2, 2006")
+		date = codexDate(t, lang)
 	}
 	base := db.JournalPageBase(campaign.Title, session.Date)
-	body, tags, ok := pageStartOn(w, template, campaign.CodexID, base, "", date)
+	body, tags, ok := pageStartOn(w, template, campaign.CodexID, lang, base, "", date)
 	if !ok {
 		return
 	}

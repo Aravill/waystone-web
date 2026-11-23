@@ -341,6 +341,7 @@ func handleCodexTitles(w http.ResponseWriter, r *http.Request) {
 type codexRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Language    string `json:"language"` // required on create; "" on an update keeps the current one
 }
 
 func (req *codexRequest) normalize() string {
@@ -350,6 +351,9 @@ func (req *codexRequest) normalize() string {
 	}
 	if utf8.RuneCountInString(req.Description) > maxCodexDescRunes {
 		return "description is too long"
+	}
+	if req.Language != "" && !models.ValidLanguage(req.Language) {
+		return "unknown language"
 	}
 	return ""
 }
@@ -367,8 +371,12 @@ func handleCreateCodex(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, msg)
 		return
 	}
+	if req.Language == "" {
+		writeJSONError(w, http.StatusBadRequest, "choose a language")
+		return
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	codex := models.Codex{ID: db.GenerateUUID(), Name: req.Name, Description: req.Description, CreatedBy: userID, CreatedAt: now, UpdatedAt: now}
+	codex := models.Codex{ID: db.GenerateUUID(), Name: req.Name, Description: req.Description, Language: req.Language, CreatedBy: userID, CreatedAt: now, UpdatedAt: now}
 	// Admins have every right anyway; a stored row would outlive a demotion unseen.
 	if err := db.CreateCodex(codex, !rt.admin); err != nil {
 		if errors.Is(err, db.ErrCodexNameTaken) {
@@ -394,7 +402,7 @@ func handleUpdateCodex(w http.ResponseWriter, r *http.Request, id string) {
 		writeJSONError(w, http.StatusBadRequest, msg)
 		return
 	}
-	if err := db.UpdateCodex(id, req.Name, req.Description); err != nil {
+	if err := db.UpdateCodex(id, req.Name, req.Description, req.Language); err != nil {
 		switch {
 		case errors.Is(err, db.ErrCodexNotFound):
 			writeJSONError(w, http.StatusNotFound, err.Error())
@@ -512,7 +520,7 @@ func handleGetCodex(w http.ResponseWriter, r *http.Request, id string) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"codex":      map[string]interface{}{"id": id, "name": codex.Name, "description": codex.Description},
+		"codex":      map[string]interface{}{"id": id, "name": codex.Name, "description": codex.Description, "language": codex.Language},
 		"note_count": noteCount,
 		"pages":      list,
 		"folders":    folders,

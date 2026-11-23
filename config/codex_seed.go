@@ -10,6 +10,7 @@ var InitialCodex = models.Codex{
 	Name: "The Karrow Marches",
 	Description: "A cold border country of toll roads, dark waystones and villages that have stopped answering.\n\n" +
 		"Start with *The Karrow Road*, or read about *The Waystones*.",
+	Language:  models.LangEnglish,
 	CreatedBy: royID,
 }
 

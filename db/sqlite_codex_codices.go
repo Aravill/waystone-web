@@ -7,11 +7,11 @@ import (
 	"waystone-web/models"
 )
 
-const codexColumns = `id, name, description, created_by, created_at, updated_at`
+const codexColumns = `id, name, description, language, created_by, created_at, updated_at`
 
 func scanCodex(row rowScanner) (models.Codex, error) {
 	var w models.Codex
-	err := row.Scan(&w.ID, &w.Name, &w.Description, &w.CreatedBy, &w.CreatedAt, &w.UpdatedAt)
+	err := row.Scan(&w.ID, &w.Name, &w.Description, &w.Language, &w.CreatedBy, &w.CreatedAt, &w.UpdatedAt)
 	return w, err
 }
 
@@ -61,8 +61,8 @@ func (s *SQLiteStore) CreateCodex(w models.Codex, creatorGetsEdit bool) error {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec(`INSERT INTO codices (`+codexColumns+`) VALUES (?, ?, ?, ?, ?, ?)`,
-		w.ID, w.Name, w.Description, w.CreatedBy, w.CreatedAt, w.UpdatedAt)
+	_, err = tx.Exec(`INSERT INTO codices (`+codexColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		w.ID, w.Name, w.Description, w.Language, w.CreatedBy, w.CreatedAt, w.UpdatedAt)
 	if isUniqueViolation(err) {
 		return ErrCodexNameTaken
 	}
@@ -79,11 +79,12 @@ func (s *SQLiteStore) CreateCodex(w models.Codex, creatorGetsEdit bool) error {
 	return tx.Commit()
 }
 
-func (s *SQLiteStore) UpdateCodex(id, name, description string) error {
+// UpdateCodex leaves the language as it is when language is "".
+func (s *SQLiteStore) UpdateCodex(id, name, description, language string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	res, err := s.db.Exec(`UPDATE codices SET name = ?, description = ?, updated_at = ? WHERE id = ?`,
-		name, description, nowUTC(), id)
+	res, err := s.db.Exec(`UPDATE codices SET name = ?, description = ?, language = CASE WHEN ? = '' THEN language ELSE ? END, updated_at = ? WHERE id = ?`,
+		name, description, language, language, nowUTC(), id)
 	if isUniqueViolation(err) {
 		return ErrCodexNameTaken
 	}

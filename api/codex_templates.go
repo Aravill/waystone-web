@@ -22,15 +22,18 @@ const (
 	builtinTemplatePrefix = "builtin:"
 )
 
-// builtinTemplate is a template defined here: the same in every codex, never stored, so the server
-// can apply it and the client shows the same text. Tags are names, created in the codex on use.
+// builtinTemplate is a template defined here: the same in every codex of a language, never stored, so
+// the server can apply it and the client shows the same text. Tags are names, created in the codex on
+// use. The ids are the same in every language.
 type builtinTemplate struct {
 	ID, Name, Description string
 	Tags                  []string
 	Body                  string
 }
 
-var builtinTemplates = []builtinTemplate{
+var builtinTemplates = map[string][]builtinTemplate{models.LangEnglish: builtinEnglish, models.LangCzech: builtinCzech}
+
+var builtinEnglish = []builtinTemplate{
 	{"blank", "Blank page", "Start from nothing", []string{}, ""},
 	{"session", "Session", "Notes from one game session", []string{"session"},
 		"**Date:** {{date}}\n**Who was there:** [[ ]], [[ ]]\n\n## Summary\n\n_What happened, in a line or two._\n\n## What happened\n\n1. \n\n## People met\n\n- [[ ]]\n\n## Loot and rewards\n\n- \n\n## Loose ends\n\n- \n\n## Next time\n\n"},
@@ -50,42 +53,88 @@ var builtinTemplates = []builtinTemplate{
 		"_What this is about, in one line._\n\n## The story\n\n## What people believe\n\n## Sources\n\n- [[ ]]\n"},
 }
 
-// templateToday is the day {{date}} stands for, written the way the Codices mock-up shows dates.
-func templateToday() string { return time.Now().UTC().Format("Jan 2, 2006") }
-
-// fillTemplate applies the two placeholders in one pass, so a title that contains "{{date}}" stays as typed.
-func fillTemplate(body, title string) string {
-	return fillTemplateOn(body, title, templateToday())
+var builtinCzech = []builtinTemplate{
+	{"blank", "Prázdná stránka", "Začít od nuly", []string{}, ""},
+	{"session", "Sezení", "Zápis z jednoho herního sezení", []string{"sezení"},
+		"**Datum:** {{date}}\n**Přítomni:** [[ ]], [[ ]]\n\n## Shrnutí\n\n_Co se stalo, jednou nebo dvěma větami._\n\n## Co se stalo\n\n1. \n\n## Koho jsme potkali\n\n- [[ ]]\n\n## Kořist a odměny\n\n- \n\n## Nedořešené věci\n\n- \n\n## Příště\n\n"},
+	{"character", "Postava", "Hráčská i nehráčská postava", []string{"npc"},
+		"_Kdo je {{title}}, jednou větou._\n\n**Bydliště:** [[ ]]\n**Příslušnost:** [[ ]]\n\n## Vzhled\n\n## Povaha\n\n## Minulost\n\n## Vztahy\n\n- [[ ]]: \n\n## Poznámky\n\n"},
+	{"settlement", "Sídlo", "Vesnice, městečko nebo město", []string{"sídlo"},
+		"_Co je {{title}} zač, jednou větou._\n\n**Počet obyvatel:** \n**Vládne:** [[ ]]\n**Oblast:** [[ ]]\n\n## Významná místa\n\n- [[ ]]\n\n## Významné osoby\n\n- [[ ]]\n\n## Historie\n\n## Zvěsti\n\n- \n"},
+	{"landmark", "Místo", "Místo, které si zaslouží vlastní stránku", []string{"místo"},
+		"_Co je {{title}} zač a kde leží, jednou větou._\n\n**Poblíž:** [[ ]]\n\n## Popis\n\n## Historie\n\n## Nebezpečí\n\n## Zvěsti\n\n- \n"},
+	{"event", "Událost", "Něco, co se stalo: bitva, požár, svatba", []string{"událost"},
+		"_Co se stalo, jednou větou._\n\n**Kdy:** \n**Kde:** [[ ]]\n**Kdo:** [[ ]], [[ ]]\n\n## Co se stalo\n\n## Proč na tom záleží\n\n## Následky\n\n- \n"},
+	{"faction", "Frakce", "Cech, kult, rod nebo vojsko", []string{"frakce"},
+		"_Co je {{title}} za skupinu, jednou větou._\n\n**V čele:** [[ ]]\n**Sídlí v:** [[ ]]\n\n## Cíle\n\n## Členové\n\n- [[ ]]\n\n## Spojenci a nepřátelé\n\n- \n\n## Prostředky\n\n"},
+	{"item", "Předmět", "Věc, relikvie nebo poklad", []string{"předmět"},
+		"_Co je {{title}} zač, jednou větou._\n\n**Vlastník:** [[ ]]\n\n## Vzhled\n\n## Co umí\n\n## Historie\n\n## Kde je teď\n\n"},
+	{"lore", "Historie", "Dějiny, legendy, náboženství, zvyky", []string{"historie"},
+		"_O čem to je, jednou větou._\n\n## Příběh\n\n## Čemu lidé věří\n\n## Prameny\n\n- [[ ]]\n"},
 }
 
-// fillTemplateOn is fillTemplate with a date of the caller's choosing (a journal page uses its
-// session's date).
-func fillTemplateOn(body, title, date string) string {
+// codexLanguage loads a codex's language; ok is false (with the response written) when it can't.
+func codexLanguage(w http.ResponseWriter, codexID string) (string, bool) {
+	codex, err := db.GetCodex(codexID)
+	if err != nil {
+		codexServerError(w, "retrieve codex")
+		return "", false
+	}
+	if codex == nil {
+		codexStoreError(w, db.ErrCodexNotFound, "")
+		return "", false
+	}
+	return codex.Language, true
+}
+
+// codexDate writes a date in a codex's language.
+func codexDate(t time.Time, lang string) string {
+	if lang == models.LangCzech {
+		return t.Format("2. 1. 2006")
+	}
+	return t.Format("Jan 2, 2006")
+}
+
+// codexToday is the day {{date}} stands for.
+func codexToday(lang string) string { return codexDate(time.Now().UTC(), lang) }
+
+// fillTemplate applies the two placeholders in one pass, so a title that contains "{{date}}" stays as typed.
+func fillTemplate(body, title, date string) string {
 	return strings.NewReplacer("{{title}}", title, "{{date}}", date).Replace(body)
 }
 
-func builtinTemplateByID(id string) *builtinTemplate {
+func builtinTemplateByID(id, lang string) *builtinTemplate {
 	if !strings.HasPrefix(id, builtinTemplatePrefix) {
 		return nil
 	}
-	for i := range builtinTemplates {
-		if builtinTemplates[i].ID == strings.TrimPrefix(id, builtinTemplatePrefix) {
-			return &builtinTemplates[i]
+	for i, t := range builtinTemplates[lang] {
+		if t.ID == strings.TrimPrefix(id, builtinTemplatePrefix) {
+			return &builtinTemplates[lang][i]
 		}
 	}
 	return nil
 }
 
-// handleBuiltinTemplates serves GET /api/codices/templates/builtin: the built-in templates and
-// the date {{date}} stands for today.
+// handleBuiltinTemplates serves GET /api/codices/templates/builtin[?codex=id]: the built-in templates
+// in the codex's language (English without one) and the date {{date}} stands for today.
 func handleBuiltinTemplates(w http.ResponseWriter, r *http.Request) {
-	out := make([]map[string]interface{}, 0, len(builtinTemplates))
-	for _, t := range builtinTemplates {
+	lang := models.LangEnglish
+	if codexID := r.URL.Query().Get("codex"); codexID != "" {
+		_, rt, ok := codexRightsFor(w, r)
+		if !ok || !rt.checkCodex(w, codexID, false) {
+			return
+		}
+		if lang, ok = codexLanguage(w, codexID); !ok {
+			return
+		}
+	}
+	out := make([]map[string]interface{}, 0, len(builtinTemplates[lang]))
+	for _, t := range builtinTemplates[lang] {
 		out = append(out, map[string]interface{}{
 			"id": builtinTemplatePrefix + t.ID, "name": t.Name, "description": t.Description, "tags": t.Tags, "body": t.Body,
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"templates": out, "today": templateToday()})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"language": lang, "templates": out, "today": codexToday(lang)})
 }
 
 func codexTemplateObject(users map[string]*models.User, t models.CodexTemplate) map[string]interface{} {
@@ -137,13 +186,15 @@ func (req *templateRequest) normalize() string {
 	return ""
 }
 
-// builtinNameTaken reports whether name is a built-in template's name (two cards of one name
-// would look identical in the New page dialog).
+// builtinNameTaken reports whether name is a built-in template's name in any language (two cards of
+// one name would look identical in the New page dialog, now or after the codex changes its language).
 func builtinNameTaken(w http.ResponseWriter, name string) bool {
-	for _, b := range builtinTemplates {
-		if db.NormName(b.Name) == db.NormName(name) {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": "A built-in template has that name.", "code": "template_name_taken"})
-			return true
+	for _, list := range builtinTemplates {
+		for _, b := range list {
+			if db.NormName(b.Name) == db.NormName(name) {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "A built-in template has that name, in English or Czech.", "code": "template_name_taken"})
+				return true
+			}
 		}
 	}
 	return false
@@ -240,7 +291,8 @@ func handleCodexTemplate(w http.ResponseWriter, r *http.Request, id string) {
 		writeJSONError(w, http.StatusBadRequest, msg)
 		return
 	}
-	if builtinNameTaken(w, req.Name) {
+	// A template saved before its name became a built-in one keeps it.
+	if db.NormName(req.Name) != db.NormName(t.Name) && builtinNameTaken(w, req.Name) {
 		return
 	}
 	if err := db.UpdateCodexTemplate(id, req.Name, req.Description, req.Body, req.Tags, userID); err != nil {
@@ -254,16 +306,21 @@ func handleCodexTemplate(w http.ResponseWriter, r *http.Request, id string) {
 // made in (built-in or the codex's own, placeholders applied), or the plain body. ok is false (with
 // the response written) when the template doesn't exist in that codex.
 func pageStart(w http.ResponseWriter, templateID, codexID, title, body string) (string, []string, bool) {
-	return pageStartOn(w, templateID, codexID, title, body, templateToday())
+	lang, ok := codexLanguage(w, codexID)
+	if !ok {
+		return "", nil, false
+	}
+	return pageStartOn(w, templateID, codexID, lang, title, body, codexToday(lang))
 }
 
-// pageStartOn is pageStart with the date {{date}} stands for.
-func pageStartOn(w http.ResponseWriter, templateID, codexID, title, body, date string) (string, []string, bool) {
+// pageStartOn is pageStart with the codex's language and the date {{date}} stands for (a journal page
+// uses its session's date).
+func pageStartOn(w http.ResponseWriter, templateID, codexID, lang, title, body, date string) (string, []string, bool) {
 	if templateID == "" {
 		return body, nil, true
 	}
-	if b := builtinTemplateByID(templateID); b != nil {
-		return fillTemplateOn(b.Body, title, date), b.Tags, true
+	if b := builtinTemplateByID(templateID, lang); b != nil {
+		return fillTemplate(b.Body, title, date), b.Tags, true
 	}
 	t, err := db.GetCodexTemplate(templateID)
 	if err != nil {
@@ -278,7 +335,7 @@ func pageStartOn(w http.ResponseWriter, templateID, codexID, title, body, date s
 	for _, tag := range t.Tags {
 		names = append(names, tag.Name)
 	}
-	return fillTemplateOn(t.Body, title, date), names, true
+	return fillTemplate(t.Body, title, date), names, true
 }
 
 type pageCopyRequest struct {
