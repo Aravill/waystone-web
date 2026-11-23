@@ -1420,17 +1420,19 @@ button.wikilink {
 
 .cx-widthpick {
     display: flex;
-    align-items: center;
+    gap: 0.375rem;
+    margin: 0.5rem 0;
+}
+
+.cx-widthpick .cx-act {
+    min-height: 2rem;
+    padding: 0 0.625rem;
     font-size: 0.8125rem;
 }
 
-.cx-widthpick .muted {
-    margin-right: 0.75rem;
-}
-
-.cx-widthpick .tab:last-child {
-    margin-right: 0;
-    padding-right: 0;
+.cx-widthpick .cx-act[aria-pressed="true"] {
+    border-color: var(--rubric);
+    color: var(--rubric);
 }
 
 .cx-crumb {
@@ -1493,7 +1495,8 @@ button.wikilink {
 }
 
 .cx-spacer {
-    flex: 0 0 0.5rem;
+    flex: none;
+    width: 0.5rem; /* not flex-basis: Firefox leaves that out of the row's width and wraps the last button */
 }
 
 .cx-act {
