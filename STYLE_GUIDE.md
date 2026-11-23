@@ -42,6 +42,7 @@ All colours are CSS custom properties on `:root`. Never hard-code a hex value in
 | Token | Name | Hex | Usage |
 |-------|------|-----|-------|
 | `--bg` | Vellum | `#F2EAD8` | Page background, cards, inputs |
+| `--cloth` | Cloth | `#F2EAD8` | Banner fill (same as `--bg` on parchment) |
 | `--folio` | Folio | `#E6DBC2` | Selected / hover fill, modal backdrop page, raised areas |
 | `--ink` | Iron-gall | `#2B241C` | Text, strong rules, primary button fill |
 | `--muted` | Faded ink | `#6B5E4B` | Metadata, labels, inactive nav, finished/cancelled |
@@ -59,6 +60,7 @@ The same tokens redefined. Applied with `[data-theme="dark"]` on `<html>`, and b
 | Token | Hex |
 |-------|-----|
 | `--bg` | `#16120E` |
+| `--cloth` | `#160D0D` |
 | `--folio` | `#2A231B` |
 | `--ink` | `#E8DCC4` |
 | `--muted` | `#A8997F` |
@@ -71,14 +73,14 @@ The same tokens redefined. Applied with `[data-theme="dark"]` on `<html>`, and b
 
 ```css
 :root {
-    --bg: #F2EAD8; --folio: #E6DBC2; --ink: #2B241C; --muted: #6B5E4B;
+    --bg: #F2EAD8; --cloth: #F2EAD8; --folio: #E6DBC2; --ink: #2B241C; --muted: #6B5E4B;
     --line: rgba(43, 36, 28, 0.4); --ctl: rgba(43, 36, 28, 0.64);
     --rubric: #8E2A1E; --verdigris: #355E52; --ochre: #7A5A12;
     --shadow: rgba(43, 36, 28, 0.24);
 }
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-        --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+        --bg: #16120E; --cloth: #160D0D; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
         --line: rgba(232, 220, 196, 0.3); --ctl: rgba(232, 220, 196, 0.5);
         --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
         --shadow: rgba(0, 0, 0, 0.7);
