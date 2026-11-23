@@ -39,7 +39,7 @@ Waystone posts game announcements into a Discord channel per game and mirrors ea
 | `kind` | `dm` or `channel` |
 | `target` | user ID (`dm`) or channel ID (`channel`) |
 | `campaign_id` | `''` for no game. Used to drop rows when a game or its channel goes |
-| `payload` | JSON Discord message (content plus one embed) |
+| `payload` | JSON Discord message (content plus one link button) |
 | `attempts`, `next_attempt_at`, `last_error` | |
 | `status` | `queued`, `failed` |
 | `created_at` | |
@@ -65,7 +65,7 @@ Waystone posts game announcements into a Discord channel per game and mirrors ea
   - **Characters:** `character_status`, `character_assigned`, `character_cleared`.
   - `discord_channel_lost` (admins only) is always sent.
 - Session times use Discord timestamps `<t:UNIX:F>` (`<t:UNIX:R>` alongside), from `sessionStart`. A session without a parseable start (manual, `time=''`) shows its date as plain text.
-- Every message links to the relevant Waystone page (game, calendar month or inbox) under `PUBLIC_URL`. Without `PUBLIC_URL` there are no links.
+- Every message has a link button to the place of its event under `PUBLIC_URL` (`docs/design/notification-links.md`). Without `PUBLIC_URL` there is no button.
 
 ### Channel posts (per game)
 - These are separate from the inbox: one post per event per game, queued at the same call sites, only when the game has a channel and the event is ticked on the admin page. Posts have no mentions.

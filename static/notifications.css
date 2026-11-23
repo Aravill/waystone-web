@@ -142,6 +142,7 @@
     color: var(--muted);
     font-size: 0.875rem;
     text-decoration: none;
+    outline-offset: -3px;
     overflow-wrap: anywhere;
     transition: background-color 0.15s;
 }
