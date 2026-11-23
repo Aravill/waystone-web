@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=82">
     <link rel="stylesheet" href="/static/notifications.css?v=12">
-    <link rel="stylesheet" href="/static/codex.css?v=47">
+    <link rel="stylesheet" href="/static/codex.css?v=48">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -551,7 +551,19 @@
                                         </template>
                                     </ul>
                                 </div>
-                                <p class="hint hint--formatting">Formatting: **bold** · *italic* · # heading · - list · 1. list · &gt; quote · [link](https://…) · [[Page title]] or [[Page title|shown text]] to link a page in this codex · ![[image.png|caption]] to show an image · <a href="/codices/help" target="_blank" rel="noopener">Full writing guide</a></p>
+                                <div class="cx-thumbs-wrap" x-show="pageData.attachments.length">
+                                    <h3 class="cx-props-label">Attachments on this page · <span x-text="pageData.attachments.length"></span></h3>
+                                    <ul class="cx-attach-list">
+                                        <template x-for="a in pageData.attachments" :key="a.id">
+                                            <li>
+                                                <span class="cx-thumb-name"><span x-text="a.name"></span> <small class="muted" x-text="codexFileSize(a.size)"></small></span>
+                                                <button type="button" class="text-link" x-show="!isTimeline" :aria-label="'Insert ' + a.name + ' at the cursor'" @click="insertEmbed('![[' + a.name + ']]', false)">Insert</button>
+                                            </li>
+                                        </template>
+                                    </ul>
+                                </div>
+                                <p class="hint">Add, replace or remove files in the Attachments box on the page.</p>
+                                <p class="hint hint--formatting">Formatting: **bold** · *italic* · # heading · - list · 1. list · &gt; quote · [link](https://…) · [[Page title]] or [[Page title|shown text]] to link a page in this codex · ![[image.png|caption]] to show an image · ![[rules.pdf|label]] to link an attached file · <a href="/codices/help" target="_blank" rel="noopener">Full writing guide</a></p>
                             </div>
                             <div class="field field--note">
                                 <label for="fNote">What changed (optional)</label>
@@ -1169,7 +1181,7 @@
     <script src="/campaigns.js?v=66"></script>
     <script src="/static/codex-editor.js?v=6"></script>
     <script src="/static/codex-graph.js?v=3"></script>
-    <script src="/static/codex-help.js?v=2"></script>
-    <script src="/static/codex.js?v=38"></script>
+    <script src="/static/codex-help.js?v=3"></script>
+    <script src="/static/codex.js?v=39"></script>
 </body>
 </html>

@@ -1929,6 +1929,34 @@ a.cx-chip--tag[aria-current] {
     overflow-wrap: anywhere;
 }
 
+.cx-file {
+    overflow-wrap: anywhere;
+}
+
+.cx-file-size {
+    color: var(--muted);
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+.cx-attach-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cx-attach-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+    padding: 0.25rem 0;
+}
+
+.cx-attach-list li + li {
+    border-top: 1px solid var(--cx-soft);
+}
+
 .cx-cover {
     margin: 0.5rem 0 0.75rem;
     max-width: 30rem;

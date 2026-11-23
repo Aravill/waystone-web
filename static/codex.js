@@ -224,6 +224,14 @@ function codexPicHtml(pic, name, caption, kind, opts) {
     return `<figure class="cx-figure cx-figure--${opts.size} cx-figure--${align}" data-pic="${opts.n}" data-size="${opts.size}" data-align="${opts.align}">${btn}${bar}${figcaption}</figure>`;
 }
 
+// An attached file in the text (![[rules.pdf]], ![[rules.pdf|Player rules]]): a link with the size after it.
+// file is the page's attachment ({name, size, url, inline}) or null when there is none by that name.
+function codexFileHtml(file, name, caption) {
+    if (!file) return `<span class="cx-img-missing">Attachment removed: ${escapeHtml(name)}</span>`;
+    const open = file.inline ? ' target="_blank" rel="noopener"' : ` download="${escapeHtml(file.name)}"`;
+    return `<a class="cx-file" href="${escapeHtml(file.url)}"${open}>${escapeHtml(caption || file.name)}</a> <span class="cx-file-size">${codexFileSize(file.size)}</span>`;
+}
+
 // ---- Live lists: a paragraph of its own, {{list tag:npc folder:Places/Inns links:here kind:lore sort:updated limit:20}} ----
 // Rendered in the browser from the codex payload, never stored: so a list adds no [[links]], no
 // backlinks and nothing to the graph. Values are bare or "quoted".
@@ -307,19 +315,25 @@ function codexLiveList(spec, ctx) {
 // no lists callback (old revisions, template previews) it shows as a plain "Live list: ..." line.
 // A user mention links to the profile under the user's current name; users is the list from
 // /api/codices/users (null: not loaded, so the written name), and a deleted user is plain text.
-function codexMarkdown(body, lookup, canCreate = true, images = null, lists = null, editable = false, users = null) {
+// An embed that is no picture of the page is a file link when files(name) finds an attachment, and reads
+// "Attachment removed" when it has an attachment extension but none is found; it shares the index
+// counting of pictures (pics) but is always an inline link, never a figure or part of a gallery.
+function codexMarkdown(body, lookup, canCreate = true, images = null, lists = null, editable = false, users = null, files = null) {
     const found = [];
     const pics = [];
     const specs = [];
-    const text = String(body || '').replace(/[\u0001\u0002\u0003\u0004]/g, '').replace(/^[ \t]*---[ \t]*$/gm, '\n\u0004\n').replace(CODEX_LIST_RE, (m) => {
+    const text = String(body || '').replace(/[\u0001\u0002\u0003\u0004\u0005]/g, '').replace(/^[ \t]*---[ \t]*$/gm, '\n\u0004\n').replace(CODEX_LIST_RE, (m) => {
         specs.push(m.trim().slice(6, -2).trim());
         return `\u0003 ${specs.length - 1} \u0003`;
     }).replace(CODEX_IMAGE_RE, (m, n, raw) => {
         const o = codexPicOptions(raw);
-        pics.push({ name: n.trim(), caption: o.caption, size: o.size, align: o.align });
-        return `\u0002 ${pics.length - 1} \u0002`;
+        const name = n.trim();
+        pics.push({ name, caption: o.caption, size: o.size, align: o.align });
+        const asPic = images && images(name);
+        const file = !asPic && files ? files(name) : null;
+        return file || (!asPic && CODEX_FILE_EXT_RE.test(name)) ? `\u0005 ${pics.length - 1} \u0005` : `\u0002 ${pics.length - 1} \u0002`;
     }).replace(CODEX_LINK_RE, (m, t, label) => {
-        found.push({ text: t.trim(), label: label && label.replace(/\u0002 \d+ \u0002/g, '') });
+        found.push({ text: t.trim(), label: label && label.replace(/[\u0002\u0005] \d+ [\u0002\u0005]/g, '') });
         return `\u0001 ${found.length - 1} \u0001`;
     }).replace(CODEX_USER_RE, (m, name, id) => {
         found.push({ user: id, text: name });
@@ -338,7 +352,10 @@ function codexMarkdown(body, lookup, canCreate = true, images = null, lists = nu
         const ids = Array.from(run.matchAll(/\u0002 (\d+) \u0002/g), (m) => m[1]);
         if (ids.length === 1) return pic(ids[0], 'figure', true);
         return `<div class="cx-gallery">${ids.map((i) => pic(i, 'figure')).join('')}</div>`;
-    }).replace(/\u0002 (\d+) \u0002/g, (m, i) => pic(i, 'inline')).replace(/\u0001 (\d+) \u0001/g, (m, i) => {
+    }).replace(/\u0002 (\d+) \u0002/g, (m, i) => pic(i, 'inline')).replace(/\u0005 (\d+) \u0005/g, (m, i) => {
+        const p = pics[Number(i)];
+        return p ? codexFileHtml(files ? files(p.name) : null, p.name, p.caption) : '';
+    }).replace(/\u0001 (\d+) \u0001/g, (m, i) => {
         const l = found[Number(i)];
         if (!l) return '';
         if (l.user) {
@@ -364,7 +381,8 @@ function codexHelpHtml(src) {
         const title = CODEX_HELP_PAGES.find((p) => codexNorm(p) === t) || CODEX_HELP_ALIASES[t];
         return title ? { id: 'example', title } : null;
     };
-    const images = (name) => ({ name, url: '/static/img/favicon.svg', width: 64, height: 64 });
+    const images = (name) => (CODEX_FILE_EXT_RE.test(name) ? null : { name, url: '/static/img/favicon.svg', width: 64, height: 64 });
+    const files = (name) => (CODEX_FILE_EXT_RE.test(name) ? { name, size: 2400000, url: '#', inline: true } : null);
     const ctx = {
         pages: [
             { id: 'h1', title: 'Brindle the Innkeeper', folder_id: 'fp', tag_ids: ['tn'], kind: 'lore', created_at: '2026-01-02T10:00:00Z', updated_at: '2026-03-01T10:00:00Z' },
@@ -378,7 +396,7 @@ function codexHelpHtml(src) {
         cur: '',
         back: new Set()
     };
-    return codexMarkdown(src, lookup, true, images, (spec) => codexLiveList(spec, ctx), false, [{ id: 'roy', display_name: 'Roy' }]);
+    return codexMarkdown(src, lookup, true, images, (spec) => codexLiveList(spec, ctx), false, [{ id: 'roy', display_name: 'Roy' }], files);
 }
 
 // Save as template, "Headings only": the page's ## and ### lines (as the renderer reads them: up
@@ -1107,7 +1125,7 @@ window.codexPage = function () {
             return renderMarkdown(text);
         },
         codexMarkdown(body, lookup) {
-            return codexMarkdown(body, lookup, true, this.imageLookup, null, false, this.users);
+            return codexMarkdown(body, lookup, true, this.imageLookup, null, false, this.users, this.fileLookup);
         },
         countLabel(n, word) {
             return `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -1473,6 +1491,11 @@ window.codexPage = function () {
             const map = new Map(Object.values(this.pageData?.image_index || {}).map((p) => [codexNorm(p.name), p]));
             return (name) => map.get(codexNorm(name)) || null;
         },
+        // The page's attachments by name, for ![[rules.pdf]] (see codexMarkdown).
+        get fileLookup() {
+            const map = new Map((this.pageData?.attachments || []).map((a) => [codexNorm(a.name), a]));
+            return (name) => map.get(codexNorm(name)) || null;
+        },
         // Renders {{list ...}} from the codex payload (none yet: "Loading…"; reading this.codex makes
         // bodyHtml render again when it arrives). Links here are the page's "Linked from" list.
         get listRenderer() {
@@ -1482,7 +1505,7 @@ window.codexPage = function () {
             return (spec) => codexLiveList(spec, ctx);
         },
         get bodyHtml() {
-            return this.page ? codexMarkdown(this.page.body, this.linkLookup, this.canEdit, this.imageLookup, this.listRenderer, this.canEdit, this.users) : '';
+            return this.page ? codexMarkdown(this.page.body, this.linkLookup, this.canEdit, this.imageLookup, this.listRenderer, this.canEdit, this.users, this.fileLookup) : '';
         },
         // Pages that link here by [[link]]; map pins are not shown.
         get linkedFrom() {
@@ -1541,7 +1564,7 @@ window.codexPage = function () {
             this.tocActive = active;
         },
         get previewHtml() {
-            return this.draft ? codexMarkdown(this.draft.body, this.titleLookup, true, this.imageLookup, this.listRenderer, false, this.users) : '';
+            return this.draft ? codexMarkdown(this.draft.body, this.titleLookup, true, this.imageLookup, this.listRenderer, false, this.users, this.fileLookup) : '';
         },
         // Pages of the current codex (from the codex payload loadNav fetched), for previews and the editor.
         get titles() {
@@ -3293,7 +3316,7 @@ window.codexPage = function () {
         async uploadBatch(files) {
             const list = Array.from(files).filter((f) => f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(f.name));
             if (!list.length) {
-                this.showMessage('Choose PNG, JPEG, WebP or GIF images.', 'error');
+                this.showMessage('Choose PNG, JPEG, WebP or GIF images. Other files go in the Attachments box on the page.', 'error');
                 return;
             }
             for (const [i, file] of list.entries()) {
@@ -3330,15 +3353,18 @@ window.codexPage = function () {
         // ![[name|]] on a paragraph of its own (the renderer makes a figure of a picture-only paragraph),
         // with the cursor after it.
         insertPicture(img) {
-            const text = `![[${img.name}|]]`;
+            this.insertEmbed(`![[${img.name}|]]`, true);
+        },
+        // text at the cursor (replacing a selection). block puts it on a paragraph of its own.
+        insertEmbed(text, block) {
             const v = this.editorReady ? this.editor.view : null;
             const ta = this.$refs.bodyArea;
             const doc = v ? v.state.doc.toString() : this.draft.body;
             const from = v ? v.state.selection.main.from : ta.selectionStart || 0;
             const to = v ? v.state.selection.main.to : ta.selectionEnd || 0;
             const before = doc.slice(0, from), after = doc.slice(to);
-            const pre = !before ? '' : before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
-            const post = !after ? '\n' : after.startsWith('\n\n') ? '' : after.startsWith('\n') ? '\n' : '\n\n';
+            const pre = !block || !before ? '' : before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+            const post = !block ? '' : !after ? '\n' : after.startsWith('\n\n') ? '' : after.startsWith('\n') ? '\n' : '\n\n';
             const insert = pre + text + post;
             if (v) {
                 v.dispatch({ changes: { from, to, insert }, selection: { anchor: from + insert.length }, scrollIntoView: true });
