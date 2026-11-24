@@ -201,9 +201,10 @@ type Store interface {
 	ReplacePageAttachment(pageID, id, file string, size int64, userID string) (models.PageAttachment, string, error)
 	RemovePageAttachment(pageID, id string) (string, error)
 	GetMapImages(pageID string) ([]models.MapImage, error)
-	AddMapImage(img models.MapImage) error
-	RestoreMapImage(pageID, imageID, userID string) (models.MapImage, error)
-	RemoveMap(pageID, userID string) (int, error)
+	AddMapImage(img models.MapImage) (scaleCleared bool, err error)
+	RestoreMapImage(pageID, imageID, userID string) (scaleCleared bool, err error)
+	GetMapScale(pageID string) (*models.MapScale, error)
+	SetMapScale(pageID string, m *models.MapScale, userID string) error
 	GetTimelineEvents(pageID string) ([]models.TimelineEvent, error)
 	GetEventsLinkingTo(pageID string) ([]models.TimelineEvent, error)
 	CreateTimelineEvent(e models.TimelineEvent) (models.TimelineEvent, error)
@@ -213,10 +214,12 @@ type Store interface {
 	GetTimelineCalendar(pageID string) (models.TimelineCalendar, error)
 	SetTimelineCalendar(pageID string, c models.TimelineCalendar, userID string) error
 	GetMapPins(pageID string) ([]models.MapPin, error)
+	GetPinsLinkingTo(pageID string) ([]models.MapPin, error)
 	AddMapPin(pin models.MapPin) (models.MapPin, error)
-	AddMapPinWithNewPage(page models.Page, pin models.MapPin) (models.MapPin, error)
-	MoveMapPin(mapID, pinID string, x, y float64, userID string) error
-	DeleteMapPin(mapID, pinID, userID string) error
+	AddMapPinWithPage(pin models.MapPin, page models.Page, body string, x models.NewPageExtras) (models.MapPin, error)
+	UpdateMapPin(pin models.MapPin, userID string) (eventID string, err error)
+	MoveMapPin(mapID, pinID string, x, y float64, userID string) (eventID string, err error)
+	DeleteMapPin(mapID, pinID, userID string) (eventID string, err error)
 	GetMapPinEvents(mapID string, limit int) ([]models.MapPinEvent, error)
 	UndoMapPinEvent(mapID, eventID, userID string) error
 	Backup(path string) error

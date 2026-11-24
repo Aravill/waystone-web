@@ -49,6 +49,18 @@ func pageCodex(q querier, id string) (codex, title string, err error) {
 	return
 }
 
+// checkPageText refuses to write text into a map page (ErrMapNoText).
+func checkPageText(q querier, id string) error {
+	var kind string
+	if err := q.QueryRow(`SELECT kind FROM pages WHERE id = ?`, id).Scan(&kind); err != nil {
+		return err
+	}
+	if kind == models.PageMap {
+		return ErrMapNoText
+	}
+	return nil
+}
+
 func pageAliases(q querier, id string) ([]string, error) {
 	rows, err := q.Query(`SELECT alias FROM page_aliases WHERE page_id = ? ORDER BY alias`, id)
 	if err != nil {
@@ -188,7 +200,7 @@ func (s *SQLiteStore) GetPage(id string) (*models.Page, error) {
 func (s *SQLiteStore) GetCodexPages() ([]models.PageListItem, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	rows, err := s.db.Query(`SELECT id, kind, COALESCE((SELECT file != '' FROM map_images i WHERE i.page_id = pages.id ORDER BY created_at DESC, rowid DESC LIMIT 1), 0), codex_id, folder_id, title, created_at, updated_at FROM pages ORDER BY title COLLATE NOCASE, id`)
+	rows, err := s.db.Query(`SELECT id, kind, codex_id, folder_id, title, created_at, updated_at FROM pages ORDER BY title COLLATE NOCASE, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +208,7 @@ func (s *SQLiteStore) GetCodexPages() ([]models.PageListItem, error) {
 	at := map[string]int{}
 	for rows.Next() {
 		var p models.PageListItem
-		if err := rows.Scan(&p.ID, &p.Kind, &p.HasMap, &p.CodexID, &p.FolderID, &p.Title, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Kind, &p.CodexID, &p.FolderID, &p.Title, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -241,32 +253,25 @@ func (s *SQLiteStore) GetPageLinks(fromID string) ([]models.PageLink, error) {
 	return out, rows.Err()
 }
 
-// GetBacklinks lists the pages that link to id and the map pins that point at it (self-links excluded).
+// GetBacklinks lists the pages that link to id (self-links excluded).
 func (s *SQLiteStore) GetBacklinks(id string) ([]models.PageBacklink, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	out := []models.PageBacklink{}
-	for _, q := range []string{
-		`SELECT p.id, p.title, p.kind, l.target_text, '' FROM page_links l JOIN pages p ON p.id = l.from_page_id
-			WHERE l.to_page_id = ? AND p.id <> ? ORDER BY p.title COLLATE NOCASE`,
-		`SELECT p.id, p.title, p.kind, m.target_text, m.id FROM map_pins m JOIN pages p ON p.id = m.map_page_id
-			WHERE m.to_page_id = ? AND p.id <> ? ORDER BY p.title COLLATE NOCASE`,
-	} {
-		rows, err := s.db.Query(q, id, id)
-		if err != nil {
+	rows, err := s.db.Query(`SELECT p.id, p.title, p.kind, l.target_text FROM page_links l JOIN pages p ON p.id = l.from_page_id
+		WHERE l.to_page_id = ? AND p.id <> ? ORDER BY p.title COLLATE NOCASE`, id, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var b models.PageBacklink
+		if err := rows.Scan(&b.PageID, &b.Title, &b.Kind, &b.TargetText); err != nil {
 			return nil, err
 		}
-		for rows.Next() {
-			var b models.PageBacklink
-			if err := rows.Scan(&b.PageID, &b.Title, &b.Kind, &b.TargetText, &b.PinID); err != nil {
-				rows.Close()
-				return nil, err
-			}
-			out = append(out, b)
-		}
-		rows.Close()
+		out = append(out, b)
 	}
-	return out, nil
+	return out, rows.Err()
 }
 
 // CountPagesByAuthor returns how many pages the user created (pages.author_id), per codex id.
@@ -312,33 +317,28 @@ func (s *SQLiteStore) GetCodexBodies(codexID string) ([]models.PageBody, error) 
 	return out, rows.Err()
 }
 
-// GetWantedPages lists the titles that links and pins in a codex point at without a page, most wanted first.
+// GetWantedPages lists the titles that links in a codex point at without a page, most wanted first.
 func (s *SQLiteStore) GetWantedPages(codexID string) ([]models.WantedPage, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	counts := map[string]*models.WantedPage{}
-	for _, q := range []string{
-		`SELECT l.target_text FROM page_links l JOIN pages p ON p.id = l.from_page_id WHERE l.to_page_id = '' AND p.codex_id = ?`,
-		`SELECT m.target_text FROM map_pins m JOIN pages p ON p.id = m.map_page_id WHERE m.to_page_id = '' AND p.codex_id = ?`,
-	} {
-		rows, err := s.db.Query(q, codexID)
-		if err != nil {
+	rows, err := s.db.Query(`SELECT l.target_text FROM page_links l JOIN pages p ON p.id = l.from_page_id WHERE l.to_page_id = '' AND p.codex_id = ?`, codexID)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			rows.Close()
 			return nil, err
 		}
-		for rows.Next() {
-			var t string
-			if err := rows.Scan(&t); err != nil {
-				rows.Close()
-				return nil, err
-			}
-			k := NormName(t)
-			if counts[k] == nil {
-				counts[k] = &models.WantedPage{Text: t}
-			}
-			counts[k].Count++
+		k := NormName(t)
+		if counts[k] == nil {
+			counts[k] = &models.WantedPage{Text: t}
 		}
-		rows.Close()
+		counts[k].Count++
 	}
+	rows.Close()
 	out := []models.WantedPage{}
 	for _, w := range counts {
 		out = append(out, *w)
@@ -433,6 +433,9 @@ func (s *SQLiteStore) SavePageRevision(id string, base int, rev models.PageRevis
 	defer tx.Rollback()
 	codex, title, err := pageCodex(tx, id)
 	if err != nil {
+		return models.PageSaveResult{}, err
+	}
+	if err := checkPageText(tx, id); err != nil {
 		return models.PageSaveResult{}, err
 	}
 	latest, err := scanPageRevision(tx.QueryRow(`SELECT `+pageRevisionColumns+` FROM page_revisions WHERE page_id = ? ORDER BY number DESC LIMIT 1`, id))
@@ -561,28 +564,6 @@ func (s *SQLiteStore) RenamePage(id, newTitle, userID string, keep int) (int, er
 			}
 		}
 	}
-	// Pins pointing here under the old title follow the rename (no pin event).
-	pins, err := tx.Query(`SELECT id, target_text FROM map_pins WHERE to_page_id = ?`, id)
-	if err != nil {
-		return 0, err
-	}
-	var pinIDs []string
-	for pins.Next() {
-		var pid, text string
-		if err := pins.Scan(&pid, &text); err != nil {
-			pins.Close()
-			return 0, err
-		}
-		if NormName(text) == NormName(oldTitle) {
-			pinIDs = append(pinIDs, pid)
-		}
-	}
-	pins.Close()
-	for _, pid := range pinIDs {
-		if _, err := tx.Exec(`UPDATE map_pins SET target_text = ? WHERE id = ?`, newTitle, pid); err != nil {
-			return 0, err
-		}
-	}
 	// Re-derive links from the new bodies, then every resolution in this codex.
 	idx, err := loadCodexIndex(tx, codex)
 	if err != nil {
@@ -649,7 +630,7 @@ func (s *SQLiteStore) SetPageAliases(id string, aliases []string) error {
 }
 
 // MovePage puts a page in another codex. Its title and aliases must be free there.
-// Links from the old codex to it turn missing; its own links and pins re-resolve in the new codex.
+// Links from the old codex to it turn missing; its own links re-resolve in the new codex.
 func (s *SQLiteStore) MovePage(id, codexID string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -689,6 +670,13 @@ func (s *SQLiteStore) MovePage(id, codexID string) error {
 	if _, err := tx.Exec(`UPDATE timeline_events SET title = COALESCE((SELECT title FROM pages WHERE id = linked_page_id), title), linked_page_id = '', updated_at = ? WHERE page_id = ? AND linked_page_id <> ''`, nowUTC(), id); err != nil {
 		return err
 	}
+	// The same for map pins.
+	if err := unlinkMapPinsTx(tx, id, title); err != nil {
+		return err
+	}
+	if err := unlinkOwnPinsTx(tx, id); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`UPDATE pages SET codex_id = ?, folder_id = '', updated_at = ? WHERE id = ?`, codexID, nowUTC(), id); err != nil {
 		return err
 	}
@@ -699,7 +687,7 @@ func (s *SQLiteStore) MovePage(id, codexID string) error {
 }
 
 // DeletePage removes a page with everything attached to it and returns the image files (map
-// and page pictures) and the attachment files to delete from disk. Links and pins that pointed at it turn missing.
+// and page pictures) and the attachment files to delete from disk. Links that pointed at it turn missing; events and pins that linked it become plain ones.
 func (s *SQLiteStore) DeletePage(id string) (files, attachments []string, err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -713,6 +701,9 @@ func (s *SQLiteStore) DeletePage(id string) (files, attachments []string, err er
 		return nil, nil, err
 	}
 	if err := unlinkTimelineEventsTx(tx, id, title); err != nil {
+		return nil, nil, err
+	}
+	if err := unlinkMapPinsTx(tx, id, title); err != nil {
 		return nil, nil, err
 	}
 	if files, err = queryFiles(tx, `SELECT file FROM map_images WHERE page_id = ? AND file != '' UNION SELECT file FROM page_images WHERE page_id = ?`, id, id); err != nil {
@@ -729,6 +720,7 @@ func (s *SQLiteStore) DeletePage(id string) (files, attachments []string, err er
 		`DELETE FROM map_pins WHERE map_page_id = ?`,
 		`DELETE FROM map_pin_events WHERE map_page_id = ?`,
 		`DELETE FROM map_images WHERE page_id = ?`,
+		`DELETE FROM map_scales WHERE page_id = ?`,
 		`DELETE FROM page_images WHERE page_id = ?`,
 		`DELETE FROM page_attachments WHERE page_id = ?`,
 		`DELETE FROM page_tags WHERE page_id = ?`,

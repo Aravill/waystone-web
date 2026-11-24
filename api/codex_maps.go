@@ -2,7 +2,6 @@ package api
 
 import (
 	"bufio"
-	"encoding/json"
 	"errors"
 	"image"
 	_ "image/gif"
@@ -10,6 +9,7 @@ import (
 	_ "image/png"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -32,7 +32,7 @@ var codexImageTypes = map[string]string{"image/png": ".png", "image/jpeg": ".jpg
 func codexImageURL(file string) string { return "/api/codices/files/" + file }
 
 // currentMapImage splits a page's image rows (newest first) into its history and its current
-// image. A newest row with no file is the "map removed" marker: no current image, and markers
+// image. A newest row with no file is an old "map removed" marker: no current image, and markers
 // are not part of the history.
 func currentMapImage(rows []models.MapImage) (current *models.MapImage, history []models.MapImage) {
 	history = []models.MapImage{}
@@ -53,6 +53,14 @@ func currentMapImage(rows []models.MapImage) (current *models.MapImage, history 
 // It reports false when rest is not one of them.
 func handleCodexMapRoutes(w http.ResponseWriter, r *http.Request, id string, rest []string, method func(...string) bool) bool {
 	switch {
+	case rest[0] == "map" && len(rest) == 1:
+		if method(http.MethodGet) {
+			handleGetMap(w, r, id)
+		}
+	case rest[0] == "map" && len(rest) == 2 && rest[1] == "scale":
+		if method(http.MethodPut, http.MethodDelete) {
+			handleSetMapScale(w, r, id)
+		}
 	case rest[0] == "images" && len(rest) == 1:
 		if method(http.MethodGet, http.MethodPost) {
 			if r.Method == http.MethodGet {
@@ -60,10 +68,6 @@ func handleCodexMapRoutes(w http.ResponseWriter, r *http.Request, id string, res
 			} else {
 				handleUploadMapImage(w, r, id)
 			}
-		}
-	case rest[0] == "map" && len(rest) == 1:
-		if method(http.MethodDelete) {
-			handleRemoveMap(w, r, id)
 		}
 	case rest[0] == "images" && len(rest) == 3 && rest[2] == "restore":
 		if method(http.MethodPost) {
@@ -76,7 +80,7 @@ func handleCodexMapRoutes(w http.ResponseWriter, r *http.Request, id string, res
 	case rest[0] == "pins" && len(rest) == 2:
 		if method(http.MethodPut, http.MethodDelete) {
 			if r.Method == http.MethodPut {
-				handleMovePin(w, r, id, rest[1])
+				handleChangePin(w, r, id, rest[1])
 			} else {
 				handleDeletePin(w, r, id, rest[1])
 			}
@@ -97,10 +101,18 @@ func handleCodexMapRoutes(w http.ResponseWriter, r *http.Request, id string, res
 
 func codexMapError(w http.ResponseWriter, err error, what string) {
 	switch {
-	case errors.Is(err, db.ErrPinNotFound), errors.Is(err, db.ErrPinEventNotFound), errors.Is(err, db.ErrImageNotFound):
+	case errors.Is(err, db.ErrNotMap):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "This page is not a map.", "code": "not_a_map"})
+	case errors.Is(err, db.ErrNoMap):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "no_image"})
+	case errors.Is(err, db.ErrPinNotFound):
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error(), "code": "pin_deleted"})
+	case errors.Is(err, db.ErrPinEventNotFound), errors.Is(err, db.ErrImageNotFound):
 		writeJSONError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, db.ErrPinEventUndone):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "already_undone"})
+	case errors.Is(err, db.ErrLinkNotInCodex):
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error(), "code": "page_not_in_codex"})
 	default:
 		codexStoreError(w, err, what) // logs anything unexpected
 	}
@@ -113,95 +125,114 @@ func codexImageObject(users map[string]*models.User, img models.MapImage, curren
 	}
 }
 
-func codexPinObject(pin models.MapPin, pages map[string]models.PageListItem) map[string]interface{} {
-	o := map[string]interface{}{"id": pin.ID, "x": pin.X, "y": pin.Y, "target_text": pin.TargetText, "status": "missing", "target": nil}
-	if t, ok := pages[pin.ToPageID]; ok {
-		o["status"] = "ok"
-		o["target"] = map[string]interface{}{"id": t.ID, "title": t.Title, "has_map": t.HasMap}
-	}
-	return o
-}
-
-func codexPagesByID() (map[string]models.PageListItem, error) {
-	all, err := db.GetCodexPages()
+// codexMapPayload is the map as the client shows it: {image, pins, scale}. A pin has a linked page
+// (title, kind, excerpt) or null; a link to a page that is gone counts as no link.
+func codexMapPayload(pageID, codexID string) (map[string]interface{}, error) {
+	images, err := db.GetMapImages(pageID)
 	if err != nil {
 		return nil, err
 	}
-	byID := make(map[string]models.PageListItem, len(all))
-	for _, p := range all {
-		byID[p.ID] = p
-	}
-	return byID, nil
-}
-
-// codexAddMapPayload adds the map's current image and pins to a page payload.
-func codexAddMapPayload(payload map[string]interface{}, page *models.Page) error {
-	images, err := db.GetMapImages(page.ID)
+	pins, err := db.GetMapPins(pageID)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	scale, err := db.GetMapScale(pageID)
+	if err != nil {
+		return nil, err
 	}
 	users, err := journalUsers()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	pins, err := db.GetMapPins(page.ID)
-	if err != nil {
-		return err
-	}
-	pages, err := codexPagesByID()
-	if err != nil {
-		return err
+	pages := map[string]models.GraphPage{}
+	for _, p := range pins {
+		if p.LinkedPageID == "" {
+			continue
+		}
+		list, _, err := db.GetCodexGraph(codexID)
+		if err != nil {
+			return nil, err
+		}
+		for _, g := range list {
+			pages[g.ID] = g
+		}
+		break
 	}
 	var image interface{}
 	if cur, _ := currentMapImage(images); cur != nil {
 		image = codexImageObject(users, *cur, true)
 	}
-	pinList := make([]map[string]interface{}, 0, len(pins))
+	list := make([]map[string]interface{}, 0, len(pins))
 	for _, p := range pins {
-		pinList = append(pinList, codexPinObject(p, pages))
+		o := map[string]interface{}{
+			"id": p.ID, "x": p.X, "y": p.Y, "name": p.Name, "description": p.Description, "icon": p.Icon, "color": p.Color,
+			"linked": nil, "created_by_user": journalUser(users, p.CreatedBy), "created_at": p.CreatedAt,
+		}
+		if g, ok := pages[p.LinkedPageID]; ok && p.LinkedPageID != "" {
+			o["name"] = g.Title
+			o["linked"] = map[string]interface{}{"id": g.ID, "title": g.Title, "folder_id": g.FolderID, "excerpt": graphExcerpt(g.Body)}
+		}
+		list = append(list, o)
 	}
-	payload["map"] = map[string]interface{}{"image": image, "pins": pinList}
-	return nil
+	return map[string]interface{}{"image": image, "pins": list, "scale": scale}, nil
 }
 
-// codexAddOnMaps lists the maps that pin the page, with each map's current image for a thumbnail.
-func codexAddOnMaps(payload map[string]interface{}, backs []models.PageBacklink) error {
-	onMaps := []map[string]interface{}{}
-	type mapData struct {
-		pins     []models.MapPin
-		imageURL string
+// replyMap answers with the map's current state (plus extra) after a change.
+func replyMap(w http.ResponseWriter, status int, id string, extra map[string]interface{}) {
+	codexID, err := db.GetPageCodexID(id)
+	if err != nil {
+		codexServerError(w, "retrieve page")
+		return
 	}
-	cache := map[string]mapData{}
-	for _, b := range backs {
-		if b.PinID == "" {
-			continue
-		}
-		d, ok := cache[b.PageID]
-		if !ok {
-			pins, err := db.GetMapPins(b.PageID)
-			if err != nil {
-				return err
-			}
-			images, err := db.GetMapImages(b.PageID)
-			if err != nil {
-				return err
-			}
-			d = mapData{pins: pins}
-			if cur, _ := currentMapImage(images); cur != nil {
-				d.imageURL = codexImageURL(cur.File)
-			}
-			cache[b.PageID] = d
-		}
-		o := map[string]interface{}{"map_id": b.PageID, "map_title": b.Title, "pin_id": b.PinID, "image_url": d.imageURL, "x": 0.5, "y": 0.5}
-		for _, pin := range d.pins {
-			if pin.ID == b.PinID {
-				o["x"], o["y"] = pin.X, pin.Y
-			}
-		}
-		onMaps = append(onMaps, o)
+	payload, err := codexMapPayload(id, codexID)
+	if err != nil {
+		codexServerError(w, "retrieve map")
+		return
 	}
-	payload["on_maps"] = onMaps
-	return nil
+	out := map[string]interface{}{"map": payload}
+	for k, v := range extra {
+		out[k] = v
+	}
+	writeJSON(w, status, out)
+}
+
+func handleGetMap(w http.ResponseWriter, r *http.Request, id string) {
+	_, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, false) {
+		return
+	}
+	if kind, err := pageKind(id); err != nil {
+		codexServerError(w, "retrieve page")
+		return
+	} else if kind != models.PageMap {
+		codexMapError(w, db.ErrNotMap, "")
+		return
+	}
+	replyMap(w, http.StatusOK, id, nil)
+}
+
+// codexOnMaps lists the maps that pin the page, for its side panel.
+func codexOnMaps(pageID string) ([]map[string]interface{}, error) {
+	pins, err := db.GetPinsLinkingTo(pageID)
+	if err != nil {
+		return nil, err
+	}
+	out := []map[string]interface{}{}
+	titles := map[string]string{}
+	for _, p := range pins {
+		if _, seen := titles[p.MapPageID]; !seen {
+			m, err := db.GetPage(p.MapPageID)
+			if err != nil {
+				return nil, err
+			}
+			if m == nil {
+				continue
+			}
+			titles[p.MapPageID] = m.Title
+		}
+		out = append(out, map[string]interface{}{"map": map[string]interface{}{"id": p.MapPageID, "title": titles[p.MapPageID]}, "pin_id": p.ID})
+	}
+	return out, nil
 }
 
 func handleListMapImages(w http.ResponseWriter, r *http.Request, id string) {
@@ -237,13 +268,11 @@ func handleUploadMapImage(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	// Check the page before reading the body.
-	page, err := db.GetPage(id)
-	if err != nil {
+	if kind, err := pageKind(id); err != nil {
 		codexServerError(w, "retrieve page")
 		return
-	}
-	if page == nil {
-		codexStoreError(w, db.ErrPageNotFound, "")
+	} else if kind != models.PageMap {
+		codexMapError(w, db.ErrNotMap, "")
 		return
 	}
 	file, cfg, ok := receiveCodexImage(w, r)
@@ -251,17 +280,13 @@ func handleUploadMapImage(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	img := models.MapImage{ID: db.GenerateUUID(), PageID: id, File: file, Width: cfg.Width, Height: cfg.Height, UploadedBy: userID, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
-	if err := db.AddMapImage(img); err != nil {
+	cleared, err := db.AddMapImage(img)
+	if err != nil {
 		removeCodexFiles([]string{file})
 		codexMapError(w, err, "save the image")
 		return
 	}
-	users, err := journalUsers()
-	if err != nil {
-		codexServerError(w, "retrieve users")
-		return
-	}
-	writeJSON(w, http.StatusCreated, map[string]interface{}{"image": codexImageObject(users, img, true)})
+	replyMap(w, http.StatusCreated, id, map[string]interface{}{"scale_cleared": cleared})
 }
 
 // receiveCodexImage stores the request body as an image in the upload directory (PNG, JPEG, WebP
@@ -375,48 +400,108 @@ func handleCodexFile(w http.ResponseWriter, r *http.Request, name string) {
 	http.ServeFile(w, r, path)
 }
 
-// handleRemoveMap clears the page's map and answers with how many pins went with it.
-func handleRemoveMap(w http.ResponseWriter, r *http.Request, id string) {
-	userID, rt, ok := codexRightsFor(w, r)
-	if !ok || !rt.checkPage(w, id, true) {
-		return
-	}
-	n, err := db.RemoveMap(id, userID)
-	if err != nil {
-		codexMapError(w, err, "remove the map")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "pins_removed": n})
-}
-
 func handleRestoreMapImage(w http.ResponseWriter, r *http.Request, id, imageID string) {
 	userID, rt, ok := codexRightsFor(w, r)
 	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
-	img, err := db.RestoreMapImage(id, imageID, userID)
+	cleared, err := db.RestoreMapImage(id, imageID, userID)
 	if err != nil {
 		codexMapError(w, err, "restore the image")
 		return
 	}
-	users, err := journalUsers()
-	if err != nil {
-		codexServerError(w, "retrieve users")
-		return
-	}
-	writeJSON(w, http.StatusCreated, map[string]interface{}{"image": codexImageObject(users, img, true)})
+	replyMap(w, http.StatusCreated, id, map[string]interface{}{"scale_cleared": cleared})
 }
 
+const (
+	maxPinName  = 120
+	maxPinDesc  = 1000
+	maxUnitLen  = 20
+	maxMapScale = 1e9
+)
+
+// handleSetMapScale takes {x1, y1, x2, y2, length, unit}: the two points are length units apart. DELETE clears it.
+func handleSetMapScale(w http.ResponseWriter, r *http.Request, id string) {
+	userID, rt, ok := codexRightsFor(w, r)
+	if !ok || !rt.checkPage(w, id, true) {
+		return
+	}
+	if r.Method == http.MethodDelete {
+		if err := db.SetMapScale(id, nil, userID); err != nil {
+			codexMapError(w, err, "clear the scale")
+			return
+		}
+		replyMap(w, http.StatusOK, id, nil)
+		return
+	}
+	var m models.MapScale
+	if !codexDecode(w, r, 4<<10, &m) {
+		return
+	}
+	m.Unit = strings.Join(strings.Fields(m.Unit), " ")
+	for _, v := range []float64{m.X1, m.Y1, m.X2, m.Y2} {
+		if v < 0 || v > 1 {
+			writeJSONError(w, http.StatusBadRequest, "both points must be on the map")
+			return
+		}
+	}
+	if math.Hypot(m.X1-m.X2, m.Y1-m.Y2) < 0.005 {
+		writeJSONError(w, http.StatusBadRequest, "the two points are too close together")
+		return
+	}
+	if n := utf8.RuneCountInString(m.Unit); m.Length <= 0 || m.Length > maxMapScale || n < 1 || n > maxUnitLen {
+		writeJSONError(w, http.StatusBadRequest, "enter a distance above 0 and a unit of up to 20 characters")
+		return
+	}
+	if err := db.SetMapScale(id, &m, userID); err != nil {
+		codexMapError(w, err, "set the scale")
+		return
+	}
+	replyMap(w, http.StatusOK, id, nil)
+}
+
+// pinRequest is a new pin, or a change of one: either its place (x, y) or its details.
 type pinRequest struct {
-	X          *float64 `json:"x"`
-	Y          *float64 `json:"y"`
-	TargetText string   `json:"target_text"`
-	CreatePage bool     `json:"create_page"` // add: create the lore page first (empty, in the map's codex)
+	X            *float64 `json:"x"`
+	Y            *float64 `json:"y"`
+	Name         string   `json:"name"`
+	Description  string   `json:"description"`
+	LinkedPageID string   `json:"linked_page_id"`
+	Icon         string   `json:"icon"`
+	Color        string   `json:"color"`
+	CreatePage   bool     `json:"create_page"` // add: make an article named after the pin first
 }
 
 // validPosition reports whether both coordinates are present and fractions of the image.
-func (req pinRequest) validPosition() bool {
+func (req *pinRequest) validPosition() bool {
 	return req.X != nil && req.Y != nil && *req.X >= 0 && *req.X <= 1 && *req.Y >= 0 && *req.Y <= 1
+}
+
+// fill checks the details and puts them into p. The name of a linked pin is replaced by the store.
+// It returns an error message, or "".
+func (req *pinRequest) fill(p *models.MapPin) string {
+	if !containsString(models.PinIcons, req.Icon) || !containsString(models.PinColors, req.Color) {
+		return "unknown icon or colour"
+	}
+	p.Icon, p.Color, p.LinkedPageID = req.Icon, req.Color, req.LinkedPageID
+	if req.LinkedPageID != "" {
+		req.CreatePage = false
+		return ""
+	}
+	p.Name = strings.Join(strings.Fields(req.Name), " ")
+	p.Description = strings.TrimSpace(strings.ReplaceAll(req.Description, "\r\n", "\n"))
+	if req.CreatePage {
+		if _, ok := codexName(p.Name); !ok {
+			return "title must be 1 to 120 characters and can't contain [ ] or |"
+		}
+	}
+	if n := utf8.RuneCountInString(p.Name); n < 1 || n > maxPinName {
+		return "name must be 1 to 120 characters"
+	}
+	if utf8.RuneCountInString(p.Description) > maxPinDesc {
+		return "the description can be up to 1000 characters"
+	}
+	return ""
 }
 
 func handleAddPin(w http.ResponseWriter, r *http.Request, id string) {
@@ -425,27 +510,27 @@ func handleAddPin(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	var req pinRequest
-	if !codexDecode(w, r, 4<<10, &req) {
+	if !codexDecode(w, r, 16<<10, &req) {
 		return
 	}
-	text, valid := codexName(req.TargetText)
-	if !valid || !req.validPosition() {
-		writeJSONError(w, http.StatusBadRequest, "a pin needs a position on the map and a page title")
+	if !req.validPosition() {
+		writeJSONError(w, http.StatusBadRequest, "a pin needs a position on the map")
 		return
 	}
-	mapPage, err := db.GetPage(id)
-	if err != nil {
-		codexServerError(w, "retrieve map")
+	pin := models.MapPin{MapPageID: id, X: *req.X, Y: *req.Y, CreatedBy: userID}
+	if msg := req.fill(&pin); msg != "" {
+		writeJSONError(w, http.StatusBadRequest, msg)
 		return
 	}
-	if mapPage == nil {
-		codexStoreError(w, db.ErrPageNotFound, "")
-		return
-	}
-	pin := models.MapPin{MapPageID: id, X: *req.X, Y: *req.Y, TargetText: text, CreatedBy: userID}
+	var page interface{}
+	var err error
 	if req.CreatePage {
-		// The page and the pin are saved together; the store sets the page's codex to the map's.
-		pin, err = db.AddMapPinWithNewPage(models.Page{ID: db.GenerateUUID(), Title: text, AuthorID: userID}, pin)
+		p, body, tags, ok := pinPage(w, id, pin)
+		if !ok {
+			return
+		}
+		pin, err = db.AddMapPinWithPage(pin, p, body, models.NewPageExtras{TagNames: tags})
+		page = map[string]interface{}{"id": p.ID, "title": p.Title}
 	} else {
 		pin, err = db.AddMapPin(pin)
 	}
@@ -453,32 +538,69 @@ func handleAddPin(w http.ResponseWriter, r *http.Request, id string) {
 		codexMapError(w, err, "add the pin")
 		return
 	}
-	pages, err := codexPagesByID()
-	if err != nil {
-		codexServerError(w, "retrieve pages")
-		return
-	}
-	writeJSON(w, http.StatusCreated, map[string]interface{}{"pin": codexPinObject(pin, pages)})
+	replyMap(w, http.StatusCreated, id, map[string]interface{}{"pin": map[string]interface{}{"id": pin.ID}, "page": page})
 }
 
-func handleMovePin(w http.ResponseWriter, r *http.Request, id, pinID string) {
+// pinPage is the article made for a new pin: the Settlement template for a settlement or city pin,
+// else Landmark, under the pin's description. On failure it has already written the error response.
+func pinPage(w http.ResponseWriter, mapID string, pin models.MapPin) (models.Page, string, []string, bool) {
+	codexID, err := db.GetPageCodexID(mapID)
+	if err != nil {
+		codexServerError(w, "retrieve page")
+		return models.Page{}, "", nil, false
+	}
+	lang, ok := codexLanguage(w, codexID)
+	if !ok {
+		return models.Page{}, "", nil, false
+	}
+	template := "builtin:landmark"
+	if pin.Icon == "settlement" || pin.Icon == "city" {
+		template = "builtin:settlement"
+	}
+	b := builtinTemplateByID(template, lang)
+	body := fillTemplate(b.Body, pin.Name, codexToday(lang))
+	if pin.Description != "" {
+		text, ok := linkUserMentions(w, pin.Description)
+		if !ok {
+			return models.Page{}, "", nil, false
+		}
+		body = text + "\n\n" + body
+	}
+	return models.Page{ID: db.GenerateUUID(), Title: pin.Name, AuthorID: pin.CreatedBy}, body, b.Tags, true
+}
+
+// handleChangePin moves a pin ({x, y}) or changes its details (everything else).
+func handleChangePin(w http.ResponseWriter, r *http.Request, id, pinID string) {
 	userID, rt, ok := codexRightsFor(w, r)
 	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
 	var req pinRequest
-	if !codexDecode(w, r, 4<<10, &req) {
+	if !codexDecode(w, r, 16<<10, &req) {
 		return
 	}
-	if !req.validPosition() {
-		writeJSONError(w, http.StatusBadRequest, "a pin needs a position on the map")
+	var event string
+	var err error
+	if req.X != nil || req.Y != nil {
+		if !req.validPosition() {
+			writeJSONError(w, http.StatusBadRequest, "a pin needs a position on the map")
+			return
+		}
+		event, err = db.MoveMapPin(id, pinID, *req.X, *req.Y, userID)
+	} else {
+		req.CreatePage = false
+		pin := models.MapPin{ID: pinID, MapPageID: id}
+		if msg := req.fill(&pin); msg != "" {
+			writeJSONError(w, http.StatusBadRequest, msg)
+			return
+		}
+		event, err = db.UpdateMapPin(pin, userID)
+	}
+	if err != nil {
+		codexMapError(w, err, "change the pin")
 		return
 	}
-	if err := db.MoveMapPin(id, pinID, *req.X, *req.Y, userID); err != nil {
-		codexMapError(w, err, "move the pin")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	replyMap(w, http.StatusOK, id, map[string]interface{}{"event_id": event})
 }
 
 func handleDeletePin(w http.ResponseWriter, r *http.Request, id, pinID string) {
@@ -486,11 +608,12 @@ func handleDeletePin(w http.ResponseWriter, r *http.Request, id, pinID string) {
 	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
-	if err := db.DeleteMapPin(id, pinID, userID); err != nil {
+	event, err := db.DeleteMapPin(id, pinID, userID)
+	if err != nil {
 		codexMapError(w, err, "remove the pin")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	replyMap(w, http.StatusOK, id, map[string]interface{}{"event_id": event})
 }
 
 func handlePinEvents(w http.ResponseWriter, r *http.Request, id string) {
@@ -516,25 +639,10 @@ func handlePinEvents(w http.ResponseWriter, r *http.Request, id string) {
 		}
 		list = append(list, map[string]interface{}{
 			"id": e.ID, "action": e.Action, "user": journalUser(users, e.UserID), "created_at": e.CreatedAt,
-			"undone_by_user": undone, "label": pinEventLabel(e),
+			"undone_by_user": undone, "name": e.Name,
 		})
 	}
 	writeJSON(w, http.StatusOK, list)
-}
-
-func pinEventLabel(e models.MapPinEvent) string {
-	snap := e.After
-	if snap == "" {
-		snap = e.Before
-	}
-	var pin models.MapPin
-	_ = json.Unmarshal([]byte(snap), &pin)
-	name := strings.TrimSpace(pin.TargetText)
-	if utf8.RuneCountInString(name) > 60 {
-		name = string([]rune(name)[:60]) + "…"
-	}
-	verb := map[string]string{"add": "Added a pin for", "move": "Moved the pin for", "remove": "Removed the pin for"}[e.Action]
-	return verb + " “" + name + "”"
 }
 
 func handleUndoPinEvent(w http.ResponseWriter, r *http.Request, id, eventID string) {
@@ -546,7 +654,53 @@ func handleUndoPinEvent(w http.ResponseWriter, r *http.Request, id, eventID stri
 		codexMapError(w, err, "undo the pin change")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	replyMap(w, http.StatusOK, id, nil)
+}
+
+// copyMapInto puts the image (as a new file), scale and pins of a map into the extras of its copy and
+// returns the new files; on error the caller removes them. In another codex the pins lose their links.
+func copyMapInto(x *models.NewPageExtras, src *models.Page, sameCodex bool, userID string) ([]string, error) {
+	images, err := db.GetMapImages(src.ID)
+	if err != nil {
+		return nil, err
+	}
+	c := &models.MapCopy{}
+	if c.Scale, err = db.GetMapScale(src.ID); err != nil {
+		return nil, err
+	}
+	if c.Pins, err = db.GetMapPins(src.ID); err != nil {
+		return nil, err
+	}
+	if !sameCodex {
+		for i, p := range c.Pins {
+			if p.LinkedPageID == "" {
+				continue
+			}
+			if page, err := db.GetPage(p.LinkedPageID); err != nil {
+				return nil, err
+			} else if page != nil {
+				c.Pins[i].Name = page.Title
+			}
+			c.Pins[i].LinkedPageID = ""
+		}
+	}
+	x.Map = c
+	cur, _ := currentMapImage(images)
+	if cur == nil {
+		return nil, nil
+	}
+	file, err := copyUploadFile(cur.File)
+	if os.IsNotExist(err) {
+		log.Printf("codex copy page: map image %s is missing, not copied", cur.File)
+		c.Scale, c.Pins = nil, nil
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	cur.ID, cur.File, cur.UploadedBy, cur.CreatedAt = db.GenerateUUID(), file, userID, time.Now().UTC().Format(time.RFC3339)
+	c.Image = cur
+	return []string{file}, nil
 }
 
 const maxGIFFrames = 1000

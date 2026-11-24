@@ -665,288 +665,6 @@ button.wikilink {
     flex-wrap: wrap;
 }
 
-/* Maps */
-/* The map is the first section of the article column, so it lays itself out by the column's own
-   width (container query), not the viewport's. */
-.map-block {
-    container-type: inline-size;
-    margin-bottom: 1.5rem;
-}
-
-.map-block .section-header {
-    margin-top: 0;
-}
-
-.map-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 15rem;
-    gap: 1.25rem;
-    align-items: start;
-}
-
-.map-stage {
-    position: relative;
-    min-width: 0;
-    border: 1px solid var(--ink);
-    outline: 1px solid var(--ink);
-    outline-offset: 3px;
-}
-
-.codex-map,
-.codex-map.leaflet-container {
-    height: 70vh;
-    min-height: 22rem;
-    background: var(--folio);
-    font-family: inherit;
-}
-
-.codex-map .leaflet-bar,
-.codex-map .leaflet-bar a {
-    border-radius: 0;
-}
-
-.codex-map .leaflet-bar {
-    border: 1px solid var(--ink);
-    box-shadow: none;
-}
-
-.codex-map .leaflet-bar a {
-    background: var(--bg);
-    color: var(--ink);
-    border-bottom: 1px solid var(--line);
-    font-family: inherit;
-    text-decoration: none;
-    width: auto;
-    min-width: 30px;
-    padding: 0 0.25rem;
-}
-
-.codex-map .leaflet-bar a:hover,
-.codex-map .leaflet-bar a:focus-visible {
-    background: var(--folio);
-}
-
-.codex-map .leaflet-tooltip {
-    border: 1px solid var(--ink);
-    border-radius: 0;
-    background: var(--bg);
-    color: var(--ink);
-    box-shadow: none;
-    font-family: inherit;
-}
-
-.codex-map .leaflet-tooltip-top::before {
-    border-top-color: var(--ink);
-}
-
-.codex-pin {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    box-sizing: border-box;
-    background: var(--bg);
-    border: 2px solid var(--ink);
-    color: var(--ink);
-    font-size: 16px;
-    line-height: 1;
-}
-
-.codex-pin--map {
-    border-style: double;
-    border-width: 4px;
-}
-
-.codex-pin--missing {
-    border-style: dashed;
-    color: var(--muted);
-}
-
-.codex-pin--open {
-    background: var(--ink);
-    color: var(--bg);
-}
-
-.codex-map .leaflet-marker-draggable {
-    cursor: grab;
-}
-
-.map-menu {
-    position: absolute;
-    z-index: 1000;
-    display: grid;
-    min-width: 11rem;
-    border: 1px solid var(--ink);
-    background: var(--bg);
-}
-
-.map-menu button {
-    padding: 0.625rem 0.875rem;
-    background: none;
-    border: none;
-    border-bottom: 1px solid var(--line);
-    color: var(--ink);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-}
-
-.map-menu button:last-child {
-    border-bottom: none;
-    color: var(--muted);
-}
-
-.map-menu button:hover,
-.map-menu button:focus-visible {
-    background: var(--folio);
-}
-
-.map-banner {
-    position: absolute;
-    z-index: 1000;
-    left: 50%;
-    bottom: 0.75rem;
-    transform: translateX(-50%);
-    margin: 0;
-    padding: 0.5rem 0.875rem;
-    border: 1px solid var(--rubric);
-    background: var(--bg);
-}
-
-.map-panel {
-    min-width: 0;
-    padding: 1rem 1.25rem;
-    border: 1px solid var(--line);
-    min-height: 12rem;
-}
-
-.map-panel-body {
-    display: grid;
-    gap: 0.75rem;
-}
-
-.map-panel-title {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: 1.875rem;
-    font-weight: 400;
-    line-height: 1.2;
-    overflow-wrap: anywhere;
-}
-
-.map-panel .game-text {
-    overflow-wrap: anywhere;
-}
-
-.map-panel-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.625rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--line);
-}
-
-.pin-key {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1.5rem;
-    margin: 0.75rem 0 0;
-    padding: 0;
-    list-style: none;
-    color: var(--muted);
-    font-size: 0.875rem;
-}
-
-.pin-key li {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.codex-pin--key {
-    width: 22px;
-    height: 22px;
-    font-size: 12px;
-}
-
-.codex-pin--key.codex-pin--map {
-    border-width: 3px;
-}
-
-.map-link {
-    display: grid;
-    gap: 0.375rem;
-}
-
-.map-thumb {
-    display: block;
-    max-width: 7.5rem;
-    max-height: 5rem;
-    border: 1px solid var(--line);
-    object-fit: cover;
-}
-
-.pin-options {
-    display: grid;
-    gap: 0.25rem;
-    margin: 0.5rem 0 1rem;
-    padding: 0;
-    list-style: none;
-    max-height: 16rem;
-    overflow-y: auto;
-}
-
-.pin-options button {
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    background: none;
-    border: 1px solid var(--line);
-    color: var(--ink);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-    overflow-wrap: anywhere;
-}
-
-.pin-options button:hover,
-.pin-options button:focus-visible {
-    background: var(--folio);
-    border-color: var(--ink);
-}
-
-.image-list {
-    display: grid;
-    gap: 0.875rem;
-    margin: 0.75rem 0 0;
-    padding: 0;
-    list-style: none;
-}
-
-.image-list li {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem 1rem;
-}
-
-.pin-event {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 0.75rem;
-}
-
-.map-history {
-    padding-top: 1rem;
-}
-
-@container (max-width: 640px) {
-    .map-layout {
-        grid-template-columns: minmax(0, 1fr);
-    }
-}
-
 /* Breadcrumb: middle folders collapse to an ellipsis on narrow screens. */
 .crumb-ellipsis {
     display: none;
@@ -960,10 +678,6 @@ button.wikilink {
     .crumb-ellipsis {
         display: inline;
     }
-}
-
-.map-layout + p {
-    margin-top: 1.25rem;
 }
 
 /* ---------- Codices layout ("vault"): top bar, folder tree, page tabs, article, side panel ---------- */
@@ -4408,7 +4122,7 @@ a.tl-title:hover {
     pointer-events: none;
 }
 
-.tl-picker input {
+.modal-form .tl-picker input[type="text"] {
     width: 100%;
     padding-left: 2.25rem;
 }
@@ -4712,4 +4426,772 @@ a.tl-title:hover {
 
 .cx-jmeta dd {
     margin: 0;
+}
+
+/* ---------- Map pages ---------- */
+.codex-page {
+    /* Pin colours: the same in both themes, because the map image under them doesn't change. */
+    --pin-red: #9A2F3A; --pin-orange: #A2551A; --pin-gold: #7D6412; --pin-green: #4B6A2C;
+    --pin-teal: #2A6A68; --pin-blue: #2F5490; --pin-purple: #6A4086; --pin-black: #2B241C;
+    --pin-ink: #F7EFDD;
+}
+
+.mp-c-red { --pin: var(--pin-red); }
+.mp-c-orange { --pin: var(--pin-orange); }
+.mp-c-gold { --pin: var(--pin-gold); }
+.mp-c-green { --pin: var(--pin-green); }
+.mp-c-teal { --pin: var(--pin-teal); }
+.mp-c-blue { --pin: var(--pin-blue); }
+.mp-c-purple { --pin: var(--pin-purple); }
+.mp-c-black { --pin: var(--pin-black); }
+
+.mp-stage {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    aspect-ratio: var(--mp-ar, 3 / 2); /* the image's shape, set by codex.js */
+    min-height: 24rem;
+    max-height: calc(100vh - 9rem);
+    border: 1px solid var(--ink);
+    border-top: 2px solid var(--rubric);
+    background: var(--folio);
+    overflow: hidden;
+}
+
+.mp-stage--full {
+    position: fixed;
+    inset: 0;
+    z-index: 900; /* over the header and the top bar, under dialogs and toasts */
+    min-height: 0;
+    max-height: none;
+    aspect-ratio: auto;
+    border-width: 0;
+}
+
+.mp-map,
+.mp-map.leaflet-container {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: var(--folio);
+    font: inherit;
+}
+
+.mp-map.is-aiming,
+.mp-map.is-aiming .leaflet-interactive {
+    cursor: crosshair;
+}
+
+.mp-map:focus-visible {
+    outline: 3px solid var(--rubric);
+    outline-offset: -3px;
+}
+
+/* A pin hangs from its point: the tile with its tail (--t) shrinks with the zoom, the label doesn't. */
+.mp-marker {
+    --t: var(--mp-t, 30px);
+}
+
+.mp-marker:focus-visible {
+    outline: none;
+}
+
+.mp-in {
+    position: absolute;
+    left: calc(var(--t) / -2);
+    bottom: 0;
+    padding-bottom: calc(var(--t) * 0.27);
+}
+
+/* a bigger target than the drawing, for fingers */
+.mp-in::before {
+    content: "";
+    position: absolute;
+    inset: -8px -8px 0;
+}
+
+.mp-in::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: calc(var(--t) * 0.47);
+    height: calc(var(--t) * 0.3);
+    background: var(--pin-ink);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    transform: translateX(-50%);
+}
+
+.mp-tile {
+    position: relative;
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    width: var(--t, 30px);
+    height: var(--t, 30px);
+    background: var(--pin);
+    border: 2px solid var(--pin-ink);
+    box-shadow: 0 0 0 1px var(--pin-black);
+    color: var(--pin-ink);
+}
+
+.mp-tile svg {
+    width: 84%;
+    height: 84%;
+}
+
+.mp-label {
+    position: absolute;
+    left: 0;
+    bottom: calc(var(--t) * 1.27 + 2px);
+    max-width: 14rem;
+    padding: 0 0.3125rem;
+    overflow: hidden;
+    transform: translateX(-50%);
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mp-pin--linked .mp-label {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.mp-marker.no-label:not(.is-hot):not(:focus) .mp-label {
+    visibility: hidden;
+}
+
+.mp-marker.is-hot,
+.mp-marker:focus,
+.mp-marker.is-open,
+.mp-marker.is-moving {
+    z-index: 10000 !important;
+}
+
+.mp-marker:hover,
+.mp-marker:focus,
+.mp-marker.is-open,
+.mp-marker.is-moving {
+    --t: max(var(--mp-t, 30px), 26px);
+}
+
+.mp-marker:focus-visible .mp-tile,
+.mp-marker.is-open .mp-tile {
+    box-shadow: 0 0 0 1px var(--pin-black), 0 0 0 4px var(--bg), 0 0 0 6px var(--rubric);
+}
+
+.mp-marker.is-moving {
+    cursor: grab;
+}
+
+.mp-marker.is-moving .mp-tile {
+    outline: 2px dashed var(--pin-black);
+    outline-offset: 4px;
+}
+
+/* tools on the map */
+.mp-tools {
+    position: absolute;
+    z-index: 5;
+    display: flex;
+    gap: 0.25rem;
+}
+
+.mp-tools--zoom {
+    left: 0.625rem;
+    top: 0.625rem;
+    flex-direction: column;
+}
+
+.mp-tools--acts {
+    right: 0.625rem;
+    top: 0.625rem;
+}
+
+.mp-tool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    padding: 0 0.625rem;
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.mp-tool:hover {
+    background: var(--folio);
+}
+
+.mp-tool[aria-pressed="true"] {
+    background: var(--ink);
+    color: var(--bg);
+}
+
+.mp-tool--primary {
+    background: var(--rubric);
+    border-color: var(--rubric);
+    color: var(--bg);
+    font-weight: 600;
+}
+
+.mp-tool--primary:hover {
+    background: var(--rubric);
+    filter: brightness(1.1);
+}
+
+.mp-tool svg {
+    width: 1.125rem;
+    height: 1.125rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+}
+
+/* what the map is waiting for: place a pin, move it, the ruler, the scale */
+.mp-banner {
+    position: absolute;
+    z-index: 6;
+    left: 50%;
+    bottom: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem 0.75rem;
+    width: max-content;
+    max-width: calc(100% - 1.25rem);
+    padding: 0.5rem 0.75rem;
+    transform: translateX(-50%);
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    font-size: 0.875rem;
+}
+
+.mp-banner p {
+    margin: 0;
+}
+
+.mp-banner b {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* the cross is for the keyboard: shown while the map itself has the focus */
+.mp-aim {
+    position: absolute;
+    z-index: 4;
+    left: 50%;
+    top: 50%;
+    width: 28px;
+    height: 28px;
+    margin: -14px 0 0 -14px;
+    visibility: hidden;
+    pointer-events: none;
+    background:
+        linear-gradient(var(--ink), var(--ink)) center / 2px 100% no-repeat,
+        linear-gradient(var(--ink), var(--ink)) center / 100% 2px no-repeat;
+    filter: drop-shadow(0 0 1px var(--bg)) drop-shadow(0 0 1px var(--bg));
+}
+
+.mp-map.is-aiming:focus-visible ~ .mp-aim {
+    visibility: visible;
+}
+
+.mp-map[data-mode="move"] ~ .mp-aim {
+    visibility: hidden;
+}
+
+.mp-line {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 3;
+    stroke-dasharray: 8 5;
+}
+
+.mp-line--halo {
+    stroke: var(--bg);
+    stroke-width: 7;
+    stroke-dasharray: none;
+}
+
+.mp-dot {
+    fill: var(--bg);
+    fill-opacity: 1;
+    stroke: var(--ink);
+    stroke-width: 2;
+}
+
+.mp-note span {
+    position: absolute;
+    padding: 0 0.3125rem;
+    transform: translate(-50%, -50%);
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.mp-note--total span {
+    transform: translate(-50%, 0.75rem);
+    border: 1px solid var(--ink);
+    background: var(--bg);
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.mp-scale {
+    position: absolute;
+    z-index: 500;
+    left: 0.625rem;
+    bottom: 0.625rem;
+    display: grid;
+    gap: 1px;
+    padding: 0.125rem 0.375rem 0.3125rem;
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    pointer-events: none;
+}
+
+.mp-stage--busy .mp-scale {
+    bottom: 4.5rem;
+}
+
+.mp-scale[hidden] {
+    display: none;
+}
+
+.mp-scale i {
+    display: block;
+    box-sizing: border-box;
+    height: 6px;
+    border: 1px solid var(--ink);
+    border-top: 0;
+    background: linear-gradient(90deg, var(--ink) 50%, transparent 50%) bottom / 100% 3px no-repeat;
+}
+
+/* the pin preview: by its pin, or a sheet at the bottom of a narrow map */
+.mp-card {
+    position: absolute;
+    z-index: 7;
+    width: min(21rem, calc(100% - 1.25rem));
+    max-height: calc(100% - 1.25rem);
+    overflow-y: auto;
+    padding: 0.75rem 0.875rem 0.875rem;
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    border-top: 4px solid var(--pin, var(--ink));
+    box-shadow: 0 10px 30px var(--shadow);
+    font-size: 0.875rem;
+}
+
+.mp-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+}
+
+.mp-card-head .mp-tile {
+    flex: none;
+    margin: 1px;
+}
+
+.mp-card h2 {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.375rem;
+    font-weight: 400;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.mp-card h2:focus {
+    outline: none;
+}
+
+.mp-card-x {
+    flex: none;
+    width: 2rem;
+    height: 2rem;
+    margin: -0.25rem -0.375rem 0 0;
+    background: none;
+    border: 0;
+    color: var(--ink);
+    font: inherit;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.mp-card-text {
+    margin: 0.5rem 0 0;
+    max-height: 9rem;
+    overflow-y: auto;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.mp-card-by {
+    margin: 0.5rem 0 0;
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+.mp-card-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.625rem;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--line);
+}
+
+.mp-empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 2px dashed var(--ctl);
+    text-align: center;
+}
+
+.mp-empty p {
+    margin: 0;
+}
+
+.mp-empty.is-over {
+    border-color: var(--rubric);
+    background: var(--bg);
+}
+
+/* side panel: the pins and the icon key */
+.mp-find {
+    display: block;
+    padding: 0.5rem 0.75rem 0;
+}
+
+.mp-find input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 2.25rem;
+    padding: 0 0.5rem;
+    background: var(--bg);
+    border: 1px solid var(--ctl);
+    color: var(--ink);
+    font: inherit;
+}
+
+.cx-box ul.mp-list {
+    max-height: 22rem;
+    overflow-y: auto;
+}
+
+.cx-box ul.mp-list li,
+.cx-box ul.mp-key li {
+    padding: 0;
+}
+
+.mp-list button,
+.mp-key button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 2.25rem;
+    padding: 0.1875rem 0.25rem;
+    background: none;
+    border: 0;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mp-list button:hover,
+.mp-key button:hover {
+    background: var(--cx-hover);
+}
+
+.mp-list .mp-name {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.mp-list .is-linked .mp-name {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.mp-tile--s {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    border-width: 1px;
+    box-shadow: none;
+}
+
+.mp-tile--key {
+    --pin: var(--bg);
+    border-color: var(--ink);
+    color: var(--ink);
+}
+
+.mp-key button span:nth-child(2) {
+    flex: 1;
+}
+
+.mp-key button[aria-pressed="false"] {
+    color: var(--muted);
+    text-decoration: line-through;
+}
+
+.mp-key button[aria-pressed="false"] .mp-tile {
+    border-style: dashed;
+    border-color: var(--muted);
+    color: var(--muted);
+}
+
+.mp-count {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* pin dialog */
+.mp-icons {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.mp-icons p {
+    margin: 0 0 0.25rem;
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+.mp-icons div > div,
+.mp-colors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+.mp-opt {
+    display: inline-grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+}
+
+.mp-opt svg {
+    width: 1.625rem;
+    height: 1.625rem;
+}
+
+.mp-opt:hover {
+    background: var(--cx-hover);
+}
+
+.mp-opt[aria-checked="true"] {
+    border-color: var(--ink);
+    background: var(--pin, var(--ink));
+    color: var(--pin-ink);
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--rubric);
+}
+
+.mp-colors .mp-opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    width: auto;
+    padding: 0 0.625rem 0 0.375rem;
+    font-size: 0.875rem;
+}
+
+.mp-colors .mp-opt i {
+    width: 1.375rem;
+    height: 1.375rem;
+    box-sizing: border-box;
+    background: var(--pin);
+    border: 1px solid var(--ctl);
+}
+
+.mp-colors .mp-opt[aria-checked="true"] {
+    background: var(--folio);
+    color: var(--ink);
+}
+
+.mp-prev {
+    position: relative;
+    margin: 1.25rem 0 0.5rem;
+    height: 5.5rem;
+    background: var(--folio);
+    border: 1px solid var(--line);
+}
+
+.mp-prev .mp-marker {
+    position: absolute;
+    left: 50%;
+    bottom: 0.75rem;
+}
+
+.mp-credit {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+@media (max-width: 900px) {
+    .mp-stage:not(.mp-stage--full) {
+        min-height: min(26rem, 68vh);
+        max-height: 75vh;
+    }
+}
+
+@media (max-width: 600px) {
+    .mp-card {
+        left: 0 !important;
+        right: 0;
+        top: auto !important;
+        bottom: 0;
+        width: auto;
+        max-height: 62%;
+        border-width: 4px 0 0;
+    }
+
+    .mp-banner {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: auto;
+        max-width: none;
+        transform: none;
+        border-width: 1px 0 0;
+    }
+
+    .mp-tool-long {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+    }
+}
+
+.mp-wrap {
+    margin: 0 0 1.5rem;
+}
+
+.mp-banner-acts {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+.mp-uploading {
+    position: absolute;
+    z-index: 8;
+    inset: auto 0 0;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg);
+    border-top: 1px solid var(--ink);
+    font-size: 0.875rem;
+}
+
+.mp-uploading p {
+    margin: 0;
+}
+
+.mp-uploading progress {
+    width: 100%;
+    accent-color: var(--rubric);
+}
+
+/* Full screen: nothing behind it scrolls, and no container between it and the window confines it. */
+.mp-full-on {
+    overflow: hidden;
+}
+
+.mp-full-on :is(.cx-main, .cx-inner) {
+    container-type: normal;
+    contain: none;
+    transform: none;
+}
+
+/* history of a map */
+.mp-hist {
+    margin: 0 0 2rem;
+    padding: 0;
+    border-top: 1px solid var(--line);
+    list-style: none;
+}
+
+.mp-hist li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.875rem;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.mp-hist-text {
+    flex: 1 1 12rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.mp-hist-text b {
+    font-weight: 600;
+}
+
+.mp-hist small {
+    display: block;
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+.mp-thumb {
+    flex: none;
+    width: 6rem;
+    height: 4rem;
+    border: 1px solid var(--line);
+    object-fit: cover;
+}
+
+.mp-look {
+    margin: 1.25rem 0 1rem;
+}
+
+.mp-colors {
+    padding: 0 0.25rem 0.25rem 0;
+}
+
+.mp-scale-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }

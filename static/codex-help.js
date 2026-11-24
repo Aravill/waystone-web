@@ -70,7 +70,7 @@ const CODEX_HELP = [
             '<ul><li><code>tag:name</code> only pages with that tag. Repeat it and a page must have all of them.</li>' +
             '<li><code>folder:Name</code> pages in any folder of that name, sub-folders included. <code>folder:Places/Inns</code> follows a path from the top.</li>' +
             '<li><code>links:here</code> pages that link to this one.</li>' +
-            '<li><code>kind:lore</code> or <code>kind:timeline</code></li>' +
+            '<li><code>kind:lore</code>, <code>kind:timeline</code> or <code>kind:map</code></li>' +
             '<li><code>sort:title</code> (the default), <code>sort:updated</code> or <code>sort:created</code> (newest first)</li>' +
             '<li><code>limit:10</code> 1 to 200, 50 if you do not say. The box then says how many more there are.</li></ul>' +
             '<p>An option the list does not know is reported in the box. The examples below use made-up pages.</p>',

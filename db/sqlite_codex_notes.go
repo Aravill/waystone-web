@@ -139,6 +139,9 @@ func (s *SQLiteStore) AppendNoteToPage(noteID, userID, pageID, addition string, 
 	if codex != note.CodexID {
 		return models.PageRevision{}, ErrPageNotFound
 	}
+	if err := checkPageText(tx, pageID); err != nil {
+		return models.PageRevision{}, err
+	}
 	latest, err := scanPageRevision(tx.QueryRow(`SELECT `+pageRevisionColumns+` FROM page_revisions WHERE page_id = ? ORDER BY number DESC LIMIT 1`, pageID))
 	if err != nil {
 		return models.PageRevision{}, err

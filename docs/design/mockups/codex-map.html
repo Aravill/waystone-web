@@ -1,0 +1,2546 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codices Map Page</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;1,400&family=Barlow+Condensed:wght@600&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
+<style>
+/* Map page mock-up: the third page type in the Codices (docs/design/codex-maps.md).
+   Built on the shipped Codices shell (codex.css) and STYLE_GUIDE.md tokens. The viewer and the
+   "Map pages" styles are the same code as static/codex-map.js and static/codex.css. */
+:root {
+    --bg: #F2EAD8; --folio: #E6DBC2; --ink: #2B241C; --muted: #6B5E4B;
+    --line: rgba(43, 36, 28, 0.4); --ctl: rgba(43, 36, 28, 0.64);
+    --rubric: #8E2A1E; --verdigris: #355E52; --ochre: #7A5A12;
+    --shadow: rgba(43, 36, 28, 0.24); --scrim: rgba(43, 36, 28, 0.55);
+    --cx-bar: #2B241C; --cx-bar-text: #F2EAD8; --cx-bar-accent: #D9735C;
+    --cx-bar-line: rgba(242, 234, 216, 0.22); --cx-bar-fill: #3A3128;
+    --cx-soft: color-mix(in srgb, var(--ink) 16%, transparent);
+    --cx-hover: color-mix(in srgb, var(--ink) 9%, transparent);
+    --cx-top-h: 3.5rem;
+    --font-text: 'Inter', system-ui, sans-serif;
+    --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    --font-title: 'IM Fell English SC', serif;
+    color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+    --line: rgba(232, 220, 196, 0.3); --ctl: rgba(232, 220, 196, 0.5);
+    --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
+    --shadow: rgba(0, 0, 0, 0.7); --scrim: rgba(0, 0, 0, 0.74);
+    --cx-bar: #0C0A07; --cx-bar-text: #E8DCC4; --cx-bar-line: rgba(232, 220, 196, 0.2); --cx-bar-fill: #2A231B; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+    --bg: #16120E; --folio: #2A231B; --ink: #E8DCC4; --muted: #A8997F;
+    --line: rgba(232, 220, 196, 0.3); --ctl: rgba(232, 220, 196, 0.5);
+    --rubric: #D9735C; --verdigris: #7FB09E; --ochre: #D4A94A;
+    --shadow: rgba(0, 0, 0, 0.7); --scrim: rgba(0, 0, 0, 0.74);
+    --cx-bar: #0C0A07; --cx-bar-text: #E8DCC4; --cx-bar-line: rgba(232, 220, 196, 0.2); --cx-bar-fill: #2A231B; color-scheme: dark;
+}
+/* ---------- base ---------- */
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-text); font-size: 1rem; line-height: 1.55; }
+a { color: var(--rubric); text-underline-offset: 4px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--rubric); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+svg.i { width: 1.125rem; height: 1.125rem; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- mock-up controls (not part of the design) ---------- */
+.mock-bar {
+    position: relative; z-index: 60;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+    padding: 8px 16px; background: #2b2b2b; color: #eee; font: 13px/1.4 Inter, sans-serif;
+}
+.mock-bar strong { font-weight: 600; }
+.mock-seg { display: inline-flex; border: 1px solid #555; border-radius: 6px; overflow: hidden; }
+.mock-seg button { background: none; border: 0; color: #ddd; padding: 5px 10px; font-size: 13px; }
+.mock-seg button + button { border-left: 1px solid #555; }
+.mock-seg button[aria-pressed="true"] { background: #eee; color: #111; }
+.mock-note { color: #bbb; flex: 1 1 18rem; }
+.stage[data-width="phone"] .app { width: 390px; margin: 16px auto; outline: 1px solid #888; }
+
+/* ---------- app frame ---------- */
+.app { container: app / inline-size; background: var(--bg); }
+
+.site {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+    max-width: 71rem; margin: 0 auto; padding: 20px 24px 14px; border-bottom: 3px double var(--ink);
+}
+.logo { font-family: 'UnifrakturMaguntia', serif; font-size: 34px; color: var(--ink); text-decoration: none; line-height: 1; }
+.nav { display: flex; gap: 22px; }
+.nav a { font-family: var(--font-title); font-size: 21px; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; padding: 4px 0; }
+.nav a[aria-current] { color: var(--ink); border-bottom-color: var(--rubric); }
+.avatar { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); background: var(--folio); font-family: var(--font-display); }
+@container app (max-width: 600px) {
+    .site { padding: 12px 16px 10px; }
+    .logo { font-size: 28px; }
+    .nav { order: 3; width: 100%; gap: 16px; }
+    .nav a { font-size: 19px; }
+}
+
+/* top bar */
+.cx-top {
+    position: sticky; top: 0; z-index: 30;
+    display: flex; align-items: center; gap: 0.75rem; min-height: var(--cx-top-h);
+    margin-top: 1rem; padding: 0.5rem 1rem;
+    background: var(--cx-bar); color: var(--cx-bar-text); border-bottom: 2px solid var(--cx-bar-accent);
+}
+.cx-brand { font-family: var(--font-display); font-size: 1.25rem; letter-spacing: 0.06em; text-transform: uppercase; color: inherit; text-decoration: none; }
+.cx-pick { display: inline-flex; align-items: center; gap: .5rem; min-height: 2.5rem; padding: 0 .75rem; background: none; border: 1px solid var(--cx-bar-line); font-size: .875rem; white-space: nowrap; }
+.cx-pick::after { content: "▾"; font-size: .75rem; opacity: .8; }
+.cx-search { flex: 1 1 auto; max-width: 26rem; margin-left: auto; position: relative; }
+.cx-search input { width: 100%; height: 2.5rem; padding: 0 .75rem 0 2.25rem; background: var(--cx-bar-fill); color: var(--cx-bar-text); border: 1px solid var(--cx-bar-line); font: inherit; font-size: .875rem; }
+.cx-search input::placeholder { color: color-mix(in srgb, var(--cx-bar-text) 70%, transparent); }
+.cx-search svg { position: absolute; left: .7rem; top: .7rem; }
+.cx-menu { display: none; width: 2.5rem; height: 2.5rem; background: none; border: 1px solid transparent; place-items: center; }
+
+/* shell */
+.cx-shell { display: grid; grid-template-columns: 16rem minmax(0, 1fr) 16.5rem; grid-template-areas: "nav main rail"; }
+.cx-nav { grid-area: nav; background: var(--folio); border-right: 1px solid var(--line); }
+.cx-nav-in, .cx-rail-in { position: sticky; top: var(--cx-top-h); max-height: calc(100vh - var(--cx-top-h)); overflow-y: auto; font-size: .875rem; }
+.cx-nav-in { padding: 1rem .75rem 2.5rem 1rem; }
+.cx-new { display: block; width: 100%; min-height: 2.25rem; margin-bottom: 1.25rem; text-align: left; padding: 0 .75rem; background: var(--bg); border: 1px solid var(--line); }
+.cx-new:hover { background: var(--cx-hover); }
+.nav-title { margin: 0 0 .25rem; font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.tree, .tree ul { list-style: none; margin: 0; padding: 0; }
+.tree ul { padding-left: .75rem; margin-left: .45rem; border-left: 1px solid var(--cx-soft); }
+.tree .f { display: block; padding: .25rem .375rem; font-weight: 600; }
+.tree .f::before { content: "▾ "; color: var(--muted); font-size: .75rem; }
+.tree a { display: flex; align-items: center; gap: .375rem; padding: .25rem .375rem .25rem 1.25rem; color: var(--ink); text-decoration: none; border-left: 3px solid transparent; }
+.tree a:hover { background: var(--cx-hover); }
+.tree a[aria-current] { background: var(--cx-hover); border-left-color: var(--rubric); font-weight: 600; }
+.tree a .ty { margin-left: -1.1rem; color: var(--muted); }
+.tree a .ty svg { width: .85rem; height: .85rem; }
+.nav-group { margin-top: 1.25rem; }
+.nav-group a { display: flex; justify-content: space-between; padding: .25rem .375rem; color: var(--ink); text-decoration: none; }
+.nav-group a:hover { background: var(--cx-hover); }
+.nav-group .count { color: var(--muted); }
+
+.cx-main { grid-area: main; min-width: 0; container: main / inline-size; padding-bottom: 5rem; }
+.cx-tabs { display: flex; height: 2.5rem; padding: 0 .5rem; background: var(--folio); border-bottom: 1px solid var(--line); font-size: .8125rem; overflow-x: auto; }
+.cx-tabs span { display: inline-flex; align-items: center; padding: 0 .875rem; margin-top: .375rem; color: var(--muted); white-space: nowrap; }
+.cx-tabs span[aria-current] { background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-bottom-color: var(--bg); margin-bottom: -1px; }
+.cx-inner { max-width: 50rem; margin: 0 auto; padding: 1.5rem 2rem 0; }
+.crumbs { font-size: .8125rem; color: var(--muted); margin-bottom: .375rem; }
+.crumbs a { color: var(--muted); text-decoration: none; }
+.crumbs .sep { margin: 0 .375rem; }
+.kicker { display: inline-flex; align-items: center; gap: .375rem; font-size: .8125rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; font-weight: 600; margin-bottom: .125rem; }
+.kicker svg { width: 1rem; height: 1rem; }
+.cx-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .5rem 1rem; padding-bottom: .5rem; border-bottom: 2px solid var(--rubric); }
+.cx-title { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(1.9rem, 1.4rem + 2vw, 2.75rem); line-height: 1.1; }
+.cx-actions { display: flex; flex-wrap: wrap; gap: .375rem; }
+.cx-act { display: inline-flex; align-items: center; gap: .375rem; min-height: 2.25rem; padding: 0 .75rem; background: var(--folio); border: 1px solid var(--line); color: var(--ink); font-size: .875rem; text-decoration: none; }
+.cx-act:hover { background: var(--cx-hover); }
+.cx-act--primary { background: var(--rubric); border-color: var(--rubric); color: var(--bg); font-weight: 600; }
+.cx-act--primary:hover { background: var(--rubric); filter: brightness(1.1); }
+.cx-sub { margin: .5rem 0 1rem; color: var(--muted); font-size: .875rem; }
+.lede { margin: 0 0 1.25rem; font-size: 1.02rem; }
+.editor-only { display: none !important; }
+[data-role="editor"] .editor-only { display: revert !important; }
+[data-role="editor"] .cx-act.editor-only { display: inline-flex !important; }
+
+.cx-rail { grid-area: rail; border-left: 1px solid var(--line); }
+.cx-rail-in { padding: 1rem; }
+.cx-box { margin: 0 0 1.25rem; border: 1px solid var(--line); background: var(--bg); }
+.cx-box > h2 { margin: 0; padding: .375rem .75rem; background: var(--cx-bar); color: var(--cx-bar-text); border-bottom: 2px solid var(--cx-bar-accent); font-family: var(--font-display); font-size: 1rem; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; line-height: 1.4; }
+.cx-box ul { margin: 0; padding: .375rem .75rem .625rem; list-style: none; }
+.cx-box li { padding: .3125rem 0; }
+.cx-box li + li { border-top: 1px solid var(--cx-soft); }
+.cx-box small { display: block; color: var(--muted); font-size: .8125rem; }
+
+/* Jump to: centuries with their years; the year in view gets the rubric edge */
+.jump { padding: .375rem 0 .625rem !important; }
+.jump li { padding: 0 !important; border: 0 !important; }
+.jump .cent { display: block; padding: .375rem .75rem .125rem; color: var(--muted); font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.jump a { display: flex; justify-content: space-between; padding: .2rem .75rem .2rem 1.25rem; color: var(--ink); text-decoration: none; border-left: 3px solid transparent; font-variant-numeric: tabular-nums; }
+.jump a:hover { background: var(--cx-hover); }
+.jump a[aria-current] { border-left-color: var(--rubric); background: var(--cx-hover); font-weight: 600; }
+.jump a span { color: var(--muted); font-weight: 400; }
+
+@container app (max-width: 1150px) {
+    .cx-shell { grid-template-columns: 15rem minmax(0, 1fr); grid-template-areas: "nav main" "nav rail"; }
+    .cx-rail { border-left: 0; }
+    .cx-rail-in { position: static; max-height: none; max-width: 50rem; margin: 0 auto; padding: 0 2rem 3rem; }
+    .cx-box--jump { display: none; }
+}
+@container app (max-width: 820px) {
+    .cx-shell { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "rail"; }
+    .cx-nav { display: none; }
+    .cx-menu { display: inline-grid; }
+    .cx-pick { display: none; }
+    .cx-inner { padding: 1rem 1rem 0; }
+    .cx-rail-in { padding: 0 1rem 3rem; }
+}
+
+
+/* ---------- dialogs (Modals in STYLE_GUIDE.md, Codices header) ---------- */
+.scrim { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 1rem; background: var(--scrim); }
+.sheet { width: min(100%, 36rem); max-height: calc(100vh - 2rem); overflow-y: auto; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--ink); outline: 1px solid var(--line); outline-offset: 4px; box-shadow: 0 1.5rem 4rem var(--shadow); }
+.sheet--wide { width: min(100%, 44rem); }
+.sheet-h { position: sticky; top: 0; z-index: 2; display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: .875rem 1rem .875rem 1.5rem; background: var(--cx-bar); color: var(--cx-bar-text); border-bottom: 2px solid var(--cx-bar-accent); }
+.sheet-h .eyebrow { display: block; font-size: .8125rem; opacity: .85; }
+.sheet-h h2 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 1.5rem; letter-spacing: .04em; text-transform: uppercase; line-height: 1.2; }
+.x { width: 2.5rem; height: 2.5rem; flex: none; display: grid; place-items: center; background: none; border: 1px solid transparent; }
+.x:hover { border-color: currentColor; }
+.sheet-b { padding: 1.375rem 1.5rem .5rem; display: grid; gap: 1.25rem; }
+.fld { display: grid; gap: .375rem; min-width: 0; }
+.fld > label, .fld > .lbl { font-size: .9375rem; font-weight: 600; }
+.fld .opt { font-weight: 400; color: var(--muted); }
+.cell { width: 100%; min-height: 2.75rem; padding: .5rem .75rem; background: var(--folio); color: var(--ink); border: 0; border-bottom: 1px solid var(--ink); font: inherit; }
+.cell:focus { outline: none; border-bottom-color: var(--rubric); box-shadow: inset 0 -2px 0 var(--rubric); }
+.cell[readonly] { background: transparent; border-bottom: 1px dashed var(--line); color: var(--ink); }
+.hint { font-size: .875rem; color: var(--muted); margin: 0; }
+.date-row { display: grid; grid-template-columns: 7rem minmax(0, 1fr) 5rem; gap: .75rem; }
+.date-row .fld > label { font-weight: 500; font-size: .875rem; }
+.err { color: var(--rubric); font-size: .875rem; margin: 0; }
+.err::before { content: "✗ "; }
+
+/* page picker: a combobox; the chosen page sits in a linked row */
+.picker { position: relative; }
+.picker .cell { padding-left: 2.25rem; }
+.picker > svg { position: absolute; left: .75rem; top: .8rem; color: var(--muted); }
+.pick-list { position: absolute; left: 0; right: 0; top: 100%; z-index: 5; margin: 0; padding: .25rem 0; list-style: none; max-height: 14rem; overflow-y: auto; background: var(--bg); border: 1px solid var(--ink); box-shadow: 0 .5rem 1.5rem var(--shadow); }
+.pick-list li { display: flex; justify-content: space-between; gap: 1rem; padding: .45rem .75rem; cursor: pointer; }
+.pick-list li small { color: var(--muted); white-space: nowrap; }
+.pick-list li[aria-selected="true"], .pick-list li:hover { background: var(--folio); }
+.pick-list li mark { background: none; color: inherit; font-weight: 600; }
+.linked { display: flex; align-items: center; gap: .625rem; min-height: 2.75rem; padding: .375rem .75rem; border: 1px solid var(--ink); border-left: 4px solid var(--rubric); }
+.linked .mk { flex: none; }
+.linked .t { font-family: var(--font-display); font-size: 1.15rem; line-height: 1.2; flex: 1; min-width: 0; }
+.linked .t small { display: block; font-family: var(--font-text); font-size: .8125rem; color: var(--muted); }
+.text-btn { background: none; border: 0; padding: .25rem 0; color: var(--rubric); text-decoration: underline; text-underline-offset: 4px; font-size: .875rem; }
+.ck { display: flex; gap: .5rem; align-items: flex-start; font-size: .9375rem; }
+.ck input { margin-top: .3rem; accent-color: var(--ink); }
+
+.sheet-f { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: 1rem; padding: .875rem 1.5rem; background: var(--folio); border-top: 1px solid var(--line); }
+.sheet-f .left { margin-right: auto; }
+.btn { min-height: 2.625rem; min-width: 7rem; padding: 0 1rem; font-size: .90625rem; font-weight: 500; }
+.btn--sec { background: none; border: 1px solid var(--ctl); color: var(--ink); }
+.btn--sec:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn--pri { background: var(--ink); border: 1px solid var(--ink); color: var(--bg); }
+.btn--pri:hover { opacity: .85; }
+.btn--danger { min-width: 0; background: none; border: 0; padding: 0; color: var(--rubric); text-decoration: underline; text-underline-offset: 4px; }
+
+/* page types in the New page dialog */
+.types { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+.type { display: grid; gap: .25rem; align-content: start; padding: .75rem; text-align: left; background: var(--bg); border: 1px solid var(--line); }
+.type:hover { background: var(--cx-hover); }
+.type b { display: flex; align-items: center; gap: .375rem; font-weight: 600; }
+.type span { font-size: .8125rem; color: var(--muted); line-height: 1.4; }
+.type[aria-checked="true"] { border-color: var(--rubric); box-shadow: inset 0 0 0 1px var(--rubric); }
+.type[aria-disabled="true"] { border-style: dashed; color: var(--muted); cursor: not-allowed; }
+.type[aria-disabled="true"]:hover { background: var(--bg); }
+.tpl-note { padding: .75rem; border: 1px solid var(--line); background: var(--folio); font-size: .875rem; color: var(--muted); }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .75rem; }
+
+@media (max-width: 600px) {
+    .scrim { place-items: end stretch; padding: 0; }
+    .sheet, .sheet--wide { width: 100%; max-height: 92vh; border: 0; border-top: 1px solid var(--ink); outline: 0; }
+    .sheet-f { flex-direction: column-reverse; align-items: stretch; }
+    .sheet-f .left { margin: .5rem 0 0; align-self: center; }
+    .types, .two, .date-row { grid-template-columns: 1fr; }
+}
+
+
+/* required styles */
+
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-container,
+.leaflet-pane > svg,
+.leaflet-pane > canvas,
+.leaflet-zoom-box,
+.leaflet-image-layer,
+.leaflet-layer {
+	position: absolute;
+	left: 0;
+	top: 0;
+	}
+.leaflet-container {
+	overflow: hidden;
+	}
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+	-webkit-user-select: none;
+	   -moz-user-select: none;
+	        user-select: none;
+	  -webkit-user-drag: none;
+	}
+/* Prevents IE11 from highlighting tiles in blue */
+.leaflet-tile::selection {
+	background: transparent;
+}
+/* Safari renders non-retina tile on retina better with this, but Chrome is worse */
+.leaflet-safari .leaflet-tile {
+	image-rendering: -webkit-optimize-contrast;
+	}
+/* hack that prevents hw layers "stretching" when loading new tiles */
+.leaflet-safari .leaflet-tile-container {
+	width: 1600px;
+	height: 1600px;
+	-webkit-transform-origin: 0 0;
+	}
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+	display: block;
+	}
+/* .leaflet-container svg: reset svg max-width decleration shipped in Joomla! (joomla.org) 3.x */
+/* .leaflet-container img: map is broken in FF if you have max-width: 100% on tiles */
+.leaflet-container .leaflet-overlay-pane svg {
+	max-width: none !important;
+	max-height: none !important;
+	}
+.leaflet-container .leaflet-marker-pane img,
+.leaflet-container .leaflet-shadow-pane img,
+.leaflet-container .leaflet-tile-pane img,
+.leaflet-container img.leaflet-image-layer,
+.leaflet-container .leaflet-tile {
+	max-width: none !important;
+	max-height: none !important;
+	width: auto;
+	padding: 0;
+	}
+
+.leaflet-container img.leaflet-tile {
+	/* See: https://bugs.chromium.org/p/chromium/issues/detail?id=600120 */
+	mix-blend-mode: plus-lighter;
+}
+
+.leaflet-container.leaflet-touch-zoom {
+	-ms-touch-action: pan-x pan-y;
+	touch-action: pan-x pan-y;
+	}
+.leaflet-container.leaflet-touch-drag {
+	-ms-touch-action: pinch-zoom;
+	/* Fallback for FF which doesn't support pinch-zoom */
+	touch-action: none;
+	touch-action: pinch-zoom;
+}
+.leaflet-container.leaflet-touch-drag.leaflet-touch-zoom {
+	-ms-touch-action: none;
+	touch-action: none;
+}
+.leaflet-container {
+	-webkit-tap-highlight-color: transparent;
+}
+.leaflet-container a {
+	-webkit-tap-highlight-color: rgba(51, 181, 229, 0.4);
+}
+.leaflet-tile {
+	filter: inherit;
+	visibility: hidden;
+	}
+.leaflet-tile-loaded {
+	visibility: inherit;
+	}
+.leaflet-zoom-box {
+	width: 0;
+	height: 0;
+	-moz-box-sizing: border-box;
+	     box-sizing: border-box;
+	z-index: 800;
+	}
+/* workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=888319 */
+.leaflet-overlay-pane svg {
+	-moz-user-select: none;
+	}
+
+.leaflet-pane         { z-index: 400; }
+
+.leaflet-tile-pane    { z-index: 200; }
+.leaflet-overlay-pane { z-index: 400; }
+.leaflet-shadow-pane  { z-index: 500; }
+.leaflet-marker-pane  { z-index: 600; }
+.leaflet-tooltip-pane   { z-index: 650; }
+.leaflet-popup-pane   { z-index: 700; }
+
+.leaflet-map-pane canvas { z-index: 100; }
+.leaflet-map-pane svg    { z-index: 200; }
+
+.leaflet-vml-shape {
+	width: 1px;
+	height: 1px;
+	}
+.lvml {
+	behavior: none;
+	display: inline-block;
+	position: absolute;
+	}
+
+
+/* control positioning */
+
+.leaflet-control {
+	position: relative;
+	z-index: 800;
+	pointer-events: visiblePainted; /* IE 9-10 doesn't have auto */
+	pointer-events: auto;
+	}
+.leaflet-top,
+.leaflet-bottom {
+	position: absolute;
+	z-index: 1000;
+	pointer-events: none;
+	}
+.leaflet-top {
+	top: 0;
+	}
+.leaflet-right {
+	right: 0;
+	}
+.leaflet-bottom {
+	bottom: 0;
+	}
+.leaflet-left {
+	left: 0;
+	}
+.leaflet-control {
+	float: left;
+	clear: both;
+	}
+.leaflet-right .leaflet-control {
+	float: right;
+	}
+.leaflet-top .leaflet-control {
+	margin-top: 10px;
+	}
+.leaflet-bottom .leaflet-control {
+	margin-bottom: 10px;
+	}
+.leaflet-left .leaflet-control {
+	margin-left: 10px;
+	}
+.leaflet-right .leaflet-control {
+	margin-right: 10px;
+	}
+
+
+/* zoom and fade animations */
+
+.leaflet-fade-anim .leaflet-popup {
+	opacity: 0;
+	-webkit-transition: opacity 0.2s linear;
+	   -moz-transition: opacity 0.2s linear;
+	        transition: opacity 0.2s linear;
+	}
+.leaflet-fade-anim .leaflet-map-pane .leaflet-popup {
+	opacity: 1;
+	}
+.leaflet-zoom-animated {
+	-webkit-transform-origin: 0 0;
+	    -ms-transform-origin: 0 0;
+	        transform-origin: 0 0;
+	}
+svg.leaflet-zoom-animated {
+	will-change: transform;
+}
+
+.leaflet-zoom-anim .leaflet-zoom-animated {
+	-webkit-transition: -webkit-transform 0.25s cubic-bezier(0,0,0.25,1);
+	   -moz-transition:    -moz-transform 0.25s cubic-bezier(0,0,0.25,1);
+	        transition:         transform 0.25s cubic-bezier(0,0,0.25,1);
+	}
+.leaflet-zoom-anim .leaflet-tile,
+.leaflet-pan-anim .leaflet-tile {
+	-webkit-transition: none;
+	   -moz-transition: none;
+	        transition: none;
+	}
+
+.leaflet-zoom-anim .leaflet-zoom-hide {
+	visibility: hidden;
+	}
+
+
+/* cursors */
+
+.leaflet-interactive {
+	cursor: pointer;
+	}
+.leaflet-grab {
+	cursor: -webkit-grab;
+	cursor:    -moz-grab;
+	cursor:         grab;
+	}
+.leaflet-crosshair,
+.leaflet-crosshair .leaflet-interactive {
+	cursor: crosshair;
+	}
+.leaflet-popup-pane,
+.leaflet-control {
+	cursor: auto;
+	}
+.leaflet-dragging .leaflet-grab,
+.leaflet-dragging .leaflet-grab .leaflet-interactive,
+.leaflet-dragging .leaflet-marker-draggable {
+	cursor: move;
+	cursor: -webkit-grabbing;
+	cursor:    -moz-grabbing;
+	cursor:         grabbing;
+	}
+
+/* marker & overlays interactivity */
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-image-layer,
+.leaflet-pane > svg path,
+.leaflet-tile-container {
+	pointer-events: none;
+	}
+
+.leaflet-marker-icon.leaflet-interactive,
+.leaflet-image-layer.leaflet-interactive,
+.leaflet-pane > svg path.leaflet-interactive,
+svg.leaflet-image-layer.leaflet-interactive path {
+	pointer-events: visiblePainted; /* IE 9-10 doesn't have auto */
+	pointer-events: auto;
+	}
+
+/* visual tweaks */
+
+.leaflet-container {
+	background: #ddd;
+	outline-offset: 1px;
+	}
+.leaflet-container a {
+	color: #0078A8;
+	}
+.leaflet-zoom-box {
+	border: 2px dotted #38f;
+	background: rgba(255,255,255,0.5);
+	}
+
+
+/* general typography */
+.leaflet-container {
+	font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+	font-size: 12px;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	}
+
+
+/* general toolbar styles */
+
+.leaflet-bar {
+	box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+	border-radius: 4px;
+	}
+.leaflet-bar a {
+	background-color: #fff;
+	border-bottom: 1px solid #ccc;
+	width: 26px;
+	height: 26px;
+	line-height: 26px;
+	display: block;
+	text-align: center;
+	text-decoration: none;
+	color: black;
+	}
+.leaflet-bar a,
+.leaflet-control-layers-toggle {
+	background-position: 50% 50%;
+	background-repeat: no-repeat;
+	display: block;
+	}
+.leaflet-bar a:hover,
+.leaflet-bar a:focus {
+	background-color: #f4f4f4;
+	}
+.leaflet-bar a:first-child {
+	border-top-left-radius: 4px;
+	border-top-right-radius: 4px;
+	}
+.leaflet-bar a:last-child {
+	border-bottom-left-radius: 4px;
+	border-bottom-right-radius: 4px;
+	border-bottom: none;
+	}
+.leaflet-bar a.leaflet-disabled {
+	cursor: default;
+	background-color: #f4f4f4;
+	color: #bbb;
+	}
+
+.leaflet-touch .leaflet-bar a {
+	width: 30px;
+	height: 30px;
+	line-height: 30px;
+	}
+.leaflet-touch .leaflet-bar a:first-child {
+	border-top-left-radius: 2px;
+	border-top-right-radius: 2px;
+	}
+.leaflet-touch .leaflet-bar a:last-child {
+	border-bottom-left-radius: 2px;
+	border-bottom-right-radius: 2px;
+	}
+
+/* zoom control */
+
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+	font: bold 18px 'Lucida Console', Monaco, monospace;
+	text-indent: 1px;
+	}
+
+.leaflet-touch .leaflet-control-zoom-in, .leaflet-touch .leaflet-control-zoom-out  {
+	font-size: 22px;
+	}
+
+
+/* layers control */
+
+.leaflet-control-layers {
+	box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+	background: #fff;
+	border-radius: 5px;
+	}
+.leaflet-control-layers-toggle {
+	background-image: none;
+	width: 36px;
+	height: 36px;
+	}
+.leaflet-retina .leaflet-control-layers-toggle {
+	background-image: none;
+	background-size: 26px 26px;
+	}
+.leaflet-touch .leaflet-control-layers-toggle {
+	width: 44px;
+	height: 44px;
+	}
+.leaflet-control-layers .leaflet-control-layers-list,
+.leaflet-control-layers-expanded .leaflet-control-layers-toggle {
+	display: none;
+	}
+.leaflet-control-layers-expanded .leaflet-control-layers-list {
+	display: block;
+	position: relative;
+	}
+.leaflet-control-layers-expanded {
+	padding: 6px 10px 6px 6px;
+	color: #333;
+	background: #fff;
+	}
+.leaflet-control-layers-scrollbar {
+	overflow-y: scroll;
+	overflow-x: hidden;
+	padding-right: 5px;
+	}
+.leaflet-control-layers-selector {
+	margin-top: 2px;
+	position: relative;
+	top: 1px;
+	}
+.leaflet-control-layers label {
+	display: block;
+	font-size: 13px;
+	font-size: 1.08333em;
+	}
+.leaflet-control-layers-separator {
+	height: 0;
+	border-top: 1px solid #ddd;
+	margin: 5px -10px 5px -6px;
+	}
+
+/* Default icon URLs */
+.leaflet-default-icon-path { /* used only in path-guessing heuristic, see L.Icon.Default */
+	background-image: none;
+	}
+
+
+/* attribution and scale controls */
+
+.leaflet-container .leaflet-control-attribution {
+	background: #fff;
+	background: rgba(255, 255, 255, 0.8);
+	margin: 0;
+	}
+.leaflet-control-attribution,
+.leaflet-control-scale-line {
+	padding: 0 5px;
+	color: #333;
+	line-height: 1.4;
+	}
+.leaflet-control-attribution a {
+	text-decoration: none;
+	}
+.leaflet-control-attribution a:hover,
+.leaflet-control-attribution a:focus {
+	text-decoration: underline;
+	}
+.leaflet-attribution-flag {
+	display: inline !important;
+	vertical-align: baseline !important;
+	width: 1em;
+	height: 0.6669em;
+	}
+.leaflet-left .leaflet-control-scale {
+	margin-left: 5px;
+	}
+.leaflet-bottom .leaflet-control-scale {
+	margin-bottom: 5px;
+	}
+.leaflet-control-scale-line {
+	border: 2px solid #777;
+	border-top: none;
+	line-height: 1.1;
+	padding: 2px 5px 1px;
+	white-space: nowrap;
+	-moz-box-sizing: border-box;
+	     box-sizing: border-box;
+	background: rgba(255, 255, 255, 0.8);
+	text-shadow: 1px 1px #fff;
+	}
+.leaflet-control-scale-line:not(:first-child) {
+	border-top: 2px solid #777;
+	border-bottom: none;
+	margin-top: -2px;
+	}
+.leaflet-control-scale-line:not(:first-child):not(:last-child) {
+	border-bottom: 2px solid #777;
+	}
+
+.leaflet-touch .leaflet-control-attribution,
+.leaflet-touch .leaflet-control-layers,
+.leaflet-touch .leaflet-bar {
+	box-shadow: none;
+	}
+.leaflet-touch .leaflet-control-layers,
+.leaflet-touch .leaflet-bar {
+	border: 2px solid rgba(0,0,0,0.2);
+	background-clip: padding-box;
+	}
+
+
+/* popup */
+
+.leaflet-popup {
+	position: absolute;
+	text-align: center;
+	margin-bottom: 20px;
+	}
+.leaflet-popup-content-wrapper {
+	padding: 1px;
+	text-align: left;
+	border-radius: 12px;
+	}
+.leaflet-popup-content {
+	margin: 13px 24px 13px 20px;
+	line-height: 1.3;
+	font-size: 13px;
+	font-size: 1.08333em;
+	min-height: 1px;
+	}
+.leaflet-popup-content p {
+	margin: 17px 0;
+	margin: 1.3em 0;
+	}
+.leaflet-popup-tip-container {
+	width: 40px;
+	height: 20px;
+	position: absolute;
+	left: 50%;
+	margin-top: -1px;
+	margin-left: -20px;
+	overflow: hidden;
+	pointer-events: none;
+	}
+.leaflet-popup-tip {
+	width: 17px;
+	height: 17px;
+	padding: 1px;
+
+	margin: -10px auto 0;
+	pointer-events: auto;
+
+	-webkit-transform: rotate(45deg);
+	   -moz-transform: rotate(45deg);
+	    -ms-transform: rotate(45deg);
+	        transform: rotate(45deg);
+	}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+	background: white;
+	color: #333;
+	box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+	}
+.leaflet-container a.leaflet-popup-close-button {
+	position: absolute;
+	top: 0;
+	right: 0;
+	border: none;
+	text-align: center;
+	width: 24px;
+	height: 24px;
+	font: 16px/24px Tahoma, Verdana, sans-serif;
+	color: #757575;
+	text-decoration: none;
+	background: transparent;
+	}
+.leaflet-container a.leaflet-popup-close-button:hover,
+.leaflet-container a.leaflet-popup-close-button:focus {
+	color: #585858;
+	}
+.leaflet-popup-scrolled {
+	overflow: auto;
+	}
+
+.leaflet-oldie .leaflet-popup-content-wrapper {
+	-ms-zoom: 1;
+	}
+.leaflet-oldie .leaflet-popup-tip {
+	width: 24px;
+	margin: 0 auto;
+
+	-ms-filter: "progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678)";
+	filter: progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678);
+	}
+
+.leaflet-oldie .leaflet-control-zoom,
+.leaflet-oldie .leaflet-control-layers,
+.leaflet-oldie .leaflet-popup-content-wrapper,
+.leaflet-oldie .leaflet-popup-tip {
+	border: 1px solid #999;
+	}
+
+
+/* div icon */
+
+.leaflet-div-icon {
+	background: #fff;
+	border: 1px solid #666;
+	}
+
+
+/* Tooltip */
+/* Base styles for the element that has a tooltip */
+.leaflet-tooltip {
+	position: absolute;
+	padding: 6px;
+	background-color: #fff;
+	border: 1px solid #fff;
+	border-radius: 3px;
+	color: #222;
+	white-space: nowrap;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	pointer-events: none;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+	}
+.leaflet-tooltip.leaflet-interactive {
+	cursor: pointer;
+	pointer-events: auto;
+	}
+.leaflet-tooltip-top:before,
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+	position: absolute;
+	pointer-events: none;
+	border: 6px solid transparent;
+	background: transparent;
+	content: "";
+	}
+
+/* Directions */
+
+.leaflet-tooltip-bottom {
+	margin-top: 6px;
+}
+.leaflet-tooltip-top {
+	margin-top: -6px;
+}
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-top:before {
+	left: 50%;
+	margin-left: -6px;
+	}
+.leaflet-tooltip-top:before {
+	bottom: 0;
+	margin-bottom: -12px;
+	border-top-color: #fff;
+	}
+.leaflet-tooltip-bottom:before {
+	top: 0;
+	margin-top: -12px;
+	margin-left: -6px;
+	border-bottom-color: #fff;
+	}
+.leaflet-tooltip-left {
+	margin-left: -6px;
+}
+.leaflet-tooltip-right {
+	margin-left: 6px;
+}
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+	top: 50%;
+	margin-top: -6px;
+	}
+.leaflet-tooltip-left:before {
+	right: 0;
+	margin-right: -12px;
+	border-left-color: #fff;
+	}
+.leaflet-tooltip-right:before {
+	left: 0;
+	margin-left: -12px;
+	border-right-color: #fff;
+	}
+
+/* Printing */
+
+@media print {
+	/* Prevent printers from removing background-images of controls. */
+	.leaflet-control {
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+		}
+	}
+
+/* ---------- Map pages ---------- */
+.codex-page {
+    /* Pin colours: the same in both themes, because the map image under them doesn't change. */
+    --pin-red: #9A2F3A; --pin-orange: #A2551A; --pin-gold: #7D6412; --pin-green: #4B6A2C;
+    --pin-teal: #2A6A68; --pin-blue: #2F5490; --pin-purple: #6A4086; --pin-black: #2B241C;
+    --pin-ink: #F7EFDD;
+}
+
+.mp-c-red { --pin: var(--pin-red); }
+.mp-c-orange { --pin: var(--pin-orange); }
+.mp-c-gold { --pin: var(--pin-gold); }
+.mp-c-green { --pin: var(--pin-green); }
+.mp-c-teal { --pin: var(--pin-teal); }
+.mp-c-blue { --pin: var(--pin-blue); }
+.mp-c-purple { --pin: var(--pin-purple); }
+.mp-c-black { --pin: var(--pin-black); }
+
+.mp-stage {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    aspect-ratio: var(--mp-ar, 3 / 2); /* the image's shape, set by codex.js */
+    min-height: 24rem;
+    max-height: calc(100vh - 9rem);
+    border: 1px solid var(--ink);
+    border-top: 2px solid var(--rubric);
+    background: var(--folio);
+    overflow: hidden;
+}
+
+.mp-stage--full {
+    position: fixed;
+    inset: 0;
+    z-index: 900; /* over the header and the top bar, under dialogs and toasts */
+    min-height: 0;
+    max-height: none;
+    aspect-ratio: auto;
+    border-width: 0;
+}
+
+.mp-map,
+.mp-map.leaflet-container {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: var(--folio);
+    font: inherit;
+}
+
+.mp-map.is-aiming,
+.mp-map.is-aiming .leaflet-interactive {
+    cursor: crosshair;
+}
+
+.mp-map:focus-visible {
+    outline: 3px solid var(--rubric);
+    outline-offset: -3px;
+}
+
+/* A pin hangs from its point: the tile with its tail (--t) shrinks with the zoom, the label doesn't. */
+.mp-marker {
+    --t: var(--mp-t, 30px);
+}
+
+.mp-marker:focus-visible {
+    outline: none;
+}
+
+.mp-in {
+    position: absolute;
+    left: calc(var(--t) / -2);
+    bottom: 0;
+    padding-bottom: calc(var(--t) * 0.27);
+}
+
+/* a bigger target than the drawing, for fingers */
+.mp-in::before {
+    content: "";
+    position: absolute;
+    inset: -8px -8px 0;
+}
+
+.mp-in::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: calc(var(--t) * 0.47);
+    height: calc(var(--t) * 0.3);
+    background: var(--pin-ink);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    transform: translateX(-50%);
+}
+
+.mp-tile {
+    position: relative;
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    width: var(--t, 30px);
+    height: var(--t, 30px);
+    background: var(--pin);
+    border: 2px solid var(--pin-ink);
+    box-shadow: 0 0 0 1px var(--pin-black);
+    color: var(--pin-ink);
+}
+
+.mp-tile svg {
+    width: 84%;
+    height: 84%;
+}
+
+.mp-label {
+    position: absolute;
+    left: 0;
+    bottom: calc(var(--t) * 1.27 + 2px);
+    max-width: 14rem;
+    padding: 0 0.3125rem;
+    overflow: hidden;
+    transform: translateX(-50%);
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mp-pin--linked .mp-label {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.mp-marker.no-label:not(.is-hot):not(:focus) .mp-label {
+    visibility: hidden;
+}
+
+.mp-marker.is-hot,
+.mp-marker:focus,
+.mp-marker.is-open,
+.mp-marker.is-moving {
+    z-index: 10000 !important;
+}
+
+.mp-marker:hover,
+.mp-marker:focus,
+.mp-marker.is-open,
+.mp-marker.is-moving {
+    --t: max(var(--mp-t, 30px), 26px);
+}
+
+.mp-marker:focus-visible .mp-tile,
+.mp-marker.is-open .mp-tile {
+    box-shadow: 0 0 0 1px var(--pin-black), 0 0 0 4px var(--bg), 0 0 0 6px var(--rubric);
+}
+
+.mp-marker.is-moving {
+    cursor: grab;
+}
+
+.mp-marker.is-moving .mp-tile {
+    outline: 2px dashed var(--pin-black);
+    outline-offset: 4px;
+}
+
+/* tools on the map */
+.mp-tools {
+    position: absolute;
+    z-index: 5;
+    display: flex;
+    gap: 0.25rem;
+}
+
+.mp-tools--zoom {
+    left: 0.625rem;
+    top: 0.625rem;
+    flex-direction: column;
+}
+
+.mp-tools--acts {
+    right: 0.625rem;
+    top: 0.625rem;
+}
+
+.mp-tool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    padding: 0 0.625rem;
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.mp-tool:hover {
+    background: var(--folio);
+}
+
+.mp-tool[aria-pressed="true"] {
+    background: var(--ink);
+    color: var(--bg);
+}
+
+.mp-tool--primary {
+    background: var(--rubric);
+    border-color: var(--rubric);
+    color: var(--bg);
+    font-weight: 600;
+}
+
+.mp-tool--primary:hover {
+    background: var(--rubric);
+    filter: brightness(1.1);
+}
+
+.mp-tool svg {
+    width: 1.125rem;
+    height: 1.125rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+}
+
+/* what the map is waiting for: place a pin, move it, the ruler, the scale */
+.mp-banner {
+    position: absolute;
+    z-index: 6;
+    left: 50%;
+    bottom: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem 0.75rem;
+    width: max-content;
+    max-width: calc(100% - 1.25rem);
+    padding: 0.5rem 0.75rem;
+    transform: translateX(-50%);
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    font-size: 0.875rem;
+}
+
+.mp-banner p {
+    margin: 0;
+}
+
+.mp-banner b {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* the cross is for the keyboard: shown while the map itself has the focus */
+.mp-aim {
+    position: absolute;
+    z-index: 4;
+    left: 50%;
+    top: 50%;
+    width: 28px;
+    height: 28px;
+    margin: -14px 0 0 -14px;
+    visibility: hidden;
+    pointer-events: none;
+    background:
+        linear-gradient(var(--ink), var(--ink)) center / 2px 100% no-repeat,
+        linear-gradient(var(--ink), var(--ink)) center / 100% 2px no-repeat;
+    filter: drop-shadow(0 0 1px var(--bg)) drop-shadow(0 0 1px var(--bg));
+}
+
+.mp-map.is-aiming:focus-visible ~ .mp-aim {
+    visibility: visible;
+}
+
+.mp-map[data-mode="move"] ~ .mp-aim {
+    visibility: hidden;
+}
+
+.mp-line {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 3;
+    stroke-dasharray: 8 5;
+}
+
+.mp-line--halo {
+    stroke: var(--bg);
+    stroke-width: 7;
+    stroke-dasharray: none;
+}
+
+.mp-dot {
+    fill: var(--bg);
+    fill-opacity: 1;
+    stroke: var(--ink);
+    stroke-width: 2;
+}
+
+.mp-note span {
+    position: absolute;
+    padding: 0 0.3125rem;
+    transform: translate(-50%, -50%);
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.mp-note--total span {
+    transform: translate(-50%, 0.75rem);
+    border: 1px solid var(--ink);
+    background: var(--bg);
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.mp-scale {
+    position: absolute;
+    z-index: 500;
+    left: 0.625rem;
+    bottom: 0.625rem;
+    display: grid;
+    gap: 1px;
+    padding: 0.125rem 0.375rem 0.3125rem;
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    pointer-events: none;
+}
+
+.mp-stage--busy .mp-scale {
+    bottom: 4.5rem;
+}
+
+.mp-scale[hidden] {
+    display: none;
+}
+
+.mp-scale i {
+    display: block;
+    box-sizing: border-box;
+    height: 6px;
+    border: 1px solid var(--ink);
+    border-top: 0;
+    background: linear-gradient(90deg, var(--ink) 50%, transparent 50%) bottom / 100% 3px no-repeat;
+}
+
+/* the pin preview: by its pin, or a sheet at the bottom of a narrow map */
+.mp-card {
+    position: absolute;
+    z-index: 7;
+    width: min(18.5rem, calc(100% - 1.25rem));
+    max-height: calc(100% - 1.25rem);
+    overflow-y: auto;
+    padding: 0.75rem 0.875rem 0.875rem;
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    border-top: 4px solid var(--pin, var(--ink));
+    box-shadow: 0 10px 30px var(--shadow);
+    font-size: 0.875rem;
+}
+
+.mp-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+}
+
+.mp-card-head .mp-tile {
+    flex: none;
+    margin: 1px;
+}
+
+.mp-card h2 {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.375rem;
+    font-weight: 400;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.mp-card h2:focus {
+    outline: none;
+}
+
+.mp-card-x {
+    flex: none;
+    width: 2rem;
+    height: 2rem;
+    margin: -0.25rem -0.375rem 0 0;
+    background: none;
+    border: 0;
+    color: var(--ink);
+    font: inherit;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.mp-card-text {
+    margin: 0.5rem 0 0;
+    max-height: 9rem;
+    overflow-y: auto;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.mp-card-by {
+    margin: 0.5rem 0 0;
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+.mp-card-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.625rem;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--line);
+}
+
+.mp-empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 2px dashed var(--ctl);
+    text-align: center;
+}
+
+.mp-empty p {
+    margin: 0;
+}
+
+.mp-empty.is-over {
+    border-color: var(--rubric);
+    background: var(--bg);
+}
+
+/* side panel: the pins and the icon key */
+.mp-find {
+    display: block;
+    padding: 0.5rem 0.75rem 0;
+}
+
+.mp-find input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 2.25rem;
+    padding: 0 0.5rem;
+    background: var(--bg);
+    border: 1px solid var(--ctl);
+    color: var(--ink);
+    font: inherit;
+}
+
+.cx-box ul.mp-list {
+    max-height: 22rem;
+    overflow-y: auto;
+}
+
+.cx-box ul.mp-list li,
+.cx-box ul.mp-key li {
+    padding: 0;
+}
+
+.mp-list button,
+.mp-key button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 2.25rem;
+    padding: 0.1875rem 0.25rem;
+    background: none;
+    border: 0;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mp-list button:hover,
+.mp-key button:hover {
+    background: var(--cx-hover);
+}
+
+.mp-list .mp-name {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.mp-list .is-linked .mp-name {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.mp-tile--s {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    border-width: 1px;
+    box-shadow: none;
+}
+
+.mp-tile--key {
+    --pin: var(--bg);
+    border-color: var(--ink);
+    color: var(--ink);
+}
+
+.mp-key button span:nth-child(2) {
+    flex: 1;
+}
+
+.mp-key button[aria-pressed="false"] {
+    color: var(--muted);
+    text-decoration: line-through;
+}
+
+.mp-key button[aria-pressed="false"] .mp-tile {
+    border-style: dashed;
+    border-color: var(--muted);
+    color: var(--muted);
+}
+
+.mp-count {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* pin dialog */
+.mp-icons {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.mp-icons p {
+    margin: 0 0 0.25rem;
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+.mp-icons div > div,
+.mp-colors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+.mp-opt {
+    display: inline-grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    cursor: pointer;
+}
+
+.mp-opt svg {
+    width: 1.625rem;
+    height: 1.625rem;
+}
+
+.mp-opt:hover {
+    background: var(--cx-hover);
+}
+
+.mp-opt[aria-checked="true"] {
+    border-color: var(--ink);
+    background: var(--pin, var(--ink));
+    color: var(--pin-ink);
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--rubric);
+}
+
+.mp-colors .mp-opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    width: auto;
+    padding: 0 0.625rem 0 0.375rem;
+    font-size: 0.875rem;
+}
+
+.mp-colors .mp-opt i {
+    width: 1.375rem;
+    height: 1.375rem;
+    background: var(--pin);
+}
+
+.mp-colors .mp-opt[aria-checked="true"] {
+    background: var(--folio);
+    color: var(--ink);
+}
+
+.mp-prev {
+    position: relative;
+    height: 5.5rem;
+    background: var(--folio);
+    border: 1px solid var(--line);
+}
+
+.mp-prev .mp-marker {
+    position: absolute;
+    left: 50%;
+    bottom: 0.75rem;
+}
+
+.mp-credit {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
+@media (max-width: 900px) {
+    .mp-stage:not(.mp-stage--full) {
+        min-height: min(26rem, 68vh);
+        max-height: 75vh;
+    }
+}
+
+@media (max-width: 600px) {
+    .mp-card {
+        left: 0 !important;
+        right: 0;
+        top: auto !important;
+        bottom: 0;
+        width: auto;
+        max-height: 62%;
+        border-width: 4px 0 0;
+    }
+
+    .mp-banner {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: auto;
+        max-width: none;
+        transform: none;
+        border-width: 1px 0 0;
+    }
+
+    .mp-tool-long {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+    }
+}
+
+/* ---------- mock-up only ---------- */
+
+.editor-only { display: none !important; }
+[data-role="editor"] .editor-only { display: revert !important; }
+[data-role="editor"] .cx-act.editor-only, [data-role="editor"] .mp-tool.editor-only { display: inline-flex !important; }
+[data-role="editor"] .more.editor-only { display: block !important; }
+[data-width="thin"] .cx-inner { max-width: 50rem; }
+[data-width="medium"] .cx-inner { max-width: max(50rem, 75%); }
+[data-width="wide"] .cx-inner { max-width: none; }
+.more { position: relative; }
+.more-menu { position: absolute; right: 0; top: calc(100% + .25rem); z-index: 25; min-width: 13.5rem; background: var(--bg); border: 1px solid var(--ink); box-shadow: 0 10px 30px var(--shadow); }
+.more-menu button { display: block; width: 100%; padding: .5rem .75rem; background: none; border: 0; text-align: left; font-size: .875rem; }
+.more-menu button:hover { background: var(--cx-hover); }
+.more-menu hr { margin: .25rem 0; border: 0; border-top: 1px solid var(--line); }
+.more-menu .danger { color: var(--rubric); }
+.bbtns { display: inline-flex; flex-wrap: wrap; gap: .375rem; }
+.sheet-in { display: grid; gap: 1.25rem; }
+.sheet-in[hidden] { display: none; }
+.sec { margin: 1.5rem 0 .5rem; font-family: var(--font-display); font-weight: 400; font-size: 1.5625rem; }
+.sec::before { content: "§ "; color: var(--rubric); }
+.hist { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.hist li { display: flex; align-items: center; gap: .875rem; padding: .625rem 0; border-bottom: 1px solid var(--line); }
+.hist .grow { flex: 1; min-width: 0; }
+.hist small { display: block; color: var(--muted); font-size: .8125rem; }
+.hist b { font-weight: 600; }
+.thumb { flex: none; width: 6rem; height: 4rem; border: 1px solid var(--line); background: center / cover; }
+.thumb--old { filter: grayscale(.8); }
+.toast { position: fixed; z-index: 1000; left: 50%; bottom: 1.5rem; transform: translateX(-50%); max-width: calc(100vw - 2rem); width: max-content; padding: .75rem 1rem; background: var(--bg); border: 1px solid var(--ink); border-left: 4px solid var(--verdigris); box-shadow: 0 10px 30px var(--shadow); font-size: .9375rem; }
+.scrim { z-index: 950; }
+
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="ic-timeline" viewBox="0 0 24 24"><path d="M7 3v18"/><rect x="5" y="5" width="4" height="4" fill="currentColor"/><rect x="5" y="15" width="4" height="4"/><path d="M12 7h8M12 17h6"/></symbol>
+    <symbol id="ic-article" viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 10h6M9 14h6M9 18h4"/></symbol>
+    <symbol id="ic-map" viewBox="0 0 24 24"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></symbol>
+    <symbol id="ic-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="ic-pen" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></symbol>
+    <symbol id="ic-hist" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
+    <symbol id="ic-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="ic-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="ic-ruler" viewBox="0 0 24 24"><path d="M3 16 16 3l5 5L8 21z"/><path d="m7 12 2 2M10 9l3 3M13 6l2 2"/></symbol>
+    <symbol id="ic-full" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
+    <symbol id="ic-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+</svg>
+
+<div class="mock-bar">
+    <strong>Map mock-up</strong>
+    <span class="mock-seg" role="group" aria-label="Screen">
+        <button type="button" data-set="screen" data-v="map">Map</button>
+        <button type="button" data-set="screen" data-v="empty">New, empty map</button>
+        <button type="button" data-set="screen" data-v="history">History</button>
+        <button type="button" data-set="screen" data-v="linked">A pinned page</button>
+        <button type="button" id="mNewPage">New page</button>
+    </span>
+    <span class="mock-seg" role="group" aria-label="Viewer">
+        <button type="button" data-set="role" data-v="viewer">Can see</button>
+        <button type="button" data-set="role" data-v="editor">Can edit</button>
+    </span>
+    <span class="mock-seg" role="group" aria-label="Colour theme">
+        <button type="button" data-set="theme" data-v="light">Parchment</button>
+        <button type="button" data-set="theme" data-v="dark">Candlelight</button>
+    </span>
+    <span class="mock-seg" role="group" aria-label="Width">
+        <button type="button" data-set="width" data-v="thin">Thin</button>
+        <button type="button" data-set="width" data-v="medium">Medium</button>
+        <button type="button" data-set="width" data-v="wide">Wide</button>
+    </span>
+    <span class="mock-note">Everything works: zoom, click pins, add, move, delete, measure, set the scale. For the phone, narrow the window or open this on one.</span>
+</div>
+
+<div class="app codex-page" id="app" data-role="editor" data-screen="map" data-width="medium">
+    <header class="site">
+        <a class="logo" href="#" data-dead>Waystone</a>
+        <nav class="nav" aria-label="Main"><a href="#" data-dead>Home</a><a href="#" data-dead>Games</a><a href="#" data-dead>Characters</a><a href="#" data-dead aria-current="page">Codices</a></nav>
+        <span class="avatar" aria-label="Signed in as Testy">T</span>
+    </header>
+
+    <div class="cx-top">
+        <button class="cx-menu" type="button" aria-label="Open pages"><svg class="i"><use href="#ic-menu"/></svg></button>
+        <a class="cx-brand" href="#" data-dead>Codices</a>
+        <button class="cx-pick" type="button">The Karrow Marches</button>
+        <div class="cx-search" role="search"><svg class="i" aria-hidden="true"><use href="#ic-search"/></svg><label class="sr-only" for="q">Search</label><input id="q" type="search" placeholder="Search The Karrow Marches"></div>
+    </div>
+
+    <div class="cx-shell">
+        <aside class="cx-nav" aria-label="Pages in this codex"><div class="cx-nav-in">
+            <button class="cx-new editor-only" type="button" id="navNew">+ New page</button>
+            <p class="nav-title">Pages</p>
+            <ul class="tree">
+                <li><span class="f">Places</span><ul>
+                    <li><a href="#" data-dead>Cloveswick</a></li>
+                    <li><a href="#" data-go="linked">Karrow Ford</a></li>
+                    <li><a href="#" data-dead>Saltmarsh Reach</a></li>
+                    <li><a href="#" data-dead>The Toll House</a></li>
+                </ul></li>
+                <li><a href="#" data-dead><span class="ty"><svg class="i"><use href="#ic-timeline"/></svg></span>History of the Karrow</a></li>
+                <li><a href="#" data-go="map" aria-current="page"><span class="ty"><svg class="i"><use href="#ic-map"/></svg></span>Map of the Karrow</a></li>
+                <li><a href="#" data-dead>Old Hesk</a></li>
+            </ul>
+            <div class="nav-group"><p class="nav-title">This codex</p>
+                <a href="#" data-dead>Codex home</a><a href="#" data-dead>Graph view <span class="count">16 pages</span></a><a href="#" data-dead>Tags <span class="count">9</span></a><a href="#" data-dead>Recent changes</a>
+            </div>
+        </div></aside>
+
+        <main class="cx-main">
+            <div class="cx-tabs" aria-hidden="true"><span>Karrow Ford</span><span aria-current="page" id="tabNow">Map of the Karrow</span></div>
+            <div class="cx-inner">
+                <nav class="crumbs" aria-label="Breadcrumb"><a href="#" data-dead>The Karrow Marches</a><span class="sep">›</span><span id="crumbNow">Map of the Karrow</span></nav>
+
+                <div data-on="map empty history">
+                    <div class="kicker"><svg class="i" aria-hidden="true"><use href="#ic-map"/></svg>Map</div>
+                    <div class="cx-head">
+                        <h1 class="cx-title" id="h1">Map of the Karrow</h1>
+                        <div class="cx-actions">
+                            <button class="cx-act" type="button" data-on="history" data-go="map">Back to the map</button>
+                            <a class="cx-act" href="#" data-go="history"><svg class="i"><use href="#ic-hist"/></svg>History</a>
+                            <div class="more editor-only">
+                                <button class="cx-act" type="button" id="moreBtn" aria-haspopup="menu" aria-expanded="false"><svg class="i"><use href="#ic-more"/></svg>More</button>
+                                <div class="more-menu" id="moreMenu" role="menu" hidden>
+                                    <button type="button" role="menuitem" data-dead>Rename</button>
+                                    <button type="button" role="menuitem" data-dead>Aliases</button>
+                                    <button type="button" role="menuitem" data-dead>Change folder</button>
+                                    <button type="button" role="menuitem" data-dead>Move to another codex…</button>
+                                    <button type="button" role="menuitem" data-dead>Copy page…</button>
+                                    <button type="button" role="menuitem" data-act="scale">Set scale…</button>
+                                    <button type="button" role="menuitem" data-act="clearScale">Clear the scale</button>
+                                    <button type="button" role="menuitem" data-dead>Replace image…</button>
+                                    <hr><button type="button" role="menuitem" class="danger" data-dead>Delete page</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <section data-on="map" aria-label="Map">
+                    <p class="cx-sub" id="sub"></p>
+                    <div class="mp-stage" id="stage">
+                        <div class="mp-map" id="map" role="application" aria-label="Map of the Karrow. Arrow keys pan, plus and minus zoom, Tab goes through the pins."></div>
+                        <div class="mp-aim" aria-hidden="true"></div>
+                        <div class="mp-tools mp-tools--zoom">
+                            <button class="mp-tool" type="button" data-act="in" aria-label="Zoom in" title="Zoom in">+</button>
+                            <button class="mp-tool" type="button" data-act="out" aria-label="Zoom out" title="Zoom out">−</button>
+                            <button class="mp-tool" type="button" data-act="fit" title="Show the whole map">Fit</button>
+                            <button class="mp-tool" type="button" data-act="full" id="fullBtn" aria-pressed="false" aria-label="Full screen" title="Full screen"><svg class="i"><use href="#ic-full"/></svg></button>
+                        </div>
+                        <div class="mp-tools mp-tools--acts">
+                            <button class="mp-tool" type="button" data-act="ruler" id="rulerBtn" aria-pressed="false" title="Measure distances"><svg class="i"><use href="#ic-ruler"/></svg><span class="mp-tool-long">Ruler</span></button>
+                            <button class="mp-tool mp-tool--primary editor-only" type="button" data-act="add"><svg class="i"><use href="#ic-plus"/></svg><span class="mp-tool-long">Add pin</span></button>
+                        </div>
+                        <div class="mp-card" id="card" role="dialog" aria-labelledby="cardT" hidden></div>
+                        <div class="mp-banner" id="banner" hidden><p id="bannerText" role="status"></p><span id="bannerBtns" class="bbtns"></span></div>
+                    </div>
+                </section>
+
+                <section data-on="empty" aria-label="Map">
+                    <p class="cx-sub">No image yet · created by you today</p>
+                    <div class="mp-stage"><div class="mp-empty">
+                        <p><strong>Add the map's image</strong></p>
+                        <p>Drop a PNG, JPEG, WebP or GIF here, up to 25 MB.</p>
+                        <button class="cx-act cx-act--primary editor-only" type="button" data-go="map">Choose an image</button>
+                    </div></div>
+                </section>
+
+                <section data-on="history" aria-label="History">
+                    <p class="cx-sub">Pin changes and images. The newest 200 pin changes are kept.</p>
+                    <h2 class="sec">Pin changes</h2>
+                    <ul class="hist" id="hist"></ul>
+                    <h2 class="sec">Images</h2>
+                    <ul class="hist">
+                        <li><span class="thumb" data-art></span><span class="grow"><b>Current image</b><small>1800 × 1200 · added by Roy · Nov 22, 2026</small></span></li>
+                        <li><span class="thumb thumb--old" data-art></span><span class="grow">Earlier image<small>1200 × 800 · added by Roy · Nov 20, 2026</small></span><button class="text-btn editor-only" type="button" data-dead>Restore</button></li>
+                    </ul>
+                </section>
+
+                <section data-on="linked">
+                    <div class="cx-head"><h1 class="cx-title">Karrow Ford</h1><div class="cx-actions"><button class="cx-act cx-act--primary editor-only" type="button" data-dead><svg class="i"><use href="#ic-pen"/></svg>Edit</button><button class="cx-act" type="button" data-dead><svg class="i"><use href="#ic-hist"/></svg>History</button></div></div>
+                    <p class="cx-sub">Revision 4 · last edited by Adam yesterday</p>
+                    <p>A river crossing and a market of about forty families. The <a href="#" data-dead>Ferrymen of the Ford</a> run the boats when the water is too high to wade.</p>
+                    <p>The start of <a href="#" data-dead>The Karrow Road</a>.</p>
+                </section>
+            </div>
+        </main>
+
+        <aside class="cx-rail" aria-label="Side panel"><div class="cx-rail-in">
+            <section class="cx-box" data-on="map"><h2 id="pinsH">Pins</h2>
+                <label class="mp-find"><span class="sr-only">Find a pin</span><input type="search" id="pinQ" placeholder="Find a pin" autocomplete="off"></label>
+                <ul class="mp-list" id="pinList"></ul>
+            </section>
+            <section class="cx-box" data-on="map"><h2>Icons</h2><ul class="mp-key" id="key"></ul></section>
+            <section class="cx-box" data-on="linked"><h2>On the map</h2><ul><li><a href="#" data-pin="p1">Map of the Karrow</a></li></ul></section>
+            <section class="cx-box" data-on="map history linked"><h2>Attachments · 1</h2><ul><li><a href="#" data-dead>karrow-print.pdf</a><small>2.4 MB · added by Roy · Nov 22, 2026</small></li></ul></section>
+            <section class="cx-box"><h2>Linked from · 1</h2><ul><li><a href="#" data-dead>The Karrow Road</a></li></ul></section>
+        </div></aside>
+    </div>
+    <div class="toast" id="toast" role="status" hidden></div>
+</div>
+
+<div class="codex-page" id="dlgHost"></div>
+
+<script type="text/plain" id="art">PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAwIDEyMDAiIHdpZHRoPSIxODAwIiBoZWlnaHQ9IjEyMDAiPjxyZWN0IHdpZHRoPSIxODAwIiBoZWlnaHQ9IjEyMDAiIGZpbGw9IiNiOWM5YzQiLz48cGF0aCBkPSJNLTIwIC0yMCBIMTQ4MCBDMTUwMCA2MCAxNDQwIDEzMCAxNDcwIDIyMCBDMTUwMCAzMDAgMTYxMCAzMTAgMTYwMCA0MjAgQzE1OTAgNTIwIDE0ODAgNTQwIDE1MDAgNjQwIEMxNTE1IDc0MCAxNjQwIDc2MCAxNjEwIDg4MCBDMTU5MCA5NjAgMTQ3MCA5ODAgMTQzMCAxMDYwIEMxNDAwIDExMjAgMTQyMCAxMTgwIDE0MDAgMTIyMCBILTIwIFoiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzhmYTZhMiIgc3Ryb2tlLXdpZHRoPSIyMiIgb3BhY2l0eT0iMC4yMiIvPjxwYXRoIGQ9Ik0tMjAgLTIwIEgxNDgwIEMxNTAwIDYwIDE0NDAgMTMwIDE0NzAgMjIwIEMxNTAwIDMwMCAxNjEwIDMxMCAxNjAwIDQyMCBDMTU5MCA1MjAgMTQ4MCA1NDAgMTUwMCA2NDAgQzE1MTUgNzQwIDE2NDAgNzYwIDE2MTAgODgwIEMxNTkwIDk2MCAxNDcwIDk4MCAxNDMwIDEwNjAgQzE0MDAgMTEyMCAxNDIwIDExODAgMTQwMCAxMjIwIEgtMjAgWiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOGZhNmEyIiBzdHJva2Utd2lkdGg9IjQ0IiBvcGFjaXR5PSIwLjIyIi8+PHBhdGggZD0iTS0yMCAtMjAgSDE0ODAgQzE1MDAgNjAgMTQ0MCAxMzAgMTQ3MCAyMjAgQzE1MDAgMzAwIDE2MTAgMzEwIDE2MDAgNDIwIEMxNTkwIDUyMCAxNDgwIDU0MCAxNTAwIDY0MCBDMTUxNSA3NDAgMTY0MCA3NjAgMTYxMCA4ODAgQzE1OTAgOTYwIDE0NzAgOTgwIDE0MzAgMTA2MCBDMTQwMCAxMTIwIDE0MjAgMTE4MCAxNDAwIDEyMjAgSC0yMCBaIiBmaWxsPSJub25lIiBzdHJva2U9IiM4ZmE2YTIiIHN0cm9rZS13aWR0aD0iNjYiIG9wYWNpdHk9IjAuMjIiLz48cGF0aCBkPSJNLTIwIC0yMCBIMTQ4MCBDMTUwMCA2MCAxNDQwIDEzMCAxNDcwIDIyMCBDMTUwMCAzMDAgMTYxMCAzMTAgMTYwMCA0MjAgQzE1OTAgNTIwIDE0ODAgNTQwIDE1MDAgNjQwIEMxNTE1IDc0MCAxNjQwIDc2MCAxNjEwIDg4MCBDMTU5MCA5NjAgMTQ3MCA5ODAgMTQzMCAxMDYwIEMxNDAwIDExMjAgMTQyMCAxMTgwIDE0MDAgMTIyMCBILTIwIFoiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzhmYTZhMiIgc3Ryb2tlLXdpZHRoPSI4OCIgb3BhY2l0eT0iMC4yMiIvPjxwYXRoIGQ9Ik0tMjAgLTIwIEgxNDgwIEMxNTAwIDYwIDE0NDAgMTMwIDE0NzAgMjIwIEMxNTAwIDMwMCAxNjEwIDMxMCAxNjAwIDQyMCBDMTU5MCA1MjAgMTQ4MCA1NDAgMTUwMCA2NDAgQzE1MTUgNzQwIDE2NDAgNzYwIDE2MTAgODgwIEMxNTkwIDk2MCAxNDcwIDk4MCAxNDMwIDEwNjAgQzE0MDAgMTEyMCAxNDIwIDExODAgMTQwMCAxMjIwIEgtMjAgWiIgZmlsbD0iI2U5ZGNiOSIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjQiLz48cGF0aCBkPSJNMTE4MCA4MjAgQzEyNjAgNzgwIDE0MDAgODAwIDE0MzAgODgwIEMxNDQwIDk2MCAxMzMwIDEwMTAgMTI0MCA5OTAgQzExNjAgOTcwIDExMjAgODYwIDExODAgODIwWiIgZmlsbD0iI2M5ZDJiMiIgb3BhY2l0eT0iLjgiLz48cGF0aCBkPSJNNzIwIDI1MCBDNzAwIDM0MCA4MDAgNDAwIDc4MCA1MDAgQzc2MCA2MDAgODYwIDY0MCA5MDAgNzIwIEM5NTAgODIwIDEwODAgODQwIDExODAgOTAwIEMxMjgwIDk1MCAxNDAwIDkwMCAxNjAwIDkzMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNmY4Zjk1IiBzdHJva2Utd2lkdGg9IjE2Ii8+PHBhdGggZD0iTTcyMCAyNTAgQzcwMCAzNDAgODAwIDQwMCA3ODAgNTAwIEM3NjAgNjAwIDg2MCA2NDAgOTAwIDcyMCBDOTUwIDgyMCAxMDgwIDg0MCAxMTgwIDkwMCBDMTI4MCA5NTAgMTQwMCA5MDAgMTYwMCA5MzAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2FhYzNjMyIgc3Ryb2tlLXdpZHRoPSIxMCIvPjxwYXRoIGQ9Ik02NDAgMzIwIEM2ODAgNDIwIDU2MCA1MjAgNjQwIDYyMCBDNzAwIDY5MCA4NDAgNzAwIDkwMCA3NDAgQzk4MCA3ODAgOTYwIDkwMCA4NjAgOTYwIEM3NjAgMTAxMCA1NjAgOTYwIDQyMCAxMDQwIiBmaWxsPSJub25lIiBzdHJva2U9IiM3YTViMzYiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWRhc2hhcnJheT0iMTYgMTEiLz48cGF0aCBkPSJNOTAwIDc0MCBDMTAwMCA3MDAgMTEyMCA2NDAgMTI2MCA2NjAgQzEzNjAgNjgwIDE0NDAgNjQwIDE0OTAgNjQwIiBmaWxsPSJub25lIiBzdHJva2U9IiM3YTViMzYiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWRhc2hhcnJheT0iMTYgMTEiLz48cGF0aCBkPSJNNjE2LjkgMTEwLjYgTDY4Mi42IDcuNiBMNzQ4LjQgMTEwLjYgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNNjgyLjYgNy42IEw3NDguNCAxMTAuNiBMNjk3IDExMC42IEw2ODguNCA2Ny43IFoiIGZpbGw9IiNhODk0NmEiLz48cGF0aCBkPSJNMTExOS43IDEyMS41IEwxMTY1LjMgNTAuMSBMMTIxMSAxMjEuNSBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0xMTY1LjMgNTAuMSBMMTIxMSAxMjEuNSBMMTE3NS4yIDEyMS41IEwxMTY5LjMgOTEuOCBaIiBmaWxsPSIjYTg5NDZhIi8+PHBhdGggZD0iTTEwNjYuOCAxMzMuMyBMMTEyOS4yIDM1LjcgTDExOTEuNSAxMzMuMyBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0xMTI5LjIgMzUuNyBMMTE5MS41IDEzMy4zIEwxMTQyLjcgMTMzLjMgTDExMzQuNiA5Mi43IFoiIGZpbGw9IiNhODk0NmEiLz48cGF0aCBkPSJNOTk3LjQgMTM1LjggTDEwNDguNSA1NS44IEwxMDk5LjYgMTM1LjggWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNMTA0OC41IDU1LjggTDEwOTkuNiAxMzUuOCBMMTA1OS42IDEzNS44IEwxMDUzIDEwMi41IFoiIGZpbGw9IiNhODk0NmEiLz48cGF0aCBkPSJNNzM1LjcgMTM4LjkgTDgwMS45IDM1LjQgTDg2OCAxMzguOSBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik04MDEuOSAzNS40IEw4NjggMTM4LjkgTDgxNi4yIDEzOC45IEw4MDcuNiA5NS44IFoiIGZpbGw9IiNhODk0NmEiLz48cGF0aCBkPSJNNzk4LjIgMTQwLjMgTDg0Ny4yIDYzLjYgTDg5Ni4yIDE0MC4zIFoiIGZpbGw9IiNkNmM1OWMiIHN0cm9rZT0iIzViNGEzMyIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTg0Ny4yIDYzLjYgTDg5Ni4yIDE0MC4zIEw4NTcuOSAxNDAuMyBMODUxLjUgMTA4LjMgWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik00NTguOSAxNDIgTDUwMi4xIDc0LjUgTDU0NS4yIDE0MiBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik01MDIuMSA3NC41IEw1NDUuMiAxNDIgTDUxMS41IDE0MiBMNTA1LjggMTEzLjkgWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik02NjUgMTQ0LjggTDcxMi4xIDcxIEw3NTkuMiAxNDQuOCBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik03MTIuMSA3MSBMNzU5LjIgMTQ0LjggTDcyMi4zIDE0NC44IEw3MTYuMiAxMTQgWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik0xMDg3LjIgMTQ5LjUgTDExNTUuMSA0My4zIEwxMjIyLjkgMTQ5LjUgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNMTE1NS4xIDQzLjMgTDEyMjIuOSAxNDkuNSBMMTE2OS44IDE0OS41IEwxMTYxIDEwNS4zIFoiIGZpbGw9IiNhODk0NmEiLz48cGF0aCBkPSJNMzIzLjIgMTUzLjkgTDM3Ni4yIDcxIEw0MjkuMiAxNTMuOSBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0zNzYuMiA3MSBMNDI5LjIgMTUzLjkgTDM4Ny43IDE1My45IEwzODAuOCAxMTkuMyBaIiBmaWxsPSIjYTg5NDZhIi8+PHBhdGggZD0iTTEwMTMuMyAxNjAuOCBMMTA1OS4zIDg4LjkgTDExMDUuMiAxNjAuOCBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0xMDU5LjMgODguOSBMMTEwNS4yIDE2MC44IEwxMDY5LjMgMTYwLjggTDEwNjMuMyAxMzAuOCBaIiBmaWxsPSIjYTg5NDZhIi8+PHBhdGggZD0iTTk3LjEgMTYyLjEgTDEzMi4xIDEwNy40IEwxNjcuMSAxNjIuMSBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0xMzIuMSAxMDcuNCBMMTY3LjEgMTYyLjEgTDEzOS43IDE2Mi4xIEwxMzUuMSAxMzkuMyBaIiBmaWxsPSIjYTg5NDZhIi8+PHBhdGggZD0iTTEzNC42IDE2Ny40IEwxODcuNCA4NC43IEwyNDAuMiAxNjcuNCBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0xODcuNCA4NC43IEwyNDAuMiAxNjcuNCBMMTk4LjkgMTY3LjQgTDE5MiAxMzMgWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik01NDYgMTcxLjkgTDYxMi43IDY3LjUgTDY3OS40IDE3MS45IFoiIGZpbGw9IiNkNmM1OWMiIHN0cm9rZT0iIzViNGEzMyIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTYxMi43IDY3LjUgTDY3OS40IDE3MS45IEw2MjcuMiAxNzEuOSBMNjE4LjUgMTI4LjQgWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik00ODUuMSAxODAuNCBMNTQ4LjEgODEuOCBMNjExLjEgMTgwLjQgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNNTQ4LjEgODEuOCBMNjExLjEgMTgwLjQgTDU2MS44IDE4MC40IEw1NTMuNiAxMzkuMyBaIiBmaWxsPSIjYTg5NDZhIi8+PHBhdGggZD0iTTM5OC4zIDE4Ni41IEw0NDYuMSAxMTEuNyBMNDkzLjkgMTg2LjUgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNNDQ2LjEgMTExLjcgTDQ5My45IDE4Ni41IEw0NTYuNSAxODYuNSBMNDUwLjMgMTU1LjQgWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik00MzguNyAxOTIuMiBMNTAwLjIgOTYgTDU2MS42IDE5Mi4yIFoiIGZpbGw9IiNkNmM1OWMiIHN0cm9rZT0iIzViNGEzMyIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTUwMC4yIDk2IEw1NjEuNiAxOTIuMiBMNTEzLjUgMTkyLjIgTDUwNS41IDE1Mi4xIFoiIGZpbGw9IiNhODk0NmEiLz48cGF0aCBkPSJNMTE0Mi4yIDE5My4zIEwxMjAwLjUgMTAyLjEgTDEyNTguOCAxOTMuMyBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0xMjAwLjUgMTAyLjEgTDEyNTguOCAxOTMuMyBMMTIxMy4yIDE5My4zIEwxMjA1LjYgMTU1LjMgWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik0xNzEuNSAxOTUuNCBMMjA5LjQgMTM2LjIgTDI0Ny4yIDE5NS40IFoiIGZpbGw9IiNkNmM1OWMiIHN0cm9rZT0iIzViNGEzMyIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTIwOS40IDEzNi4yIEwyNDcuMiAxOTUuNCBMMjE3LjYgMTk1LjQgTDIxMi43IDE3MC43IFoiIGZpbGw9IiNhODk0NmEiLz48cGF0aCBkPSJNNjY1LjggMTk4LjUgTDcwNS4xIDEzNyBMNzQ0LjQgMTk4LjUgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNNzA1LjEgMTM3IEw3NDQuNCAxOTguNSBMNzEzLjcgMTk4LjUgTDcwOC41IDE3Mi45IFoiIGZpbGw9IiNhODk0NmEiLz48cGF0aCBkPSJNODQwLjQgMjA4LjMgTDkwNi41IDEwNC43IEw5NzIuNiAyMDguMyBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik05MDYuNSAxMDQuNyBMOTcyLjYgMjA4LjMgTDkyMC45IDIwOC4zIEw5MTIuMiAxNjUuMSBaIiBmaWxsPSIjYTg5NDZhIi8+PHBhdGggZD0iTTkxNC44IDIxMi44IEw5NzIuMyAxMjIuOCBMMTAyOS44IDIxMi44IFoiIGZpbGw9IiNkNmM1OWMiIHN0cm9rZT0iIzViNGEzMyIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTk3Mi4zIDEyMi44IEwxMDI5LjggMjEyLjggTDk4NC44IDIxMi44IEw5NzcuMyAxNzUuMyBaIiBmaWxsPSIjYTg5NDZhIi8+PHBhdGggZD0iTTkwNy44IDIxNC42IEw5NDEuMiAxNjIuMyBMOTc0LjYgMjE0LjYgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNOTQxLjIgMTYyLjMgTDk3NC42IDIxNC42IEw5NDguNSAyMTQuNiBMOTQ0LjEgMTkyLjggWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik02NTYuMSAyMTYgTDcxMy43IDEyNiBMNzcxLjIgMjE2IFoiIGZpbGw9IiNkNmM1OWMiIHN0cm9rZT0iIzViNGEzMyIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTcxMy43IDEyNiBMNzcxLjIgMjE2IEw3MjYuMiAyMTYgTDcxOC43IDE3OC41IFoiIGZpbGw9IiNhODk0NmEiLz48cGF0aCBkPSJNNDQ3LjcgMjIxLjYgTDUwMi41IDEzNS45IEw1NTcuMyAyMjEuNiBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik01MDIuNSAxMzUuOSBMNTU3LjMgMjIxLjYgTDUxNC40IDIyMS42IEw1MDcuMiAxODUuOSBaIiBmaWxsPSIjYTg5NDZhIi8+PHBhdGggZD0iTTM2My43IDIzMy4yIEw0MDguOCAxNjIuNiBMNDUzLjkgMjMzLjIgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNNDA4LjggMTYyLjYgTDQ1My45IDIzMy4yIEw0MTguNiAyMzMuMiBMNDEyLjcgMjAzLjggWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik04MS4xIDIzOS41IEwxMjEuOCAxNzUuOCBMMTYyLjUgMjM5LjUgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNMTIxLjggMTc1LjggTDE2Mi41IDIzOS41IEwxMzAuNyAyMzkuNSBMMTI1LjQgMjEzIFoiIGZpbGw9IiNhODk0NmEiLz48cGF0aCBkPSJNMTA1Ni45IDI0My40IEwxMTEyLjUgMTU2LjQgTDExNjggMjQzLjQgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNMTExMi41IDE1Ni40IEwxMTY4IDI0My40IEwxMTI0LjUgMjQzLjQgTDExMTcuMyAyMDcuMiBaIiBmaWxsPSIjYTg5NDZhIi8+PHBhdGggZD0iTTQ0OS41IDI0OS41IEw1MTUuNyAxNDUuOSBMNTgyIDI0OS41IFoiIGZpbGw9IiNkNmM1OWMiIHN0cm9rZT0iIzViNGEzMyIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTUxNS43IDE0NS45IEw1ODIgMjQ5LjUgTDUzMC4xIDI0OS41IEw1MjEuNSAyMDYuMyBaIiBmaWxsPSIjYTg5NDZhIi8+PHBhdGggZD0iTTcyOC4xIDI1Mi43IEw3NzAuMSAxODYuOSBMODEyLjEgMjUyLjcgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNNzcwLjEgMTg2LjkgTDgxMi4xIDI1Mi43IEw3NzkuMiAyNTIuNyBMNzczLjcgMjI1LjMgWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik02ODguNyAyNTMuNyBMNzQ0LjMgMTY2LjcgTDc5OS45IDI1My43IFoiIGZpbGw9IiNkNmM1OWMiIHN0cm9rZT0iIzViNGEzMyIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTc0NC4zIDE2Ni43IEw3OTkuOSAyNTMuNyBMNzU2LjQgMjUzLjcgTDc0OS4xIDIxNy41IFoiIGZpbGw9IiNhODk0NmEiLz48cGF0aCBkPSJNMTEyNS44IDI1NC42IEwxMTgxLjYgMTY3LjEgTDEyMzcuNSAyNTQuNiBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0xMTgxLjYgMTY3LjEgTDEyMzcuNSAyNTQuNiBMMTE5My44IDI1NC42IEwxMTg2LjUgMjE4LjEgWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik04OTkuOSAyNTYuNiBMOTM0LjEgMjAzLjEgTDk2OC4zIDI1Ni42IFoiIGZpbGw9IiNkNmM1OWMiIHN0cm9rZT0iIzViNGEzMyIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTkzNC4xIDIwMy4xIEw5NjguMyAyNTYuNiBMOTQxLjUgMjU2LjYgTDkzNy4xIDIzNC4zIFoiIGZpbGw9IiNhODk0NmEiLz48cGF0aCBkPSJNNjk2LjUgMjYzLjEgTDc2MSAxNjIuMiBMODI1LjUgMjYzLjEgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNNzYxIDE2Mi4yIEw4MjUuNSAyNjMuMSBMNzc1IDI2My4xIEw3NjYuNiAyMjEuMSBaIiBmaWxsPSIjYTg5NDZhIi8+PHBhdGggZD0iTTMxMC4zIDI2My4yIEwzNjIuMSAxODIuMSBMNDEzLjkgMjYzLjIgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNMzYyLjEgMTgyLjEgTDQxMy45IDI2My4yIEwzNzMuNCAyNjMuMiBMMzY2LjYgMjI5LjQgWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik00MzguNyAyNjcuOSBMNDk4LjcgMTc0IEw1NTguNyAyNjcuOSBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik00OTguNyAxNzQgTDU1OC43IDI2Ny45IEw1MTEuNyAyNjcuOSBMNTAzLjkgMjI4LjggWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik0xMTIxLjYgMjY5LjggTDExNjMuOSAyMDMuNiBMMTIwNi4zIDI2OS44IFoiIGZpbGw9IiNkNmM1OWMiIHN0cm9rZT0iIzViNGEzMyIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTExNjMuOSAyMDMuNiBMMTIwNi4zIDI2OS44IEwxMTczLjEgMjY5LjggTDExNjcuNiAyNDIuMiBaIiBmaWxsPSIjYTg5NDZhIi8+PHBhdGggZD0iTTEyMi4yIDI3MS42IEwxODAuMiAxODAuOCBMMjM4LjIgMjcxLjYgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNMTgwLjIgMTgwLjggTDIzOC4yIDI3MS42IEwxOTIuOCAyNzEuNiBMMTg1LjIgMjMzLjggWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik0zNTIuOSAyOTUuMiBMMzkzLjggMjMxLjMgTDQzNC42IDI5NS4yIFoiIGZpbGw9IiNkNmM1OWMiIHN0cm9rZT0iIzViNGEzMyIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTM5My44IDIzMS4zIEw0MzQuNiAyOTUuMiBMNDAyLjYgMjk1LjIgTDM5Ny4zIDI2OC42IFoiIGZpbGw9IiNhODk0NmEiLz48cGF0aCBkPSJNMTA3Mi41IDI5NyBMMTEzNy4zIDE5NS42IEwxMjAyIDI5NyBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0xMTM3LjMgMTk1LjYgTDEyMDIgMjk3IEwxMTUxLjMgMjk3IEwxMTQyLjkgMjU0LjggWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik01MTMuNSAyOTcuOCBMNTUwIDI0MC42IEw1ODYuNiAyOTcuOCBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik01NTAgMjQwLjYgTDU4Ni42IDI5Ny44IEw1NTggMjk3LjggTDU1My4yIDI3NCBaIiBmaWxsPSIjYTg5NDZhIi8+PHBhdGggZD0iTTMzOS4yIDMwMC40IEwzODguMiAyMjMuNiBMNDM3LjMgMzAwLjQgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNMzg4LjIgMjIzLjYgTDQzNy4zIDMwMC40IEwzOTguOSAzMDAuNCBMMzkyLjUgMjY4LjQgWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik03MTguNCAzMDEuNSBMNzg0IDE5OC44IEw4NDkuNyAzMDEuNSBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik03ODQgMTk4LjggTDg0OS43IDMwMS41IEw3OTguMyAzMDEuNSBMNzg5LjggMjU4LjcgWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik03Ny4yIDMwMy40IEwxMjAuMSAyMzYuMyBMMTYyLjkgMzAzLjQgWiIgZmlsbD0iI2Q2YzU5YyIgc3Ryb2tlPSIjNWI0YTMzIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJNMTIwLjEgMjM2LjMgTDE2Mi45IDMwMy40IEwxMjkuNCAzMDMuNCBMMTIzLjggMjc1LjQgWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik04MTkuNSAzMDMuNiBMODUyLjUgMjUyIEw4ODUuNCAzMDMuNiBaIiBmaWxsPSIjZDZjNTljIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik04NTIuNSAyNTIgTDg4NS40IDMwMy42IEw4NTkuNiAzMDMuNiBMODU1LjMgMjgyLjEgWiIgZmlsbD0iI2E4OTQ2YSIvPjxwYXRoIGQ9Ik0xNjkuMyAzMTkuMiBMMjA5LjYgMjU2LjEgTDI0OS45IDMxOS4yIFoiIGZpbGw9IiNkNmM1OWMiIHN0cm9rZT0iIzViNGEzMyIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0iTTIwOS42IDI1Ni4xIEwyNDkuOSAzMTkuMiBMMjE4LjMgMzE5LjIgTDIxMy4xIDI5Mi45IFoiIGZpbGw9IiNhODk0NmEiLz48cGF0aCBkPSJNMTE0Mi4xIDQ0My44IGwtMTEgMCBsMTEgLTI5LjMgbDExIDI5LjMgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMjA0LjQgNDQ4IGwtNy42IDAgbDcuNiAtMjAuMiBsNy42IDIwLjIgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMTgyLjggNDQ5LjIgbC05LjQgMCBsOS40IC0yNS4xIGw5LjQgMjUuMSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTExNDcuMSA0NTEuNCBsLTcuMiAwIGw3LjIgLTE5LjMgbDcuMiAxOS4zIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTI0MC40IDQ1MS45IGwtMTAuNyAwIGwxMC43IC0yOC40IGwxMC43IDI4LjQgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMTM4LjYgNDU4LjMgbC03LjQgMCBsNy40IC0xOS43IGw3LjQgMTkuNyB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEyMjMuNiA0NTguNyBsLTkuOCAwIGw5LjggLTI2LjIgbDkuOCAyNi4yIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTE2Mi42IDQ2MS43IGwtOC4zIDAgbDguMyAtMjIuMSBsOC4zIDIyLjEgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMTcwLjIgNDYyLjkgbC0xMCAwIGwxMCAtMjYuNiBsMTAgMjYuNiB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTExMzQuOCA0NjUuNiBsLTguMiAwIGw4LjIgLTIxLjggbDguMiAyMS44IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTA4NC44IDQ2Ny4yIGwtMTEuNSAwIGwxMS41IC0zMC41IGwxMS41IDMwLjUgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMjU3LjQgNDcwLjggbC03LjcgMCBsNy43IC0yMC42IGw3LjcgMjAuNiB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEwOTMuNSA0NzEuMSBsLTcuMyAwIGw3LjMgLTE5LjQgbDcuMyAxOS40IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTA5NC4zIDQ3MS45IGwtMTEuMiAwIGwxMS4yIC0yOS45IGwxMS4yIDI5LjkgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMjU5IDQ3NC40IGwtOSAwIGw5IC0yMy45IGw5IDIzLjkgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMTA3LjcgNDc2LjEgbC05LjIgMCBsOS4yIC0yNC41IGw5LjIgMjQuNSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTExMjYuOSA0NzkuMiBsLTEwIDAgbDEwIC0yNi43IGwxMCAyNi43IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTA1OS4yIDQ4Mi4zIGwtOC41IDAgbDguNSAtMjIuNyBsOC41IDIyLjcgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMDk0LjIgNDg0LjQgbC0xMC4xIDAgbDEwLjEgLTI2LjggbDEwLjEgMjYuOCB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEyMTkuMiA0ODQuNiBsLTguNiAwIGw4LjYgLTIyLjggbDguNiAyMi44IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTE0Ni44IDQ4Ny41IGwtOC40IDAgbDguNCAtMjIuNSBsOC40IDIyLjUgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zMTAuNCA0OTMuOCBsLTExLjQgMCBsMTEuNCAtMzAuNSBsMTEuNCAzMC41IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTI3Ny44IDQ5NyBsLTEwIDAgbDEwIC0yNi43IGwxMCAyNi43IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTI3Ny42IDQ5NyBsLTguNiAwIGw4LjYgLTIzIGw4LjYgMjMgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMjA1LjEgNDk3LjUgbC04LjMgMCBsOC4zIC0yMi4xIGw4LjMgMjIuMSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEwNTkuNSA1MDQuOSBsLTggMCBsOCAtMjEuNCBsOCAyMS40IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTEyOS4yIDUwNi4yIGwtOC4xIDAgbDguMSAtMjEuNyBsOC4xIDIxLjcgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMjUzLjggNTA2LjUgbC03LjMgMCBsNy4zIC0xOS41IGw3LjMgMTkuNSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTIzNiA1MDkgbC03LjQgMCBsNy40IC0xOS43IGw3LjQgMTkuNyB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEyNTYuOCA1MTMuMyBsLTEwLjUgMCBsMTAuNSAtMjguMSBsMTAuNSAyOC4xIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTIxNi4xIDUxMy44IGwtOCAwIGw4IC0yMS40IGw4IDIxLjQgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0yNjMuNSA1MTMuOSBsLTguOCAwIGw4LjggLTIzLjUgbDguOCAyMy41IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMzY2LjkgNTE2LjEgbC0xMS4yIDAgbDExLjIgLTI5LjggbDExLjIgMjkuOCB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTQyOSA1MTcuNCBsLTExLjMgMCBsMTEuMyAtMzAuMiBsMTEuMyAzMC4yIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTA3Ni44IDUxOC42IGwtOS4xIDAgbDkuMSAtMjQuNCBsOS4xIDI0LjQgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMjA3LjEgNTE5LjQgbC03LjcgMCBsNy43IC0yMC40IGw3LjcgMjAuNCB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTI5OC45IDUyMC43IGwtOS41IDAgbDkuNSAtMjUuNCBsOS41IDI1LjQgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zOTYuMSA1MjQuMSBsLTEwLjMgMCBsMTAuMyAtMjcuNCBsMTAuMyAyNy40IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTE1Mi4zIDUyNy4yIGwtOS44IDAgbDkuOCAtMjYgbDkuOCAyNiB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTQwNy42IDUzMCBsLTExLjggMCBsMTEuOCAtMzEuNSBsMTEuOCAzMS41IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTMwOC43IDUzMC41IGwtMTAuMSAwIGwxMC4xIC0yNyBsMTAuMSAyNyB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTUwMy4zIDUzMi42IGwtOC43IDAgbDguNyAtMjMuMiBsOC43IDIzLjIgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik00MDUuNCA1MzMuMSBsLTExLjMgMCBsMTEuMyAtMzAgbDExLjMgMzAgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMjUwLjkgNTMzLjkgbC03LjMgMCBsNy4zIC0xOS41IGw3LjMgMTkuNSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTExOTguMiA1MzUuMiBsLTkuMyAwIGw5LjMgLTI0LjkgbDkuMyAyNC45IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTY2LjEgNTM2LjYgbC0xMi4yIDAgbDEyLjIgLTMyLjQgbDEyLjIgMzIuNCB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTExNDkuOSA1MzcgbC0xMC4xIDAgbDEwLjEgLTI2LjggbDEwLjEgMjYuOCB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEwNTUuOSA1MzcuMiBsLTExLjYgMCBsMTEuNiAtMzEgbDExLjYgMzEgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0yMjQuNSA1MzcuNCBsLTExLjEgMCBsMTEuMSAtMjkuNyBsMTEuMSAyOS43IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNNDg1LjEgNTM4LjUgbC04LjMgMCBsOC4zIC0yMi4yIGw4LjMgMjIuMiB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEzMTQuNyA1MzkuMSBsLTkuMyAwIGw5LjMgLTI0LjkgbDkuMyAyNC45IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNNDgzLjggNTQwLjQgbC0xMS4xIDAgbDExLjEgLTI5LjcgbDExLjEgMjkuNyB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTE2OC42IDU0MS45IGwtOC41IDAgbDguNSAtMjIuNiBsOC41IDIyLjYgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zMDMuNCA1NDMuNyBsLTguMyAwIGw4LjMgLTIyLjEgbDguMyAyMi4xIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTM2LjMgNTQzLjkgbC0xMS40IDAgbDExLjQgLTMwLjMgbDExLjQgMzAuMyB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTI0OS42IDU0NC44IGwtMTEuOSAwIGwxMS45IC0zMS43IGwxMS45IDMxLjcgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMjI1LjYgNTQ0LjkgbC05LjIgMCBsOS4yIC0yNC40IGw5LjIgMjQuNCB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTE4NC44IDU0NS4yIGwtMTAuMSAwIGwxMC4xIC0yNi45IGwxMC4xIDI2LjkgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik00MDEuMiA1NDYuMSBsLTExLjUgMCBsMTEuNSAtMzAuNyBsMTEuNSAzMC43IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNNTA4LjcgNTQ2LjQgbC0xMi42IDAgbDEyLjYgLTMzLjUgbDEyLjYgMzMuNSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTUwOC40IDU0OC4yIGwtMTIuNSAwIGwxMi41IC0zMy40IGwxMi41IDMzLjQgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zMzYuNiA1NDkuOCBsLTExLjMgMCBsMTEuMyAtMzAgbDExLjMgMzAgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMzAgNTUwLjggbC04LjIgMCBsOC4yIC0yMiBsOC4yIDIyIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTEwMi4yIDU1MC45IGwtNy42IDAgbDcuNiAtMjAuNCBsNy42IDIwLjQgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0yMTIuMyA1NTEuMSBsLTkuOCAwIGw5LjggLTI2LjEgbDkuOCAyNi4xIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTIzOS41IDU1MS4zIGwtMTAuMSAwIGwxMC4xIC0yNi44IGwxMC4xIDI2LjggeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xNjguNyA1NTEuMyBsLTkgMCBsOSAtMjQgbDkgMjQgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0yOTQuNyA1NTcgbC0xMS45IDAgbDExLjkgLTMxLjYgbDExLjkgMzEuNiB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEyMDIuMSA1NTcuMyBsLTkuMiAwIGw5LjIgLTI0LjYgbDkuMiAyNC42IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTExNy4zIDU1OC41IGwtMTAuMSAwIGwxMC4xIC0yNi44IGwxMC4xIDI2LjggeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMTQ5LjEgNTU5LjMgbC03LjUgMCBsNy41IC0yMC4xIGw3LjUgMjAuMSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTExMjkuNCA1NjEuNCBsLTcuOCAwIGw3LjggLTIwLjcgbDcuOCAyMC43IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMzk1LjggNTYxLjUgbC0xMC45IDAgbDEwLjkgLTI5IGwxMC45IDI5IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMjIzLjcgNTYzLjQgbC03LjQgMCBsNy40IC0xOS43IGw3LjQgMTkuNyB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTUzMS4yIDU2My42IGwtOC4yIDAgbDguMiAtMjEuOSBsOC4yIDIxLjkgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xNTEuNiA1NjQuNSBsLTEyLjEgMCBsMTIuMSAtMzIuMSBsMTIuMSAzMi4xIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNNDc3IDU2Ni43IGwtOS4xIDAgbDkuMSAtMjQuMyBsOS4xIDI0LjMgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik01NDMuNSA1NjcuMSBsLTEwLjkgMCBsMTAuOSAtMjkgbDEwLjkgMjkgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMjU3LjIgNTc0IGwtOC42IDAgbDguNiAtMjIuOSBsOC42IDIyLjkgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMTYzLjMgNTc3LjEgbC0xMSAwIGwxMSAtMjkuMiBsMTEgMjkuMiB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTExNDIuMiA1NzguOSBsLTkuMSAwIGw5LjEgLTI0LjMgbDkuMSAyNC4zIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNNTMzLjMgNTc4LjkgbC0xMS4zIDAgbDExLjMgLTMwLjIgbDExLjMgMzAuMiB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEyMTQgNTc5LjMgbC05LjggMCBsOS44IC0yNi4xIGw5LjggMjYuMSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTM2NC43IDU4MS4zIGwtNy42IDAgbDcuNiAtMjAuMSBsNy42IDIwLjEgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zMTAuNCA1ODIuMSBsLTcuOSAwIGw3LjkgLTIxIGw3LjkgMjEgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik00MjQuNiA1ODQuMiBsLTEwLjkgMCBsMTAuOSAtMjkuMSBsMTAuOSAyOS4xIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTEzNC4yIDU4OS4yIGwtMTEuMiAwIGwxMS4yIC0zMCBsMTEuMiAzMCB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTU3MC43IDU5My4xIGwtNy41IDAgbDcuNSAtMjAgbDcuNSAyMCB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTIzNi41IDU5My42IGwtMTAuMyAwIGwxMC4zIC0yNy42IGwxMC4zIDI3LjYgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zNTguMSA1OTQuMyBsLTEyLjIgMCBsMTIuMiAtMzIuNCBsMTIuMiAzMi40IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNNTM1LjUgNTk4LjkgbC04LjEgMCBsOC4xIC0yMS43IGw4LjEgMjEuNyB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTI3MS4xIDU5OS4yIGwtNy41IDAgbDcuNSAtMjAgbDcuNSAyMCB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTE2NyA2MDEuMyBsLTkuMyAwIGw5LjMgLTI0LjggbDkuMyAyNC44IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMjIzLjkgNjAxLjggbC0xMi4xIDAgbDEyLjEgLTMyLjEgbDEyLjEgMzIuMSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTU0Ny45IDYwMi41IGwtOS41IDAgbDkuNSAtMjUuMiBsOS41IDI1LjIgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik00MTYuNCA2MDIuNSBsLTguMyAwIGw4LjMgLTIyLjMgbDguMyAyMi4zIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMzkzLjQgNjA0LjMgbC04LjkgMCBsOC45IC0yMy42IGw4LjkgMjMuNiB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTUwMCA2MDQuOSBsLTguMiAwIGw4LjIgLTIxLjkgbDguMiAyMS45IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNNTE0LjcgNjA4LjcgbC0xMC40IDAgbDEwLjQgLTI3LjcgbDEwLjQgMjcuNyB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTExMSA2MDkuMyBsLTEwIDAgbDEwIC0yNi43IGwxMCAyNi43IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNNTQyLjkgNjA5LjcgbC0xMC41IDAgbDEwLjUgLTI3LjkgbDEwLjUgMjcuOSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTM1NS40IDYxMi43IGwtOC41IDAgbDguNSAtMjIuNSBsOC41IDIyLjUgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0yNjIuNiA2MTIuOCBsLTcuNCAwIGw3LjQgLTE5LjkgbDcuNCAxOS45IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTc0LjYgNjE0LjIgbC05LjkgMCBsOS45IC0yNi4zIGw5LjkgMjYuMyB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTU0Mi4zIDYxNi41IGwtOC43IDAgbDguNyAtMjMuMyBsOC43IDIzLjMgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0yMzguOCA2MTkuNSBsLTguOSAwIGw4LjkgLTIzLjkgbDguOSAyMy45IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMzc5LjQgNjIwLjYgbC0xMC45IDAgbDEwLjkgLTI5LjEgbDEwLjkgMjkuMSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEzNi45IDYyNC45IGwtOS45IDAgbDkuOSAtMjYuNSBsOS45IDI2LjUgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik00ODMuNSA2MjUuNyBsLTcuNiAwIGw3LjYgLTIwLjMgbDcuNiAyMC4zIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTEyLjkgNjMxLjcgbC05LjMgMCBsOS4zIC0yNC44IGw5LjMgMjQuOCB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTM2OS45IDYzMy44IGwtMTEuMyAwIGwxMS4zIC0zMC4yIGwxMS4zIDMwLjIgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zMzguMyA2MzcuNCBsLTcuOSAwIGw3LjkgLTIxLjEgbDcuOSAyMS4xIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNNDAxLjMgNjM4LjMgbC05LjQgMCBsOS40IC0yNS4yIGw5LjQgMjUuMiB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTk0LjEgNjM5LjUgbC05LjUgMCBsOS41IC0yNS4zIGw5LjUgMjUuMyB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTU2Ny43IDY0MS40IGwtMTEuOSAwIGwxMS45IC0zMS43IGwxMS45IDMxLjcgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMzUuOSA2NDIgbC0xMS40IDAgbDExLjQgLTMwLjMgbDExLjQgMzAuMyB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEzNC4zIDY0My44IGwtMTEuMSAwIGwxMS4xIC0yOS42IGwxMS4xIDI5LjYgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0yMDcuMSA2NDguNiBsLTcuNSAwIGw3LjUgLTIwIGw3LjUgMjAgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zMjMuNCA2NDguOSBsLTcuMiAwIGw3LjIgLTE5LjMgbDcuMiAxOS4zIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNNTg4LjQgNjUwLjkgbC04LjMgMCBsOC4zIC0yMi4yIGw4LjMgMjIuMiB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTQwNi40IDY1Mi42IGwtMTAuNiAwIGwxMC42IC0yOC4zIGwxMC42IDI4LjMgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik00MjMuMyA2NTIuNyBsLTcuNiAwIGw3LjYgLTIwLjQgbDcuNiAyMC40IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMjk5LjUgNjUzLjMgbC0xMC45IDAgbDEwLjkgLTI5LjIgbDEwLjkgMjkuMiB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTQ3MC4yIDY1My4zIGwtMTAuMSAwIGwxMC4xIC0yNyBsMTAuMSAyNyB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTIzMCA2NjAuMiBsLTEwLjggMCBsMTAuOCAtMjguNyBsMTAuOCAyOC43IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMzQzLjQgNjYxLjYgbC0xMC4zIDAgbDEwLjMgLTI3LjUgbDEwLjMgMjcuNSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTI2Mi44IDY2My41IGwtOC41IDAgbDguNSAtMjIuNiBsOC41IDIyLjYgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zNDQuNCA2NjQuNSBsLTkuNyAwIGw5LjcgLTI2IGw5LjcgMjYgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zNzguMyA2NjYuOCBsLTcuNiAwIGw3LjYgLTIwLjMgbDcuNiAyMC4zIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTAxLjEgNjY3LjIgbC0xMS4xIDAgbDExLjEgLTI5LjcgbDExLjEgMjkuNyB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTM4OC45IDY2Ny41IGwtNy4zIDAgbDcuMyAtMTkuMyBsNy4zIDE5LjMgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik00NDcuOCA2NzUuNyBsLTEyLjMgMCBsMTIuMyAtMzIuNyBsMTIuMyAzMi43IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNNTQ5LjEgNjc2LjIgbC04LjkgMCBsOC45IC0yMy44IGw4LjkgMjMuOCB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTM2NC44IDY3Ni44IGwtOC43IDAgbDguNyAtMjMuMSBsOC43IDIzLjEgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xODAuNSA2NzguMSBsLTguMiAwIGw4LjIgLTIxLjkgbDguMiAyMS45IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTYyLjIgNjc5LjkgbC0xMi40IDAgbDEyLjQgLTMzIGwxMi40IDMzIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMjI5IDY4My40IGwtOS40IDAgbDkuNCAtMjUgbDkuNCAyNSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTQxNS44IDY4Ny43IGwtMTAuNSAwIGwxMC41IC0yNy45IGwxMC41IDI3LjkgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xMDIuNyA2ODkuMyBsLTEwLjIgMCBsMTAuMiAtMjcuMyBsMTAuMiAyNy4zIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNNDA4LjEgNjkwLjIgbC0xMC44IDAgbDEwLjggLTI4LjkgbDEwLjggMjguOSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEwOC40IDY5My44IGwtMTIuNCAwIGwxMi40IC0zMy4xIGwxMi40IDMzLjEgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0xNDEuNSA2OTcuNyBsLTExLjQgMCBsMTEuNCAtMzAuNCBsMTEuNCAzMC40IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTk2LjMgNjk4LjUgbC03LjUgMCBsNy41IC0yMC4xIGw3LjUgMjAuMSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTUzMy41IDcwMC4xIGwtMTEuNiAwIGwxMS42IC0zMSBsMTEuNiAzMSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTQzMy44IDcwMi4yIGwtMTEuMSAwIGwxMS4xIC0yOS41IGwxMS4xIDI5LjUgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0yMzcuMiA3MDkuOSBsLTguMyAwIGw4LjMgLTIyLjEgbDguMyAyMi4xIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMzYzLjkgNzEwLjUgbC0xMS41IDAgbDExLjUgLTMwLjcgbDExLjUgMzAuNyB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTE5My4yIDcxMC44IGwtOC41IDAgbDguNSAtMjIuNyBsOC41IDIyLjcgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zMjkuNCA3MTAuOCBsLTEwLjUgMCBsMTAuNSAtMjguMSBsMTAuNSAyOC4xIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTM3LjQgNzE0IGwtMTAuOCAwIGwxMC44IC0yOC43IGwxMC44IDI4LjcgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0yMzQuMyA3MTguMiBsLTkuOSAwIGw5LjkgLTI2LjQgbDkuOSAyNi40IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNNDgyLjkgNzE5LjUgbC03LjMgMCBsNy4zIC0xOS40IGw3LjMgMTkuNCB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEyNy42IDcyMi41IGwtMTEuNSAwIGwxMS41IC0zMC43IGwxMS41IDMwLjcgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik01MjcuNSA3MjcuMyBsLTExLjUgMCBsMTEuNSAtMzAuNyBsMTEuNSAzMC43IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNNTIxLjggNzMxLjggbC03LjkgMCBsNy45IC0yMS4xIGw3LjkgMjEuMSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTI1Ny4yIDczMi42IGwtOC44IDAgbDguOCAtMjMuNSBsOC44IDIzLjUgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zMzcuNiA3NDEuMiBsLTEyLjYgMCBsMTIuNiAtMzMuNSBsMTIuNiAzMy41IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMzk1LjIgNzU0LjUgbC03LjkgMCBsNy45IC0yMS4xIGw3LjkgMjEuMSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTQzNS42IDc1NS4zIGwtMTEuMyAwIGwxMS4zIC0zMC4xIGwxMS4zIDMwLjEgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zMjQuMyA3NTcuNSBsLTEwLjIgMCBsMTAuMiAtMjcuMSBsMTAuMiAyNy4xIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTk1LjggNzU3LjcgbC0xMSAwIGwxMSAtMjkuNCBsMTEgMjkuNCB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTQ1NC40IDc1Ny44IGwtMTAuOCAwIGwxMC44IC0yOC43IGwxMC44IDI4LjcgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik00NzQgNzU4IGwtOS45IDAgbDkuOSAtMjYuNSBsOS45IDI2LjUgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zNDkuMSA3NjEuMyBsLTkuNSAwIGw5LjUgLTI1LjQgbDkuNSAyNS40IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMzk0LjggNzYxLjkgbC04LjggMCBsOC44IC0yMy40IGw4LjggMjMuNCB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTMzMi43IDc2Ny45IGwtMTIgMCBsMTIgLTMxLjkgbDEyIDMxLjkgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zNTkuMyA3NzMuNyBsLTEyLjUgMCBsMTIuNSAtMzMuMiBsMTIuNSAzMy4yIHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMjMyLjYgNzc3LjkgbC0xMi42IDAgbDEyLjYgLTMzLjUgbDEyLjYgMzMuNSB6IiBmaWxsPSIjN2Y4ZjVjIiBzdHJva2U9IiM0ZDU3MzYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTMzMS41IDc3OC45IGwtMTEuNiAwIGwxMS42IC0zMC45IGwxMS42IDMwLjkgeiIgZmlsbD0iIzdmOGY1YyIgc3Ryb2tlPSIjNGQ1NzM2IiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0zMjUuMiA3ODAuOCBsLTExLjkgMCBsMTEuOSAtMzEuNyBsMTEuOSAzMS43IHoiIGZpbGw9IiM3ZjhmNWMiIHN0cm9rZT0iIzRkNTczNiIgc3Ryb2tlLXdpZHRoPSIxLjYiLz48cGF0aCBkPSJNMTIwNS4yIDkyMC4yIHYtMTIgTTExOTkuMiA5MjAuMiBsMyAtMTAgTTEyMTEuMiA5MjAuMiBsLTMgLTEwIiBzdHJva2U9IiM1ZjZmNGEiIHN0cm9rZS13aWR0aD0iMi40Ii8+PHBhdGggZD0iTTEzNDQuOSA4NTEuNCB2LTEyIE0xMzM4LjkgODUxLjQgbDMgLTEwIE0xMzUwLjkgODUxLjQgbC0zIC0xMCIgc3Ryb2tlPSIjNWY2ZjRhIiBzdHJva2Utd2lkdGg9IjIuNCIvPjxwYXRoIGQ9Ik0xMjQzLjMgODkyLjcgdi0xMiBNMTIzNy4zIDg5Mi43IGwzIC0xMCBNMTI0OS4zIDg5Mi43IGwtMyAtMTAiIHN0cm9rZT0iIzVmNmY0YSIgc3Ryb2tlLXdpZHRoPSIyLjQiLz48cGF0aCBkPSJNMTM0OS40IDkyNy44IHYtMTIgTTEzNDMuNCA5MjcuOCBsMyAtMTAgTTEzNTUuNCA5MjcuOCBsLTMgLTEwIiBzdHJva2U9IiM1ZjZmNGEiIHN0cm9rZS13aWR0aD0iMi40Ii8+PHBhdGggZD0iTTEzMTguOSA4NjAuNCB2LTEyIE0xMzEyLjkgODYwLjQgbDMgLTEwIE0xMzI0LjkgODYwLjQgbC0zIC0xMCIgc3Ryb2tlPSIjNWY2ZjRhIiBzdHJva2Utd2lkdGg9IjIuNCIvPjxwYXRoIGQ9Ik0xMzg0LjcgOTY5Ljggdi0xMiBNMTM3OC43IDk2OS44IGwzIC0xMCBNMTM5MC43IDk2OS44IGwtMyAtMTAiIHN0cm9rZT0iIzVmNmY0YSIgc3Ryb2tlLXdpZHRoPSIyLjQiLz48cGF0aCBkPSJNMTMxNiA5MzMuOCB2LTEyIE0xMzEwIDkzMy44IGwzIC0xMCBNMTMyMiA5MzMuOCBsLTMgLTEwIiBzdHJva2U9IiM1ZjZmNGEiIHN0cm9rZS13aWR0aD0iMi40Ii8+PHBhdGggZD0iTTEyMTUuMiA5NTUuNiB2LTEyIE0xMjA5LjIgOTU1LjYgbDMgLTEwIE0xMjIxLjIgOTU1LjYgbC0zIC0xMCIgc3Ryb2tlPSIjNWY2ZjRhIiBzdHJva2Utd2lkdGg9IjIuNCIvPjxwYXRoIGQ9Ik0xMjE1LjEgODg0Ljcgdi0xMiBNMTIwOS4xIDg4NC43IGwzIC0xMCBNMTIyMS4xIDg4NC43IGwtMyAtMTAiIHN0cm9rZT0iIzVmNmY0YSIgc3Ryb2tlLXdpZHRoPSIyLjQiLz48cGF0aCBkPSJNMTMzMy4zIDg5NC43IHYtMTIgTTEzMjcuMyA4OTQuNyBsMyAtMTAgTTEzMzkuMyA4OTQuNyBsLTMgLTEwIiBzdHJva2U9IiM1ZjZmNGEiIHN0cm9rZS13aWR0aD0iMi40Ii8+PHBhdGggZD0iTTEyODIuMSA5Njggdi0xMiBNMTI3Ni4xIDk2OCBsMyAtMTAgTTEyODguMSA5NjggbC0zIC0xMCIgc3Ryb2tlPSIjNWY2ZjRhIiBzdHJva2Utd2lkdGg9IjIuNCIvPjxwYXRoIGQ9Ik0xMjc4LjUgOTExLjcgdi0xMiBNMTI3Mi41IDkxMS43IGwzIC0xMCBNMTI4NC41IDkxMS43IGwtMyAtMTAiIHN0cm9rZT0iIzVmNmY0YSIgc3Ryb2tlLXdpZHRoPSIyLjQiLz48cGF0aCBkPSJNMTMyNS40IDg1My4zIHYtMTIgTTEzMTkuNCA4NTMuMyBsMyAtMTAgTTEzMzEuNCA4NTMuMyBsLTMgLTEwIiBzdHJva2U9IiM1ZjZmNGEiIHN0cm9rZS13aWR0aD0iMi40Ii8+PHBhdGggZD0iTTEyMTcuNyA4NjQgdi0xMiBNMTIxMS43IDg2NCBsMyAtMTAgTTEyMjMuNyA4NjQgbC0zIC0xMCIgc3Ryb2tlPSIjNWY2ZjRhIiBzdHJva2Utd2lkdGg9IjIuNCIvPjxwYXRoIGQ9Ik0xMzY0LjMgODgzLjcgdi0xMiBNMTM1OC4zIDg4My43IGwzIC0xMCBNMTM3MC4zIDg4My43IGwtMyAtMTAiIHN0cm9rZT0iIzVmNmY0YSIgc3Ryb2tlLXdpZHRoPSIyLjQiLz48cGF0aCBkPSJNMTM5OS4xIDkxMC40IHYtMTIgTTEzOTMuMSA5MTAuNCBsMyAtMTAgTTE0MDUuMSA5MTAuNCBsLTMgLTEwIiBzdHJva2U9IiM1ZjZmNGEiIHN0cm9rZS13aWR0aD0iMi40Ii8+PHBhdGggZD0iTTEyMDguMyA5MDIuMiB2LTEyIE0xMjAyLjMgOTAyLjIgbDMgLTEwIE0xMjE0LjMgOTAyLjIgbC0zIC0xMCIgc3Ryb2tlPSIjNWY2ZjRhIiBzdHJva2Utd2lkdGg9IjIuNCIvPjxwYXRoIGQ9Ik0xMjkxLjcgODQxLjcgdi0xMiBNMTI4NS43IDg0MS43IGwzIC0xMCBNMTI5Ny43IDg0MS43IGwtMyAtMTAiIHN0cm9rZT0iIzVmNmY0YSIgc3Ryb2tlLXdpZHRoPSIyLjQiLz48cGF0aCBkPSJNMTI5OS4yIDk0Ni40IHYtMTIgTTEyOTMuMiA5NDYuNCBsMyAtMTAgTTEzMDUuMiA5NDYuNCBsLTMgLTEwIiBzdHJva2U9IiM1ZjZmNGEiIHN0cm9rZS13aWR0aD0iMi40Ii8+PHBhdGggZD0iTTEyNzUuNiA4NjcuNSB2LTEyIE0xMjY5LjYgODY3LjUgbDMgLTEwIE0xMjgxLjYgODY3LjUgbC0zIC0xMCIgc3Ryb2tlPSIjNWY2ZjRhIiBzdHJva2Utd2lkdGg9IjIuNCIvPjxwYXRoIGQ9Ik0xMTk0LjcgOTIyLjYgdi0xMiBNMTE4OC43IDkyMi42IGwzIC0xMCBNMTIwMC43IDkyMi42IGwtMyAtMTAiIHN0cm9rZT0iIzVmNmY0YSIgc3Ryb2tlLXdpZHRoPSIyLjQiLz48cGF0aCBkPSJNMTI3NS45IDg1Ni45IHYtMTIgTTEyNjkuOSA4NTYuOSBsMyAtMTAgTTEyODEuOSA4NTYuOSBsLTMgLTEwIiBzdHJva2U9IiM1ZjZmNGEiIHN0cm9rZS13aWR0aD0iMi40Ii8+PHBhdGggZD0iTTEzNjMuMiA4NDIuNyB2LTEyIE0xMzU3LjIgODQyLjcgbDMgLTEwIE0xMzY5LjIgODQyLjcgbC0zIC0xMCIgc3Ryb2tlPSIjNWY2ZjRhIiBzdHJva2Utd2lkdGg9IjIuNCIvPjxwYXRoIGQ9Ik0xMzgwLjggOTMzLjYgdi0xMiBNMTM3NC44IDkzMy42IGwzIC0xMCBNMTM4Ni44IDkzMy42IGwtMyAtMTAiIHN0cm9rZT0iIzVmNmY0YSIgc3Ryb2tlLXdpZHRoPSIyLjQiLz48cGF0aCBkPSJNMTM3NS44IDkyNyB2LTEyIE0xMzY5LjggOTI3IGwzIC0xMCBNMTM4MS44IDkyNyBsLTMgLTEwIiBzdHJva2U9IiM1ZjZmNGEiIHN0cm9rZS13aWR0aD0iMi40Ii8+PHBhdGggZD0iTTEzMzAgOTQ5LjQgdi0xMiBNMTMyNCA5NDkuNCBsMyAtMTAgTTEzMzYgOTQ5LjQgbC0zIC0xMCIgc3Ryb2tlPSIjNWY2ZjRhIiBzdHJva2Utd2lkdGg9IjIuNCIvPjxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzViNGEzMyIgc3Ryb2tlLXdpZHRoPSIzIj48Y2lyY2xlIGN4PSIxNjgwIiBjeT0iMTUwIiByPSI1NiIvPjxwYXRoIGQ9Ik0xNjgwIDcwIEwxNjk0IDE1MCBMMTY4MCAyMzAgTDE2NjYgMTUwIFoiIGZpbGw9IiM1YjRhMzMiLz48cGF0aCBkPSJNMTYwMCAxNTAgTDE2ODAgMTM4IEwxNzYwIDE1MCBMMTY4MCAxNjIgWiIgZmlsbD0iI2U5ZGNiOSIvPjwvZz48dGV4dCB4PSI0MzAiIHk9IjExMCIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc3R5bGU9Iml0YWxpYyIgZm9udC1zaXplPSI0NiIgbGV0dGVyLXNwYWNpbmc9IjguMyIgZmlsbD0iIzViNGEzMyIgb3BhY2l0eT0iLjc1IiB0cmFuc2Zvcm09InJvdGF0ZSgtMyA0MzAgMTEwKSI+VGhlIEthcnJvdyBIZWlnaHRzPC90ZXh0Pjx0ZXh0IHg9IjE2MCIgeT0iNzAwIiBmb250LWZhbWlseT0iR2VvcmdpYSxzZXJpZiIgZm9udC1zdHlsZT0iaXRhbGljIiBmb250LXNpemU9IjM4IiBsZXR0ZXItc3BhY2luZz0iNi44IiBmaWxsPSIjNWI0YTMzIiBvcGFjaXR5PSIuNzUiIHRyYW5zZm9ybT0icm90YXRlKDQgMTYwIDcwMCkiPkRpbXdvb2Q8L3RleHQ+PHRleHQgeD0iMTIwMCIgeT0iMTA2MCIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc3R5bGU9Iml0YWxpYyIgZm9udC1zaXplPSIzNCIgbGV0dGVyLXNwYWNpbmc9IjYuMSIgZmlsbD0iIzViNGEzMyIgb3BhY2l0eT0iLjc1IiB0cmFuc2Zvcm09InJvdGF0ZSgtNCAxMjAwIDEwNjApIj5TYWx0bWFyc2g8L3RleHQ+PHRleHQgeD0iMTU4MCIgeT0iNTQwIiBmb250LWZhbWlseT0iR2VvcmdpYSxzZXJpZiIgZm9udC1zdHlsZT0iaXRhbGljIiBmb250LXNpemU9IjQwIiBsZXR0ZXItc3BhY2luZz0iNy4yIiBmaWxsPSIjNWI0YTMzIiBvcGFjaXR5PSIuNzUiIHRyYW5zZm9ybT0icm90YXRlKDcwIDE1ODAgNTQwKSI+VGhlIEdyZXkgU2VhPC90ZXh0Pjx0ZXh0IHg9IjEwMDAiIHk9IjQ4MCIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc3R5bGU9Iml0YWxpYyIgZm9udC1zaXplPSIzMCIgbGV0dGVyLXNwYWNpbmc9IjUuNCIgZmlsbD0iIzViNGEzMyIgb3BhY2l0eT0iLjc1IiB0cmFuc2Zvcm09InJvdGF0ZSgtMTQgMTAwMCA0ODApIj5UaGUgVmFsZTwvdGV4dD48cmVjdCB4PSIxNCIgeT0iMTQiIHdpZHRoPSIxNzcyIiBoZWlnaHQ9IjExNzIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzViNGEzMyIgc3Ryb2tlLXdpZHRoPSI0Ii8+PHJlY3QgeD0iMjQiIHk9IjI0IiB3aWR0aD0iMTc1MiIgaGVpZ2h0PSIxMTUyIiBmaWxsPSJub25lIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iMS41Ii8+PHBhdGggZD0iTTgwIDExMjAgaDMwMCBNODAgMTEwOCB2MjQgTTIzMCAxMTA4IHYyNCBNMzgwIDExMDggdjI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM1YjRhMzMiIHN0cm9rZS13aWR0aD0iNCIvPjx0ZXh0IHg9IjgwIiB5PSIxMDk4IiBmb250LWZhbWlseT0iR2VvcmdpYSxzZXJpZiIgZm9udC1zaXplPSIyNiIgZmlsbD0iIzViNGEzMyI+MDwvdGV4dD48dGV4dCB4PSIzNDUiIHk9IjEwOTgiIGZvbnQtZmFtaWx5PSJHZW9yZ2lhLHNlcmlmIiBmb250LXNpemU9IjI2IiBmaWxsPSIjNWI0YTMzIj41MCBtaWxlczwvdGV4dD48L3N2Zz4=</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+// Pin icons for Codices maps: [id, label, svg inner markup] by group, drawn on a 0 0 512 512 view box.
+// From game-icons.net by Lorc, Delapouite and contributors, CC BY 3.0 (static/vendor/game-icons/LICENSE).
+// The ids are stored with the pins (models.PinIcons in Go lists the same ones).
+window.CODEX_PIN_ICONS = [
+    { group: 'Places', icons: [
+        ['place', 'Place', '<path fill="currentColor" d="M256 17.108c-75.73 0-137.122 61.392-137.122 137.122c.055 23.25 6.022 46.107 11.58 56.262L256 494.892l119.982-274.244h-.063a137.1 137.1 0 0 0 17.202-66.418C393.122 78.5 331.73 17.108 256 17.108m0 68.56a68.56 68.56 0 0 1 68.56 68.562A68.56 68.56 0 0 1 256 222.79a68.56 68.56 0 0 1-68.56-68.56A68.56 68.56 0 0 1 256 85.67z"/>'],
+        ['settlement', 'Settlement', '<path fill="currentColor" d="m109.902 35.87l-71.14 59.284h142.28zm288 32l-71.14 59.284h142.28l-71.14-59.285zM228.73 84.403l-108.9 90.75h217.8zm-173.828 28.75v62h36.81l73.19-60.992v-1.008zm23 14h16v18h-16zm265 18v10.963l23 19.166v-16.13h16v18h-13.756l.104.087l19.098 15.914h-44.446v14h78v-39h18v39h14v-62zm-194.345 48v20.08l24.095-20.08zm28.158 0l105.1 87.582l27.087-22.574v-65.008zm74.683 14h35.735v34h-35.735zm-76.714 7.74L30.37 335.153H319l-144.314-120.26zm198.046 13.51l-76.857 64.047l32.043 26.704H481.63l-108.9-90.75zm-23.214 108.75l.103.086l19.095 15.914h-72.248v77.467h60.435v-63.466h50v63.467h46v-93.466H349.516zm-278.614 16V476.13h126v-76.976h50v76.977h31.565V353.155H70.902zm30 30h50v50h-50z"/>'],
+        ['city', 'City', '<path fill="currentColor" d="M256 22.604c-10.01 0-20.02 2.388-26.836 7.163c-2.162 1.514-6.99 10.97-9.213 20.113c-.69 2.84-1.016 5.075-1.446 7.516h74.992c-.43-2.44-.757-4.676-1.447-7.516c-2.224-9.142-7.052-18.6-9.214-20.113c-6.817-4.775-16.826-7.163-26.836-7.163M80 26.626l-50.707 126.77h95.814l2.8-7zm352 0l-47.906 119.77l2.8 7h95.813zm-199 48.77v14h46v-14zm-19.438 32l-7 14h98.875l-7-14zm-63.468 32l-24.8 62h261.413l-24.8-62zM25 171.396v318h55v-39s4.074-32 16-32s16 32 16 32v39h80v-39c0-32 42.762-80 64-80c23.75 0 64 48 64 80v39h80v-39s4.074-32 16-32s16 32 16 32v39h55v-318h-92.906l19.2 48H393v183h-18v-135h-46v23h-18v-23h-46v23h-18v-23h-46v23h-18v-23h-46v135h-18v-183H98.707l19.2-48zm14 23h18v32H39zm416 0h18v32h-18zm-318 25v30h46v-7h18v7h46v-7h18v7h46v-7h18v7h46v-30zm-50 71h18v32H87zm320 0h18v32h-18zM256 312.91l2.846.946s24.722 8.202 49.69 22.766c12.483 7.282 25.14 16.154 35.077 26.918S361 387.396 361 402.396h-18c0-9-4.55-17.91-12.613-26.645c-8.064-8.735-19.406-16.863-30.922-23.58c-20.776-12.12-39.553-18.78-43.465-20.142c-3.912 1.36-22.69 8.022-43.465 20.14c-11.516 6.72-22.858 14.847-30.922 23.583S169 393.397 169 402.397h-18c0-15 7.45-28.092 17.387-38.856c9.936-10.764 22.594-19.636 35.078-26.918c24.967-14.564 49.69-22.766 49.69-22.766z"/>'],
+        ['fortress', 'Fortress', '<path fill="currentColor" d="M151 32v247h18V32zm247 9.574l-13.428 7.59c-31.626 17.876-61.492 12.267-93.138 4.356c-31.647-7.912-64.83-18.84-97.946-4.807L188 51.039v115.549l12.512-5.3c25.883-10.968 54.201-2.396 86.554 5.692s68.988 14.98 106.362-6.144l4.572-2.584zM73 297v67.271l32 32V487h302v-90.729l32-32V297h-46v39h-18v-39h-46v39h-18v-39h-46v39h-18v-39h-46v39h-18v-39h-46v39h-18v-39z"/>'],
+        ['tower', 'Tower', '<path fill="currentColor" d="m256 32l-96 48h23v71h-32v50h30.945L155.36 440.244l-.653.477l.522.72l-4.175 37.566l-.994 8.945l17.89 1.99l.995-8.946L171.61 457h168.78l2.665 23.994l.994 8.945l17.89-1.99l-.995-8.944l-4.174-37.567l.523-.72l-.654-.476L330.054 201H361v-50h-32V80h23zm-48 64h32v48h-32zm64 0h32v48h-32zm-103 73h14v14h-14zm32 0h14v14h-14zm32 0h14v14h-14zm32 0h14v14h-14zm32 0h14v14h-14zm32 0h14v14h-14zm-113.328 32h80.656L256 236.848zm-16.65 9.283L240.33 247h-45.385l4.08-36.717zm113.955 0l4.08 36.717h-45.385zM192.945 265h31.383l-34.822 30.953l3.44-30.953zm58.477 0h9.156l51.75 46H199.672zm36.25 0h31.383l3.44 30.953L287.67 265zm-83.994 64h104.644L256 367.053zm-18.8 8.586L236.323 375h-55.6l4.157-37.414zm142.243 0L331.278 375h-55.6l51.444-37.414zM178.724 393h41.6l-45.26 32.914zm72.205 0h10.144l63.25 46H187.678l63.25-46zm40.75 0h41.6l3.658 32.914z"/>'],
+        ['inn', 'Inn', '<path fill="currentColor" d="M252.094 19.438c-18.092-.063-35.548 9.82-43.125 28.437v9.688l-11.376-2.5c-14.316-3.17-25.792-1.15-33.375 3.843c-7.585 4.994-12.174 12.898-12.345 25.438c-.13 9.54 1.93 15.82 4.813 20s6.673 6.672 11.906 8.062c10.465 2.78 26.67-.357 41.094-8.75l5.968-3.47l5.063 4.658c8.405 7.744 14.51 11.07 20.56 12.25c6.052 1.18 13.046.318 23.44-2.875l9.842-3.032l2.063 10.093c2.695 13.158 14.91 23.407 29.125 23.407c13.237 0 23.67-9.028 27.313-21.468l2.218-7.532l7.783.843c8.855.99 19.41-4.045 25-10.343l6-6.75l6.968 5.782c18.61 15.487 35.46 16.96 47.283 11.468c11.82-5.494 20.18-18.602 19.25-38.782c-.88-18.827-10.97-30.448-25.5-35.812c-14.532-5.364-33.76-3.61-51.282 8.218l-7.436 5.032l-5.344-7.25c-7.038-9.585-17.09-15.485-26.72-17c-9.628-1.516-18.487.928-25.374 8.406l-7.406 8.03l-6.78-8.56c-10.443-13.165-25.214-19.482-39.626-19.532zM65.22 119.968C37.8 203.65 25.784 289.07 28.812 376.19c39.55 17.23 81.422 18.105 123.437 18a957 957 0 0 0 6.594-34.22c-32.102 1.678-64.094 2.52-94.313-9.124c-2.33-66.88 6.917-121.622 28-187.03c27.318 6.5 55.01 8.61 83.25 7.467c-.07-11.715-.387-22.556-1.03-32.31c-37.168-1.726-73.593-8.642-109.53-19zm148 2.97c-6.57 3.29-13.37 5.82-20.19 7.406c3.092 33.456 1.947 78.392-2.186 127.094c-4.777 56.28-13.866 116.5-26.438 166.718H434.25c-9.932-52.565-18.812-111.61-23.594-166.72c-3.87-44.618-5.233-86.115-2.03-119.717c-10.777-1.282-22.047-5.642-32.938-13.22c-7.498 5.988-16.954 10.145-27.25 10.75c-7.46 16.247-23.42 28.125-42.688 28.125c-19.644 0-36.84-11.86-44.344-28.938c-8.26 1.885-15.993 2.507-23.72 1c-8.57-1.67-16.468-6.014-24.467-12.5zm-78.376 319.906L116.22 491.25h358.686l-21.72-48.406h-318.34z"/>'],
+        ['temple', 'Temple', '<path fill="currentColor" d="M256 26.2L52 135h408zM73 153v14h366v-14zm16 32v206h30V185zm101.334 0v206h30V185zm101.332 0v206h30V185zM393 185v206h30V185zM73 409v30h366v-30zm-32 48v30h430v-30z"/>'],
+        ['shop', 'Shop', '<path fill="currentColor" d="M256.18 21c-23.242 0-46.577 3.01-63.186 8.54c-8.304 2.763-14.868 6.196-18.808 9.558c-3.94 3.36-5.167 5.956-5.186 8.96L168.943 57H41v14h430V57H342.967l.033-9.033c.01-3.002-1.17-5.55-5.057-8.895s-10.407-6.773-18.677-9.535C302.724 24.014 279.42 21 256.18 21M38.277 89l-10.443 94h80.9l20.243-86.36L122.81 183h81.07l17.114-86.68l-3.096 86.68h75.75l-4.634-86.518L307.694 183h81.497l-6.167-86.36L403.266 183h80.9l-10.443-94zM25.834 201l-.51 4.588C39.822 226.445 52.968 235 64 235c11.32 0 24.852-8.89 39.8-30.96l.714-3.04zm95.687 0l-.32 4.498C135.753 226.495 148.935 235 160 235c11.293 0 24.788-8.85 39.693-30.803l.63-3.197zm95.736 0l-.156 4.352C231.69 226.455 244.908 235 256 235c11.08 0 24.28-8.525 38.85-29.576l-.237-4.424h-77.357zm94.324 0l.674 3.12c15 22.192 28.503 31.044 39.773 31.013c11.03-.03 24.212-8.62 38.772-29.637l-.32-4.496zm95.906 0l.713 3.04C423.147 226.11 436.68 235 448 235c11.032 0 24.178-8.555 38.676-29.412l-.51-4.588h-78.68zM112 223.31C97.313 242.11 81.492 253 64 253c-13.972 0-26.884-6.906-39-19.264V487h318V279h114v208h30V233.736C474.884 246.094 461.972 253 448 253c-17.49 0-33.31-10.888-47.996-29.684c-14.664 18.808-30.432 29.77-47.926 29.817c-17.508.048-33.352-10.87-48.092-29.807C289.303 242.116 273.486 253 256 253c-17.492 0-33.313-10.89-48-29.69c-14.687 18.8-30.508 29.69-48 29.69s-33.313-10.89-48-29.69M55 279h258v178H55zm18 18v142h222V297zm288 0v71.064l78 .573V297zM88 312h128c-108.235 8-116.31 24-128 113.11zm273 74.066v13.998l78 .573v-14.002zm0 32V487h78v-68.365z"/>'],
+        ['port', 'Port', '<path fill="currentColor" d="M90.53 23c-18.345 0-36.688 7.002-50.686 21c-27.996 27.996-27.994 73.38 0 101.375c21.776 21.776 54.08 26.603 80.53 14.5l53.69 53.688c-21.425 19.696-44 38.257-67.44 55.937l30.126 30.125c18.734-22.545 37.953-44.474 57.844-65.53l169.594 169.593c-51.845 40.444-120.866 53.838-192.813 42.562L173 424.906L72.47 404.47l95.405 88.405l1.97-26c86.593 36.97 177.603 34.61 241.343-11.75l63.062 21.313l-21.47-63.594c44.61-63.62 46.408-153.412 9.908-238.875l26.03-1.97l-88.406-95.375l20.438 100.53l21.344-1.624c11.278 71.983-2.168 141.017-42.656 192.876l-169.782-169.75c21.075-20.34 42.93-39.665 65.78-57.72l-30.123-30.124c-17.015 24.154-35.673 46.66-55.688 67.813l-53.97-53.97C167.834 98.183 163.032 65.814 141.22 44c-14-13.998-32.343-21-50.69-21m0 27.03c11.434.002 22.872 4.34 31.595 13.064c17.447 17.447 17.446 45.742 0 63.187c-17.446 17.447-45.71 17.447-63.156 0c-17.447-17.444-17.448-45.74 0-63.186C67.69 54.37 79.097 50.03 90.53 50.03"/>'],
+        ['bridge', 'Bridge', '<path fill="currentColor" d="M25 265v71.11c7.526-4.42 17.73-10.278 30-16.98V265zm432 0v54.205a1117 1117 0 0 1 30 16.93V265zm-201.49.28c-39.653.03-99.394 23.28-148.06 46.976c-44.553 21.694-76.747 41.37-82.45 44.88V471h110.387c1.88-32.24 13.54-69.11 32.552-99.74c20.797-33.505 51.085-60.252 88.058-60.26c36.985-.008 67.298 26.736 88.12 60.244c19.038 30.635 30.72 67.51 32.603 99.756H487V357.145c-5.72-3.51-38.067-23.218-82.82-44.93c-48.875-23.713-108.863-46.962-148.67-46.934z"/>'],
+        ['mine', 'Mine', '<path fill="currentColor" d="m403.818 33.117l-369.554 15.4v46.012L426.97 79.425l-23.152-46.31zM385.334 99.04l-30.408 1.17l9.78 185.806l38.554-7.71zm-135.152 5.198l-18.39.71l-2.694 15.61l-26.578 18.75l.13.866l-.273-.047l-3.063 17.738l6.188 1.07l4.617 30.395l31.532 5.445l14.543-27.088l6.186 1.07l3.063-17.74l-.273-.046l.416-.773l-18.75-26.578zm-77.444 2.98l-22.82.878l-39.47 54.775l-1.692 33.138l63.982-88.79zm-77.625 2.985l-31.275 1.203l-28.72 272.832l45.66 6.733l14.335-280.767zM236.928 128.1l14.457 20.49l-34.947-6.035zm-20.516 32.718l28.87 4.985l-7.012 13.064l-19.63-3.39l-2.228-14.66zM437.12 289.89l-76.434 15.288l-44.99-14.998l-28.706 28.703h169.457zm-260.05 2.268l-9.42 20.725h-16.386v18h8.205l-7.275 16h-22.93v18h14.75l-8.183 18h-26.568v18h18.386l-13.636 30h-24.75v18h16.568l-8.762 19.275l16.387 7.45l12.147-26.725h143.423l-6.75-18H133.785l13.637-30h103.605l-6.75-18h-88.673l8.18-18h73.74l-6.75-18h-58.807l7.273-16h45.535l-4.498-12h41.258l6-6h-80.113l6.035-13.276l-16.387-7.45zm69.182 44.725l40.36 107.635c6.022-8.242 15.748-13.635 26.652-13.635c11.916 0 22.43 6.438 28.234 16h55.53c5.804-9.562 16.32-16 28.236-16c10.424 0 19.768 4.93 25.832 12.564l26.64-106.564zm67.012 112c-8.39 0-15 6.61-15 15s6.61 15 15 15s15-6.61 15-15s-6.61-15-15-15m112 0c-8.39 0-15 6.61-15 15s6.61 15 15 15s15-6.61 15-15s-6.61-15-15-15"/>']
+    ] },
+    { group: 'Danger', icons: [
+        ['camp', 'Enemy camp or base', '<path fill="currentColor" d="M247 28v80h18V28zm35 0v64l80-32zm-26 96c-48 48-144 112-192 128c0 64-16 208-32 240h160c16-16 64-144 64-192c0 48 48 176 64 192h160c-16-32-32-176-32-240c-48-16-144-80-192-128M112 300h80v80h-80z"/>'],
+        ['battle', 'Battle', '<path fill="currentColor" d="M19.75 14.438c59.538 112.29 142.51 202.35 232.28 292.718l3.626 3.75l.063-.062c21.827 21.93 44.04 43.923 66.405 66.25c-18.856 14.813-38.974 28.2-59.938 40.312l28.532 28.53l68.717-68.717c42.337 27.636 76.286 63.646 104.094 105.81l28.064-28.06c-42.47-27.493-79.74-60.206-106.03-103.876l68.936-68.938l-28.53-28.53c-11.115 21.853-24.413 42.015-39.47 60.593c-43.852-43.8-86.462-85.842-130.125-125.47c-.224-.203-.432-.422-.656-.625C183.624 122.75 108.515 63.91 19.75 14.437zm471.875 0c-83.038 46.28-154.122 100.78-221.97 161.156l22.814 21.562l56.81-56.812l13.22 13.187l-56.438 56.44l24.594 23.186c61.802-66.92 117.6-136.92 160.97-218.72zm-329.53 125.906l200.56 200.53a403 403 0 0 1-13.405 13.032L148.875 153.53zm-76.69 113.28l-28.5 28.532l68.907 68.906c-26.29 43.673-63.53 76.414-106 103.907l28.063 28.06c27.807-42.164 61.758-78.174 104.094-105.81l68.718 68.717l28.53-28.53c-20.962-12.113-41.08-25.5-59.937-40.313c17.865-17.83 35.61-35.433 53.157-52.97l-24.843-25.655l-55.47 55.467c-4.565-4.238-9.014-8.62-13.374-13.062l55.844-55.844l-24.53-25.374c-18.28 17.856-36.602 36.06-55.158 54.594c-15.068-18.587-28.38-38.758-39.5-60.625z"/>'],
+        ['dragon', 'Dragon', '<path fill="currentColor" d="M188.8 20.38c-5.3 26.85 4.6 55.74 34.1 86.52c11.2-7.29 31.6-10.94 50-8.16c-46-22.31-66.5-47.13-84.1-78.36M29.19 26.62C43.56 73.08 81.09 128.8 129.6 168.3C93.51 166 49.93 153.1 18.76 143c24.96 35.2 64.17 52.9 103.34 66.3C97.13 227 66.99 245 18.66 248c54.64 19.2 107.54 8.9 131.34.7c-17.9 34.9-100.72 66.2-122.31 77c53.26 4.2 121.71-11 167.01-32.9c10 24.6-1.6 53.2-10.1 77.8c-1.9 4.5-3.8 8.9-5.7 13.3c5.1-3.5 10.1-7 14.9-10.6c23.6-16.2 47.8-31.9 59.5-58.8c26.1 31.2 62.7 62.1 107 85.4c17.4 22.1 28.3 49 34.2 73.8c8.3-19.1 13.8-40.2 9.7-60.3c24.5-3.6 35.6-29.7 35.5-54.4c-12.6 6.2-15.1 6.3-31.2 8.2c0-10.1.6-12.5-3-28.7c-10.3 8.4-21 11.2-30.8 11.8c2.1-7.6 3-19.5 3.7-27.3c-13 7.1-19.2 9.7-30.1 10.8c-.4-10.9-.1-20-4.1-30.4c-29.6 19-48.6 1.5-68-21.3c19.8-17 96.4-21.8 95.1 7.1c14-7.3 18.8-11.2 23.6-15.9c9.1 8.5 13.4 20.9 15.1 31.4c9.3-9.4 10.3-10.5 17.1-23.8c5.7 10.1 8.8 17 10.7 30.6c8.5-6.2 15.4-13.1 19.8-21.4c7.5 15.5 8.3 16 12.4 33c17.8-13.1 21.8-31.2 22.8-47.6c2-33-.3-108.2-31-142.9c1.7 36.3-13.1 70-33.8 80.7c-12.6 4.9-96.5-74.6-137.6-93.3c-23.5-10.2-48.1 7.1-67.8 9.3C147 106.2 83.57 70.94 29.19 26.62M296.1 152.8c13.3 20.9 32.2 36.9 60.1 55c-19.4 2.9-65.8-6.7-77.7-24c-5.5-7.9 7.1-21.3 17.6-31M180.6 319.1c-14.4 6.2-29.2 10.9-43.8 14.3c-2.4 3.6-4.6 7.1-6.7 10.5c14.8 5.3 31.5 7 44.1 2.8c3.3-9.8 5.5-19.3 6.4-27.6m-68 19.1l-10.2 1.5c-31.81 36.6-61.9 103.2-48.24 151.9h36.13c-11.12-37.7-16.53-87.1 22.31-153.4m8.5 21.5c-5.9 11.4-10.4 22.1-13.8 32.1c12.9 6.7 29.1 8.9 44.8 8.2c4.6-10.5 9.8-21.8 14.6-33.3c-15.4 1.8-31.4-1.4-45.6-7m111.4 6.6c-12 10.5-25.2 20.3-38.9 29.6c7 34 33.4 63.4 73.9 95.7h83.3c-57.2-31.8-94.6-73.3-118.3-125.3m-130 43.2c-2.5 11.8-3.3 22.7-3 32.9c37.3 14.2 62.5 13.5 97.5 4.1c-7.2-10.3-13-21-16.9-32.3c-32.7 9.4-55.4 5.7-77.6-4.7m106.6 52.4c-38.1 10.9-68.8 13.2-107.5.3c1.8 10.4 4.5 20.1 7.5 29.4h130.1c-11.3-9.8-21.4-19.6-30.1-29.7"/>'],
+        ['monster', 'Monster', '<path fill="currentColor" d="M142.026 16.89C94.242 38.888 62.71 74.257 62.71 113.927c0 26.11 13.42 50.288 36.22 70.04c-11.664 25.398-18.99 53.91-20.81 84.212c17.194.562 33.53 4.205 48.192 11.7c41.566 21.25 61.083 66.944 57.787 121.093a287 287 0 0 0 23.122 4.58c.894-16.76.83-33.468-.496-50.122l18.63-1.485c1.438 18.035 1.466 36.014.458 53.938c8.022.76 16.14 1.21 24.322 1.382V353.03h18.687v56.13c7.83-.25 15.693-.755 23.565-1.514c-.995-17.845-.96-35.745.47-53.7l18.63 1.485c-1.323 16.597-1.39 33.247-.504 49.95c7.307-1.07 14.6-2.355 21.863-3.843c-3.467-54.395 16.04-100.333 57.748-121.656c14.66-7.497 30.998-11.142 48.19-11.702c-1.843-30.716-9.343-59.594-21.284-85.252c22.08-19.56 35.044-43.346 35.044-69c0-39.67-31.532-75.04-79.316-97.035C386.283 33.46 394.32 53.31 394.32 74.27c0 42.688-31.51 79.614-77.026 97.146l-6.14-14.3c11.148-4.44 21.233-10.197 29.876-16.964c10.1-7.905 18.202-17.087 23.91-27.154c-29.85-25.333-66.642-40.283-106.488-40.283c-40.34 0-77.554 15.314-107.6 41.223c5.674 9.7 13.588 18.555 23.372 26.214c9.67 7.57 21.145 13.877 33.894 18.49l-6.125 14.264c-47.677-16.863-81.06-54.696-81.06-98.636c0-20.96 8.038-40.81 21.093-57.377zm10.286 183.128c.054-.004.1.004.127.037c18.414 23.35 51.93 39.697 91.086 43.162c-5.892 19.698-26.99 34.53-52.67 34.53c-30.21 0-55.148-20.584-55.148-45.517c.002-12.465 6.205-23.997 16.11-32.173c.083.094.33-.027.494-.04zm211.668.002c.053-.003.1.006.138.04c9.907 8.175 16.112 19.707 16.112 32.173c0 24.93-24.937 45.515-55.15 45.515c-25.68 0-46.776-14.83-52.67-34.53c39.156-3.466 72.673-19.813 91.087-43.16c.112.085.322-.03.483-.038M258.4 244.174c5.625 27.42 13.928 54.84 32.91 82.26c-20.274 5.432-44.818 5.627-65.82 0c17.968-27.42 26.834-54.84 32.91-82.26m-76.31 175.54c-2.34 15.4-6.413 31.3-12.25 47.372a169 169 0 0 0 27.663 14.637c3.627-19.225 6.537-38.376 8.33-57.455a309 309 0 0 1-23.744-4.553zm152.802.48a409 409 0 0 1-22.526 3.888c1.777 18.972 4.655 38.015 8.248 57.13a169 169 0 0 0 26.452-14.126c-5.776-15.906-9.824-31.644-12.174-46.893zm-41.094 6.115c-8.335.8-16.668 1.323-24.975 1.58v65.694a158 158 0 0 0 33.973-6.01c-3.898-20.343-7.058-40.766-8.998-61.265zm-69.402.237c-1.953 20.54-5.13 41.002-9.043 61.385a158 158 0 0 0 34.783 5.773v-65.713a349 349 0 0 1-25.74-1.445"/>'],
+        ['danger', 'Danger', '<path fill="currentColor" d="M425.344 22.22c-9.027.085-18.7 5.826-24.344 19.405c-11.143 26.803-31.93 59.156-58.563 93.47a141.2 141.2 0 0 1 27.5 30.31c35.1-26.57 68.882-46.81 98.125-56.75c44.6-15.16 12.02-69.72-35.343-35.343c26.91-27.842 11.107-51.27-7.376-51.093zm-341.22.03c-18.5.378-37.604 23.962-16.343 49.875C31.523 38.635-.802 85.48 37.095 102.813c28.085 12.844 62.54 35.66 99.062 64.343c8.125-12.5 18.207-23.61 29.78-32.937c-26.782-35.743-48.44-69.835-61.78-98.47c-4.515-9.69-12.22-13.66-20.03-13.5zm169.5 99.688c-67.104 0-121.31 54.21-121.31 121.312c0 44.676 24.04 83.613 59.905 104.656v56.406h18.718v-47.468a120 120 0 0 0 16.093 4.78v42.688h18.69v-40.03a124 124 0 0 0 15.749 0v40.03h18.686v-42.687a121 121 0 0 0 16.094-4.78v47.467h18.688V347.97c35.92-21.03 60-60.003 60-104.72c0-67.105-54.208-121.313-121.313-121.313zm-66.874 88.218c19.88 0 36 16.12 36 36s-16.12 36-36 36s-36-16.12-36-36s16.12-36 36-36m133.563 0c19.878 0 36 16.12 36 36s-16.122 36-36 36c-19.88 0-36-16.12-36-36s16.12-36 36-36m-66.72 52.344l29.938 48.188h-59.874l29.938-48.188zm-107.28 70.563c-40.263 32.472-78.546 58.41-109.22 72.437c-37.896 17.334-5.57 64.146 30.688 30.656c-30.237 36.854 21.167 69.05 36.376 36.406c15.072-32.352 40.727-71.7 72.438-112.5a141 141 0 0 1-30.28-27zm213.156 1.718a141 141 0 0 1-27.908 24.69c31.846 39.39 56.82 76.862 69.438 107.217c17.203 41.383 71.774 9.722 31.72-31.718c47.363 34.376 79.94-20.185 35.342-35.345c-32.146-10.926-69.758-34.3-108.593-64.844z"/>']
+    ] },
+    { group: 'To explore', icons: [
+        ['dungeon', 'Dungeon', '<path fill="currentColor" d="m193.571 26.027l35.192 83.99c14.877 7.658 33.121 6.696 47.488-1.279l40.283-85.976c-45.582-7.268-84.512-4.945-122.963 3.265m137.3 7.606l-32.038 71.38c12.536 12.349 37.237 18.872 47.033 15.448l31.172-64.691c-12.422-8.392-27.428-15.886-46.168-22.137zm-154.86-1.97c-21.814 6.55-40.982 16.35-56.099 28.591c14.941 15.844 28.861 34.184 38.194 52.832c24.477 6.133 35.479-6.849 47.475-18.55zm-74.245 34.831c-36.541 32.91-66.523 76.42-78.068 125.215l65.957 3.353c12.006-30.53 24.552-56.284 54.231-72.755c-9.883-20.24-23.626-39.403-42.12-55.813m292.503-.29l-31.852 61.044c32.54 21.007 43.572 41.348 52.597 69l72.464-8.43c-9.612-55.894-42.206-107.047-93.209-121.614m-52.233 137.2c4.757 12.937-15.842 29.7-9.07 39.428c-4.011.85-8.874 1.642-14.385-8.957c-1.126 12.49 2.172 19.603 12.168 29.209c-2.682.783-8.045 2.75-12.08.566c-1.24 7.386 10.867 13.863 20.725 14.832l8.392-2.175c-6.09-1.106-7.881-3.315-10.627-6.13c2.97-1.32 12.554-7.117 2.149-14.751c12.634-2.752 6.035-14.89 4.14-21.862c7.525 7.798 15.243 22.54 21.862 7.084c4.176 12.604 6.561 12.12 13.614 9.107c1.054 9.196-2.957 14.791-8.792 22.518l12.494-4.992c6.018-5.026 20.16-25.502 6.428-35.5c2.603 12.443-5.563 14.388-18.672-10.937c-4.377 30.773-12.236-7.49-28.346-17.44m-321.668 2.108v66.242l72.842-11.858l1.592-49.873zm143.486.363c3.732 8.72-14.487 45.226-18.865 14.453c-13.109 25.325-23.908 24.26-21.304 11.817c-13.732 9.998-1.347 33.458 4.671 38.484l11.229 3.001c-5.835-7.727-11.565-13.614-10.512-22.81c7.053 3.013 10.492 5.604 14.668-7c6.618 15.456 17.32-4.378 24.846-12.175c-1.554 11.494-6.282 22.427 7.303 25.197c-9.13 10.082 1.899 19.99-12.694 22.812l8.393 2.176c9.857-.97 20.385-10.606 19.144-17.992c-4.035 2.183-7.818 3.376-10.5 2.594c9.996-9.607 10.662-21.46 9.536-33.95c-5.511 10.6-7.917 11.738-11.752 13.698c6.77-9.728-5.927-32.285-14.163-40.305m327.512 1.172l-77.57 5.687l1.156 79.192l75.524 2.842zM98.313 279.81l-79.955 9.779l1.202 99.754l83.54 1.152zm280.659 7.347l-28.332 7.031l21.455 68.315l16.125-5.043zm-246.961 3.348l-9.248 70.303l16.125 5.043l21.455-68.315zM412.269 310.3v83.58l79.166-8.031l2.289-75.55zm84.605 91.656l-88.934 9.947l-1.16 80.727l90.674.586zm-395.822 2.002l-81.848 2.322l-4.658 86.184h90z"/>'],
+        ['cave', 'Cave', '<path fill="currentColor" d="M346.951 24.582L299.193 72.34l-101.136-7.024l-40.97 80.737l68.688 25.35l37.153-19.936l8.511 15.861l-44.293 23.768l-79.7-29.416l-70.19 55.341l35.117 58.995l-.375.2l13.014 21.585l29.134 2.361l55.06-35.123l9.679 15.176l-60.16 38.377l-44.364-3.596l-18.23-30.234l-56.8 30.586l33.712 61.804l-33.713 40.735L18 444.177V494h170.62l-5.6-45.592a261 261 0 0 1-5.147-4.512c-4.186-3.761-5.89-5.444-8.027-7.484l-73.13 21.797l-21.339-20.484l12.467-12.985l13.777 13.225l73.068-21.78l3.784 3.667s4.24 4.09 9.216 8.636l37.797-37.248l8.133 79.54l6.3-93.444l10.364 28.387l6.281-45.112l3.14-3.091l-.29-.233l22.486-27.974l.465-.907l.188.096l11.453-14.248l14.03 11.277l-9.122 11.348l67.803 34.715l27.008-9.489l22.478 17.71l22.924-12.036l8.367 15.938l-33.262 17.46l-23.875-18.81l-24.964 8.772l-9.584-4.907l39.04 87.842L383.923 494H494v-28.512L462.713 478.2l-6.776-16.678L494 446.06V211.176l-23.438-26.463l-21.654-67.371l-33.547 32.666l-107.77-13.873l-28.019-29.096l12.967-12.486l23.629 24.539l92.867 11.953l31.442-30.615l-52.79-61.801zm27.53 177.74l34.177 41.428l28.863-6.56l-4.136-13.59l17.22-5.243l9.77 32.098l-58.543 13.307l-31.377-38.033l-33.086 19.853l-9.262-15.436z"/>'],
+        ['ruins', 'Ruins', '<path fill="currentColor" d="m277.822 18l-33.46 5.637l20.41 20.41l42.12-5.5L457.26 171.332l8.892 52.78l-188.006-57.487l-8.16 12.145L494 247.27v-65.372L321.695 18zm-55.242 9.307L42.775 57.597l-14.457 47.276l195.346 59.732c3.162-2.613 6.453-5.325 12.973-10.673L71.084 103.31l34.695-36.474l2.195-2.31L242.262 46.99L222.58 27.31zm78.53 30.146l-20.282 2.65l23.832 23.83l-32.492 10.833l46.45 11.61l-29.983 44.634l154.928 47.373l-2.995-17.778l-139.46-123.152zm-42.794 5.59L116.626 81.55l-12.427 13.063l149.204 45.625c10.38-8.434 21.128-17.107 30.07-24.093l-75.64-18.91l63.506-21.17zM148.13 164.598l-26.595 26.595l-11.867-23.734l-14.95 44.843l-27.23-40.846L53.434 424.46c34.415 5.734 70.622 6.06 109.13-.075zm-5.134 43.134l6 202l-17.992.536l-6-202zm-69.992.004l17.992.528l-6 204l-17.992-.528zM99 208h18v208H99zm310 57v42.73c15.296 4.103 50.7 4.374 85 3.99V265zm-21.236 64c-3.1 2.538-6.47 4.89-10.202 6.822c-6.376 3.302-14.134 5.18-22.37 3.875c-4.783-.758-9.604-2.636-14.467-5.408L327.155 375H439v-46zM457 329v46h37v-46zm-185.658 17.377c-8.592 4.21-16.74 8.066-23.008 13.033c-5.09 4.035-9.18 8.75-12.11 15.59h78.05zM237.104 393c6.465 18.295 8.62 33.21 8.447 46H247v-46zM265 393v46h110v-46zm186.73 0l-46.003 46H494v-46zM195 442.203c-36.733 4.718-73.905 6.542-111.535 5.186l-3.414 4.45l35.934 6.764l-34.38 29.76c38.292 1.366 76.09-.08 113.396-4.42zm-174 .014v41.69a820 820 0 0 0 34.656 3.113l20.36-17.624l-28.067-5.283l13.704-17.867a670 670 0 0 1-40.654-4.03zM243.748 457c-2.055 11.088-5.47 20.656-8.2 30H311v-30zM329 457v30h110v-30zm128 0v30h37v-30z"/>'],
+        ['tomb', 'Tomb', '<path fill="currentColor" d="M256 46c-81.822 0-150 63.366-150 150v150c0 6.668-.757 23.558 0 30h300c.757-6.442 0-23.332 0-30V196c0-86.634-68.178-150-150-150M16 406v60h480v-60z"/>'],
+        ['treasure', 'Treasure', '<path fill="currentColor" d="M410.365 101.005c8.21-22.26 16.21-31.12 20.33-34.45c3.06-2.48 5.73-3.42 7.92-2.81c4 1.13 8.49 7.45 11.88 16.89c10.89 30.34 10 84.28-.93 129.51zm-286 72.92c7.52-31 10.28-66.13 7.77-94.92l-43.6-4.86zm289.46-113l-301.2-33.53c-2.5-.28-5.24 1.46-7.11 3c-3.67 3-10.42 10.32-17.66 27.64l308.68 34.34c5.16-13.25 11.02-23.89 17.31-31.43zm-228.78 298.71v-70.72l10.76 1.19l42.24 5.18v70.51zm16-40.34a13 13 0 0 0 5.34 10.29l-2.34 24.42l17 1.74l-4-25a9.54 9.54 0 0 0 5-9.15a13.64 13.64 0 0 0-11.06-12.59s.17.1.13.1c-5.95-.68-11.07 3.9-10.07 10.1zm53 64.45l-85-9.84v-86.72l-1.05-.09a8.14 8.14 0 0 1-7.27 6.71a8 8 0 0 1 5.23 8.9a8 8 0 0 1-8 6.66c8.453 4.004 4.341 16.778-4.86 15.1a8 8 0 0 1-8 13.8a8.01 8.01 0 0 1-12.28 10.29v.09a8 8 0 0 1-3.86 8.37l9.13 5.35v14.25l-12 7.13l-12-7.12v-14.26l8.15-4.82a8.21 8.21 0 0 1-5.07-5.92a.4.4 0 0 1 0-.1a8 8 0 0 1-15.18-5c-6.851 7.214-18.094-2.065-12.31-10.16c-8.346 4.519-16.217-6.676-9.14-13c-9.17 2.661-14.453-10.083-6.09-14.69a8 8 0 0 1-3.21-15.67c-9.294-1.047-9.548-14.463-.3-15.86c-.669-.164-1.264-.473-1.83-.76l-17.24-1.86l.6 167.11l309.18 34.49l-.6-165.83l-107-13.05zm140.06-164l4.72 1.91l.91.58l38.72 4.31l-23.26-64.77l-12.82 37c-.16.46-3.41 9.8-8.27 20.99zm-208.54-39.74l5 5.49l12.75-11.15l21.45-2.28l16.61 15.35l10.51 8.73l18.54-9.29l3.44.5c.12-.67.25-1.34.38-2c3.08-16.1 7.35-30.16 7.53-30.75l13.39-43.91l16.88 42.71l8.42 21.42l10.66-12.39l22.14-25.73l5.78 33.45l3.29 19.1l17.1-9.64l35.09-19.79l-18.48-51.4l-247.86-27.61c2.51 34.94-1.85 77.32-12.39 112h2.32l7-12.86h40.46zm-111.29 97.39c7.6 2.1 7.9 12.766.43 15.29c7.737.867 9.802 11.153 3 14.94c7.653-.548 11.614 8.947 5.84 14c7.313-2.115 13.168 6.216 8.7 12.38c6.288-3.518 13.657 2.417 11.56 9.31c4.53-4.723 12.506-2.304 13.65 4.14c2.057-5.713 9.48-7.141 13.51-2.6c-1.285-6.404 5.23-11.566 11.17-8.85c-4.564-5.77.425-14.123 7.67-12.84c-6.419-4.541-3.122-14.648 4.74-14.53c-7.316-3.503-5.375-14.415 2.7-15.18a8 8 0 0 1-5.38-8l-76.43-8.26c-.41.19-.746.15-1.16.2m367.54 139.08l-.59-163.86l-8.67 7l-55.51 46.79l.58 162zm-26.23-165.2l-24.11-15.27l-4.18-1.69c-5.91 11.52-13.39 23-22.66 27.88c-5.44 2.88-12.22 4.34-20.16 4.34c-11.13 0-24.75-2.91-37.35-8c-10-4-23.3-11-30.26-21.34c-4.9-7.29-6.64-17.77-5.31-32.92l-21.78 10.93l-19-15.8l-11.42-10.53l-9.16 1l-20.45 17.83l-11-11.7h-24.21l-17.61 32l-5.7-7.2l-4.42 4.85l-10.76 16.35l-12.29 4.91L97.611 256h-12.2l-2.776 6.005l76.9 8.21a8.15 8.15 0 0 1 2-2.9a8 8 0 0 1 10.31-.46a2 2 0 0 1-.14-.24c-4.955-8.368 6.459-16.62 12.87-9.375c6.412 7.245-3.167 17.571-10.87 11.635a8 8 0 0 1 1.12 2.89l22.62 2.44l168.54 20.57l51.49-43.38zm-28.34-57.73l-36.88 20.79l-7.14-41.47l-28 32.51l-18.13-46.11s-16.65 54.58-7 69c7.69 11.45 35.42 22.25 54.33 22.25c5 0 9.43-.76 12.67-2.48c13.8-7.31 30.15-54.49 30.15-54.49m-317.08 270.8v-.2c0-3.77-8.21-6.83-18.33-6.83s-18.33 3.06-18.33 6.83c0 3.21 6 5.9 14 6.63v.2c0 3.77 8.21 6.83 18.33 6.83s18.33-3.06 18.33-6.83c-.01-3.21-5.98-5.9-14-6.63m350 6.63c-10.13 0-18.33 3.06-18.33 6.83s8.21 6.83 18.33 6.83s18.33-3.06 18.33-6.83s-8.25-6.8-18.38-6.8zm40-16.28c-10.13 0-18.33 3.06-18.33 6.83s8.21 6.83 18.33 6.83s18.33-3.06 18.33-6.83s-8.22-6.83-18.34-6.83z"/>'],
+        ['portal', 'Portal', '<path fill="currentColor" d="M298.736 21.016c-99.298 0-195.928 104.647-215.83 233.736c-7.074 45.887-3.493 88.68 8.512 124.787a243 243 0 0 1-11.467-20.034c-16.516-32.335-24.627-65.378-25-96.272c-11.74 36.254-8.083 82.47 14.482 126.643c27.7 54.227 81.563 91.94 139.87 97.502a136.5 136.5 0 0 0 17.364 1.108c99.298 0 195.93-104.647 215.83-233.736c9.28-60.196.23-115.072-22.133-156.506c21.625 21.867 36.56 45.786 44.617 69.496c.623-30.408-14.064-65.766-44.21-95.806c-33.718-33.598-77.227-50.91-114.995-50.723c-2.328-.118-4.67-.197-7.04-.197zm-5.6 36.357c40.223 0 73.65 20.342 95.702 53.533c15.915 42.888 12.51 108.315.98 147.858c-16.02 54.944-40.598 96.035-79.77 126.107c-41.79 32.084-98.447 24.39-115.874-5.798a43.4 43.4 0 0 1-3.38-7.385c11.724 14.06 38.188 14.944 61.817 1.3c25.48-14.71 38.003-40.727 27.968-58.108c-10.036-17.384-38.826-19.548-64.307-4.837c-9.83 5.676-17.72 13.037-23.14 20.934a82 82 0 0 1 1.626-3.88c-18.687 24.49-24.562 52.126-12.848 72.417c38.702 45.923 98.07 25.503 140.746-6.426c37.95-28.392 72.32-73.55 89.356-131.988a296 296 0 0 0 3.467-13.008c-.286 2.218-.59 4.442-.934 6.678c-16.807 109.02-98.412 197.396-182.272 197.396c-35.644 0-65.954-15.975-87.74-42.71c-26.492-48.396-15.988-142.083 4.675-185.15c26.745-55.742 66.133-122.77 134.324-116.804c46.03 4.027 63.098 58.637 39.128 116.22c-8.61 20.685-21.192 39.314-36.21 54.313c24.91-16.6 46.72-42.13 59.572-73c23.97-57.583 6.94-113.422-39.13-116.805c-85.737-6.296-137.638 58.55-177.542 128.485a319 319 0 0 0-20.977 60.707a263 263 0 0 1 2.493-22.652C127.67 145.75 209.275 57.373 293.135 57.373z"/>']
+    ] },
+    { group: 'Land and people', icons: [
+        ['forest', 'Forest', '<path fill="currentColor" d="M249.28 19.188v.25c-18.114 38.634-45.065 72.36-77.686 102.937l37.72-3.938l-51.345 65.032l24.81-7.907l-33.624 54.875l16.53 9.843l-65.25 92.157l36.095.188l-51.686 83.594l63.562-8.126l12 32.094l66.438-25.282L215.5 493.28h52.938l-6.532-68.217l38.188 16.406l10.187-24.783l44.283 20.97l56.406-20.75l-37.064-64.094l-12.437-2.282l6.78 17.19l7.844 19.905l-19.938-7.78l-50.906-19.908v35.751l-14.156-8.594l-69.375-42l-21.595 21.25l-18.03 17.75l2.155-25.22l2.125-24.655l18.188 1.56l9.218-9.092l5.19-5.094l6.218 3.75l61.375 37.156v-29.906l12.75 4.97l43.718 17.092l-5.092-12.906l-6.157-15.656l16.533 3.03l45.468 8.345l-34.53-38.94l-23.625 14.033l-6.688 3.968l-5.125-5.874l-14.28-16.437l.218 1.217l-18.406 3.22l-5.97-34.313l-5.75-33.063l22 25.345l31.188 35.875l43.907-26.03c-24.67-19.543-39.507-33.87-49.658-48.814l.813 12.656l1.97 31l-18.75-24.75l-34.47-45.437l-22.25 46.813l-13.844 29.125l-3.843-32.032l-3.5-28.843l16.532-1.968l16.624-34.97l6.594-13.875l9.28 12.22l25 32.936l-.75-11.53l-.906-14.28l13.47 4.936L341.81 188l-26.125-35.156l-55.843-28.875l-8.938 20.218l-9.656 21.937l-7.72-22.688l-7.468-21.875l16.97-5.78l3.718-8.438l4-9.125l8.844 4.593l49.375 25.53l16.467-5.562c-43.42-34.31-64.63-68.886-76.156-103.593z"/>'],
+        ['mountain', 'Mountain', '<path fill="currentColor" d="m245.795 19.12l-52.363 153.513l26.67 61.937l38.884-52.37l53.217 67.493l11.682-40.486zM101.172 193.69l-29.06 80.222l24.54-12.715l24.803 14.33l11.64-48.013l-31.923-33.825zm83.267 5.308l-20.776 60.904l-15.27-16.177l-14.662 60.48l-37.568-21.707l-33.44 17.324L19.04 420.42l84.884 30.937l73.418-22.437l73.935 19.47l71.66-21.536l91.973 25.226l77.28-31.66l-48.44-89.006l-39.045 26.664l-38.892-27.576l-27.153 42.79l-15.78-10.013l39.032-61.51l-26.6-64.752l-15.246 52.83l-60.634-76.9l-43.664 58.81l-31.33-72.76zm223.06 65.81L375.84 314.7l29.066 20.61l29.865-20.394l-27.27-50.11z"/>'],
+        ['quest', 'Quest', '<path fill="currentColor" d="M103.432 17.844a87 87 0 0 0-3.348.08q-3.822.163-7.604.678c-20.167 2.747-39.158 13.667-52.324 33.67c-24.613 37.4 2.194 98.025 56.625 98.025c.536 0 1.058-.012 1.583-.022v.704h60.565c-10.758 31.994-30.298 66.596-52.448 101.43a283 283 0 0 0-6.29 10.406l34.878 35.733l-56.263 9.423c-32.728 85.966-27.42 182.074 48.277 182.074v-.002l9.31.066c23.83-.57 46.732-4.298 61.325-12.887c4.174-2.458 7.63-5.237 10.467-8.42h-32.446c-20.33 5.95-40.8-6.94-47.396-25.922c-8.956-25.77 7.52-52.36 31.867-60.452a55.6 55.6 0 0 1 17.565-2.834v-.406h178.33c-.57-44.403 16.35-90.125 49.184-126c23.955-26.176 42.03-60.624 51.3-94.846l-41.225-24.932l38.272-6.906l-43.37-25.807h-.005l.002-.002l.002.002l52.127-8.85c-5.232-39.134-28.84-68.113-77.37-68.113C341.14 32.26 222.11 35.29 149.34 28.496c-14.888-6.763-30.547-10.723-45.908-10.652m.464 18.703c13.137.043 27.407 3.804 41.247 10.63l.033-.07c4.667 4.735 8.542 9.737 11.68 14.985H82.92l10.574 14.78c10.608 14.83 19.803 31.99 21.09 42.024c.643 5.017-.11 7.167-1.814 8.836c-1.705 1.67-6.228 3.875-15.99 3.875c-40.587 0-56.878-44.952-41.012-69.06C66.238 46.64 79.582 39.22 95.002 37.12a64 64 0 0 1 8.894-.573M118.5 80.78h46.28c4.275 15.734 3.656 33.07-.544 51.51H131.52c1.9-5.027 2.268-10.574 1.6-15.77c-1.527-11.913-7.405-24.065-14.62-35.74m101.553 317.095c6.44 6.84 11.192 15.31 13.37 24.914c3.797 16.736 3.092 31.208-1.767 43.204c-4.526 11.175-12.576 19.79-22.29 26h237.19c14.448 0 24.887-5.678 32.2-14.318c7.312-8.64 11.2-20.514 10.705-32.352a47.7 47.7 0 0 0-2.407-13.18l-69.91-8.205l42.017-20.528c-8.32-3.442-18.64-5.537-31.375-5.537H220.053zm-42.668.506a37 37 0 0 0-3.457.153a34.8 34.8 0 0 0-7.824 1.63c-15.11 5.02-25.338 21.54-20.11 36.583c3.673 10.57 15.347 17.71 25.654 13.938l1.555-.57h43.354c.946-6.36.754-13.882-1.358-23.192c-3.71-16.358-20.543-28.483-37.815-28.54z"/>'],
+        ['party', 'The party', '<path fill="currentColor" d="M356.688 19.188c-6.83-.032-12.837.64-18.125 1.843c-24.178 5.495-36.437 21.983-50.938 41.157c-14.5 19.175-31.317 40.993-62.78 47.47C195.08 115.78 154.27 108.253 91.25 78.5c-10.013 44.88-33.406 128.62-60.906 178.656c60.093 28.5 97.245 34.926 121 30.875c.01 0 .02.004.03 0c21.59-5.827 34.487-20.094 47.876-43.092c17.014-29.227 32.563-72.198 60.25-123.188l16.406 8.938c-16.69 30.735-28.802 58.617-40 82.937c8.552-6.512 18.633-11.77 31.063-14.594c27.71-6.296 65.053-.495 121.655 24.75c-6.932-29.276-1.885-61.913 9.875-92.218c12.686-32.69 33.038-62.907 56.28-84.03c-42.595-19.553-73.152-27.554-95.124-28.282c-1.01-.033-1.993-.058-2.97-.063zm127.54 14.144a10.8 10.8 0 0 0-2.664.266c-4.378.977-8.94 4.424-12.084 11.097L289.53 497.31h23.61L490.972 49.368c3.475-10.153-.75-15.86-6.746-16.035z"/>'],
+        ['person', 'Person', '<path fill="currentColor" d="M257.375 32.03C139.957 87.197 42.343 247.886 17.5 367.75c71.742 0 124.22 22.845 162.094 63.03l10.47-11.436c-28.06-28.873-64.935-52.446-113.564-75.906c26.142-65.033 66.028-163.458 116.72-169.188c19.835-2.243 41.05 9.735 64.155 43.438c72.33-120.27 141.014 38.54 180.875 125.75c-47.687 25.854-84.5 49.463-112.97 78.718l9.25 10.406c37.335-39.758 89.657-64.812 162.72-64.812C467.784 249.384 377.24 90.37 257.375 32.03m-79.72 243.314c-15.3-.083-26.405 6.436-26.405 16.656c0 12.58 16.834 26.038 37.594 30.063s37.594-2.92 37.594-15.5s-16.835-26.038-37.594-30.063c-3.893-.755-7.657-1.137-11.188-1.156zm156.345 0c-3.53.02-7.295.4-11.188 1.156c-20.76 4.025-37.593 17.483-37.593 30.063s16.833 19.524 37.592 15.5c20.76-4.025 37.594-17.484 37.594-30.063c0-10.22-11.105-16.74-26.406-16.656z"/>']
+    ] }
+];
+window.CODEX_PIN_COLORS = [['red', 'Red'], ['orange', 'Orange'], ['gold', 'Gold'], ['green', 'Green'], ['teal', 'Teal'], ['blue', 'Blue'], ['purple', 'Purple'], ['black', 'Black']];
+
+// The Codices map viewer: a Leaflet map (simple CRS, no tiles) showing one image with pins on it.
+// Leaflet (static/vendor/leaflet) loads on first use. Positions are fractions (0..1) of the image,
+// x from the left and y from the top; lengths are measured in pixels of the image.
+(function () {
+    const loading = {};
+    function loadOnce(src, css) {
+        if (!loading[src]) {
+            loading[src] = new Promise((resolve, reject) => {
+                const el = document.createElement(css ? 'link' : 'script');
+                if (css) { el.rel = 'stylesheet'; el.href = src; } else { el.src = src; }
+                el.onload = resolve;
+                el.onerror = () => {
+                    delete loading[src];
+                    reject(new Error('Could not load ' + src));
+                };
+                document.head.appendChild(el);
+            });
+        }
+        return loading[src];
+    }
+    async function loadLeaflet() {
+        if (window.L) return;
+        await Promise.all([loadOnce('/static/vendor/leaflet/leaflet.css?v=1', true), loadOnce('/static/vendor/leaflet/leaflet.js?v=1')]);
+    }
+
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const PIN_SIZE = 30; // the tile's side in px at full size
+    const PIN_TAIL = 0.27; // the tail under it, as a part of the side (codex.css .mp-in)
+
+    const iconBodies = {};
+    for (const g of window.CODEX_PIN_ICONS || []) for (const [id, , body] of g.icons) iconBodies[id] = body;
+
+    // An icon as an inline SVG string (ids come from our own list, so no escaping is needed).
+    window.codexPinSvg = (id) => `<svg viewBox="0 0 512 512" aria-hidden="true">${iconBodies[id] || iconBodies.place || ''}</svg>`;
+
+    // "12 miles", "0.4 km", "1,250 feet": about three significant digits.
+    window.codexDistance = function (n, unit) {
+        const digits = n >= 100 ? 0 : n >= 10 ? 1 : 2;
+        return Number(n.toFixed(digits)).toLocaleString('en-US') + ' ' + unit;
+    };
+
+    // mountCodexMap(el, opts) resolves to the viewer. opts:
+    //   image {url, width, height}, pins, scale ({x1,y1,x2,y2,length,unit} or null),
+    //   onPin(id), onBackground(), onView() (panned or zoomed), onPlace({x,y}), onMove({x,y}),
+    //   onRuler({legs, total}), onScaleLine(points), imageAlt.
+    // A pin is {id, x, y, name, icon, color, linked}.
+    window.mountCodexMap = async function (el, opts) {
+        await loadLeaflet();
+        const L = window.L;
+        const w = opts.image.width, h = opts.image.height;
+        const bounds = L.latLngBounds([[0, 0], [h, w]]);
+        const map = L.map(el, {
+            crs: L.CRS.Simple, zoomSnap: 0, zoomDelta: 0.5, wheelPxPerZoomLevel: 140, minZoom: -8, maxZoom: 3,
+            attributionControl: false, zoomControl: false, maxBoundsViscosity: 0.8
+        });
+        const overlay = L.imageOverlay(opts.image.url, bounds, { alt: opts.imageAlt || 'Map' }).addTo(map);
+        const toLL = (p) => L.latLng(h * (1 - p.y), w * p.x);
+        const toFrac = (ll) => ({ x: clamp(ll.lng / w, 0, 1), y: clamp(1 - ll.lat / h, 0, 1) });
+        const inside = (ll) => ll.lng >= 0 && ll.lng <= w && ll.lat >= 0 && ll.lat <= h;
+
+        let pins = [], hidden = new Set(), openId = '', mode = '', scale = opts.scale || null, destroyed = false;
+        let fitZoom = 0;
+        const markers = new Map();
+
+        // ---- zoom: pins shrink as the map zooms out ----
+        function setLimits() {
+            fitZoom = map.getBoundsZoom(bounds);
+            map.setMinZoom(fitZoom - 0.5);
+            map.setMaxZoom(Math.max(fitZoom + 3, 2));
+            map.setMaxBounds(bounds.pad(0.35));
+        }
+        // Whole, even sizes keep the tiles sharp.
+        function pinSize(zoom = map.getZoom()) {
+            return 2 * Math.round(PIN_SIZE * clamp(0.6 + 0.2 * (zoom - fitZoom), 0.5, 1) / 2);
+        }
+        function applyPinSize(zoom) {
+            el.style.setProperty('--mp-t', pinSize(zoom) + 'px');
+        }
+        function fit(animate) {
+            map.fitBounds(bounds, { animate: !!animate });
+        }
+
+        // ---- pins ----
+        function pinIcon(p) {
+            const tile = document.createElement('span');
+            tile.className = 'mp-pin mp-c-' + p.color + (p.linked ? ' mp-pin--linked' : '');
+            tile.innerHTML = `<span class="mp-label"></span><span class="mp-in"><span class="mp-tile">${window.codexPinSvg(p.icon)}</span></span>`;
+            tile.querySelector('.mp-label').textContent = p.name;
+            return L.divIcon({ className: 'mp-marker', html: tile, iconSize: [0, 0] });
+        }
+        function addMarker(p) {
+            const m = L.marker(toLL(p), { icon: pinIcon(p), keyboard: true, riseOnHover: true, draggable: false, autoPanOnFocus: false });
+            m.on('click', () => {
+                if (!mode) opts.onPin(p.id);
+                else if (mode !== 'move') clickAt(m.getLatLng());
+            });
+            m.addTo(map);
+            const node = m.getElement();
+            node.setAttribute('aria-label', p.name + (p.linked ? ', has a page' : ''));
+            node.dataset.pin = p.id;
+            node.addEventListener('keydown', (e) => {
+                if ((e.key !== 'Enter' && e.key !== ' ') || mode === 'move') return; // Enter saves a move (the page's keys)
+                e.preventDefault();
+                e.stopPropagation();
+                if (!mode) opts.onPin(p.id);
+                else clickAt(m.getLatLng());
+            });
+            for (const t of ['mouseenter', 'focus']) node.addEventListener(t, () => showLabel(p.id, true));
+            for (const t of ['mouseleave', 'blur']) node.addEventListener(t, () => showLabel(p.id, false));
+            markers.set(p.id, m);
+        }
+        function showLabel(id, on) {
+            markers.get(id)?.getElement()?.classList.toggle('is-hot', on);
+        }
+        function setPins(list) {
+            pins = list;
+            markers.forEach((m) => m.remove());
+            markers.clear();
+            for (const p of list) if (!hidden.has(p.icon) || p.id === openId) addMarker(p);
+            markOpen();
+            layoutLabels();
+        }
+        function markOpen() {
+            markers.forEach((m, id) => m.getElement()?.classList.toggle('is-open', id === openId));
+        }
+        // Labels are placed greedily, the open pin first: one that would cover another label or a
+        // pin is hidden until the map is zoomed in, or the pin is hovered or focused.
+        function layoutLabels() {
+            if (destroyed) return;
+            const tw = pinSize(), th = tw * (1 + PIN_TAIL);
+            const items = [];
+            markers.forEach((m, id) => {
+                const node = m.getElement();
+                const label = node && node.querySelector('.mp-label');
+                if (!label) return;
+                const pt = map.latLngToContainerPoint(m.getLatLng());
+                const lw = label.offsetWidth;
+                label.style.transform = 'none'; // a whole-pixel offset, so the text stays sharp
+                label.style.marginLeft = -Math.round(lw / 2) + 'px';
+                items.push({ id, node, pt, lw, lh: label.offsetHeight, tile: [pt.x - tw / 2, pt.y - th, pt.x + tw / 2, pt.y] });
+            });
+            items.sort((a, b) => (b.id === openId) - (a.id === openId) || a.pt.y - b.pt.y || a.pt.x - b.pt.x);
+            const hit = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+            const placed = [];
+            for (const it of items) {
+                const bottom = it.pt.y - th - 2;
+                const box = [it.pt.x - it.lw / 2 - 2, bottom - it.lh, it.pt.x + it.lw / 2 + 2, bottom];
+                const clash = placed.some((b) => hit(b, box)) || items.some((o) => o !== it && hit(o.tile, box));
+                const show = !clash || it.id === openId;
+                it.node.classList.toggle('no-label', !show);
+                if (show) placed.push(box);
+            }
+        }
+
+        // ---- modes: '' (look), 'place' (click a spot), 'move' (one pin), 'ruler', 'scale' ----
+        let moving = null; // {id, marker, from, at}
+        let points = []; // ruler and scale points, as LatLng
+        const drawn = L.layerGroup().addTo(map);
+
+        function setMode(next) {
+            if (mode === 'move') endMove(false);
+            mode = next || '';
+            points = [];
+            draw();
+            el.classList.toggle('is-aiming', mode === 'place' || mode === 'ruler' || mode === 'scale' || mode === 'move');
+            el.dataset.mode = mode;
+        }
+        function clickAt(ll) {
+            if (!inside(ll)) return;
+            if (mode === 'place') opts.onPlace(toFrac(ll));
+            else if (mode === 'move') moveTo(ll);
+            else if (mode === 'ruler') { points.push(ll); draw(); }
+            else if (mode === 'scale') {
+                if (points.length >= 2) points = [];
+                points.push(ll);
+                draw();
+            }
+        }
+        function startMove(id) {
+            setMode('');
+            const m = markers.get(id), p = pins.find((x) => x.id === id);
+            if (!m || !p) return;
+            mode = 'move';
+            el.dataset.mode = mode;
+            el.classList.add('is-aiming');
+            moving = { id, marker: m, at: { x: p.x, y: p.y }, from: { x: p.x, y: p.y } };
+            m.dragging.enable();
+            m.on('drag', onDrag);
+            m.getElement().classList.add('is-moving');
+            m.getElement().focus({ preventScroll: true });
+        }
+        function onDrag() {
+            const f = toFrac(moving.marker.getLatLng());
+            moving.at = f;
+            moving.marker.setLatLng(toLL(f));
+            opts.onMove && opts.onMove(f);
+        }
+        function moveTo(ll) {
+            if (!moving) return;
+            moving.at = toFrac(ll);
+            moving.marker.setLatLng(toLL(moving.at));
+            layoutLabels();
+            opts.onMove && opts.onMove(moving.at);
+        }
+        function nudge(dx, dy) {
+            if (!moving) return;
+            const pt = map.latLngToContainerPoint(moving.marker.getLatLng());
+            const ll = map.containerPointToLatLng([pt.x + dx, pt.y + dy]);
+            moveTo(L.latLng(clamp(ll.lat, 0, h), clamp(ll.lng, 0, w)));
+            map.panInside(moving.marker.getLatLng(), { padding: [40, 60] });
+        }
+        // Ends the move; keep leaves the pin where it is (the caller saves it), otherwise it goes back.
+        function endMove(keep) {
+            if (!moving) return null;
+            const { marker, at, from } = moving;
+            marker.dragging && marker.dragging.disable();
+            marker.off('drag', onDrag);
+            marker.getElement()?.classList.remove('is-moving');
+            if (!keep) marker.setLatLng(toLL(from));
+            moving = null;
+            mode = '';
+            el.dataset.mode = '';
+            el.classList.remove('is-aiming');
+            layoutLabels();
+            return at;
+        }
+
+        // ---- ruler and scale line ----
+        const pxDist = (a, b) => Math.hypot(a.lng - b.lng, a.lat - b.lat);
+        // Units per image pixel; 0 without a scale.
+        function perPx() {
+            if (!scale) return 0;
+            const d = pxDist(toLL({ x: scale.x1, y: scale.y1 }), toLL({ x: scale.x2, y: scale.y2 }));
+            return d > 0 ? scale.length / d : 0;
+        }
+        function note(ll, text, cls) {
+            const span = document.createElement('span');
+            span.textContent = text;
+            L.marker(ll, { pane: 'tooltipPane', interactive: false, keyboard: false, icon: L.divIcon({ className: 'mp-note ' + (cls || ''), html: span, iconSize: [0, 0] }) }).addTo(drawn);
+        }
+        function draw() {
+            drawn.clearLayers();
+            const legs = [];
+            if (points.length) {
+                if (points.length > 1) {
+                    L.polyline(points, { className: 'mp-line mp-line--halo', interactive: false }).addTo(drawn);
+                    L.polyline(points, { className: 'mp-line', interactive: false }).addTo(drawn);
+                }
+                for (const p of points) L.circleMarker(p, { radius: 5, className: 'mp-dot', interactive: false }).addTo(drawn);
+                if (mode === 'ruler') {
+                    const k = perPx();
+                    for (let i = 1; i < points.length; i++) {
+                        const d = pxDist(points[i - 1], points[i]) * k;
+                        legs.push(d);
+                        if (points.length > 2) note(L.latLng((points[i - 1].lat + points[i].lat) / 2, (points[i - 1].lng + points[i].lng) / 2), window.codexDistance(d, scale.unit));
+                    }
+                    if (legs.length) note(points[points.length - 1], window.codexDistance(legs.reduce((a, b) => a + b, 0), scale.unit), 'mp-note--total');
+                }
+            }
+            if (mode === 'ruler') opts.onRuler && opts.onRuler({ points: points.length, legs, total: legs.reduce((a, b) => a + b, 0) });
+            if (mode === 'scale') opts.onScaleLine && opts.onScaleLine(points.map(toFrac));
+        }
+
+        // ---- scale bar ----
+        const bar = document.createElement('div');
+        bar.className = 'mp-scale';
+        bar.hidden = true;
+        bar.innerHTML = '<span></span><i></i>';
+        el.appendChild(bar);
+        function drawBar() {
+            const k = perPx();
+            bar.hidden = !k;
+            if (!k) return;
+            const unitsPerScreenPx = k / Math.pow(2, map.getZoom());
+            const max = unitsPerScreenPx * Math.min(140, el.clientWidth * 0.35);
+            const pow = Math.pow(10, Math.floor(Math.log10(max)));
+            const n = [5, 2, 1].map((f) => f * pow).find((v) => v <= max) || pow;
+            bar.querySelector('span').textContent = window.codexDistance(n, scale.unit);
+            bar.querySelector('i').style.width = (n / unitsPerScreenPx).toFixed(1) + 'px';
+        }
+
+        // ---- events ----
+        map.on('click', (e) => {
+            if (mode) clickAt(e.latlng);
+            else opts.onBackground && opts.onBackground();
+        });
+        map.on('zoomanim', (e) => applyPinSize(e.zoom));
+        map.on('zoom', () => applyPinSize());
+        map.on('move zoom', () => opts.onView && opts.onView());
+        map.on('zoomend moveend', () => { layoutLabels(); drawBar(); });
+        map.on('resize', () => {
+            setLimits();
+            applyPinSize();
+            layoutLabels();
+            drawBar();
+        });
+        el.addEventListener('keydown', (e) => {
+            if (mode === 'move' && e.key.startsWith('Arrow')) {
+                const step = e.shiftKey ? 10 : 2;
+                nudge({ ArrowLeft: -step, ArrowRight: step }[e.key] || 0, { ArrowUp: -step, ArrowDown: step }[e.key] || 0);
+                e.preventDefault();
+                e.stopPropagation();
+            } else if (e.key === 'Enter' && e.target === el && (mode === 'place' || mode === 'ruler' || mode === 'scale')) {
+                e.preventDefault();
+                clickAt(map.getCenter());
+            } else if (e.key === 'Backspace' && mode === 'ruler') {
+                e.preventDefault();
+                points.pop();
+                draw();
+            }
+        }, true);
+        // Labels are measured, so lay them out again once the fonts are in.
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutLabels);
+        const watch = new ResizeObserver(() => map.invalidateSize({ pan: true }));
+        watch.observe(el);
+
+        setLimits();
+        fit(false);
+        applyPinSize();
+        setPins(opts.pins || []);
+        drawBar();
+
+        return {
+            el,
+            imageUrl: opts.image.url,
+            setPins,
+            setHidden(set) { hidden = set; setPins(pins); },
+            setOpen(id) {
+                openId = id || '';
+                // A hidden pin shows while it is open.
+                if (openId && !markers.has(openId)) setPins(pins);
+                else { markOpen(); layoutLabels(); }
+            },
+            setScale(s) { scale = s || null; draw(); drawBar(); },
+            setMode,
+            mode: () => mode,
+            startMove,
+            endMove,
+            undoPoint() { points.pop(); draw(); },
+            clearPoints() { points = []; draw(); },
+            // Where to put the preview card (w by h) of a pin: beside it and clear of its label, inside the map.
+            cardSpot(id, w, h) {
+                const m = markers.get(id);
+                if (!m) return null;
+                const pt = map.latLngToContainerPoint(m.getLatLng()), size = map.getSize();
+                const pin = Math.max(pinSize(), 26) * (1 + PIN_TAIL);
+                const top = pt.y - pin;
+                const y = Math.max(8, Math.min(size.y - h - 8, top));
+                const half = (m.getElement().querySelector('.mp-label')?.offsetWidth || 0) / 2;
+                const gap = y < top ? Math.max(28, half + 8) : 28; // moved up beside the label
+                let x = pt.x + gap;
+                if (x + w > size.x - 8) x = pt.x - gap - w;
+                if (x < 8) x = Math.max(8, Math.min(size.x - w - 8, pt.x - w / 2));
+                return { x, y };
+            },
+            // Pans so the pin isn't under a sheet that covers the bottom of the map.
+            reveal(id, bottom) {
+                const m = markers.get(id);
+                if (m) map.panInside(m.getLatLng(), { paddingTopLeft: [60, 70], paddingBottomRight: [60, bottom + 10] });
+            },
+            focusPin(id) { markers.get(id)?.getElement()?.focus({ preventScroll: true }); },
+            flyTo(id) {
+                const p = pins.find((x) => x.id === id);
+                if (p) map.setView(toLL(p), Math.max(map.getZoom(), Math.min(fitZoom + 1.25, map.getMaxZoom())));
+            },
+            zoomIn: () => map.zoomIn(),
+            zoomOut: () => map.zoomOut(),
+            fit: () => fit(true),
+            focus: () => el.focus({ preventScroll: true }),
+            overlay,
+            destroy() { destroyed = true; watch.disconnect(); map.remove(); bar.remove(); }
+        };
+    };
+})();
+
+// Mock-up behaviour around the real viewer (static/codex-map.js, inlined above).
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const PAGES = {
+    ford: ['Karrow Ford', 'A river crossing and a market of about forty families. The Ferrymen of the Ford run the boats when the water is too high to wade.'],
+    toll: ['The Toll House', 'A squat stone house with a lamp that is never lit. Old Hesk lives here. It marks the end of the safe stretch of the Karrow Road.'],
+    clove: ['Cloveswick', 'A village that burned a few weeks ago. The ash smelled of cloves. One survivor, a boy who only says up, up, up, was taken in at Karrow Ford.'],
+    salt: ['Saltmarsh Reach', 'Brackish flats to the east of Karrow Ford. The Marsh Wardens patrol it.'],
+    third: ['The Third Waystone', 'The stone at the third bend of the Karrow Road. It went dark in the autumn and is cold to the touch.'],
+    way: ['The Waystones', 'Standing stones set along the Karrow Road, one a day’s walk from the next.'],
+    ward: ['The Marsh Wardens', 'Lantern-bearers who keep the causeways of Saltmarsh Reach open.']
+};
+let pins = [
+    { id: 'p1', x: .506, y: .628, page: 'ford', icon: 'settlement', color: 'green', by: 'Roy', on: 'Nov 20, 2026' },
+    { id: 'p2', x: .374, y: .56, page: 'toll', icon: 'tower', color: 'black', by: 'Roy', on: 'Nov 20, 2026' },
+    { id: 'p3', x: .7, y: .548, page: 'clove', icon: 'ruins', color: 'orange', by: 'Simon', on: 'Nov 21, 2026' },
+    { id: 'p4', x: .72, y: .76, page: 'salt', icon: 'danger', color: 'teal', by: 'Simon', on: 'Nov 21, 2026' },
+    { id: 'p5', x: .357, y: .4, page: 'third', icon: 'portal', color: 'purple', by: 'Testy', on: 'Nov 22, 2026' },
+    { id: 'p6', x: .43, y: .2, name: 'Ashwing’s roost', desc: 'Seen circling at dusk, twice. The shepherds have moved their flocks south.\nNobody has come back down from the ledge.', icon: 'dragon', color: 'red', by: 'Adam', on: 'Nov 22, 2026' },
+    { id: 'p7', x: .17, y: .53, name: 'Goblin camp', desc: 'Thirty tents, two wolves, one very loud drum.', icon: 'camp', color: 'red', by: 'Testy', on: 'Nov 22, 2026' },
+    { id: 'p8', x: .205, y: .59, name: 'Ambush at Dimwood', desc: 'Session 4. Mara lost her shield here.', icon: 'battle', color: 'red', by: 'Simon', on: 'Nov 22, 2026' },
+    { id: 'p9', x: .33, y: .84, name: 'Smuggler’s cache', desc: 'Under the third flat stone. Two chests, one trapped.', icon: 'treasure', color: 'gold', by: 'Testy', on: 'Nov 23, 2026' },
+    { id: 'p10', x: .62, y: .155, name: 'The Sunken Vault', desc: '', icon: 'dungeon', color: 'purple', by: 'Roy', on: 'Nov 23, 2026' },
+    { id: 'p11', x: .822, y: .535, name: 'Greyport', desc: 'Last ship before winter leaves in nine days.', icon: 'port', color: 'blue', by: 'Roy', on: 'Nov 23, 2026' },
+    { id: 'p12', x: .52, y: .66, name: 'The Wet Boot', desc: 'Best beds at the ford. Ask for Nella.', icon: 'inn', color: 'gold', by: 'Adam', on: 'Nov 23, 2026' },
+    { id: 'p13', x: .545, y: .7, name: 'We are here', desc: '', icon: 'party', color: 'blue', by: 'Roy', on: 'Nov 23, 2026' }
+];
+let scale = { x1: 80 / 1800, y1: 1120 / 1200, x2: 380 / 1800, y2: 1120 / 1200, length: 50, unit: 'miles' };
+let log = [
+    ['Roy', 'moved', 'We are here', 'Nov 23, 2026, 20:14'], ['Adam', 'added', 'The Wet Boot', 'Nov 23, 2026, 19:40'],
+    ['Simon', 'edited', 'Ambush at Dimwood', 'Nov 23, 2026, 9:02'], ['Testy', 'removed', 'Old bridge', 'Nov 22, 2026, 22:31']
+];
+const COLORS = window.CODEX_PIN_COLORS, GROUPS = window.CODEX_PIN_ICONS;
+const iconLabel = Object.fromEntries(GROUPS.flatMap((g) => g.icons.map((i) => [i[0], i[1]])));
+const nameOf = (p) => (p.page ? PAGES[p.page][0] : p.name);
+const view = (p) => ({ id: p.id, x: p.x, y: p.y, name: nameOf(p), icon: p.icon, color: p.color, linked: !!p.page });
+const app = $('#app'), stage = $('#stage'), card = $('#card'), banner = $('#banner');
+let m = null, open = '', hidden = new Set(), scalePts = [], rulerOn = false;
+const editor = () => app.dataset.role === 'editor';
+
+// ---- preview ----
+function openPin(id, focus) {
+    open = id;
+    m.setOpen(id);
+    const p = pins.find((x) => x.id === id);
+    if (!p) { card.hidden = true; return; }
+    const text = p.page ? PAGES[p.page][1] : p.desc;
+    card.className = 'mp-card mp-c-' + p.color;
+    card.innerHTML = `<div class="mp-card-head"><span class="mp-tile">${window.codexPinSvg(p.icon)}</span><h2 id="cardT" tabindex="-1">${esc(nameOf(p))}</h2><button class="mp-card-x" type="button" data-card="close" aria-label="Close">×</button></div>
+        ${text ? `<p class="mp-card-text">${esc(text)}</p>` : ''}<p class="mp-card-by">${esc(iconLabel[p.icon])} · added by ${esc(p.by)}, ${esc(p.on)}</p>
+        ${p.page || editor() ? `<div class="mp-card-acts">${p.page ? '<button class="cx-act cx-act--primary" type="button" data-card="page">Open page</button>' : ''}${editor() ? '<button class="cx-act" type="button" data-card="edit">Edit</button><button class="cx-act" type="button" data-card="move">Move</button><button class="cx-act cx-act--danger" type="button" data-card="del">Delete</button>' : ''}</div>` : ''}`;
+    card.hidden = false;
+    if (innerWidth <= 600) m.reveal(id, card.offsetHeight);
+    placeCard();
+    if (focus !== false) $('#cardT').focus({ preventScroll: true });
+}
+// Beside the pin where there is room, kept inside the map (narrow screens: CSS makes it a bottom sheet).
+function placeCard() {
+    if (card.hidden) return;
+    const at = m.cardSpot(open, card.offsetWidth, card.offsetHeight);
+    if (!at) return;
+    card.style.left = at.x + 'px';
+    card.style.top = at.y + 'px';
+}
+function closeCard(refocus) {
+    if (refocus && open) m.focusPin(open);
+    open = '';
+    card.hidden = true;
+    m && m.setOpen('');
+}
+card.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-card]');
+    if (!b) return;
+    const p = pins.find((x) => x.id === open);
+    if (b.dataset.card === 'close') closeCard(true);
+    else if (b.dataset.card === 'page') { full(false); show('linked'); }
+    else if (b.dataset.card === 'edit') pinDialog(p);
+    else if (b.dataset.card === 'move') startMove(p.id);
+    else if (b.dataset.card === 'del') {
+        const i = pins.indexOf(p);
+        pins.splice(i, 1);
+        closeCard();
+        refresh();
+        addLog('removed', nameOf(p));
+        toast(`Deleted “${nameOf(p)}”.`, () => { pins.splice(i, 0, p); refresh(); addLog('added', nameOf(p)); });
+    }
+});
+
+// ---- banner modes ----
+function bar(text, btns) {
+    banner.hidden = !text;
+    stage.classList.toggle('mp-stage--busy', !!text);
+    $('#bannerText').innerHTML = text || '';
+    $('#bannerBtns').innerHTML = (btns || []).map(([k, l, pri]) => `<button class="cx-act ${pri ? 'cx-act--primary' : ''}" type="button" data-bar="${k}">${l}</button>`).join('');
+}
+let moveId = '';
+function startMove(id) {
+    moveId = id;
+    closeCard();
+    m.startMove(id);
+    bar(`Drag <b>${esc(nameOf(pins.find((x) => x.id === id)))}</b>, click its new place, or use the arrow keys.`, [['saveMove', 'Save', 1], ['cancel', 'Cancel']]);
+}
+function stopMode() {
+    if (m.mode() === 'move') m.endMove(false);
+    m.setMode('');
+    rulerOn = false;
+    $('#rulerBtn').setAttribute('aria-pressed', 'false');
+    bar('');
+}
+function saveMove() {
+    const p = pins.find((x) => x.id === moveId), from = { x: p.x, y: p.y };
+    Object.assign(p, m.endMove(true));
+    bar('');
+    refresh();
+    addLog('moved', nameOf(p));
+    toast(`Moved “${nameOf(p)}”.`, () => { Object.assign(p, from); refresh(); addLog('moved', nameOf(p)); });
+}
+banner.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-bar]');
+    if (!b) return;
+    const k = b.dataset.bar;
+    if (k === 'cancel') stopMode();
+    else if (k === 'saveMove') saveMove();
+    else if (k === 'undo') m.undoPoint();
+    else if (k === 'clear') m.clearPoints();
+    else if (k === 'scaleNext') scaleDialog();
+});
+document.addEventListener('keydown', (e) => {
+    if ($('#dlgHost').firstElementChild) {
+        if (e.key === 'Escape') closeDlg();
+        return;
+    }
+    if (e.key === 'Enter' && m && m.mode() === 'move' && e.target.closest('#map')) { e.preventDefault(); saveMove(); return; }
+    if (e.key !== 'Escape') return;
+    if (m && m.mode()) stopMode();
+    else if (!card.hidden) closeCard(true);
+    else if (stage.classList.contains('mp-stage--full')) full(false);
+});
+function full(on) {
+    stage.classList.toggle('mp-stage--full', on);
+    $('#fullBtn').setAttribute('aria-pressed', on ? 'true' : 'false');
+    document.documentElement.style.overflow = on ? 'hidden' : '';
+}
+const acts = {
+    in: () => m.zoomIn(), out: () => m.zoomOut(), fit: () => m.fit(), full: () => full(!stage.classList.contains('mp-stage--full')),
+    add() { stopMode(); closeCard(); m.setMode('place'); bar('Click where the pin goes.', [['cancel', 'Cancel']]); m.focus(); },
+    ruler() {
+        if (rulerOn) { stopMode(); return; }
+        stopMode(); closeCard(); rulerOn = true; m.setMode('ruler');
+        $('#rulerBtn').setAttribute('aria-pressed', 'true');
+        m.focus();
+    },
+    scale() { if (app.dataset.screen !== 'map') show('map'); stopMode(); closeCard(); m.setMode('scale'); },
+    clearScale() { scale = null; stopMode(); refresh(); toast('The scale is cleared. The ruler and the scale bar are gone until it is set again.'); }
+};
+document.addEventListener('click', (e) => {
+    const d = e.target.closest('[data-dead]');
+    if (d) { e.preventDefault(); $('#moreMenu').hidden = true; toast('Not part of this mock-up.'); return; }
+    const a = e.target.closest('[data-act]');
+    if (a) { $('#moreMenu').hidden = true; acts[a.dataset.act](); return; }
+    const g = e.target.closest('[data-go]');
+    if (g) { e.preventDefault(); show(g.dataset.go); return; }
+    const pn = e.target.closest('[data-pin]:not(.mp-marker)');
+    if (pn) { e.preventDefault(); show('map'); stopMode(); m.flyTo(pn.dataset.pin); openPin(pn.dataset.pin); return; }
+    const s = e.target.closest('[data-set]');
+    if (s) { setOpt(s.dataset.set, s.dataset.v); return; }
+    if (e.target.closest('#moreBtn')) { $('#moreMenu').hidden = !$('#moreMenu').hidden; $('#moreBtn').setAttribute('aria-expanded', String(!$('#moreMenu').hidden)); return; }
+    if (!e.target.closest('#moreMenu')) $('#moreMenu').hidden = true;
+});
+$('#mNewPage').onclick = $('#navNew').onclick = () => newPageDialog();
+
+// ---- dialogs ----
+function dlg(eyebrow, title, body, foot) {
+    $('#dlgHost').innerHTML = `<div class="scrim"><form class="sheet" role="dialog" aria-modal="true" aria-labelledby="dT" novalidate><div class="sheet-h"><div><span class="eyebrow">${esc(eyebrow)}</span><h2 id="dT">${esc(title)}</h2></div><button class="x" type="button" data-x aria-label="Close">×</button></div><div class="sheet-b">${body}</div><div class="sheet-f">${foot}</div></form></div>`;
+    const f = $('#dlgHost form');
+    $('#dlgHost .scrim').onclick = (e) => { if (e.target === e.currentTarget) closeDlg(); };
+    $$('[data-x]', f).forEach((b) => (b.onclick = closeDlg));
+    setTimeout(() => f.querySelector('input,textarea')?.focus(), 0);
+    return f;
+}
+function closeDlg() { $('#dlgHost').innerHTML = ''; }
+// Arrow keys move in a radio group.
+function radios(box, pick) {
+    box.addEventListener('keydown', (e) => {
+        const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+        if (!step) return;
+        e.preventDefault();
+        const all = $$('[role=radio]:not([aria-disabled=true])', box), n = all[(all.indexOf(document.activeElement) + step + all.length) % all.length];
+        n.focus();
+        n.click();
+    });
+    box.addEventListener('click', (e) => { const b = e.target.closest('[role=radio]'); if (b) pick(b.dataset.v); });
+}
+function pinDialog(p, at) {
+    const d = p ? { ...p } : { x: at.x, y: at.y, name: '', desc: '', icon: 'place', color: 'red', page: '' };
+    const f = dlg('Map of the Karrow', p ? 'Edit pin' : 'Add pin', `
+        <div class="fld"><label for="dPick">Page <span class="opt">optional</span></label><div id="pickBox"></div></div>
+        <div id="plain" class="sheet-in"><div class="fld"><label for="dName">Name</label><input class="cell" id="dName" maxlength="120" value="${esc(d.name || '')}"></div>
+        <div class="fld"><label for="dDesc">Description <span class="opt">optional</span></label><textarea class="cell" id="dDesc" rows="3" maxlength="1000">${esc(d.desc || '')}</textarea></div>
+        ${p ? '' : '<label class="ck" for="dCreate"><input type="checkbox" id="dCreate"> <span>Create a page for it, from the Place template</span></label>'}</div>
+        <div class="fld"><span class="lbl" id="lI">Icon</span><div class="mp-icons" role="radiogroup" aria-labelledby="lI">${GROUPS.map((g) => `<div><p>${g.group}</p><div>${g.icons.map(([id, l]) => `<button class="mp-opt" type="button" role="radio" data-v="${id}" aria-label="${l}" title="${l}">${window.codexPinSvg(id)}</button>`).join('')}</div></div>`).join('')}</div></div>
+        <div class="fld"><span class="lbl" id="lC">Colour</span><div class="mp-colors" role="radiogroup" aria-labelledby="lC">${COLORS.map(([id, l]) => `<button class="mp-opt mp-c-${id}" type="button" role="radio" data-v="${id}"><i></i>${l}</button>`).join('')}</div></div>
+        <div class="mp-prev" aria-hidden="true"></div>
+        <p class="mp-credit">Icons by Lorc, Delapouite and contributors, game-icons.net, CC BY 3.0.</p><p class="err" id="dErr" hidden></p>`,
+        `<button class="btn btn--sec" type="button" data-x>Cancel</button><button class="btn btn--pri" type="submit">${p ? 'Save pin' : 'Add pin'}</button>`);
+    const paint = () => {
+        $$('.mp-icons .mp-opt', f).forEach((b) => { const on = b.dataset.v === d.icon; b.setAttribute('aria-checked', on); b.tabIndex = on ? 0 : -1; b.className = 'mp-opt mp-c-' + d.color; });
+        $$('.mp-colors .mp-opt', f).forEach((b) => { const on = b.dataset.v === d.color; b.setAttribute('aria-checked', on); b.tabIndex = on ? 0 : -1; });
+        const nm = d.page ? PAGES[d.page][0] : $('#dName').value.trim() || 'Name';
+        $('.mp-prev', f).innerHTML = `<span class="mp-marker"><span class="mp-pin mp-c-${d.color}${d.page ? ' mp-pin--linked' : ''}"><span class="mp-label">${esc(nm)}</span><span class="mp-in"><span class="mp-tile">${window.codexPinSvg(d.icon)}</span></span></span></span>`;
+        $('#plain').hidden = !!d.page;
+    };
+    const pick = () => {
+        $('#pickBox').innerHTML = d.page
+            ? `<div class="linked"><span class="t">${esc(PAGES[d.page][0])}<small>Its name and text show on the pin.</small></span><button class="text-btn" type="button" id="unlink">Unlink</button></div>`
+            : '<div class="picker"><svg class="i" aria-hidden="true"><use href="#ic-search"/></svg><input class="cell" id="dPick" autocomplete="off" placeholder="Find a page, or write a name below"><ul class="pick-list" hidden></ul></div>';
+        if (d.page) { $('#unlink').onclick = () => { $('#dName').value = PAGES[d.page][0]; d.page = ''; pick(); paint(); $('#dPick').focus(); }; return; }
+        const inp = $('#dPick'), ul = $('.pick-list', f);
+        const list = () => {
+            const q = inp.value.trim().toLowerCase();
+            const hits = Object.entries(PAGES).filter(([, v]) => v[0].toLowerCase().includes(q));
+            ul.innerHTML = hits.map(([k, v]) => `<li data-k="${k}">${esc(v[0])}<small>Places</small></li>`).join('') || '<li>No page matches</li>';
+            ul.hidden = false;
+        };
+        inp.oninput = list; inp.onclick = list;
+        inp.onblur = () => setTimeout(() => (ul.hidden = true), 150);
+        inp.onkeydown = (e) => { if (e.key === 'Enter' && !ul.hidden && ul.firstChild.dataset.k) { e.preventDefault(); choose(ul.firstChild.dataset.k); } };
+        ul.onmousedown = (e) => { const li = e.target.closest('[data-k]'); if (li) choose(li.dataset.k); };
+        const choose = (k) => { d.page = k; pick(); paint(); };
+    };
+    radios($('.mp-icons', f), (v) => { d.icon = v; paint(); $(`.mp-icons [data-v=${v}]`, f).focus(); });
+    radios($('.mp-colors', f), (v) => { d.color = v; paint(); });
+    $('#dName').oninput = paint;
+    pick(); paint();
+    f.onsubmit = (e) => {
+        e.preventDefault();
+        d.name = $('#dName').value.trim();
+        d.desc = $('#dDesc').value.trim();
+        if (!d.page && !d.name) { $('#dErr').hidden = false; $('#dErr').textContent = 'Give the pin a name or link a page.'; $('#dName').focus(); return; }
+        if (!p && !d.page && $('#dCreate').checked) { const k = 'n' + Date.now(); PAGES[k] = [d.name, d.desc || 'This page is empty.']; d.page = k; }
+        if (p) Object.assign(p, d);
+        else { d.id = 'p' + Date.now(); d.by = 'Testy'; d.on = 'Nov 23, 2026'; pins.push(d); }
+        closeDlg();
+        stopMode();
+        refresh();
+        addLog(p ? 'edited' : 'added', nameOf(d));
+        openPin(d.id);
+        if (!p) toast(`Added “${nameOf(d)}”.`);
+    };
+}
+function scaleDialog() {
+    const f = dlg('Map of the Karrow', 'Set scale', `<p class="hint">How far apart are the two points?</p><div class="two"><div class="fld"><label for="dLen">Distance</label><input class="cell" id="dLen" inputmode="decimal" value="50"></div><div class="fld"><label for="dUnit">Unit</label><input class="cell" id="dUnit" maxlength="20" value="miles" list="units"><datalist id="units"><option>km<option>miles<option>leagues<option>feet<option>m<option>days</datalist></div></div><p class="err" id="dErr" hidden></p>`, '<button class="btn btn--sec" type="button" data-x>Back</button><button class="btn btn--pri" type="submit">Set scale</button>');
+    f.onsubmit = (e) => {
+        e.preventDefault();
+        const len = Number($('#dLen').value.replace(',', '.')), unit = $('#dUnit').value.trim();
+        if (!(len > 0) || !unit) { $('#dErr').hidden = false; $('#dErr').textContent = 'Enter a distance above 0 and a unit.'; return; }
+        const [a, b] = scalePts;
+        scale = { x1: a.x, y1: a.y, x2: b.x, y2: b.y, length: len, unit };
+        closeDlg(); stopMode(); refresh(); toast('Scale set.');
+    };
+}
+function newPageDialog() {
+    let kind = 'map';
+    const f = dlg('The Karrow Marches', 'New page', `<div class="two"><div class="fld"><label for="dT2">Title</label><input class="cell" id="dT2" placeholder="Name the page"></div><div class="fld"><label for="dF2">Folder</label><select class="cell" id="dF2"><option>Top level<option>Places</select></div></div>
+        <div class="fld"><span class="lbl" id="lK">Type</span><div class="types" role="radiogroup" aria-labelledby="lK">${[['lore', 'article', 'Article', 'Text with headings, pictures and links'], ['timeline', 'timeline', 'Timeline', 'Events by date, newest first, under a short intro'], ['map', 'map', 'Map', 'A picture you can zoom, with pins']].map(([k, i, l, t]) => `<button class="type" type="button" role="radio" data-v="${k}"><b><svg class="i" aria-hidden="true"><use href="#ic-${i}"/></svg>${l}</b><span>${t}</span></button>`).join('')}</div></div><div class="tpl-note" id="kNote"></div>`, '<button class="btn btn--sec" type="button" data-x>Cancel</button><button class="btn btn--pri" type="submit">Create page</button>');
+    const paint = () => { $$('.type', f).forEach((b) => { b.setAttribute('aria-checked', b.dataset.v === kind); b.tabIndex = b.dataset.v === kind ? 0 : -1; }); $('#kNote').textContent = kind === 'map' ? "A map starts empty. Add its image once it is made. The type can't be changed later." : 'As today.'; };
+    radios($('.types', f), (v) => { kind = v; paint(); });
+    paint();
+    f.onsubmit = (e) => { e.preventDefault(); const t = $('#dT2').value.trim() || 'New map'; closeDlg(); show('empty'); $('#h1').textContent = t; };
+}
+
+// ---- side panel, sub line, history ----
+function refresh() {
+    m.setScale(scale);
+    m.setPins(pins.map(view));
+    lists();
+}
+function lists() {
+    const q = $('#pinQ').value.trim().toLowerCase();
+    const sorted = [...pins].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+    $('#pinsH').textContent = 'Pins · ' + pins.length;
+    $('#pinList').innerHTML = sorted.filter((p) => nameOf(p).toLowerCase().includes(q)).map((p) => `<li><button type="button" data-pin="${p.id}" class="${p.page ? 'is-linked' : ''}"><span class="mp-tile mp-tile--s mp-c-${p.color}">${window.codexPinSvg(p.icon)}</span><span class="mp-name">${esc(nameOf(p))}</span>${p.page ? '<span class="sr-only"> (has a page)</span>' : ''}</button></li>`).join('') || '<li class="mp-count" style="padding:.5rem .25rem">No pin matches.</li>';
+    const used = [...new Set(pins.map((p) => p.icon))].sort((a, b) => iconLabel[a].localeCompare(iconLabel[b]));
+    $('#key').innerHTML = used.map((i) => `<li><button type="button" aria-pressed="${!hidden.has(i)}" data-key="${i}" title="${hidden.has(i) ? 'Show' : 'Hide'} these pins"><span class="mp-tile mp-tile--s mp-tile--key">${window.codexPinSvg(i)}</span><span>${iconLabel[i]}</span><span class="mp-count">${hidden.has(i) ? 'hidden' : pins.filter((p) => p.icon === i).length}</span></button></li>`).join('');
+    const links = pins.filter((p) => p.page).length;
+    $('#sub').textContent = `${pins.length} pins, ${links} with a page · ` + (scale ? `scale set in ${scale.unit}` : 'no scale') + ' · image added by Roy Nov 22, 2026';
+    $('#rulerBtn').hidden = !scale;
+    $('[data-act=clearScale]').hidden = !scale;
+    $('#hist').innerHTML = log.map(([u, a, n, t], i) => `<li><span class="grow"><b>${esc(u)}</b> ${a} “${esc(n)}”<small>${t}</small></span><button class="text-btn editor-only" type="button" data-undo="${i}">Undo</button></li>`).join('');
+}
+$('#pinQ').oninput = lists;
+$('#key').onclick = (e) => { const b = e.target.closest('[data-key]'); if (!b) return; const k = b.dataset.key; hidden.has(k) ? hidden.delete(k) : hidden.add(k); closeCard(); m.setHidden(hidden); lists(); $(`[data-key=${k}]`).focus(); };
+$('#hist').onclick = (e) => { const b = e.target.closest('[data-undo]'); if (b) { b.replaceWith(Object.assign(document.createElement('span'), { className: 'mp-count', textContent: 'Undone by Testy' })); toast('Undone (only pretended in this list).'); } };
+function addLog(a, n) { log.unshift(['Testy', a, n, 'just now']); lists(); }
+let tt;
+function toast(text, undo) {
+    const t = $('#toast');
+    t.textContent = text;
+    if (undo) { const b = document.createElement('button'); b.className = 'text-btn'; b.textContent = 'Undo'; b.onclick = () => { t.hidden = true; undo(); }; t.append(' ', b); }
+    t.hidden = false;
+    clearTimeout(tt);
+    tt = setTimeout(() => (t.hidden = true), 6000);
+}
+
+// ---- mock-up switches ----
+function show(s) { setOpt('screen', s); window.scrollTo(0, 0); }
+function setOpt(k, v) {
+    if (k === 'theme') document.documentElement.dataset.theme = v;
+    else app.dataset[k] = v;
+    $$(`[data-set="${k}"]`).forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === v));
+    if (k === 'screen') {
+        $$('[data-on]').forEach((el) => (el.hidden = !el.dataset.on.split(' ').includes(v)));
+        const t = v === 'linked' ? 'Karrow Ford' : v === 'empty' ? 'New map' : 'Map of the Karrow';
+        $('#tabNow').textContent = $('#crumbNow').textContent = t;
+        $('#h1').textContent = t;
+    }
+    if (k === 'role' && open) openPin(open, false);
+}
+const artUrl = 'data:image/svg+xml;base64,' + $('#art').textContent.trim();
+$$('[data-art]').forEach((el) => (el.style.backgroundImage = `url("${artUrl}")`));
+(async () => {
+    m = await window.mountCodexMap($('#map'), {
+        image: { url: artUrl, width: 1800, height: 1200 }, imageAlt: 'Map of the Karrow', pins: pins.map(view), scale,
+        onPin: (id) => openPin(id),
+        onBackground: () => closeCard(),
+        onView: placeCard,
+        onPlace: (at) => pinDialog(null, at),
+        onMove() {},
+        onRuler: (r) => bar(r.points < 2 ? 'Click points along the way to measure.' : `Total <b>${window.codexDistance(r.total, scale.unit)}</b>` + (r.legs.length > 1 ? `, ${r.legs.length} legs` : ''), [...(r.points ? [['undo', 'Undo point'], ['clear', 'Clear']] : []), ['cancel', 'Done']]),
+        onScaleLine(pts) { scalePts = pts; bar(pts.length < 2 ? (pts.length ? 'Now click the second point.' : 'Click two points you know the distance between, like the ends of the map’s own scale bar.') : 'Set the distance, or click again to start over.', [...(pts.length === 2 ? [['scaleNext', 'Set distance', 1]] : []), ['cancel', 'Cancel']]); }
+    });
+    window.mock = m;
+    lists();
+    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    setOpt('screen', 'map'); setOpt('role', 'editor'); setOpt('width', 'medium');
+    const cur = document.documentElement.dataset.theme || (dark ? 'dark' : 'light');
+    $$('[data-set="theme"]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === cur));
+    openPin('p1', false);
+})();
+
+</script>
+</body>
+</html>

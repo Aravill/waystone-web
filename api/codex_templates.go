@@ -414,7 +414,14 @@ func handleCopyPage(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	var newFiles, newAttachments []string
-	if req.CopyImages {
+	if src.Kind == models.PageMap {
+		if newFiles, err = copyMapInto(&x, src, src.CodexID == req.CodexID, userID); err != nil {
+			log.Printf("codex copy page: %v", err)
+			codexServerError(w, "copy the map")
+			return
+		}
+	}
+	if req.CopyImages && src.Kind != models.PageMap {
 		if x.Images, x.CoverImageID, newFiles, err = duplicatePictures(id, src.Body, userID); err != nil {
 			removeCodexFiles(newFiles)
 			log.Printf("codex copy page: %v", err)
@@ -453,10 +460,6 @@ func duplicatePictures(pageID, body, userID string) ([]models.PageImage, string,
 	if err != nil {
 		return nil, "", nil, err
 	}
-	dir, err := db.UploadDir()
-	if err != nil {
-		return nil, "", nil, err
-	}
 	embedded := map[string]bool{}
 	for _, m := range pictureRefRe.FindAllStringSubmatch(body, -1) {
 		embedded[db.NormName(m[1])] = true
@@ -469,20 +472,11 @@ func duplicatePictures(pageID, body, userID string) ([]models.PageImage, string,
 		if (img.RemovedAt != "" && !embedded[db.NormName(img.Name)]) || !db.UploadFileRe.MatchString(img.File) {
 			continue
 		}
-		src, err := os.Open(filepath.Join(dir, img.File))
+		file, err := copyUploadFile(img.File)
 		if os.IsNotExist(err) {
 			log.Printf("codex copy page: image file %s is missing, not copied", img.File)
 			continue
 		}
-		if err != nil {
-			return out, "", files, err
-		}
-		file := db.GenerateUUID() + filepath.Ext(img.File)
-		err = db.WriteUpload(file, func(w io.Writer) error {
-			_, err := io.Copy(w, src)
-			return err
-		})
-		src.Close()
 		if err != nil {
 			return out, "", files, fmt.Errorf("copy %s: %w", img.File, err)
 		}
@@ -495,6 +489,25 @@ func duplicatePictures(pageID, body, userID string) ([]models.PageImage, string,
 		}
 	}
 	return out, cover, files, nil
+}
+
+// copyUploadFile stores a copy of an uploaded image under a new random name. The error of a file that
+// is gone satisfies os.IsNotExist.
+func copyUploadFile(name string) (string, error) {
+	dir, err := db.UploadDir()
+	if err != nil {
+		return "", err
+	}
+	src, err := os.Open(filepath.Join(dir, name))
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+	file := db.GenerateUUID() + filepath.Ext(name)
+	return file, db.WriteUpload(file, func(w io.Writer) error {
+		_, err := io.Copy(w, src)
+		return err
+	})
 }
 
 // duplicateAttachments copies the files of a page's attachments under new random names and returns the new rows

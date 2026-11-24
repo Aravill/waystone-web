@@ -75,6 +75,25 @@ func createPageWithTx(tx *sql.Tx, p models.Page, body string, x models.NewPageEx
 			}
 		}
 	}
+	if p.Kind == models.PageMap && x.Map != nil {
+		if x.Map.Image != nil {
+			x.Map.Image.PageID = p.ID
+			if err := insertMapImageTx(tx, *x.Map.Image); err != nil {
+				return err
+			}
+		}
+		if x.Map.Scale != nil {
+			if err := setMapScaleTx(tx, p.ID, *x.Map.Scale, p.AuthorID); err != nil {
+				return err
+			}
+		}
+		for _, pin := range x.Map.Pins {
+			pin.ID, pin.MapPageID = GenerateUUID(), p.ID
+			if err := insertMapPinTx(tx, pin); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
