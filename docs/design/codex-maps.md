@@ -33,7 +33,7 @@ A map is the third page type, beside Article and Timeline. It is one zoomable im
 ## Links
 - Linked pins don't count in Linked from, the graph or wanted pages. The linked page gets an **On the map** box that opens the map at that pin (`?pin={id}`), like On the timeline.
 - When the linked page is deleted or moved to another codex, the pin stays as a plain pin with the page's last title. When the map moves, its pins keep their names and lose their links.
-- Copying a map copies its image (as a new file), scale and pins; in another codex the pins lose their links. Pin history isn't copied. The copier becomes the one who added the pins' copies only where the pin had no creator; creators are kept.
+- Copying a map copies its image (as a new file), scale and pins; in another codex the pins lose their links. Pin history isn't copied. Pins keep who added them.
 - Deleting a map deletes its image files, pins and log.
 - `{{list kind:map}}` works. Quick notes and unlinked-mention links never write into a map.
 
