@@ -4,6 +4,7 @@
 (function () {
     // The viewer stays out of Alpine's reactive state.
     let view = null;
+    let mounting = false;
 
     const iconLabels = Object.fromEntries(window.CODEX_PIN_ICONS.flatMap((g) => g.icons.map(([id, label]) => [id, label])));
 
@@ -98,7 +99,7 @@
         async mountMap() {
             const el = document.getElementById('cxMap');
             const image = this.mapData.image;
-            if (!el || !image) return;
+            if (!el || !image || mounting) return;
             if (view && (view.el !== el || view.imageUrl !== image.url)) {
                 view.destroy();
                 view = null;
@@ -109,6 +110,7 @@
                 return;
             }
             document.getElementById('cxMapStage').style.setProperty('--mp-ar', image.width + ' / ' + image.height);
+            mounting = true;
             try {
                 view = await window.mountCodexMap(el, {
                     image, imageAlt: this.page.title, pins: this.viewPins(), scale: this.mapData.scale,
@@ -122,6 +124,12 @@
                 this.mapError = '';
             } catch (error) {
                 this.mapError = 'Could not load the map: ' + error.message;
+                return;
+            } finally {
+                mounting = false;
+            }
+            if (view.imageUrl !== this.mapData.image.url) { // replaced while the viewer was loading
+                this.mountMap();
                 return;
             }
             // Handlers of Alpine live on elements; the map's own keys are the document's.

@@ -1,6 +1,6 @@
 # Codex maps
 
-**Status:** decided with Michal on 2026-11-23. Mock-up: `docs/design/mockups/codex-map.html`.
+**Status:** decided with Michal on 2026-11-23, mock-up approved 2026-11-24. Mock-up: `docs/design/mockups/codex-map.html`.
 
 A map is the third page type, beside Article and Timeline. It is one zoomable image with pins.
 

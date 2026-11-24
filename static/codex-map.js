@@ -59,15 +59,16 @@
         const inside = (ll) => ll.lng >= 0 && ll.lng <= w && ll.lat >= 0 && ll.lat <= h;
 
         let pins = [], hidden = new Set(), openId = '', mode = '', scale = opts.scale || null, destroyed = false;
-        let fitZoom = 0;
+        let fitZoom = 0, wholeZoom = null; // the zoom that shows the whole map; the zoom left by the last fit
         const markers = new Map();
 
         // ---- zoom: pins shrink as the map zooms out ----
         function setLimits() {
+            if (!el.clientWidth) return; // not shown yet
             fitZoom = map.getBoundsZoom(bounds);
             map.setMinZoom(fitZoom - 0.5);
             map.setMaxZoom(Math.max(fitZoom + 3, 2));
-            map.setMaxBounds(bounds.pad(0.35));
+            map.setMaxBounds(bounds.pad(1)); // room to pan a pin out from under the preview sheet
         }
         // Whole, even sizes keep the tiles sharp.
         function pinSize(zoom = map.getZoom()) {
@@ -78,6 +79,7 @@
         }
         function fit(animate) {
             map.fitBounds(bounds, { animate: !!animate });
+            wholeZoom = animate ? fitZoom : map.getZoom();
         }
 
         // ---- pins ----
@@ -290,7 +292,7 @@
         map.on('zoomend moveend', () => { layoutLabels(); drawBar(); });
         // A map shown whole stays whole when its box changes size (full screen, page width).
         map.on('resize', () => {
-            const whole = Math.abs(map.getZoom() - fitZoom) < 0.01;
+            const whole = map.getZoom() === wholeZoom || Math.abs(map.getZoom() - wholeZoom) < 0.01;
             setLimits();
             if (whole) fit(false);
             applyPinSize();

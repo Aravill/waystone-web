@@ -99,6 +99,8 @@ Shown in the mock-up: the side panel's **Local graph**, and **Graph view** in th
 
 ## Maps
 
+*Back as a page type since 2026-11-24: see `codex-maps.md`. What follows is how they were hidden.*
+
 Hidden, not deleted. The map UI (`static/codex-map.js`, the § Map section, Add/Replace/Remove map, pins, map history) is taken out of the pages. The map tables, upload files, API and backups stay, so maps can come back later.
 
 ## PRs

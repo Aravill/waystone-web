@@ -4122,7 +4122,7 @@ a.tl-title:hover {
     pointer-events: none;
 }
 
-.tl-picker input {
+.modal-form .tl-picker input[type="text"] {
     width: 100%;
     padding-left: 2.25rem;
 }
