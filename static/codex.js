@@ -918,7 +918,7 @@ window.codexPage = function () {
                 if (this.screen === 'edit' && this.hasFiles(event)) this.onDrop(event);
             });
             window.addEventListener('beforeunload', (event) => {
-                if (this.isDirty || this.uploading || this.attach.busy) {
+                if (this.isDirty || this.uploading || this.attach.busy || this.mapUp.busy) {
                     event.preventDefault();
                     event.returnValue = '';
                 }

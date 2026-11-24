@@ -480,7 +480,7 @@ func (s *SQLiteStore) GetMapPinEvents(mapID string, limit int) ([]models.MapPinE
 		if err := rows.Scan(&e.ID, &e.MapPageID, &e.PinID, &e.UserID, &e.Action, &e.Before, &e.After, &e.UndoneBy, &e.CreatedAt); err != nil {
 			return nil, err
 		}
-		// The name a page has now, for pins that link one.
+		// The name the pin had then (a linked pin: its page's title).
 		snap := e.After
 		if snap == "" {
 			snap = e.Before

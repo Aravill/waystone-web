@@ -115,6 +115,7 @@
             markers.get(id)?.getElement()?.classList.toggle('is-hot', on);
         }
         function setPins(list) {
+            if (moving) endMove(false);
             pins = list;
             markers.forEach((m) => m.remove());
             markers.clear();
@@ -331,9 +332,10 @@
             setPins,
             setHidden(set) { hidden = set; setPins(pins); },
             setOpen(id) {
+                const was = pins.find((p) => p.id === openId);
                 openId = id || '';
-                // A hidden pin shows while it is open.
-                if (openId && !markers.has(openId)) setPins(pins);
+                // A hidden pin shows only while it is open.
+                if ((openId && !markers.has(openId)) || (was && was.id !== openId && hidden.has(was.icon))) setPins(pins);
                 else { markOpen(); layoutLabels(); }
             },
             setScale(s) { scale = s || null; draw(); drawBar(); },

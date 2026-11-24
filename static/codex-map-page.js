@@ -150,6 +150,8 @@
             }
         },
         setMap(map) {
+            // A redraw ends a move, and there is nothing to measure with once the scale is gone.
+            if (this.mapMode === 'move' || (this.mapMode === 'ruler' && !map.scale)) this.stopMapMode();
             this.pageData.map = map;
             if (this.mapOpenId && !this.mapOpenPin) this.closePin();
             this.mapHidden = this.mapHidden.filter((i) => map.pins.some((p) => p.icon === i));
@@ -253,6 +255,7 @@
             this.startMapMode('scale');
         },
         toggleMapIcon(id) {
+            if (this.mapMode === 'move') this.stopMapMode();
             this.mapHidden = this.mapHidden.includes(id) ? this.mapHidden.filter((i) => i !== id) : [...this.mapHidden, id];
             if (this.mapOpenPin && this.mapHidden.includes(this.mapOpenPin.icon)) this.closePin();
             if (view) view.setHidden(new Set(this.mapHidden));
@@ -297,6 +300,7 @@
             const at = view.endMove(true);
             this.mapMode = '';
             this.mapMoveId = '';
+            if (!at) return;
             await this.changePin('PUT', p, { x: at.x, y: at.y }, `Moved “${p.name}”.`);
             this.$nextTick(() => view && view.focusPin(id));
         },
