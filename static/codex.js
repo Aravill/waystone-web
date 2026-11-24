@@ -611,6 +611,9 @@ function codexPlainExcerpt(body, max = 220) {
 const CODEX_TL_GAP = 30;
 const CODEX_TL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v18"/><rect x="5" y="5" width="4" height="4" fill="currentColor"/><rect x="5" y="15" width="4" height="4"/><path d="M12 7h8M12 17h6"/></svg>';
 const CODEX_MAP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg>';
+const CODEX_PAGE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6z"/><path d="M9 10h6M9 14h6M9 18h4"/></svg>';
+// Closed and open; the stylesheet shows the one that fits.
+const CODEX_FOLDER_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path class="shut" d="M3 5h6l2 3h10v11H3z"/><path class="open" d="M3 19V5h6l2 3h8v3M3 19l3-8h16l-3 8z"/></svg>';
 const CODEX_TL_PEN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';
 
 // cal is {months, era, before_era}: month names (none = plain numbers) and the era suffixes.
@@ -722,9 +725,9 @@ function codexJournalPrefix(folderName) {
 function codexPageItemHtml(p, currentId, canDrag = false, prefix = '') {
     const shown = prefix && p.title.startsWith(prefix) && p.title.length > prefix.length ? p.title.slice(prefix.length) : p.title;
     const also = p.aliases.length ? `<span class="muted"> · also ${escapeHtml(p.aliases.join(', '))}</span>` : '';
-    const icon = { timeline: CODEX_TL_ICON, map: CODEX_MAP_ICON }[p.kind];
-    const kind = icon ? `<span class="cx-ty" aria-hidden="true">${icon}</span>` : '';
-    const kindText = icon ? `<span class="visually-hidden"> (${p.kind})</span>` : '';
+    const special = { timeline: CODEX_TL_ICON, map: CODEX_MAP_ICON }[p.kind];
+    const kind = `<span class="cx-ty" aria-hidden="true">${special || CODEX_PAGE_ICON}</span>`;
+    const kindText = special ? `<span class="visually-hidden"> (${p.kind})</span>` : '';
     const drag = canDrag ? ` draggable="true" data-drag="page:${escapeHtml(p.id)}"` : '';
     return `<li><a href="${codexPageUrl(p)}"${p.id === currentId ? ' aria-current="page"' : ''}${drag}>${kind}${escapeHtml(shown)}${kindText}</a>${also}</li>`;
 }
@@ -735,7 +738,7 @@ function codexFolderHtml(n, depth, canEdit, currentId, canDrag = false) {
     const prefix = codexJournalPrefix(n.name);
     const pages = n.pages.length ? `<ul class="page-list">${n.pages.map((p) => codexPageItemHtml(p, currentId, canDrag, prefix)).join('')}</ul>` : '';
     return `<details class="codex-folder${depth >= 4 ? ' codex-folder--deep' : ''}" id="folder-${id}" data-id="${id}"${open ? ' open' : ''}>` +
-        `<summary${canDrag ? ` draggable="true" data-drag="folder:${id}"` : ''}><span class="codex-folder-name">${escapeHtml(n.name)}</span><span class="codex-folder-count muted" title="${n.count} ${n.count === 1 ? 'page' : 'pages'}"><span aria-hidden="true">${n.count}</span><span class="visually-hidden"> ${n.count} ${n.count === 1 ? 'page' : 'pages'}</span></span>` +
+        `<summary${canDrag ? ` draggable="true" data-drag="folder:${id}"` : ''}><span class="cx-ty cx-ty--folder" aria-hidden="true">${CODEX_FOLDER_ICON}</span><span class="codex-folder-name">${escapeHtml(n.name)}</span><span class="codex-folder-count muted" title="${n.count} ${n.count === 1 ? 'page' : 'pages'}"><span aria-hidden="true">${n.count}</span><span class="visually-hidden"> ${n.count} ${n.count === 1 ? 'page' : 'pages'}</span></span>` +
         (canEdit ? `<button type="button" class="codex-menu-btn" data-menu="${id}" aria-label="Actions for folder ${escapeHtml(n.name)}" aria-haspopup="menu" aria-expanded="false">⋯</button>` : '') + '</summary>' +
         `<div class="codex-folder-body">` +
         n.children.map((c) => codexFolderHtml(c, depth + 1, canEdit, currentId, canDrag)).join('') + pages + '</div></details>';
@@ -1549,7 +1552,7 @@ window.codexPage = function () {
             const p = this.page;
             return [...new Set([p.author_user, ...(p.amender_users || [])].map((u) => (u && u.display_name) || 'Unknown'))].join(', ');
         },
-        // Contents rail: ids go on the rendered ## / ### headings (h3 / h4) from their text, so no
+        // Contents rail: ids go on the rendered # / ## / ### headings (h3.md-h1 / h3 / h4) from their text, so no
         // user text is ever injected as HTML.
         buildToc() {
             const body = this.$refs.body;
@@ -1558,13 +1561,14 @@ window.codexPage = function () {
                 return;
             }
             const used = new Set();
+            const top = body.querySelector('h3.md-h1') ? 1 : 2; // ## is the outermost level unless the page uses #
             this.toc = Array.from(body.querySelectorAll('h3, h4')).filter((h) => h.textContent.trim() && h.getClientRects().length > 0).map((h) => {
                 const base = 'sec-' + codexSlug(h.textContent);
                 let id = base;
                 for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
                 used.add(id);
                 h.id = id;
-                return { id, text: h.textContent.trim(), level: h.tagName === 'H3' ? 2 : 3 };
+                return { id, text: h.textContent.trim(), depth: (h.classList.contains('md-h1') ? 1 : h.tagName === 'H3' ? 2 : 3) - top };
             });
             this.updateToc();
             if (!this.tocHashDone && this.toc.length) {

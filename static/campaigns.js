@@ -1403,7 +1403,7 @@ function escapeHtml(text) {
 // Basic Markdown, safe by construction: the whole input is HTML-escaped first, then only
 // whitelisted tags are produced. Supports paragraphs, **bold** (may contain *italic*),
 // *italic*/_italic_, [text](url), "- " / "1. " lists (also right after a text line), "#" headings
-// (rendered as h3/h4) and "> " quotes. Every pattern is bounded, so rendering stays linear.
+// ("#" is an h3.md-h1, "##" an h3, "###" an h4) and "> " quotes. Every pattern is bounded, so rendering stays linear.
 function renderMarkdown(text) {
     // A blank line before an indented list line stays inside the list.
     const src = escapeHtml(String(text || '').replace(/\0/g, '').replace(/\r\n?/g, '\n'))
@@ -1468,7 +1468,7 @@ function renderMarkdown(text) {
         const head = lines[0].match(/^(#{1,3})\s+(.*)$/);
         if (head) {
             const tag = head[1].length === 3 ? 'h4' : 'h3';
-            out += `<${tag}>${inline(head[2])}</${tag}>`;
+            out += `<${tag}${head[1].length === 1 ? ' class="md-h1" aria-level="2"' : ''}>${inline(head[2])}</${tag}>`;
             lines = lines.slice(1);
         }
         let run = [], kind = '';
