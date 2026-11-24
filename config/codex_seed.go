@@ -97,27 +97,22 @@ var InitialTimelineEvents = []CodexSeedEvent{
 	{Title: "The standing stones are raised", Year: -204},
 }
 
-// InitialMapPage is the demo map. Pins name pages by title; "Hollow Tor" has no page yet.
-var InitialMapPage = CodexSeedPage{Title: "Map of the Karrow", AuthorID: royID,
-	Body: "The road from [[Karrow Ford]] north to the pass, as the toll-keeper drew it."}
+// InitialMapPage is the demo map; its scale and pins follow.
+var InitialMapPage = CodexSeedPage{Kind: models.PageMap, Title: "Map of the Karrow", AuthorID: royID}
 
+var InitialMapScale = models.MapScale{X1: 0.12, Y1: 0.78, X2: 0.84, Y2: 0.18, Length: 60, Unit: "miles"}
+
+// CodexSeedPin is a demo pin. Page, when set, is the title of the page it links.
 type CodexSeedPin struct {
-	X, Y   float64
-	Target string
-}
-
-// InitialSettlementMap is a small map on an ordinary page, so a pin to "Karrow Ford" shows
-// "Has a map" in the panel. It reuses the demo image.
-const InitialSettlementMapPage = "Karrow Ford"
-
-var InitialSettlementMapPins = []CodexSeedPin{
-	{X: 0.15, Y: 0.72, Target: "Ferrymen of the Ford"},
-	{X: 0.45, Y: 0.5, Target: "The Toll House"},
+	X, Y                          float64
+	Page, Name, Desc, Icon, Color string
+	AuthorID                      string
 }
 
 var InitialMapPins = []CodexSeedPin{
-	{X: 0.12, Y: 0.78, Target: "Karrow Ford"},
-	{X: 0.42, Y: 0.55, Target: "The Toll House"},
-	{X: 0.64, Y: 0.34, Target: "The Third Waystone"},
-	{X: 0.84, Y: 0.18, Target: "Hollow Tor"},
+	{X: 0.12, Y: 0.78, Page: "Karrow Ford", Icon: "settlement", Color: "green", AuthorID: royID},
+	{X: 0.42, Y: 0.55, Page: "The Toll House", Icon: "tower", Color: "black", AuthorID: royID},
+	{X: 0.64, Y: 0.34, Page: "The Third Waystone", Icon: "portal", Color: "purple", AuthorID: testyID},
+	{X: 0.84, Y: 0.18, Name: "Hollow Tor", Desc: "Something large nests here. The shepherds moved their flocks south.", Icon: "dragon", Color: "red", AuthorID: adamID},
+	{X: 0.3, Y: 0.86, Name: "Goblin camp", Desc: "Thirty tents, two wolves, one very loud drum.", Icon: "camp", Color: "red", AuthorID: testyID},
 }

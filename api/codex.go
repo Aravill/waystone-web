@@ -332,7 +332,7 @@ func handleCodexTitles(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		out = append(out, map[string]interface{}{
-			"id": p.ID, "title": p.Title, "has_map": p.HasMap, "aliases": p.Aliases, "codex_id": p.CodexID,
+			"id": p.ID, "title": p.Title, "aliases": p.Aliases, "codex_id": p.CodexID,
 		})
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -494,7 +494,7 @@ func handleGetCodex(w http.ResponseWriter, r *http.Request, id string) {
 			if tagIDs == nil {
 				tagIDs = []string{}
 			}
-			list = append(list, map[string]interface{}{"id": p.ID, "kind": p.Kind, "title": p.Title, "has_map": p.HasMap, "aliases": p.Aliases, "folder_id": p.FolderID, "tag_ids": tagIDs, "created_at": p.CreatedAt, "updated_at": p.UpdatedAt})
+			list = append(list, map[string]interface{}{"id": p.ID, "kind": p.Kind, "title": p.Title, "aliases": p.Aliases, "folder_id": p.FolderID, "tag_ids": tagIDs, "created_at": p.CreatedAt, "updated_at": p.UpdatedAt})
 		}
 	}
 	folders, err := db.GetFolders(id)
@@ -537,7 +537,7 @@ type pageCreateRequest struct {
 	Body     string `json:"body"`
 	CodexID  string `json:"codex_id"`
 	FolderID string `json:"folder_id"`
-	// Kind is "lore" (an article, also the default) or "timeline".
+	// Kind is "lore" (an article, also the default), "timeline" or "map".
 	Kind string `json:"kind"`
 	// TemplateID (builtin:name, or a template of the same codex) makes the server fill the body and
 	// tags from the template, ignoring Body.
@@ -583,6 +583,10 @@ func handleCreatePage(w http.ResponseWriter, r *http.Request) {
 	}
 	if kind == models.PageTimeline && req.TemplateID != "" {
 		writeJSONError(w, http.StatusBadRequest, "a timeline starts empty and can't use a template")
+		return
+	}
+	if kind == models.PageMap && (req.TemplateID != "" || req.Body != "") {
+		writeJSONError(w, http.StatusBadRequest, "a map has no text and can't use a template")
 		return
 	}
 	body, tagNames, ok := pageStart(w, req.TemplateID, req.CodexID, title, req.Body)
@@ -636,8 +640,8 @@ func codexStoreError(w http.ResponseWriter, err error, what string) {
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, db.ErrRevisionNotFound):
 		writeJSONError(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, db.ErrNoMap):
-		writeJSONError(w, http.StatusConflict, err.Error())
+	case errors.Is(err, db.ErrMapNoText):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "A map has no text.", "code": "map_no_text"})
 	default:
 		log.Printf("codex %s: %v", what, err)
 		codexServerError(w, what)
@@ -775,7 +779,7 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 		o := map[string]interface{}{"text": l.TargetText, "status": "missing", "page": nil}
 		if t, ok := byID[l.ToPageID]; ok {
 			o["status"] = "ok"
-			o["page"] = map[string]interface{}{"id": t.ID, "title": t.Title, "has_map": t.HasMap}
+			o["page"] = map[string]interface{}{"id": t.ID, "title": t.Title}
 		}
 		linkList = append(linkList, o)
 	}
@@ -783,7 +787,7 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 	if err != nil {
 		return nil, http.StatusInternalServerError, "failed to retrieve backlinks"
 	}
-	// One entry per linking page: whether it links, pins or both, and any alias used.
+	// One entry per linking page, with any alias used.
 	backList := []map[string]interface{}{}
 	at := map[string]int{}
 	for _, b := range backs {
@@ -792,18 +796,10 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 			i = len(backList)
 			at[b.PageID] = i
 			backList = append(backList, map[string]interface{}{
-				"id": b.PageID, "title": b.Title,
-				"via": []string{}, "aliases": []string{},
+				"id": b.PageID, "title": b.Title, "aliases": []string{},
 			})
 		}
-		via := "link"
-		if b.PinID != "" {
-			via = "pin"
-		}
 		o := backList[i]
-		if !containsString(o["via"].([]string), via) {
-			o["via"] = append(o["via"].([]string), via)
-		}
 		if db.NormName(b.TargetText) != db.NormName(page.Title) && !containsString(o["aliases"].([]string), b.TargetText) {
 			o["aliases"] = append(o["aliases"].([]string), b.TargetText)
 		}
@@ -816,12 +812,6 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 	for _, c := range page.Contributors {
 		if c.UserID != page.AuthorID {
 			amenders = append(amenders, c.UserID)
-		}
-	}
-	incoming := 0 // links only: pins are hidden while maps are
-	for _, b := range backs {
-		if b.PinID == "" {
-			incoming++
 		}
 	}
 	session, err := journalSessionPayload(page, users)
@@ -840,14 +830,22 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 		},
 		"links":          linkList,
 		"backlinks":      backList,
-		"incoming_count": incoming,
-		"on_maps":        []interface{}{},
+		"incoming_count": len(backs),
 		"timeline":       nil,
+		"map":            nil,
 	}
 	if page.Kind == models.PageTimeline {
 		if payload["timeline"], err = codexTimelinePayload(id, page.CodexID); err != nil {
 			return nil, http.StatusInternalServerError, "failed to retrieve timeline"
 		}
+	}
+	if page.Kind == models.PageMap {
+		if payload["map"], err = codexMapPayload(id, page.CodexID); err != nil {
+			return nil, http.StatusInternalServerError, "failed to retrieve map"
+		}
+	}
+	if payload["on_maps"], err = codexOnMaps(id); err != nil {
+		return nil, http.StatusInternalServerError, "failed to retrieve maps"
 	}
 	if payload["on_timelines"], err = codexOnTimelines(id); err != nil {
 		return nil, http.StatusInternalServerError, "failed to retrieve timelines"
@@ -862,12 +860,6 @@ func codexPagePayload(id string) (map[string]interface{}, int, string) {
 	}
 	if err := codexAddAttachmentPayload(payload, id); err != nil {
 		return nil, http.StatusInternalServerError, "failed to retrieve attachments"
-	}
-	if err := codexAddMapPayload(payload, page); err != nil {
-		return nil, http.StatusInternalServerError, "failed to retrieve map"
-	}
-	if err := codexAddOnMaps(payload, backs); err != nil {
-		return nil, http.StatusInternalServerError, "failed to retrieve maps"
 	}
 	return payload, http.StatusOK, ""
 }

@@ -15,7 +15,7 @@ A map is the third page type, beside Article and Timeline. It is one zoomable im
 - The name is a label above the pin. A linked pin's label is underlined.
 - Every pin has an icon and a colour. 27 icons from game-icons.net (CC BY 3.0, credited in the pin dialog and in `static/vendor/game-icons/LICENSE`) and 8 colours, the same in both themes because the map image doesn't change either.
 - Clicking a pin opens a small preview: the description or the start of the linked page's text, who added the pin and when, and **Open page** for a linked one. Editors also get Edit, Move and Delete there. On a phone it is a sheet at the bottom of the map.
-- **Adding:** Add pin, then click the place (or move the map under the cross and press Enter), then the dialog: link a page or write a name, description, icon, colour. **Create a page for it** makes an article from the Place template in the map's folder and links it.
+- **Adding:** Add pin, then click the place (or move the map under the cross and press Enter), then the dialog: link a page or write a name, description, icon, colour. **Create a page for it** makes an article in the map's folder (the Settlement template for a settlement or city pin, else Landmark, under the description typed) and links it.
 - **Moving:** Move in the preview, then drag the pin, click its new place or use the arrow keys; Save or Cancel (Esc). Dragging an ordinary pin only pans the map.
 - Pins get smaller as you zoom out, and a label that would cover another label or pin hides until you zoom in, hover or focus the pin.
 - The side panel lists all pins (with a search box; a click flies there and opens the preview) and the icons in use; clicking an icon hides or shows its pins, for you only.
@@ -38,7 +38,7 @@ A map is the third page type, beside Article and Timeline. It is one zoomable im
 - `{{list kind:map}}` works. Quick notes and unlinked-mention links never write into a map.
 
 ## Data
-- `map_pins`: `target_text` becomes `name` and `to_page_id` becomes `linked_page_id` (like `timeline_events`); new `description`, `icon`, `color`. Pins leave the `[[link]]` machinery.
+- `map_pins`: `target_text` now holds the pin's name and `to_page_id` the linked page's id (like `timeline_events`; the old column names stay so a rollback to an older build works); new `description`, `icon`, `color`. Pins leave the `[[link]]` machinery.
 - `map_scales (page_id, x1, y1, x2, y2, length, unit, updated_by, updated_at)`.
 - `map_pin_events` gains the action `edit`. Map images, uploads and the backup mirror are unchanged.
 

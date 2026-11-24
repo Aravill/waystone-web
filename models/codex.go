@@ -1,14 +1,15 @@
 package models
 
-// Page kinds. A lore page is an article; a timeline page also lists dated events (timeline_events).
-// A map is an optional part of any page (map_images, map_pins), not a kind.
+// Page kinds. A lore page is an article; a timeline page also lists dated events (timeline_events);
+// a map page is an image with pins (map_images, map_pins) and has no text.
 const (
 	PageLore     = "lore"
 	PageTimeline = "timeline"
+	PageMap      = "map"
 )
 
 // ValidNewPageKind tells whether a page can be created with this kind.
-func ValidNewPageKind(k string) bool { return k == PageLore || k == PageTimeline }
+func ValidNewPageKind(k string) bool { return k == PageLore || k == PageTimeline || k == PageMap }
 
 // Codex is a folder of Codex pages. Games point at a codex with campaigns.codex_id (a label only).
 type Codex struct {
@@ -75,7 +76,6 @@ type Page struct {
 type PageListItem struct {
 	ID        string
 	Kind      string
-	HasMap    bool
 	CodexID   string
 	FolderID  string
 	Title     string
@@ -127,16 +127,15 @@ type PageLink struct {
 	ToPageID   string
 }
 
-// PageBacklink is a page (via a link) or a map (via a pin) that points at a page.
+// PageBacklink is a page that links to a page.
 type PageBacklink struct {
 	PageID     string
 	Title      string
 	Kind       string
 	TargetText string
-	PinID      string // set for pins
 }
 
-// WantedPage is a title that links or pins point at but no page has yet.
+// WantedPage is a title that links point at but no page has yet.
 type WantedPage struct {
 	Text  string `json:"text"`
 	Count int    `json:"count"`
@@ -152,17 +151,47 @@ type MapImage struct {
 	CreatedAt  string `json:"created_at"`
 }
 
-// MapPin sits at x,y (fractions of the image) and points at a page by title text.
+// MapPin sits at x,y (fractions of the image). A linked pin shows its page's title; Name then keeps
+// the last known title for when the link is gone.
 type MapPin struct {
-	ID         string  `json:"id"`
-	MapPageID  string  `json:"map_page_id"`
-	X          float64 `json:"x"`
-	Y          float64 `json:"y"`
-	TargetText string  `json:"target_text"`
-	ToPageID   string  `json:"to_page_id"`
-	CreatedBy  string  `json:"created_by"`
-	CreatedAt  string  `json:"created_at"`
-	UpdatedAt  string  `json:"updated_at"`
+	ID           string  `json:"id"`
+	MapPageID    string  `json:"map_page_id"`
+	X            float64 `json:"x"`
+	Y            float64 `json:"y"`
+	Name         string  `json:"name"`
+	Description  string  `json:"description"`
+	LinkedPageID string  `json:"linked_page_id"` // "" = a plain pin
+	Icon         string  `json:"icon"`
+	Color        string  `json:"color"`
+	CreatedBy    string  `json:"created_by"`
+	CreatedAt    string  `json:"created_at"`
+	UpdatedAt    string  `json:"updated_at"`
+}
+
+// PinIcons and PinColors are the known pin looks, the first one the default (static/codex-pins.js has
+// the drawings and labels).
+var (
+	PinIcons = []string{"place", "settlement", "city", "fortress", "tower", "inn", "temple", "shop", "port", "bridge", "mine",
+		"camp", "battle", "dragon", "monster", "danger", "dungeon", "cave", "ruins", "tomb", "treasure", "portal",
+		"forest", "mountain", "quest", "party", "person"}
+	PinColors = []string{"red", "orange", "gold", "green", "teal", "blue", "purple", "black"}
+)
+
+// MapScale says that the two points (fractions of the image) are Length Units apart.
+type MapScale struct {
+	X1     float64 `json:"x1"`
+	Y1     float64 `json:"y1"`
+	X2     float64 `json:"x2"`
+	Y2     float64 `json:"y2"`
+	Length float64 `json:"length"`
+	Unit   string  `json:"unit"`
+}
+
+// MapCopy is what a copied map page starts with.
+type MapCopy struct {
+	Image *MapImage // already pointing at its own copied file
+	Scale *MapScale
+	Pins  []MapPin // ids are replaced
 }
 
 // MapPinEvent logs a pin change. Before and After are JSON MapPin snapshots ("" when absent).
@@ -171,11 +200,12 @@ type MapPinEvent struct {
 	MapPageID string
 	PinID     string
 	UserID    string
-	Action    string // add | move | remove
+	Action    string // add | edit | move | remove
 	Before    string
 	After     string
 	UndoneBy  string
 	CreatedAt string
+	Name      string // the pin's name in the snapshot
 }
 
 // Per-user rights (user_rights.action). Admins always have every right.
@@ -267,6 +297,7 @@ type NewPageExtras struct {
 	CoverImageID string
 	Calendar     *TimelineCalendar // timeline pages: the copied calendar
 	Events       []TimelineEvent   // timeline pages: the copied events (ids are replaced)
+	Map          *MapCopy          // map pages: the copied image, scale and pins
 	NoteID       string            // a quick note filed as this page: deleted in the same transaction
 }
 

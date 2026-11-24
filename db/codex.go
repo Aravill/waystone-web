@@ -24,7 +24,9 @@ var (
 	ErrParentNotFound     = errors.New("parent folder not found")
 	ErrFolderTooDeep      = errors.New("folders can nest up to 10 levels")
 	ErrPageNotFound       = errors.New("page not found")
-	ErrNoMap              = errors.New("the page has no map")
+	ErrNotMap             = errors.New("the page is not a map")
+	ErrMapNoText          = errors.New("a map has no text")
+	ErrNoMap              = errors.New("the map has no image yet")
 	ErrPinNotFound        = errors.New("pin not found")
 	ErrPinEventNotFound   = errors.New("pin event not found")
 	ErrPinEventUndone     = errors.New("pin change already undone")
@@ -212,22 +214,35 @@ func RemovePageAttachment(pageID, id string) (string, error) {
 }
 
 func GetMapImages(pageID string) ([]models.MapImage, error) { return GetStore().GetMapImages(pageID) }
-func AddMapImage(img models.MapImage) error                 { return GetStore().AddMapImage(img) }
-func RestoreMapImage(pageID, imageID, userID string) (models.MapImage, error) {
+
+// AddMapImage and RestoreMapImage report whether the new image's shape cleared the scale.
+func AddMapImage(img models.MapImage) (bool, error) { return GetStore().AddMapImage(img) }
+func RestoreMapImage(pageID, imageID, userID string) (bool, error) {
 	return GetStore().RestoreMapImage(pageID, imageID, userID)
 }
-func RemoveMap(pageID, userID string) (int, error)       { return GetStore().RemoveMap(pageID, userID) }
-func GetMapPins(pageID string) ([]models.MapPin, error)  { return GetStore().GetMapPins(pageID) }
+func GetMapScale(pageID string) (*models.MapScale, error) { return GetStore().GetMapScale(pageID) }
+func SetMapScale(pageID string, m *models.MapScale, userID string) error {
+	return GetStore().SetMapScale(pageID, m, userID)
+}
+func GetMapPins(pageID string) ([]models.MapPin, error) { return GetStore().GetMapPins(pageID) }
+func GetPinsLinkingTo(pageID string) ([]models.MapPin, error) {
+	return GetStore().GetPinsLinkingTo(pageID)
+}
 func AddMapPin(pin models.MapPin) (models.MapPin, error) { return GetStore().AddMapPin(pin) }
 
-// AddMapPinWithNewPage creates the page (in the map's codex) and pins it, in one transaction.
-func AddMapPinWithNewPage(page models.Page, pin models.MapPin) (models.MapPin, error) {
-	return GetStore().AddMapPinWithNewPage(page, pin)
+// AddMapPinWithPage creates the page (in the map's codex and folder) and a pin linking it, in one transaction.
+func AddMapPinWithPage(pin models.MapPin, page models.Page, body string, x models.NewPageExtras) (models.MapPin, error) {
+	return GetStore().AddMapPinWithPage(pin, page, body, x)
 }
-func MoveMapPin(mapID, pinID string, x, y float64, userID string) error {
+
+// UpdateMapPin, MoveMapPin and DeleteMapPin return the id of the logged change (to undo it), or "".
+func UpdateMapPin(pin models.MapPin, userID string) (string, error) {
+	return GetStore().UpdateMapPin(pin, userID)
+}
+func MoveMapPin(mapID, pinID string, x, y float64, userID string) (string, error) {
 	return GetStore().MoveMapPin(mapID, pinID, x, y, userID)
 }
-func DeleteMapPin(mapID, pinID, userID string) error {
+func DeleteMapPin(mapID, pinID, userID string) (string, error) {
 	return GetStore().DeleteMapPin(mapID, pinID, userID)
 }
 func GetMapPinEvents(mapID string, limit int) ([]models.MapPinEvent, error) {

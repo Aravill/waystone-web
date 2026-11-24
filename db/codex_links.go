@@ -170,8 +170,8 @@ func rebuildPageLinks(tx *sql.Tx, idx *codexIndex, pageID, codex, body string) e
 	return nil
 }
 
-// resolveCodexLinks re-resolves the stored links and pins of the given codices (pages and maps
-// that live there) against the current titles and aliases. Call it at the end of every
+// resolveCodexLinks re-resolves the stored links of the given codices (the pages that live there)
+// against the current titles and aliases. Call it at the end of every
 // transaction that changes what a name in a codex can point at: CreatePage, RenamePage,
 // SetPageAliases, DeletePage (that page's codex) and MovePage (the old and the new codex).
 // Body saves only rebuild that page's rows; codex deletes need none because a codex with pages
@@ -186,38 +186,31 @@ func resolveCodexLinks(tx *sql.Tx, codices ...string) error {
 
 func resolveLinksWith(tx *sql.Tx, idx *codexIndex, codices ...string) error {
 	where, args := codexFilter("p.codex_id", codices)
-	type row struct{ a, b, to, codex string }
-	for _, t := range []struct{ sel, upd string }{
-		{`SELECT l.from_page_id, l.target_text, l.to_page_id, p.codex_id FROM page_links l JOIN pages p ON p.id = l.from_page_id` + where,
-			`UPDATE page_links SET to_page_id = ? WHERE from_page_id = ? AND target_text = ?`},
-		{`SELECT m.id, m.target_text, m.to_page_id, p.codex_id FROM map_pins m JOIN pages p ON p.id = m.map_page_id` + where,
-			`UPDATE map_pins SET to_page_id = ? WHERE id = ? AND target_text = ?`},
-	} {
-		rows, err := tx.Query(t.sel, args...)
-		if err != nil {
-			return err
-		}
-		var changes []row
-		for rows.Next() {
-			var r row
-			if err := rows.Scan(&r.a, &r.b, &r.to, &r.codex); err != nil {
-				rows.Close()
-				return err
-			}
-			if now := idx.resolve(r.codex, r.b); now != r.to {
-				r.to = now
-				changes = append(changes, r)
-			}
-		}
-		if err := rows.Err(); err != nil {
+	type row struct{ from, text, to, codex string }
+	rows, err := tx.Query(`SELECT l.from_page_id, l.target_text, l.to_page_id, p.codex_id FROM page_links l JOIN pages p ON p.id = l.from_page_id`+where, args...)
+	if err != nil {
+		return err
+	}
+	var changes []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.from, &r.text, &r.to, &r.codex); err != nil {
 			rows.Close()
 			return err
 		}
+		if now := idx.resolve(r.codex, r.text); now != r.to {
+			r.to = now
+			changes = append(changes, r)
+		}
+	}
+	if err := rows.Err(); err != nil {
 		rows.Close()
-		for _, r := range changes {
-			if _, err := tx.Exec(t.upd, r.to, r.a, r.b); err != nil {
-				return err
-			}
+		return err
+	}
+	rows.Close()
+	for _, r := range changes {
+		if _, err := tx.Exec(`UPDATE page_links SET to_page_id = ? WHERE from_page_id = ? AND target_text = ?`, r.to, r.from, r.text); err != nil {
+			return err
 		}
 	}
 	return nil

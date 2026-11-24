@@ -135,6 +135,13 @@ func handleUploadPicture(w http.ResponseWriter, r *http.Request, id string) {
 	if !ok || !rt.checkPage(w, id, true) {
 		return
 	}
+	if kind, err := pageKind(id); err != nil {
+		codexServerError(w, "retrieve page")
+		return
+	} else if kind == models.PageMap {
+		codexStoreError(w, db.ErrMapNoText, "")
+		return
+	}
 	raw, err := url.PathUnescape(r.Header.Get("X-File-Name"))
 	if err != nil {
 		raw = ""

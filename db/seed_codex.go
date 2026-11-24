@@ -13,9 +13,8 @@ import (
 	"waystone-web/models"
 )
 
-// seedCodex adds the demo codex, its pages, and a map with pins (the map isn't shown yet). Pages are
-// created first and linked by title, so the missing link ([[The Ember Choir]]) and the missing
-// pin ("Hollow Tor") stay missing on purpose. Runs only on a fresh demo database.
+// seedCodex adds the demo codex, its pages, and a map with pins. Pages are created first and linked
+// by title, so the missing link ([[The Ember Choir]]) stays missing on purpose. Runs only on a fresh demo database.
 func seedCodex() error {
 	w := config.InitialCodex
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -88,28 +87,6 @@ func seedCodex() error {
 		}
 		return p.ID, nil
 	}
-	// A page with a map and pins. Pin targets are pages of the codex, so these run after all pages exist.
-	seedMap := func(pageID, authorID string, pins []config.CodexSeedPin) error {
-		file := GenerateUUID() + ".png"
-		img := demoMapPNG()
-		if err := WriteUpload(file, func(w io.Writer) error { return png.Encode(w, img) }); err != nil {
-			return fmt.Errorf("failed to seed map image: %w", err)
-		}
-		b := img.Bounds()
-		if err := store.AddMapImage(models.MapImage{ID: GenerateUUID(), PageID: pageID, File: file, Width: b.Dx(), Height: b.Dy(),
-			UploadedBy: authorID, CreatedAt: now}); err != nil {
-			if dir, derr := UploadDir(); derr == nil {
-				os.Remove(filepath.Join(dir, file))
-			}
-			return fmt.Errorf("failed to seed map image: %w", err)
-		}
-		for _, sp := range pins {
-			if _, err := store.AddMapPin(models.MapPin{MapPageID: pageID, X: sp.X, Y: sp.Y, TargetText: sp.Target, CreatedBy: authorID}); err != nil {
-				return fmt.Errorf("failed to seed map pin: %w", err)
-			}
-		}
-		return nil
-	}
 	ids := map[string]string{}
 	for _, sp := range config.InitialCodexPages {
 		id, err := create(sp)
@@ -130,15 +107,36 @@ func seedCodex() error {
 			}
 		}
 	}
-	mapID, err := create(config.InitialMapPage)
+	return seedMap(config.InitialMapPage, create, ids, now)
+}
+
+// seedMap adds the demo map page with its image, scale and pins (ids: page titles to ids).
+func seedMap(sp config.CodexSeedPage, create func(config.CodexSeedPage) (string, error), ids map[string]string, now string) error {
+	mapID, err := create(sp)
 	if err != nil {
 		return err
 	}
-	if err := seedMap(mapID, config.InitialMapPage.AuthorID, config.InitialMapPins); err != nil {
-		return err
+	file := GenerateUUID() + ".png"
+	img := demoMapPNG()
+	if err := WriteUpload(file, func(w io.Writer) error { return png.Encode(w, img) }); err != nil {
+		return fmt.Errorf("failed to seed map image: %w", err)
 	}
-	if id, ok := ids[config.InitialSettlementMapPage]; ok {
-		return seedMap(id, seedAuthor(config.InitialCodexPages, config.InitialSettlementMapPage), config.InitialSettlementMapPins)
+	b := img.Bounds()
+	if _, err := store.AddMapImage(models.MapImage{ID: GenerateUUID(), PageID: mapID, File: file, Width: b.Dx(), Height: b.Dy(),
+		UploadedBy: sp.AuthorID, CreatedAt: now}); err != nil {
+		if dir, derr := UploadDir(); derr == nil {
+			os.Remove(filepath.Join(dir, file))
+		}
+		return fmt.Errorf("failed to seed map image: %w", err)
+	}
+	if err := store.SetMapScale(mapID, &config.InitialMapScale, sp.AuthorID); err != nil {
+		return fmt.Errorf("failed to seed map scale: %w", err)
+	}
+	for _, p := range config.InitialMapPins {
+		pin := models.MapPin{MapPageID: mapID, X: p.X, Y: p.Y, Name: p.Name, Description: p.Desc, LinkedPageID: ids[p.Page], Icon: p.Icon, Color: p.Color, CreatedBy: p.AuthorID}
+		if _, err := store.AddMapPin(pin); err != nil {
+			return fmt.Errorf("failed to seed map pin: %w", err)
+		}
 	}
 	return nil
 }

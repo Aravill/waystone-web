@@ -358,6 +358,9 @@ func (s *SQLiteStore) initSchema() error {
 		y REAL NOT NULL,
 		target_text TEXT NOT NULL,
 		to_page_id TEXT NOT NULL DEFAULT '',
+		description TEXT NOT NULL DEFAULT '',
+		icon TEXT NOT NULL DEFAULT 'place',
+		color TEXT NOT NULL DEFAULT 'red',
 		created_by TEXT NOT NULL,
 		created_at TEXT NOT NULL,
 		updated_at TEXT NOT NULL
@@ -372,6 +375,17 @@ func (s *SQLiteStore) initSchema() error {
 		after TEXT NOT NULL DEFAULT '',
 		undone_by TEXT NOT NULL DEFAULT '',
 		created_at TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS map_scales (
+		page_id TEXT PRIMARY KEY,
+		x1 REAL NOT NULL,
+		y1 REAL NOT NULL,
+		x2 REAL NOT NULL,
+		y2 REAL NOT NULL,
+		length REAL NOT NULL,
+		unit TEXT NOT NULL,
+		updated_by TEXT NOT NULL,
+		updated_at TEXT NOT NULL
 	);
 	CREATE TABLE IF NOT EXISTS codex_tags (
 		id TEXT PRIMARY KEY,
@@ -618,10 +632,11 @@ func (s *SQLiteStore) initSchema() error {
 	if err := s.rescueUnsortedPages(); err != nil {
 		return err
 	}
-	// Maps are no longer a page kind: every page is 'lore' and may have a map (idempotent).
-	// Remove this when map becomes a page kind again.
-	if _, err := s.db.Exec(`UPDATE pages SET kind = 'lore' WHERE kind = 'map'`); err != nil {
-		return fmt.Errorf("failed to fold map pages into lore pages: %w", err)
+	if err := s.addMapPinColumns(); err != nil {
+		return err
+	}
+	if err := s.convertOldMaps(); err != nil {
+		return err
 	}
 
 	// Add users columns introduced after the table was first created.
