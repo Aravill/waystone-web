@@ -6,9 +6,9 @@
     <title>Waystone - Codices</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=8"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=85">
+    <link rel="stylesheet" href="/static/styles.css?v=86">
     <link rel="stylesheet" href="/static/notifications.css?v=13">
-    <link rel="stylesheet" href="/static/codex.css?v=52">
+    <link rel="stylesheet" href="/static/codex.css?v=53">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -529,7 +529,7 @@
                                 <summary>Contents</summary>
                                 <ul>
                                     <template x-for="t in toc" :key="t.id">
-                                        <li><a :href="'#' + t.id" :class="{ sub: t.level === 3 }" @click="tocActive = t.id" x-text="t.text"></a></li>
+                                        <li><a :href="'#' + t.id" :class="{ sub: t.depth > 0, sub2: t.depth > 1 }" @click="tocActive = t.id" x-text="t.text"></a></li>
                                     </template>
                                 </ul>
                             </details>
@@ -771,7 +771,7 @@
                             <h2>Outline</h2>
                             <ul class="cx-outline">
                                 <template x-for="t in toc" :key="t.id">
-                                    <li><a :href="'#' + t.id" @click="tocActive = t.id" :class="{ on: tocActive === t.id, sub: t.level === 3 }" :aria-current="tocActive === t.id ? 'location' : null" x-text="t.text"></a></li>
+                                    <li><a :href="'#' + t.id" @click="tocActive = t.id" :class="{ on: tocActive === t.id, sub: t.depth > 0, sub2: t.depth > 1 }" :aria-current="tocActive === t.id ? 'location' : null" x-text="t.text"></a></li>
                                 </template>
                             </ul>
                         </section>
@@ -1381,14 +1381,14 @@
     </div>
 
     <script src="/static/notifications.js?v=16"></script>
-    <script src="/campaigns.js?v=68"></script>
+    <script src="/campaigns.js?v=69"></script>
     <script src="/static/codex-editor.js?v=8"></script>
     <script src="/static/codex-graph.js?v=4"></script>
-    <script src="/static/codex-help.js?v=6"></script>
+    <script src="/static/codex-help.js?v=7"></script>
     <script src="/static/codex-books.js?v=1"></script>
     <script src="/static/codex-pins.js?v=1"></script>
     <script src="/static/codex-map.js?v=2"></script>
     <script src="/static/codex-map-page.js?v=1"></script>
-    <script src="/static/codex.js?v=45"></script>
+    <script src="/static/codex.js?v=46"></script>
 </body>
 </html>

@@ -10,7 +10,7 @@ const CODEX_HELP = [
         examples: [
             { src: 'The mill burned down in the spring.\nNobody saw who lit it.\n\nBy summer the miller was gone.', note: 'Paragraphs and line breaks' },
             { src: 'The **Order of the Lantern** keeps *watch* over the pass, or so _they_ claim.', note: '**bold** and *italic* or _italic_ (bold may contain italic)' },
-            { src: '# The Pass\nA short summary under the heading.\n\n## Dangers\n\n### Rockfalls\nWatch the upper road.', note: '# and ## make a banded heading, ### a smaller one. A heading goes on the first line of its paragraph.' },
+            { src: '# The Pass\nA short summary under the heading.\n\n## Dangers\n\n### Rockfalls\nWatch the upper road.', note: '# makes a large heading, ## a banded one, ### a smaller one. A heading goes on the first line of its paragraph.' },
             { src: '- Rope\n- Lantern oil\n- A map nobody trusts\n\n1. Climb\n2. Rest\n3. Descend', note: 'Lists start with -, * or 1.' },
             { src: '- A mithral crown\n  - Four points, each engraved\n    - Three holy symbols\n    - One banner\n  - A diamond in each point\n- A locked chest', note: 'Two spaces more put a line a level deeper. In the editor, Tab and Shift+Tab move list lines in and out.' },
             { src: '> "Never trust a quiet river."\n> Old miller\'s saying', note: 'Quotes start with >' },

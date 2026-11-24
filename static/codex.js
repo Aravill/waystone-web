@@ -1549,7 +1549,7 @@ window.codexPage = function () {
             const p = this.page;
             return [...new Set([p.author_user, ...(p.amender_users || [])].map((u) => (u && u.display_name) || 'Unknown'))].join(', ');
         },
-        // Contents rail: ids go on the rendered ## / ### headings (h3 / h4) from their text, so no
+        // Contents rail: ids go on the rendered # / ## / ### headings (h3.md-h1 / h3 / h4) from their text, so no
         // user text is ever injected as HTML.
         buildToc() {
             const body = this.$refs.body;
@@ -1558,13 +1558,14 @@ window.codexPage = function () {
                 return;
             }
             const used = new Set();
+            const top = body.querySelector('h3.md-h1') ? 1 : 2; // ## is the outermost level unless the page uses #
             this.toc = Array.from(body.querySelectorAll('h3, h4')).filter((h) => h.textContent.trim() && h.getClientRects().length > 0).map((h) => {
                 const base = 'sec-' + codexSlug(h.textContent);
                 let id = base;
                 for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
                 used.add(id);
                 h.id = id;
-                return { id, text: h.textContent.trim(), level: h.tagName === 'H3' ? 2 : 3 };
+                return { id, text: h.textContent.trim(), depth: (h.classList.contains('md-h1') ? 1 : h.tagName === 'H3' ? 2 : 3) - top };
             });
             this.updateToc();
             if (!this.tocHashDone && this.toc.length) {

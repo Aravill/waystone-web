@@ -2411,6 +2411,16 @@ html:has(dialog.cx-lightbox[open]) {
     font-size: 1.5rem;
 }
 
+/* "#": larger, without the band, closed by the double rule */
+.codex-page .codex-text h3.md-h1 {
+    margin: 2.5rem 0 1rem;
+    padding: 0 0 0.25rem;
+    background: none;
+    border-left: 0;
+    border-bottom: 3px double var(--ink);
+    font-size: 1.875rem;
+}
+
 .codex-page .codex-text h4 {
     margin: 1.25rem 0 0.5rem;
     font-size: 1.25rem;
@@ -2425,6 +2435,7 @@ html:has(dialog.cx-lightbox[open]) {
     display: flow-root;
 }
 
+.codex-page .codex-text > h3.md-h1:first-child,
 .codex-page .codex-text > :first-child {
     margin-top: 0;
 }
@@ -2484,6 +2495,10 @@ html:has(dialog.cx-lightbox[open]) {
 
 .codex-contents a.sub {
     padding-left: 1.75rem;
+}
+
+.codex-contents a.sub2 {
+    padding-left: 2.625rem;
 }
 
 .codex-contents a:hover {
@@ -2587,6 +2602,10 @@ html:has(dialog.cx-lightbox[open]) {
 
 .cx-outline a.sub {
     padding-left: 1.375rem;
+}
+
+.cx-outline a.sub2 {
+    padding-left: 2.125rem;
 }
 
 .cx-outline a:hover {
