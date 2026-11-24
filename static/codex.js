@@ -1,7 +1,7 @@
 // Codices page: /codices (home), /codices/c/{id} (codex), /codices/c/{id}/graph (graph), /codices/c/{id}/inbox (inbox), /codices/c/{id}/attachments (attachments),
 // /codices/p/{id}/{slug}[/edit|/history] (page).
-// Relies on campaigns.js (escapeHtml, renderMarkdown, journalByline, userAvatarHtml) and
-// codex-editor.js (createCodexEditor). One component picks the screen
+// Relies on campaigns.js (escapeHtml, renderMarkdown, journalByline, userAvatarHtml),
+// codex-editor.js (createCodexEditor) and codex-map-page.js (codexWithMap). One component picks the screen
 // from the path. Top-level names here must not clash with those scripts' (const clashes throw).
 
 // Diff helpers for the conflict panel and History (moved here from the old journal page).
@@ -246,7 +246,7 @@ function codexParseList(spec) {
         if (key === 'tag' && val) q.tags.push(val);
         else if (key === 'folder' && val) q.folder = val;
         else if (key === 'links' && val.toLowerCase() === 'here') q.links = true;
-        else if (key === 'kind' && ['lore', 'timeline'].includes(val.toLowerCase())) q.kind = val.toLowerCase();
+        else if (key === 'kind' && ['lore', 'timeline', 'map'].includes(val.toLowerCase())) q.kind = val.toLowerCase();
         else if (key === 'sort' && ['title', 'updated', 'created'].includes(val.toLowerCase())) q.sort = val.toLowerCase();
         else if (key === 'limit' && /^\d+$/.test(val)) q.limit = Math.min(CODEX_LIST_MAX, Math.max(1, Number(val)));
         else q.unknown.push(key ? `${key}:${val}` : val);
@@ -610,6 +610,7 @@ function codexPlainExcerpt(body, max = 220) {
 // Years with events more than this many years apart get a dashed spine and a "N years earlier" note.
 const CODEX_TL_GAP = 30;
 const CODEX_TL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v18"/><rect x="5" y="5" width="4" height="4" fill="currentColor"/><rect x="5" y="15" width="4" height="4"/><path d="M12 7h8M12 17h6"/></svg>';
+const CODEX_MAP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg>';
 const CODEX_TL_PEN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';
 
 // cal is {months, era, before_era}: month names (none = plain numbers) and the era suffixes.
@@ -721,8 +722,9 @@ function codexJournalPrefix(folderName) {
 function codexPageItemHtml(p, currentId, canDrag = false, prefix = '') {
     const shown = prefix && p.title.startsWith(prefix) && p.title.length > prefix.length ? p.title.slice(prefix.length) : p.title;
     const also = p.aliases.length ? `<span class="muted"> · also ${escapeHtml(p.aliases.join(', '))}</span>` : '';
-    const kind = p.kind === 'timeline' ? `<span class="cx-ty" aria-hidden="true">${CODEX_TL_ICON}</span>` : '';
-    const kindText = p.kind === 'timeline' ? '<span class="visually-hidden"> (timeline)</span>' : '';
+    const icon = { timeline: CODEX_TL_ICON, map: CODEX_MAP_ICON }[p.kind];
+    const kind = icon ? `<span class="cx-ty" aria-hidden="true">${icon}</span>` : '';
+    const kindText = icon ? `<span class="visually-hidden"> (${p.kind})</span>` : '';
     const drag = canDrag ? ` draggable="true" data-drag="page:${escapeHtml(p.id)}"` : '';
     return `<li><a href="${codexPageUrl(p)}"${p.id === currentId ? ' aria-current="page"' : ''}${drag}>${kind}${escapeHtml(shown)}${kindText}</a>${also}</li>`;
 }
@@ -758,7 +760,7 @@ function codexFolderDefault(folders, folderId) {
 }
 
 window.codexPage = function () {
-    return {
+    return window.codexWithMap({ // adds the map part, codex-map-page.js
         displayName: 'User',
         isAdmin: false,
         currentUserId: '',
@@ -1109,7 +1111,7 @@ window.codexPage = function () {
                     else if (r.screen === 'attachments') await this.loadAttachments();
                     else this.$nextTick(() => this.scrollToFolder());
                 } else {
-                    if (r.screen === 'edit' && !data.can_edit) {
+                    if (r.screen === 'edit' && (!data.can_edit || data.page.kind === 'map')) { // a map has no text
                         window.location.replace(this.pageUrl(data.page));
                         return;
                     }
@@ -1122,12 +1124,15 @@ window.codexPage = function () {
                         this.loadMentions(data.page.id);
                     }
                     if (r.screen === 'page' && data.page.kind === 'timeline') this.$nextTick(() => this.scrollToEventHash());
+                    if (r.screen === 'page' && data.page.kind === 'map') this.$nextTick(() => this.mountMap());
                     document.title = 'Waystone - ' + data.page.title;
                     if (location.pathname !== this.pageUrl(data.page) + (r.screen === 'page' ? '' : '/' + r.screen)) {
                         history.replaceState(null, '', this.pageUrl(data.page) + (r.screen === 'page' ? '' : '/' + r.screen) + location.search);
                     }
                     if (r.screen === 'edit' && !this.draft) await this.initDraft();
-                    if (r.screen === 'history') {
+                    if (r.screen === 'history' && data.page.kind === 'map') {
+                        await this.loadMapHistory();
+                    } else if (r.screen === 'history') {
                         await this.loadHistory(Number(new URLSearchParams(location.search).get('r')) || 0);
                     }
                 }
@@ -1536,9 +1541,9 @@ window.codexPage = function () {
         get bodyHtml() {
             return this.page ? codexMarkdown(this.page.body, this.linkLookup, this.canEdit, this.imageLookup, this.listRenderer, this.canEdit, this.users, this.fileLookup) : '';
         },
-        // Pages that link here by [[link]]; map pins are not shown.
+        // Pages that link here by [[link]].
         get linkedFrom() {
-            return this.pageData ? this.pageData.backlinks.filter((b) => b.via.some((v) => v !== 'pin')) : [];
+            return this.pageData ? this.pageData.backlinks : [];
         },
         get scribes() {
             const p = this.page;
@@ -1667,7 +1672,7 @@ window.codexPage = function () {
         async loadLocalGraph(pageData) {
             const seq = ++this.localSeq;
             this.localGraph = false;
-            if (!(pageData.links || []).length && !pageData.backlinks.some((b) => b.via.some((v) => v !== 'pin'))) return;
+            if (!(pageData.links || []).length && !pageData.backlinks.length) return;
             try {
                 const { response, data } = await this.send(`/api/codices/c/${encodeURIComponent(pageData.page.codex.id)}/graph?around=${encodeURIComponent(pageData.page.id)}`, 'GET');
                 if (seq !== this.localSeq || !response.ok) return;
@@ -2252,10 +2257,10 @@ window.codexPage = function () {
         // Pages of this codex that match the picker's text (title or alias), at most 8.
         get tlPickResults() {
             const d = this.dlg;
-            if ((d.type !== 'event' && d.type !== 'addToPage') || !this.codex) return [];
+            if (!['event', 'addToPage', 'pin'].includes(d.type) || !this.codex) return [];
             const q = codexNorm(d.pickQ);
             return this.codex.pages
-                .filter((p) => p.id !== (d.type === 'event' ? this.page.id : '') && (!q || codexNorm(p.title).includes(q) || p.aliases.some((a) => codexNorm(a).includes(q))))
+                .filter((p) => (d.type === 'addToPage' ? p.kind !== 'map' : p.id !== this.page.id) && (!q || codexNorm(p.title).includes(q) || p.aliases.some((a) => codexNorm(a).includes(q))))
                 .slice(0, 8)
                 .map((p) => this.tlPickItem(p));
         },
@@ -2362,7 +2367,7 @@ window.codexPage = function () {
             d.pickQ = '';
             d.pickOpen = false;
             d.createPage = false;
-            this.$nextTick(() => document.getElementById('dEvYear')?.focus());
+            this.$nextTick(() => document.getElementById(d.type === 'pin' ? 'dPinUnlink' : 'dEvYear')?.focus());
         },
         unlinkEvent() {
             const d = this.dlg;
@@ -2473,12 +2478,12 @@ window.codexPage = function () {
             }
             this.failDlg(d, response, data);
         },
-        // Arrow keys move through the page types like a radio group; Map (disabled) is skipped.
+        // Arrow keys move through the page types like a radio group.
         onKindKey(event) {
             const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
             if (!step) return;
             event.preventDefault();
-            const kinds = ['lore', 'timeline'];
+            const kinds = ['lore', 'timeline', 'map'];
             const d = this.dlg;
             d.kind = kinds[(kinds.indexOf(d.kind) + step + kinds.length) % kinds.length];
             this.$nextTick(() => document.querySelector('.cx-type[aria-checked="true"]')?.focus());
@@ -2486,7 +2491,7 @@ window.codexPage = function () {
 
         // ---- Dialogs ----
         get dlgEyebrow() {
-            if (this.dlg.type === 'event' || this.dlg.type === 'calendar') return this.page ? this.page.title : 'Timeline';
+            if (['event', 'calendar', 'pin', 'mapScale'].includes(this.dlg.type)) return this.page ? this.page.title : '';
             return { quickNote: 'Only you see it until you file it', addToPage: 'Filing a note', createPage: this.dlg.note ? 'Filing a note' : 'Codex', codex: 'Codex', templates: 'Codex', template: 'Template', rename: 'Page', aliases: 'Page', move: 'Page', copyPage: 'Page', saveTemplate: 'Page', folder: 'Folder', folderTpl: 'Folder', folderMove: 'Folder', pageFolder: 'Page', tags: 'Page', tag: 'Tag', createMissing: 'Page saved' }[this.dlg.type] || '';
         },
         get dlgTitle() {
@@ -2497,6 +2502,8 @@ window.codexPage = function () {
             if (d.type === 'createMissing') return d.rows.length === 1 ? 'Create this page?' : `Create these ${d.rows.length} pages?`;
             if (d.type === 'event') return d.eventId ? 'Edit event' : 'Add event';
             if (d.type === 'calendar') return 'Calendar';
+            if (d.type === 'pin') return d.pinId ? 'Edit pin' : 'Add pin';
+            if (d.type === 'mapScale') return 'Set scale';
             return { codex: d.codex ? 'Edit codex' : 'New codex', templates: 'Templates', template: d.template ? 'Edit template' : 'New template', rename: 'Rename page', aliases: 'Aliases', move: 'Move to another codex', copyPage: 'Copy page', saveTemplate: 'Save as template', folder: d.folder ? 'Rename folder' : 'New folder', folderMove: 'Move folder', folderTpl: 'New pages start from', pageFolder: 'Change folder', tags: 'Tags', tag: d.tag ? 'Rename tag' : 'New tag' }[d.type] || '';
         },
         get dlgWide() {
@@ -2511,6 +2518,8 @@ window.codexPage = function () {
             if (d.type === 'copyPage') return d.busy ? 'Copying...' : 'Copy page';
             if (d.type === 'event') return d.busy ? 'Saving...' : d.eventId ? 'Save event' : 'Add event';
             if (d.type === 'calendar') return d.busy ? 'Saving...' : 'Save calendar';
+            if (d.type === 'pin') return d.busy ? 'Saving...' : d.pinId ? 'Save pin' : 'Add pin';
+            if (d.type === 'mapScale') return d.busy ? 'Saving...' : 'Set scale';
             if (d.type === 'template' || d.type === 'saveTemplate') return d.busy ? 'Saving...' : 'Save template';
             return d.busy ? 'Saving...' : d.type === 'tag' && !d.tag ? 'Create tag' : d.type === 'move' ? 'Move page' : d.type === 'folderMove' ? 'Move folder' : (d.type === 'codex' && !d.codex) || (d.type === 'folder' && !d.folder) ? 'Create' + (d.type === 'codex' ? ' codex' : ' folder') : 'Save';
         },
@@ -2518,7 +2527,10 @@ window.codexPage = function () {
             const n = this.pageData?.incoming_count || 0;
             const here = this.page?.codex.name;
             const onTl = new Set((this.pageData?.on_timelines || []).map((o) => o.timeline.id)).size;
+            const onMap = new Set((this.pageData?.on_maps || []).map((o) => o.map.id)).size;
             return (this.isTimeline ? 'Its events keep their titles but lose their page links. ' : '') +
+                (this.isMap ? 'Its pins keep their names but lose their page links. ' : '') +
+                (onMap > 0 ? `It leaves ${this.countLabel(onMap, 'map')}: those pins stay as plain pins. ` : '') +
                 (onTl > 0 ? `It leaves ${this.countLabel(onTl, 'timeline')}: those events stay as plain events. ` : '') + (n > 0
                 ? `${this.countLabel(n, 'link')} from ${here} will turn into missing links, because links only reach pages in their own codex. `
                 : '') + "This page's own links are checked again in the new codex, and it goes to the top level of its folders." +
@@ -2941,6 +2953,8 @@ window.codexPage = function () {
                 else if (d.type === 'createMissing') await this.submitCreateMissing(d);
                 else if (d.type === 'event') await this.submitEvent(d);
                 else if (d.type === 'calendar') await this.submitCalendar(d);
+                else if (d.type === 'pin') await this.submitPin(d);
+                else if (d.type === 'mapScale') await this.submitScale(d);
                 else if (d.type === 'template') await this.submitTemplate(d);
                 else if (d.type === 'saveTemplate') await this.submitSaveTemplate(d);
                 else if (d.type === 'copyPage') await this.submitCopyPage(d);
@@ -2967,8 +2981,9 @@ window.codexPage = function () {
             else if (data.code === 'note_not_found') d.error = 'That note is gone: it was filed or deleted somewhere else.';
             else if (data.code === 'page_deleted') d.error = 'That page was deleted. Choose another.';
             else if (data.code === 'event_deleted') d.error = 'Someone deleted that event while you were editing it.';
+            else if (data.code === 'pin_deleted') d.error = 'Someone deleted that pin while you were editing it.';
             else if (data.code === 'not_a_timeline') d.error = 'This page is not a timeline.';
-            else if (data.code === 'page_not_in_codex') d.error = 'That page is no longer in this codex. Pick another, or leave the event unlinked.';
+            else if (data.code === 'page_not_in_codex') d.error = `That page is no longer in this codex. Pick another, or leave the ${d.type === 'pin' ? 'pin' : 'event'} unlinked.`;
             else if (response.status === 404) d.error = this.sentence(data.error || 'That no longer exists');
             else if (data.code === 'name_taken') d.error = this.conflictText(data);
             else if (data.code === 'folder_name_taken') d.error = 'A folder with that name already exists there.';
@@ -2985,12 +3000,12 @@ window.codexPage = function () {
                 d.error = 'Save or cancel your changes first.';
                 return;
             }
-            const timeline = d.kind === 'timeline';
-            const { response, data } = await this.send('/api/codices/pages', 'POST', timeline
-                ? { title, codex_id: d.codexId, folder_id: d.folderId || '', kind: 'timeline' }
+            const special = d.kind !== 'lore'; // a timeline or a map: no template, no text to write first
+            const { response, data } = await this.send('/api/codices/pages', 'POST', special
+                ? { title, codex_id: d.codexId, folder_id: d.folderId || '', kind: d.kind }
                 : { title, codex_id: d.codexId, folder_id: d.folderId || '', kind: 'lore', template_id: d.tplId, note_id: d.note ? d.note.id : '' });
             if (response.status === 201) {
-                if (!timeline) {
+                if (!special) {
                     try {
                         localStorage.setItem('codex-last-template:' + d.codexId, d.tplId);
                     } catch (error) {
@@ -2998,7 +3013,7 @@ window.codexPage = function () {
                     }
                 }
                 this.saved = true;
-                window.location.href = codexPageUrl({ id: data.page.id, title }, timeline ? '' : '/edit');
+                window.location.href = codexPageUrl({ id: data.page.id, title }, special ? '' : '/edit');
                 return;
             }
             this.failDlg(d, response, data);
@@ -3613,8 +3628,11 @@ window.codexPage = function () {
             const ok = await this.askConfirm({
                 eyebrow: 'Codex',
                 title: `Delete “${p.title}”?`,
-                message: `This deletes the page and all ${p.revision_count} of its revisions. It cannot be undone. Links to it become missing links.` +
+                message: (this.isMap
+                    ? `This deletes the map with its image and ${this.countLabel(this.mapPins.length, 'pin')}. It cannot be undone. Links to it become missing links.`
+                    : `This deletes the page and all ${p.revision_count} of its revisions. It cannot be undone. Links to it become missing links.`) +
                     (this.isTimeline ? ` Its ${this.countLabel(this.tlEvents.length, 'event')} go with it.` : '') +
+                    ((this.pageData.on_maps || []).length ? ' Pins that point at it stay on their maps as plain pins.' : '') +
                     ((this.pageData.on_timelines || []).length ? ' Events that point at it stay on their timelines as plain events.' : '') +
                     (this.pageData.attachments.length ? ` Its ${this.countLabel(this.pageData.attachments.length, 'attachment')} ${this.pageData.attachments.length === 1 ? 'is' : 'are'} deleted too.` : ''),
                 confirmLabel: 'Delete page',
@@ -3957,5 +3975,5 @@ window.codexPage = function () {
             this.messageAction = null;
             if (action) action.run();
         }
-    };
+    });
 };

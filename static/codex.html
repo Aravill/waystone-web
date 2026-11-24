@@ -8,7 +8,7 @@
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=85">
     <link rel="stylesheet" href="/static/notifications.css?v=13">
-    <link rel="stylesheet" href="/static/codex.css?v=51">
+    <link rel="stylesheet" href="/static/codex.css?v=52">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="journal-page codex-page" x-data="codexPage()">
@@ -400,19 +400,20 @@
                         <header class="cx-head">
                             <div class="cx-head-text">
                                 <p class="cx-kicker" x-show="isTimeline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18"/><rect x="5" y="5" width="4" height="4" fill="currentColor"/><rect x="5" y="15" width="4" height="4"/><path d="M12 7h8M12 17h6"/></svg>Timeline</p>
+                                <p class="cx-kicker" x-show="isMap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg>Map</p>
                                 <p class="cx-kicker" x-show="journal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg>Campaign journal · <span x-text="journal ? journal.campaign_title : ''"></span></p>
                                 <h1 class="cx-title" tabindex="-1" x-text="pageHeading"></h1>
                             </div>
                             <div class="cx-actions">
-                                <a class="cx-act" x-show="screen !== 'page'" :href="pageUrl(page)">Read</a>
+                                <a class="cx-act" x-show="screen !== 'page'" :href="pageUrl(page)" x-text="isMap ? 'Map' : 'Read'">Read</a>
                                 <button type="button" class="cx-act cx-act--primary" x-show="canEdit && isTimeline && screen === 'page'" @click="openEvent(null)">
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add event
                                 </button>
-                                <a class="cx-act" :class="{ 'cx-act--primary': !isTimeline }" x-show="canEdit" :href="pageUrl(page, '/edit')" :aria-current="screen === 'edit' ? 'page' : null">
+                                <a class="cx-act" :class="{ 'cx-act--primary': !isTimeline }" x-show="canEdit && !isMap" :href="pageUrl(page, '/edit')" :aria-current="screen === 'edit' ? 'page' : null">
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Edit
                                 </a>
-                                <a class="cx-act" :href="pageUrl(page, '/history')" :aria-current="screen === 'history' ? 'page' : null" :title="countLabel(page.revision_count, 'revision')">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>History <span class="cx-count" x-text="page.revision_count"></span>
+                                <a class="cx-act" :href="pageUrl(page, '/history')" :aria-current="screen === 'history' ? 'page' : null" :title="isMap ? 'Pin changes and images' : countLabel(page.revision_count, 'revision')">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>History <span class="cx-count" x-show="!isMap" x-text="page.revision_count"></span>
                                 </a>
                                 <span class="cx-spacer"></span>
                                 <div class="cx-more" x-show="(canEdit || canCopy) && screen !== 'edit'" @click.outside="moreOpen = false" @keydown="onMoreKey($event)">
@@ -426,21 +427,25 @@
                                         <button type="button" role="menuitem" x-show="canEdit" @click="moreDo('openMove')">Move to another codex…</button>
                                         <button type="button" role="menuitem" x-show="canCopy" @click="moreDo('openCopyPage')">Copy page…</button>
                                         <button type="button" role="menuitem" x-show="canEdit && isTimeline" @click="moreDo('openCalendar')">Calendar…</button>
-                                        <button type="button" role="menuitem" x-show="canEdit && !isTimeline" @click="moreDo('openSaveTemplate')">Save as template…</button>
+                                        <button type="button" role="menuitem" x-show="canEdit && isMap && screen === 'page'" @click="moreDo('openScale')">Set scale…</button>
+                                        <button type="button" role="menuitem" x-show="canEdit && isMap && mapData.scale" @click="moreDo('clearScale')">Clear the scale</button>
+                                        <button type="button" role="menuitem" x-show="canEdit && isMap && screen === 'page' && mapData.image" @click="moreDo('chooseMapImage')">Replace image…</button>
+                                        <button type="button" role="menuitem" x-show="canEdit && !isTimeline && !isMap" @click="moreDo('openSaveTemplate')">Save as template…</button>
                                         <hr x-show="canEdit">
                                         <button type="button" role="menuitem" class="cx-danger" x-show="canEdit" @click="moreDo('deletePage')">Delete page</button>
                                     </div>
                                 </div>
                             </div>
                         </header>
-                        <p class="cx-sub" x-show="screen === 'page'" x-text="isTimeline ? tlSummary : 'Revision ' + page.current_revision + ' · last edited by ' + page.updated_by_user.display_name + ' ' + formatStamp(page.updated_at)"></p>
+                        <p class="cx-sub" x-show="screen === 'page'" x-text="isTimeline ? tlSummary : isMap ? mapSummary : 'Revision ' + page.current_revision + ' · last edited by ' + page.updated_by_user.display_name + ' ' + formatStamp(page.updated_at)"></p>
                         <dl class="cx-jmeta" x-show="journal && screen === 'page'">
                             <div><dt>Played</dt><dd x-text="journal ? parseDateLocal(journal.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : ''"></dd></div>
                             <div><dt>At the table</dt><dd x-text="journalWho"></dd></div>
                             <div><dd><a :href="'/games/' + encodeURIComponent(journal ? journal.campaign_id : '')">Session in the game</a></dd></div>
                         </dl>
                         <p class="cx-sub" x-show="screen === 'edit' && draft" x-text="draft ? 'Saving adds revision ' + (draft.base + 1) + '. To change the title, use Rename.' : ''"></p>
-                        <p class="cx-sub" x-show="screen === 'history'" x-text="journalByline(page)"></p>
+                        <p class="cx-sub" x-show="screen === 'history' && !isMap" x-text="journalByline(page)"></p>
+                        <p class="cx-sub" x-show="screen === 'history' && isMap">Pin changes and images. The newest 200 pin changes are kept.</p>
                         <p class="cx-sub" x-show="screen === 'history' && pruned">Only the latest 200 revisions are kept.</p>
                         <p class="cx-sub" x-show="screen === 'history' && isTimeline">Events are not part of the history. They save as soon as they change.</p>
                     </div>
@@ -449,6 +454,59 @@
                 <!-- Page -->
                 <template x-if="screen === 'page' && pageData">
                     <div @scroll.window.passive="updateToc(); updateJump()">
+                        <template x-if="isMap">
+                            <section class="mp-wrap" aria-label="Map">
+                                <div class="notice" role="alert" x-show="mapError"><p x-text="mapError"></p></div>
+                                <div class="mp-stage" id="cxMapStage" :class="{ 'mp-stage--full': mapFull, 'mp-stage--busy': mapMode }">
+                                    <div class="mp-map" id="cxMap" x-show="mapData.image" role="application" :aria-label="page.title + '. Arrow keys pan, plus and minus zoom, Tab goes through the pins.'"></div>
+                                    <div class="mp-aim" aria-hidden="true"></div>
+                                    <div class="mp-tools mp-tools--zoom" x-show="mapData.image">
+                                        <button class="mp-tool" type="button" aria-label="Zoom in" title="Zoom in" @click="mapZoom(1)">+</button>
+                                        <button class="mp-tool" type="button" aria-label="Zoom out" title="Zoom out" @click="mapZoom(-1)">−</button>
+                                        <button class="mp-tool" type="button" title="Show the whole map" @click="mapFit()">Fit</button>
+                                        <button class="mp-tool" type="button" aria-label="Full screen" title="Full screen" :aria-pressed="mapFull ? 'true' : 'false'" @click="toggleMapFull()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
+                                    </div>
+                                    <div class="mp-tools mp-tools--acts" x-show="mapData.image">
+                                        <button class="mp-tool" type="button" title="Measure distances" x-show="mapData.scale" :aria-pressed="mapMode === 'ruler' ? 'true' : 'false'" @click="startMapMode('ruler')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16 16 3l5 5L8 21z"/><path d="m7 12 2 2M10 9l3 3M13 6l2 2"/></svg><span class="mp-tool-long">Ruler</span></button>
+                                        <button class="mp-tool mp-tool--primary" type="button" x-show="canEdit" @click="startMapMode('place')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="mp-tool-long">Add pin</span></button>
+                                    </div>
+                                    <template x-if="mapOpenPin">
+                                        <div class="mp-card" id="cxMapCard" role="dialog" aria-labelledby="cxMapCardTitle" :class="'mp-c-' + mapOpenPin.color" :style="'left:' + mapCardPos.x + 'px;top:' + mapCardPos.y + 'px'">
+                                            <div class="mp-card-head">
+                                                <span class="mp-tile" x-html="pinSvg(mapOpenPin.icon)"></span>
+                                                <h2 id="cxMapCardTitle" tabindex="-1" x-text="mapOpenPin.name"></h2>
+                                                <button class="mp-card-x" type="button" aria-label="Close" @click="closePin(true)">&times;</button>
+                                            </div>
+                                            <p class="mp-card-text" x-show="mapOpenPin.linked ? mapOpenPin.linked.excerpt : mapOpenPin.description" x-text="mapOpenPin.linked ? mapOpenPin.linked.excerpt : mapOpenPin.description"></p>
+                                            <p class="mp-card-by" x-text="pinLabel(mapOpenPin.icon) + ' · added by ' + mapOpenPin.created_by_user.display_name + ', ' + mapDay(mapOpenPin.created_at)"></p>
+                                            <div class="mp-card-acts" x-show="mapOpenPin.linked || canEdit">
+                                                <a class="cx-act cx-act--primary" x-show="mapOpenPin.linked" :href="mapOpenPin.linked ? pageUrl(mapOpenPin.linked) : null">Open page</a>
+                                                <button class="cx-act" type="button" x-show="canEdit" @click="openPinDialog(mapOpenPin)">Edit</button>
+                                                <button class="cx-act" type="button" x-show="canEdit" @click="startMove(mapOpenPin)">Move</button>
+                                                <button class="cx-act cx-act--danger" type="button" x-show="canEdit" @click="deletePin(mapOpenPin)">Delete</button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <div class="mp-banner" x-show="mapMode" x-cloak>
+                                        <p role="status" x-text="mapBanner"></p>
+                                        <span class="mp-banner-acts">
+                                            <button class="cx-act cx-act--primary" type="button" x-show="mapMode === 'move'" @click="saveMove()">Save</button>
+                                            <button class="cx-act cx-act--primary" type="button" x-show="mapMode === 'scale' && mapScalePts.length === 2" @click="openScaleDialog()">Set distance</button>
+                                            <button class="cx-act" type="button" x-show="mapMode === 'ruler' && mapRuler.points" @click="undoMapPoint()">Undo point</button>
+                                            <button class="cx-act" type="button" x-show="mapMode === 'ruler' && mapRuler.points" @click="clearMapPoints()">Clear</button>
+                                            <button class="cx-act" type="button" @click="stopMapMode()" x-text="mapMode === 'ruler' ? 'Done' : 'Cancel'"></button>
+                                        </span>
+                                    </div>
+                                    <div class="mp-empty" x-show="!mapData.image" :class="{ 'is-over': mapUp.over }" @dragover.prevent="mapUp.over = canEdit" @dragleave="mapUp.over = false" @drop.prevent="onMapDrop($event)">
+                                        <p><strong x-text="canEdit ? 'Add the map\'s image' : 'This map has no image yet'"></strong></p>
+                                        <p x-show="canEdit">Drop a PNG, JPEG, WebP or GIF here, up to 25 MB.</p>
+                                        <button class="cx-act cx-act--primary" type="button" x-show="canEdit" :disabled="mapUp.busy" @click="chooseMapImage()">Choose an image</button>
+                                    </div>
+                                    <div class="mp-uploading" x-show="mapUp.busy" x-cloak><progress max="100" :value="mapUp.pct" aria-label="Upload progress"></progress><p role="status">Uploading the image…</p></div>
+                                </div>
+                                <input type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif" x-ref="mapInput" @change="onMapFile($event)" tabindex="-1" aria-hidden="true">
+                            </section>
+                        </template>
                         <section class="cx-props" aria-label="Properties">
                             <h2 class="cx-props-label">Properties</h2>
                             <figure class="cx-cover" x-show="pageData.cover">
@@ -462,11 +520,11 @@
                                 <div class="cx-prop" x-show="pageData.tags.length || canEdit"><dt>Tags</dt><dd><template x-for="t in pageData.tags" :key="t.id"><a class="cx-chip cx-chip--tag" :href="tagUrl(t.name)" x-text="t.name"></a></template><span class="muted" x-show="!pageData.tags.length">None</span> <button type="button" class="text-link" x-show="canEdit" @click="openTags()">Edit tags</button></dd></div>
                                 <div class="cx-prop" x-show="page.aliases.length"><dt>Also known as</dt><dd><template x-for="a in page.aliases" :key="a"><span class="cx-chip" x-text="a"></span></template></dd></div>
                                 <div class="cx-prop"><dt>Started</dt><dd x-text="page.author_user.display_name + ', ' + shortDate(page.created_at)"></dd></div>
-                                <div class="cx-prop"><dt>Scribes</dt><dd x-text="scribes"></dd></div>
-                                <div class="cx-prop"><dt>Revisions</dt><dd><a :href="pageUrl(page, '/history')" x-text="page.revision_count"></a></dd></div>
+                                <div class="cx-prop" x-show="!isMap"><dt>Scribes</dt><dd x-text="scribes"></dd></div>
+                                <div class="cx-prop" x-show="!isMap"><dt>Revisions</dt><dd><a :href="pageUrl(page, '/history')" x-text="page.revision_count"></a></dd></div>
                             </dl>
                         </section>
-                        <article class="cx-article">
+                        <article class="cx-article" x-show="!isMap">
                             <details class="codex-contents" x-show="toc.length >= 2">
                                 <summary>Contents</summary>
                                 <ul>
@@ -598,8 +656,34 @@
                 <!-- History -->
                 <template x-if="screen === 'history' && pageData">
                     <div>
-                        <p x-show="historyLoading">Loading history...</p>
-                        <div class="history" x-show="!historyLoading && revisions.length > 0">
+                        <p x-show="historyLoading || mapHist.loading">Loading history...</p>
+                        <template x-if="isMap && !mapHist.loading">
+                            <div>
+                                <h2 class="section-header">Pin changes</h2>
+                                <p class="same" x-show="mapHist.events.length === 0">No pins have been added yet.</p>
+                                <ul class="mp-hist" x-show="mapHist.events.length">
+                                    <template x-for="e in mapHist.events" :key="e.id">
+                                        <li>
+                                            <span class="mp-hist-text"><b x-text="e.user.display_name"></b> <span x-text="mapEventText(e)"></span><small x-text="formatStamp(e.created_at)"></small></span>
+                                            <span class="mp-count" x-show="e.undone_by_user" x-text="e.undone_by_user ? 'Undone by ' + e.undone_by_user.display_name : ''"></span>
+                                            <button type="button" class="text-link" x-show="canEdit && !e.undone_by_user" :disabled="busy" :aria-label="'Undo: ' + e.user.display_name + ' ' + mapEventText(e)" @click="undoMapEvent(e)">Undo</button>
+                                        </li>
+                                    </template>
+                                </ul>
+                                <h2 class="section-header">Images</h2>
+                                <p class="same" x-show="mapHist.images.length === 0">No image yet.</p>
+                                <ul class="mp-hist" x-show="mapHist.images.length">
+                                    <template x-for="i in mapHist.images" :key="i.id">
+                                        <li>
+                                            <img class="mp-thumb" :src="i.url" alt="" loading="lazy">
+                                            <span class="mp-hist-text"><b x-text="i.current ? 'Current image' : 'Earlier image'"></b><small x-text="i.width + ' × ' + i.height + ' · added by ' + i.uploaded_by_user.display_name + ', ' + formatStamp(i.created_at)"></small></span>
+                                            <button type="button" class="text-link" x-show="canEdit && !i.current" :disabled="busy" @click="restoreMapImage(i)">Restore</button>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </template>
+                        <div class="history" x-show="!isMap && !historyLoading && revisions.length > 0">
                             <ol class="revs" reversed aria-label="Revisions, newest first">
                                 <template x-for="r in revisions" :key="r.number">
                                     <li class="rev-item">
@@ -662,6 +746,24 @@
                                         <span class="tl-cent" x-show="r.cent" x-text="r.label"></span>
                                         <a x-show="!r.cent" :href="'#y' + r.year" :aria-current="tlActiveYear === r.year ? 'location' : null" @click="tlActiveYear = r.year"><span x-text="r.label"></span><span class="tl-count" x-text="r.count"></span></a>
                                     </li>
+                                </template>
+                            </ul>
+                        </section>
+                        <section class="cx-box" aria-label="Pins" x-show="isMap && mapPins.length">
+                            <h2>Pins · <span x-text="mapPins.length"></span></h2>
+                            <label class="mp-find"><span class="visually-hidden">Find a pin</span><input type="search" placeholder="Find a pin" autocomplete="off" x-model="mapQ"></label>
+                            <ul class="mp-list">
+                                <template x-for="p in mapPinList" :key="p.id">
+                                    <li><button type="button" :class="{ 'is-linked': p.linked }" @click="goToPin(p.id)"><span class="mp-tile mp-tile--s" :class="'mp-c-' + p.color" x-html="pinSvg(p.icon)"></span><span class="mp-name" x-text="p.name"></span><span class="visually-hidden" x-text="', ' + pinLabel(p.icon) + (p.linked ? ', has a page' : '')"></span></button></li>
+                                </template>
+                            </ul>
+                            <p class="cx-box-empty" x-show="mapPinList.length === 0">No pin matches.</p>
+                        </section>
+                        <section class="cx-box" aria-label="Icons" x-show="isMap && mapKey.length">
+                            <h2>Icons</h2>
+                            <ul class="mp-key">
+                                <template x-for="k in mapKey" :key="k.id">
+                                    <li><button type="button" :aria-pressed="k.on ? 'true' : 'false'" :title="k.on ? 'Hide these pins' : 'Show these pins'" @click="toggleMapIcon(k.id)"><span class="mp-tile mp-tile--s mp-tile--key" x-html="pinSvg(k.id)"></span><span x-text="k.label"></span><span class="mp-count" x-text="k.on ? k.count : 'hidden'"></span></button></li>
                                 </template>
                             </ul>
                         </section>
@@ -728,6 +830,14 @@
                                 </template>
                             </ul>
                             <p class="cx-box-empty" x-show="mentions.total > mentions.list.length" x-text="'and ' + (mentions.total - mentions.list.length) + ' more'"></p>
+                        </section>
+                        <section class="cx-box" aria-label="On the map" x-show="onMaps.length">
+                            <h2>On the map</h2>
+                            <ul>
+                                <template x-for="o in onMaps" :key="o.key">
+                                    <li><a :href="o.url" x-text="o.title"></a></li>
+                                </template>
+                            </ul>
                         </section>
                         <section class="cx-box" aria-label="On the timeline" x-show="onTimelines.length">
                             <h2>On the timeline</h2>
@@ -813,10 +923,11 @@
                             <div class="cx-types" role="radiogroup" aria-labelledby="dKindLabel" @keydown="onKindKey($event)">
                                 <button type="button" class="cx-type" role="radio" :aria-checked="dlg.kind === 'lore' ? 'true' : 'false'" :tabindex="dlg.kind === 'lore' ? 0 : -1" @click="dlg.kind = 'lore'"><strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M9 10h6M9 14h6M9 18h4"/></svg>Article</strong><span>Text with headings, pictures and links</span></button>
                                 <button type="button" class="cx-type" role="radio" :aria-checked="dlg.kind === 'timeline' ? 'true' : 'false'" :tabindex="dlg.kind === 'timeline' ? 0 : -1" @click="dlg.kind = 'timeline'"><strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18"/><rect x="5" y="5" width="4" height="4" fill="currentColor"/><rect x="5" y="15" width="4" height="4"/><path d="M12 7h8M12 17h6"/></svg>Timeline</strong><span>Events by date, newest first, under a short intro</span></button>
-                                <button type="button" class="cx-type" role="radio" aria-checked="false" aria-disabled="true" tabindex="-1"><strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg>Map</strong><span>A picture with pins that point at pages. Later</span></button>
+                                <button type="button" class="cx-type" role="radio" :aria-checked="dlg.kind === 'map' ? 'true' : 'false'" :tabindex="dlg.kind === 'map' ? 0 : -1" @click="dlg.kind = 'map'"><strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg>Map</strong><span>A picture you can zoom, with pins</span></button>
                             </div>
                         </div>
                         <p class="cx-tpl-note" x-show="dlg.kind === 'timeline'">A timeline starts empty. Add its events once it is made. The type can't be changed later.</p>
+                        <p class="cx-tpl-note" x-show="dlg.kind === 'map'">A map starts empty. Add its image once it is made. The type can't be changed later.</p>
                         <div class="cx-np-cols" x-show="dlg.kind === 'lore'">
                             <div class="cx-np-pick">
                                 <p class="cx-np-label" id="dTplLabel">Start from</p>
@@ -949,6 +1060,72 @@
                             </div>
                         </div>
                         <label class="cx-check" x-show="!dlg.linked && !dlg.eventId"><input type="checkbox" x-model="dlg.createPage"><span>Create a page for it <small x-text="codex && codex.folders.some((f) => !f.parent_id && f.name.trim().toLowerCase() === 'events') ? '(from the Event template, in Events)' : '(from the Event template, at the top level)'"></small></span></label>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'pin'">
+                    <div>
+                        <div class="form-group">
+                            <span class="tl-label" id="dPinPageLabel">Page <span class="muted">(optional)</span></span>
+                            <div class="tl-picker" x-show="!dlg.linked">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                                <input type="text" id="dPinPick" role="combobox" aria-labelledby="dPinPageLabel" aria-controls="dPinList" aria-autocomplete="list" autocomplete="off" :aria-expanded="dlg.pickOpen ? 'true' : 'false'" :aria-activedescendant="dlg.pickOpen && tlPickResults[dlg.pickIdx] ? 'dPinOpt-' + tlPickResults[dlg.pickIdx].id : null" :placeholder="'Find a page in ' + page.codex.name" x-model="dlg.pickQ" @focus="dlg.pickOpen = true" @input="dlg.pickOpen = true; dlg.pickIdx = 0" @blur="dlg.pickOpen = false" @keydown="onPickKey($event)">
+                                <ul class="tl-pick-list" id="dPinList" role="listbox" aria-labelledby="dPinPageLabel" x-show="dlg.pickOpen">
+                                    <template x-for="(p, i) in tlPickResults" :key="p.id">
+                                        <li role="option" :id="'dPinOpt-' + p.id" :aria-selected="i === dlg.pickIdx ? 'true' : 'false'" @mousedown.prevent="pickPage(p)"><span x-text="p.title"></span><small x-text="p.folder"></small></li>
+                                    </template>
+                                    <li class="tl-pick-none" x-show="tlPickResults.length === 0">No page called that. Give the pin a name below.</li>
+                                </ul>
+                            </div>
+                            <div class="tl-linked" x-show="dlg.linked">
+                                <span class="tl-linked-title"><span x-text="dlg.linked ? dlg.linked.title : ''"></span><small x-text="dlg.linked ? [dlg.linked.folder, ...dlg.linked.tags].filter(Boolean).join(' · ') : ''"></small></span>
+                                <button type="button" class="text-link" id="dPinUnlink" @click="unlinkPin()">Unlink</button>
+                            </div>
+                            <p class="hint" x-text="dlg.linked ? 'The pin shows this page\'s name and the start of its text.' : 'Link a page and the pin takes its name.'"></p>
+                        </div>
+                        <div x-show="!dlg.linked">
+                            <div class="form-group">
+                                <label for="dPinName">Name</label>
+                                <input type="text" id="dPinName" maxlength="120" autocomplete="off" x-model="dlg.title" @input="dlg.ownTitle = dlg.title">
+                            </div>
+                            <div class="form-group">
+                                <label for="dPinDesc">Description <span class="muted">(optional)</span></label>
+                                <textarea id="dPinDesc" rows="3" maxlength="1000" x-model="dlg.desc"></textarea>
+                            </div>
+                            <label class="cx-check" x-show="!dlg.pinId"><input type="checkbox" x-model="dlg.createPage"><span>Create a page for it <small x-text="pinPageHint"></small></span></label>
+                        </div>
+                        <div class="form-group mp-look">
+                            <span class="tl-label" id="dPinIconLabel">Icon: <span class="muted" x-text="pinLabel(dlg.icon)"></span></span>
+                            <div class="mp-icons" role="radiogroup" aria-labelledby="dPinIconLabel" @keydown="onPinRadio($event, pinIconIds, 'icon')">
+                                <template x-for="g in CODEX_PIN_ICONS" :key="g.group">
+                                    <div><p x-text="g.group"></p><div>
+                                        <template x-for="i in g.icons" :key="i[0]">
+                                            <button class="mp-opt" type="button" role="radio" :class="'mp-c-' + dlg.color" :aria-checked="dlg.icon === i[0] ? 'true' : 'false'" :tabindex="dlg.icon === i[0] ? 0 : -1" :aria-label="i[1]" :title="i[1]" @click="dlg.icon = i[0]" x-html="pinSvg(i[0])"></button>
+                                        </template>
+                                    </div></div>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <span class="tl-label" id="dPinColorLabel">Colour</span>
+                            <div class="mp-colors" role="radiogroup" aria-labelledby="dPinColorLabel" @keydown="onPinRadio($event, CODEX_PIN_COLORS.map((c) => c[0]), 'color')">
+                                <template x-for="c in CODEX_PIN_COLORS" :key="c[0]">
+                                    <button class="mp-opt" type="button" role="radio" :class="'mp-c-' + c[0]" :aria-checked="dlg.color === c[0] ? 'true' : 'false'" :tabindex="dlg.color === c[0] ? 0 : -1" @click="dlg.color = c[0]"><i></i><span x-text="c[1]"></span></button>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="mp-prev" aria-hidden="true">
+                            <span class="mp-marker"><span class="mp-pin" :class="['mp-c-' + dlg.color, dlg.linked ? 'mp-pin--linked' : '']"><span class="mp-label" x-text="dlg.linked ? dlg.linked.title : dlg.title.trim() || 'Name'"></span><span class="mp-in"><span class="mp-tile" x-html="pinSvg(dlg.icon)"></span></span></span></span>
+                        </div>
+                        <p class="mp-credit">Icons by Lorc, Delapouite and contributors, <a href="https://game-icons.net" target="_blank" rel="noopener">game-icons.net</a>, CC BY 3.0.</p>
+                    </div>
+                </template>
+                <template x-if="dlg.type === 'mapScale'">
+                    <div>
+                        <p class="hint">How far apart are the two points?</p>
+                        <div class="tl-date-row mp-scale-row">
+                            <div><label for="dScaleLen">Distance</label><input type="text" id="dScaleLen" inputmode="decimal" autocomplete="off" x-model="dlg.length" x-ref="dlgFocus"></div>
+                            <div><label for="dScaleUnit">Unit</label><input type="text" id="dScaleUnit" maxlength="20" autocomplete="off" list="dScaleUnits" x-model="dlg.unit"><datalist id="dScaleUnits"><option>km</option><option>miles</option><option>leagues</option><option>feet</option><option>m</option><option>days</option></datalist></div>
+                        </div>
                     </div>
                 </template>
                 <template x-if="dlg.type === 'calendar'">
@@ -1209,6 +1386,9 @@
     <script src="/static/codex-graph.js?v=4"></script>
     <script src="/static/codex-help.js?v=5"></script>
     <script src="/static/codex-books.js?v=1"></script>
-    <script src="/static/codex.js?v=44"></script>
+    <script src="/static/codex-pins.js?v=1"></script>
+    <script src="/static/codex-map.js?v=2"></script>
+    <script src="/static/codex-map-page.js?v=1"></script>
+    <script src="/static/codex.js?v=45"></script>
 </body>
 </html>

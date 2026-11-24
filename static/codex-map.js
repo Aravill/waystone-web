@@ -288,8 +288,11 @@
         map.on('zoom', () => applyPinSize());
         map.on('move zoom', () => opts.onView && opts.onView());
         map.on('zoomend moveend', () => { layoutLabels(); drawBar(); });
+        // A map shown whole stays whole when its box changes size (full screen, page width).
         map.on('resize', () => {
+            const whole = Math.abs(map.getZoom() - fitZoom) < 0.01;
             setLimits();
+            if (whole) fit(false);
             applyPinSize();
             layoutLabels();
             drawBar();
