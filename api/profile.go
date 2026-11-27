@@ -274,6 +274,7 @@ func handleDeleteProfile(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	jukeboxRecheckUser(userID)
 
 	// Clear session
 	if err := middleware.ClearSession(w, r); err != nil {

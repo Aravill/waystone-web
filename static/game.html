@@ -7,7 +7,7 @@
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=8"></script>
     <link rel="stylesheet" href="/static/styles.css?v=87">
-    <link rel="stylesheet" href="/static/notifications.css?v=13">
+    <link rel="stylesheet" href="/static/notifications.css?v=14">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
 <body class="page-game" x-data="gamePage()">
@@ -95,6 +95,10 @@
                             <a class="campaign-action-btn game-calendar-btn" x-show="isMember" :href="'/games/' + encodeURIComponent(campaign.id) + '/calendar'"
                                :title="unansweredCount > 0 ? pluralCount(unansweredCount, 'poll') + ' awaiting your reply' : null"
                                :aria-label="unansweredCount > 0 ? 'Calendar, ' + unansweredCount + ' awaiting your reply' : null">Calendar<span class="campaign-action-count" x-show="unansweredCount > 0" x-text="unansweredCount"></span></a>
+                            <button type="button" class="campaign-action-btn game-jukebox-btn" x-show="jukeboxRole === 'dm'" @click="openJukebox()"
+                                    x-text="jukeboxLive ? (jukeboxPaused ? 'Jukebox: paused' : 'Jukebox: live') : 'Start jukebox'"></button>
+                            <button type="button" class="campaign-action-btn game-jukebox-btn" :class="{ 'is-offair': !jukeboxLive }" x-show="jukeboxRole === 'listener'" @click="openJukebox()"
+                                    :title="jukeboxLive ? null : 'Off air: the DM is not broadcasting. The window waits and starts when they do.'">Listen<span class="game-jukebox-state" x-text="jukeboxLive ? (jukeboxPaused ? ' ◐ Paused' : ' ● Live') : ' ○ Off air'"></span></button>
                         </div>
                     </header>
 
@@ -576,9 +580,9 @@
         </div>
     </div>
 
-    <script src="/static/notifications.js?v=17"></script>
+    <script src="/static/notifications.js?v=18"></script>
     <script src="/campaigns.js?v=69"></script>
     <script src="/static/characters.js?v=5"></script>
-    <script src="/static/game.js?v=17"></script>
+    <script src="/static/game.js?v=18"></script>
 </body>
 </html>

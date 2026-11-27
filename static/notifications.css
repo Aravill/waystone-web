@@ -182,3 +182,131 @@
         max-height: calc(100vh - var(--notif-top, 3.75rem) - 0.625rem);
     }
 }
+
+/* Header jukebox (see docs/design/jukebox.md) */
+.jukebox {
+    position: relative;
+}
+
+/* A small square mark while something is on air. The menu says it in words. */
+.jukebox-dot {
+    position: absolute;
+    top: 0.375rem;
+    right: 0.375rem;
+    width: 0.5rem;
+    height: 0.5rem;
+    background: var(--verdigris);
+    border: 1px solid var(--bg);
+}
+
+.jukebox-row {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.jukebox-row-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+}
+
+.jukebox-name {
+    min-width: 0;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    overflow-wrap: anywhere;
+}
+
+.jukebox-state {
+    flex: none;
+    font-size: 0.875rem;
+    color: var(--muted);
+}
+
+.jukebox-state.is-live {
+    color: var(--verdigris);
+}
+
+.jukebox-state.is-paused {
+    color: var(--ochre);
+}
+
+.jukebox-meta {
+    margin-top: 0.125rem;
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.jukebox-actions {
+    margin-top: 0.625rem;
+}
+
+.jukebox-actions .campaign-action-btn,
+.jukebox-remote .campaign-action-btn,
+.jukebox-remote .btn-danger {
+    min-height: 2.5rem;
+    padding: 0.25rem 0.875rem;
+    font-size: 0.875rem;
+}
+
+.jukebox-remote {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--line);
+}
+
+.jukebox-vol {
+    display: block;
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.875rem;
+    font-weight: 400;
+}
+
+.jukebox-vol input[type="range"] {
+    display: block;
+    width: 100%;
+    height: 2.25rem;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: none;
+    accent-color: var(--ink);
+}
+
+.jukebox-vol input[type="range"]:focus-visible {
+    outline: 2px solid var(--rubric);
+    outline-offset: 2px;
+}
+
+.jukebox-remote-buttons {
+    display: flex;
+    gap: 0.625rem;
+    margin-top: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .jukebox {
+        position: static;
+    }
+}
+
+/* Game page jukebox buttons (loaded here because every header page has this sheet) */
+.game-jukebox-state {
+    margin-left: 0.375rem;
+    font-weight: 400;
+}
+
+/* Off air: dashed and muted like a disabled control, but still clickable (it waits for the DM) */
+.game-jukebox-btn.is-offair {
+    color: var(--muted);
+    border-style: dashed;
+    border-color: var(--line);
+}
+
+.game-jukebox-btn.is-offair:hover {
+    color: var(--bg);
+    border-style: solid;
+}

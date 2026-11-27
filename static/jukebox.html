@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waystone - Jukebox</title>
+    <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+    <script src="/static/theme.js?v=8"></script>
+    <link rel="stylesheet" href="/static/styles.css?v=87">
+    <link rel="stylesheet" href="/static/jukebox.css?v=2">
+    <script defer src="/static/vendor/alpinejs.min.js"></script>
+</head>
+<body class="jukebox-page" x-data="jukeboxPopup()">
+    <main class="jb">
+        <header class="jb-head" x-show="view !== 'loading' && view !== 'notfound'" x-cloak>
+            <p class="jb-kicker" x-text="role === 'dm' ? 'Jukebox, you are the DM' : 'Jukebox'"></p>
+            <h1 class="jb-title" x-text="title"></h1>
+        </header>
+
+        <p class="jb-note" x-show="view === 'loading'">Loading…</p>
+
+        <!-- Not available -->
+        <template x-if="view === 'notfound'">
+            <section class="jb-block">
+                <h1 class="jb-title">Jukebox not available</h1>
+                <p class="jb-text">This game has no jukebox for you. It only works while a game is ongoing, and only for its DM, players and followers.</p>
+            </section>
+        </template>
+
+        <!-- This browser can't do it -->
+        <template x-if="view === 'unsupported'">
+            <section class="jb-block">
+                <p class="jb-text" x-text="unsupportedText"></p>
+            </section>
+        </template>
+
+        <!-- Something ended the jukebox for good -->
+        <template x-if="view === 'ended'">
+            <section class="jb-block">
+                <p class="jb-text jb-text--strong" role="alert" x-text="endedText"></p>
+                <p x-show="endedReason === 'taken_over' || endedReason === 'superseded'">
+                    <button type="button" class="campaign-action-btn" @click="location.reload()" x-text="role === 'dm' ? 'Broadcast from this window' : 'Listen in this window'"></button>
+                </p>
+            </section>
+        </template>
+
+        <!-- DM: choose a source -->
+        <template x-if="view === 'start'">
+            <section class="jb-block">
+                <fieldset class="jb-sources">
+                    <legend class="jb-label">Where does the music come from?</legend>
+                    <label class="jb-source" x-show="canTab">
+                        <input type="radio" name="jb-source" value="tab" x-model="source" aria-labelledby="jbSrcTabName">
+                        <span class="jb-source-body">
+                            <span class="jb-source-name" id="jbSrcTabName">Share a tab or screen</span>
+                            <span class="jb-hint">Chrome and Edge. Pick the Spotify tab and tick "Share tab audio", or share your screen with system audio.</span>
+                        </span>
+                    </label>
+                    <label class="jb-source">
+                        <input type="radio" name="jb-source" value="input" x-model="source" aria-labelledby="jbSrcInputName">
+                        <span class="jb-source-body">
+                            <span class="jb-source-name" id="jbSrcInputName">Audio input</span>
+                            <span class="jb-hint">A sound input on this computer, such as a virtual cable or Stereo Mix that carries your music. Works in every browser.</span>
+                        </span>
+                    </label>
+                </fieldset>
+                <p class="jb-note" x-show="!canTab">Sharing a tab or screen isn't available in this browser (Firefox can't capture audio that way). Choose an input device instead.</p>
+
+                <div class="jb-field" x-show="source === 'input'">
+                    <label for="jbDevice" class="jb-label">Input device</label>
+                    <select id="jbDevice" x-model="deviceId">
+                        <option value="">Default input</option>
+                        <template x-for="d in devices" :key="d.deviceId">
+                            <option :value="d.deviceId" x-text="d.label || 'Input device'"></option>
+                        </template>
+                    </select>
+                    <p class="jb-hint" x-show="devicesUnnamed"><button type="button" class="text-link" @click="unlockDevices()">Allow access to see device names</button></p>
+                </div>
+
+                <p class="jb-error" x-show="startError" x-text="startError" role="alert"></p>
+                <button type="button" class="submit-btn" @click="start()" :disabled="starting">Start</button>
+                <p class="jb-hint">Players and followers can listen from the game page. Closing this window stops the broadcast.</p>
+            </section>
+        </template>
+
+        <!-- DM: broadcasting -->
+        <template x-if="view === 'live'">
+            <section class="jb-block">
+                <p class="jb-status" :class="'is-' + dmStatusKey" role="status">
+                    <span class="jb-glyph" aria-hidden="true" x-text="dmStatusGlyph"></span>
+                    <span x-text="dmStatusText"></span>
+                </p>
+                <div class="jb-meter" role="img" aria-label="Level of the sound you are sending"><div class="jb-meter-bar"></div></div>
+                <div class="jb-field">
+                    <label for="jbSend" class="jb-label">Send volume</label>
+                    <input id="jbSend" type="range" min="0" max="1" step="0.01" x-model.number="sendVolume" @input="applySendVolume()">
+                    <p class="jb-hint">Keep it low enough that voice chat stays clear. Everyone hears this level.</p>
+                </div>
+                <div class="jb-buttons">
+                    <button type="button" class="campaign-action-btn" @click="toggleMute()" :aria-pressed="muted.toString()" x-text="muted ? 'Unmute' : 'Mute'"></button>
+                    <button type="button" class="btn-danger" @click="stopBroadcast()">Stop</button>
+                </div>
+            </section>
+        </template>
+
+        <!-- Listener -->
+        <template x-if="view === 'listen'">
+            <section class="jb-block">
+                <p class="jb-status" :class="'is-' + state" role="status">
+                    <span class="jb-glyph" aria-hidden="true" x-text="stateGlyph"></span>
+                    <span x-text="stateText"></span>
+                </p>
+                <p x-show="needPlay"><button type="button" class="submit-btn" @click="playNow()">Play</button></p>
+                <div class="jb-field">
+                    <label for="jbVolume" class="jb-label">Volume</label>
+                    <input id="jbVolume" type="range" min="0" max="1" step="0.01" x-model.number="volume" @input="applyVolume()">
+                </div>
+                <div class="jb-buttons">
+                    <button type="button" class="campaign-action-btn" @click="toggleListenMute()" :aria-pressed="listenMuted.toString()" x-text="listenMuted ? 'Unmute' : 'Mute'"></button>
+                </div>
+            </section>
+        </template>
+
+        <!-- Who is listening -->
+        <section class="jb-block jb-people" x-show="view === 'live' || view === 'listen'" x-cloak aria-labelledby="jbPeopleHeading">
+            <h2 id="jbPeopleHeading" class="section-header">Listening<span class="section-count" x-text="listeners.length"></span></h2>
+            <ul class="jb-list">
+                <li class="jb-person" x-show="dmUser">
+                    <template x-if="dmUser">
+                        <span class="jb-person-row">
+                            <img class="user-avatar" x-show="dmUser.avatar_url" :src="dmUser.avatar_url" alt="">
+                            <span class="user-avatar user-avatar--letter" x-show="!dmUser.avatar_url" aria-hidden="true" x-text="dmUser.avatar_letter || '?'"></span>
+                            <span class="jb-person-name"><span class="jb-crown" aria-hidden="true">♛</span> <span x-text="dmUser.display_name || dmUser.name || 'Unknown'"></span></span>
+                            <span class="jb-person-tag">Broadcasting</span>
+                        </span>
+                    </template>
+                </li>
+                <template x-for="u in listeners" :key="u.id">
+                    <li class="jb-person">
+                        <span class="jb-person-row">
+                            <img class="user-avatar" x-show="u.avatar_url" :src="u.avatar_url" alt="">
+                            <span class="user-avatar user-avatar--letter" x-show="!u.avatar_url" aria-hidden="true" x-text="u.avatar_letter || '?'"></span>
+                            <span class="jb-person-name" x-text="u.display_name || u.name || 'Unknown'"></span>
+                        </span>
+                    </li>
+                </template>
+            </ul>
+            <p class="jb-note" x-show="listeners.length === 0" x-text="role === 'dm' ? 'No one is listening yet.' : 'No one else is listening.'"></p>
+        </section>
+
+        <div class="message" :class="messageType" x-show="messageVisible" x-text="messageText" role="status"></div>
+    </main>
+
+    <script src="/static/jukebox.js?v=2"></script>
+</body>
+</html>

@@ -50,6 +50,7 @@ This document describes what must-have features are to be implemented before pre
     - [x] Game page - sheet with the full description (basic Markdown), the chronicle (upcoming sessions as calendar cells, played sessions with attendees) and a side panel for the selected session or the company (visible to all users; replies and rolls are for members)
     - [x] Reply to suggested sessions from the game page
     - [x] DMs record past sessions by hand (optional times, ticked attendees, named guests), edit and delete them
+    - [x] Jukebox - the DM of an Ongoing game streams music from the browser to the game's players and followers, who listen in a pop-up with a remote in the header (live only, nothing stored); see `docs/design/jukebox.md`
     - [x] Characters - players keep a roster per system and assign one per game (history kept, shown in the chronicle), linking codex pages (up to 50); see `docs/design/characters.md` and `docs/design/character-codex-pages.md`
 - [x] Profile
     - [x] Standard operations

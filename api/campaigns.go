@@ -427,6 +427,7 @@ func handleGetCampaign(w http.ResponseWriter, r *http.Request, campaignID string
 		return
 	}
 	obj["upcoming_sessions"] = upcoming
+	obj["jukebox"] = jukeboxGameState(campaign, v.userID, v.followed[campaign.ID])
 	writeJSON(w, http.StatusOK, obj)
 }
 
@@ -858,6 +859,7 @@ func handleDeleteCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 		writeJSONError(w, http.StatusInternalServerError, "failed to delete game")
 		return
 	}
+	jukeboxRecheck(campaignID)
 	removeDeletedGameDiscordEvents(events)
 	if cover.Cover != "" {
 		removeCodexFiles([]string{cover.Cover})
@@ -905,6 +907,7 @@ func HandleCampaignStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if oldStatus != req.Status {
+		jukeboxRecheck(campaign.ID)
 		notify(userID, append(campaignFollowerIDs(campaign), campaign.DM), models.NotificationCampaignStatus, campaign, "", map[string]string{
 			"from_status": string(oldStatus),
 			"to_status":   string(req.Status),

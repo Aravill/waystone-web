@@ -383,6 +383,9 @@ func handleWithdrawSignup(w http.ResponseWriter, r *http.Request, campaignID, ta
 	if wasPlayer {
 		notifType, message = models.NotificationPlayerLeft, "left the game"
 	}
+	if wasPlayer {
+		jukeboxRecheck(campaignID)
+	}
 	notify(userID, []string{campaign.DM}, notifType, campaign, "", nil)
 	if wasPlayer {
 		if updated, err := db.GetCampaignByID(campaignID); err == nil {
@@ -443,6 +446,9 @@ func applySignupStatus(w http.ResponseWriter, campaignID, targetUserID string, s
 	if err != nil || campaign == nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve game")
 		return nil
+	}
+	if status == models.SignupDeclined || status == models.SignupKicked {
+		jukeboxRecheck(campaignID)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
