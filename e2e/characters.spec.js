@@ -99,7 +99,7 @@ test('a character links codex pages, and only the owner can', async ({ page, wor
     await page.locator('#linkPageQ').fill('E2E Kael');
     await page.locator('.char-link-result', { hasText: 'E2E Kael lore' }).click();
     const link = page.locator('.char-page-list a', { hasText: 'E2E Kael lore' });
-    await expect(link).toHaveAttribute('href', `/codices/p/${pageId}/e2e-kael-lore`);
+    await expect(link).toHaveAttribute('href', `/codices/p/${pageId}`);
 
     // Someone without access to that codex sees nothing.
     const seen = await (await testy.get(`/api/characters/${id}`)).json();

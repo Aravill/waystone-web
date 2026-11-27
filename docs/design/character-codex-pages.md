@@ -41,8 +41,9 @@ Foreign keys are off, so cascades are by hand:
   leaks, not even titles.
 - A viewer with no Codices access gets an empty list, and the section is hidden.
 - Lost access: if the owner loses See on a codex, their links into it stay (others who
-  can see it still see them; they reappear if access comes back). The owner can't see
-  or remove them meanwhile, and they still count toward the 50.
+  can see it still see them; they reappear if access comes back). The page doesn't show
+  them to the owner meanwhile (the API would still unlink one by id; nothing leaks),
+  and they still count toward the 50.
 
 ### Migration
 - One-off at startup, idempotent: every non-empty `characters.codex_url` whose path is

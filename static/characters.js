@@ -34,10 +34,9 @@ function characterSystemHtml(system) {
     return `<span class="char-system">${logo}<span>${escapeHtml(system.name)}</span></span>`;
 }
 
-// The link to a codex page (the slug mirrors codexSlug in codex.js; the server only needs the id).
+// The link to a codex page: the codex accepts it without a slug and adds the canonical one on load.
 function characterCodexPageUrl(p) {
-    const slug = Array.from(String(p.title || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '')).slice(0, 60).join('').replace(/-+$/, '') || 'page';
-    return `/codices/p/${encodeURIComponent(p.page_id)}/${encodeURIComponent(slug)}`;
+    return `/codices/p/${encodeURIComponent(p.page_id)}`;
 }
 
 // Shared by both pages: the signed-in user, the toast and logout.
@@ -310,7 +309,7 @@ window.characterPage = function () {
         async openLinkDialog() {
             this.linkDialog = { ...this.linkDialog, open: true, q: '', error: '' };
             this.$nextTick(() => document.getElementById('linkPageQ')?.focus());
-            if (this.linkDialog.titles) return;
+            if (this.linkDialog.titles || this.linkDialog.loading) return;
             this.linkDialog.loading = true;
             try {
                 const [tr, cr] = await Promise.all([fetch('/api/codices/titles'), fetch('/api/codices')]);
