@@ -102,8 +102,8 @@ func getAdminDiscord(w http.ResponseWriter, r *http.Request) {
 		"enabled": discordEnabled(), "missing_env": discordMissingEnv(),
 		"guild_id": settings.GuildID, "guild_name": "", "invite_url": settings.InviteURL,
 		"events": events, "event_options": options,
-		"channels": []map[string]string{}, "channels_error": "",
-		"games":  []map[string]string{},
+		"channels": []map[string]string{}, "voice_channels": []map[string]string{}, "channels_error": "",
+		"games":  []map[string]interface{}{},
 		"outbox": map[string]interface{}{"queued": 0, "failures": []map[string]interface{}{}},
 	}
 	if !discordEnabled() {
@@ -126,6 +126,13 @@ func getAdminDiscord(w http.ResponseWriter, r *http.Request) {
 					channels = append(channels, map[string]string{"id": c.ID, "name": c.Name})
 				}
 			}
+			voice := []map[string]string{}
+			if chans, err := client.VoiceChannels(ctx, settings.GuildID); err == nil {
+				for _, c := range chans {
+					voice = append(voice, map[string]string{"id": c.ID, "name": c.Name})
+				}
+			}
+			out["voice_channels"] = voice
 		}
 		out["channels"] = channels
 	}
@@ -141,13 +148,20 @@ func getAdminDiscord(w http.ResponseWriter, r *http.Request) {
 		}
 		return strings.ToLower(campaigns[i].Title) < strings.ToLower(campaigns[j].Title)
 	})
+	eventSettings, err := db.GetAllDiscordGameEvents()
+	if err != nil {
+		adminError(w, http.StatusInternalServerError, "failed to load games")
+		return
+	}
 	titles := map[string]string{}
-	games := make([]map[string]string, 0, len(campaigns))
+	games := make([]map[string]interface{}, 0, len(campaigns))
 	for _, c := range campaigns {
 		titles[c.ID] = c.Title
-		games = append(games, map[string]string{
+		ev := eventSettings[c.ID]
+		games = append(games, map[string]interface{}{
 			"id": c.ID, "title": c.Title, "status": string(c.Status),
 			"channel_id": c.DiscordChannelID, "channel_name": c.DiscordChannelName,
+			"events": ev.On, "voice_id": ev.VoiceID, "voice_name": ev.VoiceName, "cover": ev.Cover != "",
 		})
 	}
 	out["games"] = games
@@ -159,7 +173,9 @@ func getAdminDiscord(w http.ResponseWriter, r *http.Request) {
 	failures := make([]map[string]interface{}, 0, len(failed))
 	for _, f := range failed {
 		label := f.Target
-		if f.Kind == "dm" {
+		if strings.HasPrefix(f.Kind, "event_") {
+			label = "Discord event"
+		} else if f.Kind == "dm" {
 			if u, err := db.GetUserByID(f.Target); err == nil && u != nil {
 				label = u.DisplayName()
 			}
@@ -226,17 +242,25 @@ func putAdminDiscord(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	var covers map[string]models.DiscordGameEvents
+	if old.GuildID != "" && old.GuildID != req.GuildID {
+		if covers, err = db.GetAllDiscordGameEvents(); err != nil {
+			adminError(w, http.StatusInternalServerError, "failed to load games")
+			return
+		}
+	}
 	cleared, err := db.SaveDiscordSettings(models.DiscordSettings{GuildID: req.GuildID, InviteURL: req.InviteURL, Events: events})
 	if err != nil {
 		log.Printf("save discord settings: %v", err)
 		adminError(w, http.StatusInternalServerError, "failed to save")
 		return
 	}
+	removeAllEventCovers(covers)
 	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "cleared": cleared})
 }
 
-// HandleAdminDiscordActions serves PUT /api/admin/discord/games/{id} ({channel_id}) and
-// POST /api/admin/discord/games/{id}/test.
+// HandleAdminDiscordActions serves PUT /api/admin/discord/games/{id} ({channel_id, events,
+// voice_channel_id}), POST /api/admin/discord/games/{id}/test and /api/admin/discord/games/{id}/cover.
 func HandleAdminDiscordActions(w http.ResponseWriter, r *http.Request) {
 	if caller, err := getAdminCaller(r); err != nil || caller == nil {
 		adminForbidden(w)
@@ -258,55 +282,14 @@ func HandleAdminDiscordActions(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case len(parts) == 2 && r.Method == http.MethodPut:
-		setGameChannel(w, r, campaign)
+		setGameDiscord(w, r, campaign)
+	case len(parts) == 3 && parts[2] == "cover":
+		gameEventCover(w, r, campaign)
 	case len(parts) == 3 && parts[2] == "test" && r.Method == http.MethodPost:
 		testGameChannel(w, r, campaign)
 	default:
 		adminError(w, http.StatusNotFound, "not found")
 	}
-}
-
-func setGameChannel(w http.ResponseWriter, r *http.Request, campaign *models.Campaign) {
-	var req struct {
-		ChannelID string `json:"channel_id"`
-	}
-	if !codexDecode(w, r, 4<<10, &req) {
-		return
-	}
-	id, name := strings.TrimSpace(req.ChannelID), ""
-	if id != "" {
-		settings, err := db.GetDiscordSettings()
-		if err != nil {
-			adminError(w, http.StatusInternalServerError, "failed to load settings")
-			return
-		}
-		if settings.GuildID == "" {
-			adminError(w, http.StatusBadRequest, "Set the server ID first")
-			return
-		}
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-		defer cancel()
-		channels, err := discordConf().client.PostableChannels(ctx, settings.GuildID)
-		if err != nil {
-			adminError(w, http.StatusBadGateway, "Could not list the channels: "+err.Error())
-			return
-		}
-		found := false
-		for _, c := range channels {
-			if c.ID == id {
-				found, name = true, c.Name
-			}
-		}
-		if !found {
-			adminError(w, http.StatusBadRequest, "The bot can't post in that channel")
-			return
-		}
-	}
-	if err := db.SetCampaignDiscordChannel(campaign.ID, id, name); err != nil {
-		adminError(w, http.StatusInternalServerError, "failed to save the channel")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"channel_id": id, "channel_name": name})
 }
 
 func testGameChannel(w http.ResponseWriter, r *http.Request, campaign *models.Campaign) {

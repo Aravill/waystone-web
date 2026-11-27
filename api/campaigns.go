@@ -152,6 +152,7 @@ type campaignViewer struct {
 	characters     map[string]models.CharacterAssignment // the viewer's active character per campaign
 	codices        map[string]string                     // codex id -> name, for the game label
 	codexRights    *codexRights                          // the viewer's Codices rights, for the label's link
+	discordEvents  map[string]models.DiscordGameEvents   // Discord event settings, for the game page's line
 }
 
 // loadCampaignViewer fetches the per-viewer data for campaigns. It returns an
@@ -197,6 +198,11 @@ func loadCampaignViewer(r *http.Request, campaigns []models.Campaign) (*campaign
 	if v.characters, err = db.GetActiveAssignmentsByUser(v.userID); err != nil {
 		return nil, "failed to retrieve characters"
 	}
+	if discordEnabled() {
+		if v.discordEvents, err = db.GetAllDiscordGameEvents(); err != nil {
+			return nil, "failed to retrieve games"
+		}
+	}
 
 	// Create a map for O(1) user lookup
 	for i := range allUsers {
@@ -234,6 +240,7 @@ func (v *campaignViewer) enrich(campaign models.Campaign) map[string]interface{}
 		"codex_id":                   campaign.CodexID,
 		"codex":                      v.codexRef(campaign.CodexID),
 		"discord_channel":            discordChannelRef(campaign),
+		"discord_voice":              discordVoiceRef(campaign, v.discordEvents[campaign.ID]),
 		"system_logo_url":            v.systems[strings.ToLower(campaign.System)].LogoURL(),
 		"can_manage":                 v.isAdmin || (currentUserID != "" && campaign.DM == currentUserID),
 		"allowed_status_transitions": campaign.Status.AllowedTransitions(),
