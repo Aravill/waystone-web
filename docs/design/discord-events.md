@@ -1,6 +1,14 @@
 # Discord events
 
-**Status:** approved design, 2026-11-27. Builds on `docs/design/discord-notifications.md`.
+**Status:** built, 2026-11-27 (`api/discord_events.go`, `api/admin_discord_events.go`, `db/sqlite_discord_events.go`; see CLAUDE.md). Builds on `docs/design/discord-notifications.md`.
+
+**Decisions made while building:**
+- The event ID lives in its own table, `discord_events (session_id, campaign_id, guild_id, event_id, status, created_at)`; `status` is what the app last asked Discord for (scheduled, active, completed, cancelled).
+- Outbox kinds `event_create`, `event_status` and `event_delete`. A creation is built when it's sent, so it uses the game's settings at that moment; a session cancelled while its creation is queued drops it, and one cancelled while Discord is answering gets its new event deleted right away.
+- A session confirmed less than a minute before it starts gets no event (Discord needs a future start), just the post.
+- The event also gets an end time (start plus the duration, or plus four hours), the same moment the ticker completes it.
+- A session that was never set live (the server was down at its start) is set live and completed one after the other, because Discord only completes an active event.
+- Unknown Guild Scheduled Event (10070) on a status change or deletion counts as done.
 
 When a session is confirmed, the bot creates a Discord scheduled event in the game's voice channel, with an optional cover image, and the game's "session confirmed" channel post carries the event's link, which Discord shows as an event card with an Interested button. The admin turns this on per game.
 
