@@ -95,6 +95,13 @@ func seedCodex() error {
 		}
 		ids[sp.Title] = id
 	}
+	for _, cp := range config.InitialCharacterPages {
+		if pid, ok := ids[cp.PageTitle]; ok {
+			if _, err := store.AddCharacterPage(cp.CharacterID, pid); err != nil {
+				return err
+			}
+		}
+	}
 	if tlID, ok := ids[config.InitialTimelineTitle]; ok {
 		author := seedAuthor(config.InitialCodexPages, config.InitialTimelineTitle)
 		if err := store.SetTimelineCalendar(tlID, config.InitialTimelineCalendar, author); err != nil {

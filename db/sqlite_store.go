@@ -247,6 +247,14 @@ func (s *SQLiteStore) initSchema() error {
 		ended_at TEXT NOT NULL DEFAULT ''
 	);
 
+	CREATE TABLE IF NOT EXISTS character_pages (
+		character_id TEXT NOT NULL,
+		page_id TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		PRIMARY KEY (character_id, page_id)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_character_pages_page_id ON character_pages(page_id);
 	CREATE INDEX IF NOT EXISTS idx_characters_owner_id ON characters(owner_id);
 	CREATE INDEX IF NOT EXISTS idx_characters_system_id ON characters(system_id);
 	CREATE INDEX IF NOT EXISTS idx_character_assignments_character_id ON character_assignments(character_id);
@@ -619,6 +627,9 @@ func (s *SQLiteStore) initSchema() error {
 		if _, err := s.db.Exec(`ALTER TABLE characters ADD COLUMN codex_url TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("failed to add characters.codex_url column: %w", err)
 		}
+	}
+	if err := s.migrateCharacterCodexURLs(); err != nil {
+		return err
 	}
 	var tokenHasLastRead int
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('calendar_tokens') WHERE name = 'last_read_at'`).Scan(&tokenHasLastRead); err != nil {
@@ -2101,6 +2112,7 @@ var (
 	ErrJournalSessionGone   = errors.New("session not found")
 	ErrCharacterNotFound    = errors.New("character not found")
 	ErrCharacterAssigned    = errors.New("character has an active assignment")
+	ErrCharacterPagesFull   = errors.New("character has too many codex pages")
 	ErrCharacterMismatch    = errors.New("character is not the user's or is in another system")
 	ErrNotPlayer            = errors.New("user is not a player of this game")
 	ErrDiscordAccountTaken  = errors.New("discord account is linked to another user")

@@ -73,6 +73,13 @@ var InitialCodexPages = []CodexSeedPage{
 		Body: "What the Karrow remembers, from the first boats at [[Karrow Ford]] to the fire at [[Cloveswick]]."},
 }
 
+// InitialCharacterPages links demo characters to seeded codex pages (by title).
+var InitialCharacterPages = []struct{ CharacterID, PageTitle string }{
+	{kaelID, "Old Hesk"},
+	{kaelID, "Karrow Ford"},
+	{iselleID, "Ferrymen of the Ford"},
+}
+
 // InitialTimelineTitle is the demo timeline page; its calendar and events follow.
 const InitialTimelineTitle = "History of the Karrow"
 

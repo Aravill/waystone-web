@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
-	"path"
 	"sort"
 	"strings"
 	"time"
@@ -21,50 +19,7 @@ type characterRequest struct {
 	SystemID    string                 `json:"system_id"`
 	Description string                 `json:"description"`
 	Background  string                 `json:"background"`
-	CodexURL    string                 `json:"codex_url"`
 	Status      models.CharacterStatus `json:"status"`
-}
-
-const errCodexURL = "Only links to a Codices page on waystone.aravill.org are allowed."
-
-// validCodexURL is the one gate for a character's Codex link: https://waystone.aravill.org/codices...
-// (exact host, no port or userinfo), or /codices... on a local host the request itself came to
-// (http or https; dev and tests). It returns the normalised URL; "" is valid and clears the link.
-func validCodexURL(raw, requestHost string) (string, bool) {
-	if raw == "" {
-		return "", true
-	}
-	u, err := url.Parse(raw)
-	if err != nil || u.User != nil || u.Opaque != "" || u.Host == "" {
-		return "", false
-	}
-	host := strings.ToLower(u.Host)
-	switch {
-	case u.Scheme == "https" && host == "waystone.aravill.org":
-	case (u.Scheme == "http" || u.Scheme == "https") && host == strings.ToLower(requestHost) && isLocalHost(host):
-	default:
-		return "", false
-	}
-	// Only a trailing slash may differ from the cleaned path (no "//" or dot segments).
-	p := path.Clean(u.Path)
-	if (u.Path != p && u.Path != p+"/") || (p != "/codices" && !strings.HasPrefix(p, "/codices/")) {
-		return "", false
-	}
-	u.Host = host
-	s := u.String()
-	if len(s) > 2000 { // percent-encoded non-ASCII slugs make this longer than the input
-		return "", false
-	}
-	return s, true
-}
-
-// isLocalHost reports whether a host[:port] is localhost, 127.0.0.1 or [::1].
-func isLocalHost(hostport string) bool {
-	h := hostport
-	if i := strings.LastIndex(h, ":"); i >= 0 && !strings.HasSuffix(h, "]") {
-		h = h[:i]
-	}
-	return h == "localhost" || h == "127.0.0.1" || h == "[::1]"
 }
 
 // normalize trims the text fields and returns a validation message, or "" if valid.
@@ -73,7 +28,6 @@ func (req *characterRequest) normalize() string {
 	req.Description = strings.TrimSpace(req.Description)
 	req.Background = strings.TrimSpace(req.Background)
 	req.SystemID = strings.TrimSpace(req.SystemID)
-	req.CodexURL = strings.TrimSpace(req.CodexURL)
 	if req.Status == "" {
 		req.Status = models.CharacterAlive
 	}
@@ -183,7 +137,6 @@ func (v *characterViewer) characterJSON(c models.Character, assignments []models
 		"name":           c.Name,
 		"description":    c.Description,
 		"background":     c.Background,
-		"codex_url":      c.CodexURL,
 		"status":         c.Status,
 		"created_at":     c.CreatedAt,
 		"updated_at":     c.UpdatedAt,
@@ -273,11 +226,6 @@ func handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, msg)
 		return
 	}
-	codexURL, ok := validCodexURL(req.CodexURL, r.Host)
-	if !ok {
-		writeJSONError(w, http.StatusBadRequest, errCodexURL)
-		return
-	}
 	systems, err := systemsByID()
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve systems")
@@ -290,7 +238,7 @@ func handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	c := models.Character{
 		ID: db.GenerateUUID(), OwnerID: userID, SystemID: req.SystemID, Name: req.Name,
-		Description: req.Description, Background: req.Background, CodexURL: codexURL, Status: req.Status,
+		Description: req.Description, Background: req.Background, Status: req.Status,
 		CreatedAt: now, UpdatedAt: now,
 	}
 	if err := db.CreateCharacter(c); err != nil {
@@ -300,20 +248,27 @@ func handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"status": "success", "message": "character created", "character_id": c.ID})
 }
 
-// HandleCharacterRoutes handles /api/characters/{id} (GET, PUT, DELETE) and /api/characters/{id}/status (PUT).
+// HandleCharacterRoutes handles /api/characters/{id} (GET, PUT, DELETE), /api/characters/{id}/status (PUT)
+// and /api/characters/{id}/pages (POST) and /api/characters/{id}/pages/{pageId} (DELETE).
 func HandleCharacterRoutes(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/characters/"), "/")
-	if parts[0] == "" || len(parts) > 2 || (len(parts) == 2 && parts[1] != "status") {
+	if parts[0] == "" || len(parts) > 3 || (len(parts) == 3 && (parts[1] != "pages" || parts[2] == "")) ||
+		(len(parts) == 2 && parts[1] != "status" && parts[1] != "pages") {
 		writeJSONError(w, http.StatusNotFound, "not found")
 		return
 	}
 	id := parts[0]
-	if len(parts) == 2 {
-		if r.Method != http.MethodPut {
+	if len(parts) >= 2 {
+		switch {
+		case parts[1] == "status" && r.Method == http.MethodPut:
+			handleCharacterStatus(w, r, id)
+		case parts[1] == "pages" && len(parts) == 2 && r.Method == http.MethodPost:
+			handleAddCharacterPage(w, r, id)
+		case parts[1] == "pages" && len(parts) == 3 && r.Method == http.MethodDelete:
+			handleRemoveCharacterPage(w, r, id, parts[2])
+		default:
 			writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
-			return
 		}
-		handleCharacterStatus(w, r, id)
 		return
 	}
 	switch r.Method {
@@ -357,7 +312,83 @@ func handleGetCharacter(w http.ResponseWriter, r *http.Request, id string) {
 		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve character")
 		return
 	}
-	writeJSON(w, http.StatusOK, v.characterJSON(*c, assignments[id]))
+	pages, err := db.GetCharacterPages(id)
+	rights, rerr := loadCodexRights(v.userID)
+	if err != nil || rerr != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to retrieve character")
+		return
+	}
+	visible := []models.CharacterPage{}
+	for _, p := range pages {
+		if rights.canSee(p.CodexID) {
+			visible = append(visible, p)
+		}
+	}
+	obj := v.characterJSON(*c, assignments[id])
+	obj["codex_pages"] = visible
+	writeJSON(w, http.StatusOK, obj)
+}
+
+// handleAddCharacterPage links a codex page the owner can see (POST {page_id}).
+func handleAddCharacterPage(w http.ResponseWriter, r *http.Request, id string) {
+	c, ok := loadCharacter(w, id)
+	if !ok {
+		return
+	}
+	userID, _ := r.Context().Value("user_id").(string)
+	if c.OwnerID != userID {
+		writeJSONError(w, http.StatusForbidden, "only the owner can link codex pages")
+		return
+	}
+	var req struct {
+		PageID string `json:"page_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	req.PageID = strings.TrimSpace(req.PageID)
+	codexID, err := db.GetPageCodexID(req.PageID)
+	rights, rerr := loadCodexRights(userID)
+	if err != nil || rerr != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to link page")
+		return
+	}
+	if codexID == "" || !rights.canSee(codexID) {
+		writeJSONError(w, http.StatusNotFound, "page not found")
+		return
+	}
+	added, err := db.AddCharacterPage(id, req.PageID)
+	switch {
+	case errors.Is(err, db.ErrCharacterPagesFull):
+		writeJSONError(w, http.StatusConflict, fmt.Sprintf("A character can link at most %d codex pages.", db.MaxCharacterPages))
+	case errors.Is(err, db.ErrPageNotFound):
+		writeJSONError(w, http.StatusNotFound, "page not found")
+	case err != nil:
+		writeJSONError(w, http.StatusInternalServerError, "failed to link page")
+	case added:
+		writeJSON(w, http.StatusCreated, map[string]string{"status": "success"})
+	default:
+		writeJSON(w, http.StatusOK, map[string]string{"status": "success"})
+	}
+}
+
+// handleRemoveCharacterPage unlinks a page (204, also when it wasn't linked).
+func handleRemoveCharacterPage(w http.ResponseWriter, r *http.Request, id, pageID string) {
+	c, ok := loadCharacter(w, id)
+	if !ok {
+		return
+	}
+	userID, _ := r.Context().Value("user_id").(string)
+	if c.OwnerID != userID {
+		writeJSONError(w, http.StatusForbidden, "only the owner can unlink codex pages")
+		return
+	}
+	if err := db.RemoveCharacterPage(id, pageID); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to unlink page")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // activeAssignmentConflict is the 409 text for a character that is still playing somewhere.
@@ -398,18 +429,13 @@ func handleUpdateCharacter(w http.ResponseWriter, r *http.Request, id string) {
 		writeJSONError(w, http.StatusBadRequest, msg)
 		return
 	}
-	codexURL, ok := validCodexURL(req.CodexURL, r.Host)
-	if !ok {
-		writeJSONError(w, http.StatusBadRequest, errCodexURL)
-		return
-	}
 	if _, ok := v.systems[req.SystemID]; !ok {
 		writeJSONError(w, http.StatusBadRequest, "choose a known system")
 		return
 	}
 	updated := *c
-	updated.SystemID, updated.Name, updated.Description, updated.Background, updated.CodexURL, updated.Status =
-		req.SystemID, req.Name, req.Description, req.Background, codexURL, req.Status
+	updated.SystemID, updated.Name, updated.Description, updated.Background, updated.Status =
+		req.SystemID, req.Name, req.Description, req.Background, req.Status
 	updated.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	if err := db.UpdateCharacter(updated); err != nil {
 		switch {

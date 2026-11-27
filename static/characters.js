@@ -34,20 +34,9 @@ function characterSystemHtml(system) {
     return `<span class="char-system">${logo}<span>${escapeHtml(system.name)}</span></span>`;
 }
 
-// The one client-side Codex link check (mirrors validCodexURL in api/characters.go): https on
-// waystone.aravill.org, or this local host, with a /codices path. Returns the URL, or '' if not allowed.
-const CODEX_URL_ERROR = 'Only links to a Codices page on waystone.aravill.org are allowed.';
-function safeCodexUrl(raw) {
-    if (!raw) return '';
-    try {
-        const u = new URL(raw);
-        const local = ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname) && u.host === location.host;
-        const hostOk = (u.protocol === 'https:' && u.host === 'waystone.aravill.org') || (local && /^https?:$/.test(u.protocol));
-        const pathOk = u.pathname === '/codices' || u.pathname.startsWith('/codices/');
-        return hostOk && pathOk && !u.username && !u.password ? u.href : '';
-    } catch (e) {
-        return '';
-    }
+// The link to a codex page: the codex accepts it without a slug and adds the canonical one on load.
+function characterCodexPageUrl(p) {
+    return `/codices/p/${encodeURIComponent(p.page_id)}`;
 }
 
 // Shared by both pages: the signed-in user, the toast and logout.
@@ -94,7 +83,7 @@ function characterPageBase() {
             }
         },
 
-        safeCodexUrl,
+        codexPageUrl: characterCodexPageUrl,
         statusHtml: characterStatusHtml,
         gameBadgesHtml: characterGameBadgesHtml,
         systemHtml: characterSystemHtml,
@@ -120,7 +109,7 @@ function characterPageBase() {
 }
 
 function emptyCharacterForm(systemId = '') {
-    return { name: '', system_id: systemId, status: 'alive', description: '', background: '', codex_url: '' };
+    return { name: '', system_id: systemId, status: 'alive', description: '', background: '' };
 }
 
 window.charactersPage = function () {
@@ -167,10 +156,6 @@ window.charactersPage = function () {
             }
             if (!this.form.system_id) {
                 this.formError = 'Choose a system.';
-                return;
-            }
-            if (this.form.codex_url.trim() && !safeCodexUrl(this.form.codex_url.trim())) {
-                this.formError = CODEX_URL_ERROR;
                 return;
             }
             this.busy = true;
@@ -233,6 +218,7 @@ window.characterPage = function () {
         form: emptyCharacterForm(),
         formError: '',
         statusChoice: '',
+        linkDialog: { open: false, q: '', titles: null, names: {}, loading: false, busy: false, error: '' },
 
         async init() {
             if (!(await this.loadUser())) return;
@@ -270,7 +256,7 @@ window.characterPage = function () {
 
         startEdit() {
             const c = this.character;
-            this.form = { name: c.name, system_id: c.system_id, status: c.status, description: c.description, background: c.background, codex_url: c.codex_url || '' };
+            this.form = { name: c.name, system_id: c.system_id, status: c.status, description: c.description, background: c.background };
             this.formError = '';
             this.editing = true;
         },
@@ -284,10 +270,6 @@ window.characterPage = function () {
             this.formError = '';
             if (!this.form.name.trim()) {
                 this.formError = 'Give your character a name.';
-                return;
-            }
-            if (this.form.codex_url.trim() && !safeCodexUrl(this.form.codex_url.trim())) {
-                this.formError = CODEX_URL_ERROR;
                 return;
             }
             this.busy = true;
@@ -319,6 +301,83 @@ window.characterPage = function () {
                 await this.load();
             } catch (error) {
                 this.formError = error.message;
+            } finally {
+                this.busy = false;
+            }
+        },
+
+        async openLinkDialog() {
+            this.linkDialog = { ...this.linkDialog, open: true, q: '', error: '' };
+            this.$nextTick(() => document.getElementById('linkPageQ')?.focus());
+            if (this.linkDialog.titles || this.linkDialog.loading) return;
+            this.linkDialog.loading = true;
+            try {
+                const [tr, cr] = await Promise.all([fetch('/api/codices/titles'), fetch('/api/codices')]);
+                const titles = await tr.json();
+                const codices = await cr.json();
+                if (!tr.ok || !cr.ok) throw new Error(titles.error || codices.error || 'Failed to load pages');
+                this.linkDialog.names = Object.fromEntries((codices.codices || []).map((c) => [c.id, c.name]));
+                this.linkDialog.titles = titles;
+            } catch (error) {
+                this.linkDialog.error = error.message;
+            } finally {
+                this.linkDialog.loading = false;
+            }
+        },
+
+        closeLinkDialog() {
+            this.linkDialog.open = false;
+        },
+
+        // Pages the viewer can see that match the query (title or alias), not yet linked: prefix matches first, then A-Z.
+        get linkResults() {
+            const norm = (s) => String(s || '').trim().split(/\s+/).join(' ').toLowerCase();
+            const q = norm(this.linkDialog.q);
+            if (!q || !this.linkDialog.titles) return [];
+            const linked = new Set((this.character?.codex_pages || []).map((p) => p.page_id));
+            const out = [];
+            for (const p of this.linkDialog.titles) {
+                if (linked.has(p.id)) continue;
+                const names = [p.title, ...(p.aliases || [])].map(norm);
+                if (!names.some((n) => n.includes(q))) continue;
+                out.push({ id: p.id, title: p.title, codex_name: this.linkDialog.names[p.codex_id] || '', prefix: names.some((n) => n.startsWith(q)) });
+            }
+            out.sort((a, b) => (b.prefix - a.prefix) || a.title.localeCompare(b.title));
+            return out.slice(0, 20);
+        },
+
+        async linkPage(p) {
+            this.linkDialog.busy = true;
+            this.linkDialog.error = '';
+            try {
+                const response = await fetch(`/api/characters/${encodeURIComponent(this.characterId)}/pages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ page_id: p.id })
+                });
+                if (!response.ok) {
+                    this.linkDialog.error = (await response.json()).error || 'Failed to link page';
+                    return;
+                }
+                this.closeLinkDialog();
+                await this.load();
+                this.showMessage('Linked ' + p.title, 'success');
+            } catch (error) {
+                this.linkDialog.error = error.message;
+            } finally {
+                this.linkDialog.busy = false;
+            }
+        },
+
+        async unlinkPage(p) {
+            this.busy = true;
+            try {
+                const response = await fetch(`/api/characters/${encodeURIComponent(this.characterId)}/pages/${encodeURIComponent(p.page_id)}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error((await response.json()).error || 'Failed to unlink page');
+                await this.load();
+                this.showMessage('Unlinked ' + p.title, 'success');
+            } catch (error) {
+                this.showMessage(error.message, 'error');
             } finally {
                 this.busy = false;
             }

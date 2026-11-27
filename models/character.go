@@ -26,7 +26,6 @@ type Character struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
 	Background  string          `json:"background"`
-	CodexURL    string          `json:"codex_url"` // optional link to the character's Codices page
 	Status      CharacterStatus `json:"status"`
 	CreatedAt   string          `json:"created_at"`
 	UpdatedAt   string          `json:"updated_at"`
@@ -42,4 +41,13 @@ type CharacterAssignment struct {
 	EndedAt         string          `json:"ended_at"`
 	CharacterName   string          `json:"character_name"`   // filled by joined queries
 	CharacterStatus CharacterStatus `json:"character_status"` // filled by joined queries
+}
+
+// CharacterPage is a codex page linked to a character, with its current title and codex name.
+type CharacterPage struct {
+	PageID    string `json:"page_id"`
+	Title     string `json:"title"`
+	Kind      string `json:"kind"`
+	CodexID   string `json:"codex_id"`
+	CodexName string `json:"codex_name"`
 }

@@ -68,47 +68,48 @@ test('create a character, choose it on the game page, then see the badge and the
   await expect(page.locator('.char-game').first()).toHaveAttribute('href', `/games/${world.id}`);
 });
 
-test('a character links to its Codices page, and only Codices links are accepted', async ({ page, world }, testInfo) => {
-  const origin = /** @type {string} */ (testInfo.project.use.baseURL);
+test('a character links codex pages, and only the owner can', async ({ page, world }) => {
   const roy = await apiAs('roy');
+  const testy = await apiAs('testy');
+  let codexId = '';
+  let pageId = '';
   try {
+    const cr = await roy.post('/api/codices', { data: { name: `E2E Kael codex ${Date.now()}`, language: 'en' } });
+    expect(cr.status(), 'create codex').toBe(201);
+    codexId = (await cr.json()).codex.id;
+    const pr = await roy.post('/api/codices/pages', { data: { title: 'E2E Kael lore', codex_id: codexId } });
+    expect(pr.status(), 'create page').toBe(201);
+    pageId = (await pr.json()).page.id;
+
     const systems = await (await roy.get('/api/systems')).json();
     const systemId = systems.find((/** @type {{name: string}} */ s) => s.name === 'D&D 5e').id;
     const res = await roy.post('/api/characters', { data: { name: `Codex E2E ${Date.now()}`, system_id: systemId } });
     expect(res.status()).toBe(201);
     const id = (await res.json()).character_id;
     world.characterIds.push(id);
-    const put = (/** @type {string} */ codexUrl) => roy.put(`/api/characters/${id}`, { data: { name: 'Codex E2E', system_id: systemId, codex_url: codexUrl } });
 
-    for (const bad of ['https://evil.example/codices/x', 'https://waystone.aravill.org.evil.com/codices/x', 'http://waystone.aravill.org/codices/x', 'https://waystone.aravill.org/games/x', 'javascript:alert(1)']) {
-      const r = await put(bad);
-      expect(r.status(), bad).toBe(400);
-      expect((await r.json()).error).toContain('Codices page');
-    }
+    expect((await testy.post(`/api/characters/${id}/pages`, { data: { page_id: pageId } })).status()).toBe(403);
+    expect((await roy.post(`/api/characters/${id}/pages`, { data: { page_id: 'nope' } })).status()).toBe(404);
 
-    // The owner sets it in the edit form; the page then shows a button to it.
+    // The owner links a page from the dialog; the character page then shows it.
     await loginAs(page, 'roy');
     await page.goto(`/characters/${id}`);
-    await expect(page.locator('.char-codex-link')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Edit' }).click();
-    await page.locator('#editCodex').fill('https://evil.example/codices/x');
-    await page.getByRole('button', { name: 'Save' }).click();
-    await expect(page.locator('.game-form-error')).toContainText('Codices page');
-    await page.locator('#editCodex').fill(`${origin}/codices/c/x`);
-    await page.getByRole('button', { name: 'Save' }).click();
-    await expect(page.locator('.char-codex-link')).toHaveAttribute('href', `${origin}/codices/c/x`);
+    await expect(page.getByText('No codex pages linked yet.')).toBeVisible();
+    await page.getByRole('button', { name: '+ Link a page' }).click();
+    await page.locator('#linkPageQ').fill('E2E Kael');
+    await page.locator('.char-link-result', { hasText: 'E2E Kael lore' }).click();
+    const link = page.locator('.char-page-list a', { hasText: 'E2E Kael lore' });
+    await expect(link).toHaveAttribute('href', `/codices/p/${pageId}`);
 
-    // Someone else cannot change it.
-    const testy = await apiAs('testy');
-    expect((await testy.put(`/api/characters/${id}`, { data: { name: 'x', system_id: systemId, codex_url: '' } })).status()).toBe(403);
-    await testy.dispose();
+    // Someone without access to that codex sees nothing.
+    const seen = await (await testy.get(`/api/characters/${id}`)).json();
+    expect(seen.codex_pages).toEqual([]);
 
-    // Clearing removes the button.
-    expect((await put('')).status()).toBe(200);
-    await page.reload();
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expect(page.locator('.char-codex-link')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Unlink E2E Kael lore' }).click();
+    await expect(page.getByText('No codex pages linked yet.')).toBeVisible();
   } finally {
-    await roy.dispose();
+    if (pageId) await roy.delete(`/api/codices/pages/${pageId}`);
+    if (codexId) await roy.delete(`/api/codices/c/${codexId}`);
+    await Promise.all([roy.dispose(), testy.dispose()]);
   }
 });

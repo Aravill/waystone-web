@@ -10,7 +10,7 @@ Decisions below came out of the design grilling on 2026-11-07.
 - `id`, `owner_id` (user), `system_id` (a row in `systems`; known systems only),
   `name` (required, ≤64), `description` (optional, ≤10000, basic Markdown),
   `background` (optional, backstory, ≤10000, basic Markdown),
-  `codex_url` (optional link to the character's Codices page: `https://waystone.aravill.org/codices...` only, ≤2000 once normalised; see `validCodexURL`),
+  `codex_url` (legacy, replaced by `character_pages`, see `character-codex-pages.md`; was an optional link to the character's Codices page: `https://waystone.aravill.org/codices...` only, ≤2000 once normalised; see `validCodexURL`),
   `status` (`alive` | `retired` | `dead`, default `alive`), `created_at`, `updated_at`.
 
 `character_assignments` (history is never dropped by leaving or swapping)

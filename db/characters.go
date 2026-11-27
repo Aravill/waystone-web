@@ -21,6 +21,18 @@ func SetCharacterStatus(id string, status models.CharacterStatus) error {
 
 func DeleteCharacter(id string) error { return GetStore().DeleteCharacter(id) }
 
+func GetCharacterPages(characterID string) ([]models.CharacterPage, error) {
+	return GetStore().GetCharacterPages(characterID)
+}
+
+func AddCharacterPage(characterID, pageID string) (bool, error) {
+	return GetStore().AddCharacterPage(characterID, pageID)
+}
+
+func RemoveCharacterPage(characterID, pageID string) error {
+	return GetStore().RemoveCharacterPage(characterID, pageID)
+}
+
 func GetAssignmentsByCharacterIDs(ids []string) (map[string][]models.CharacterAssignment, error) {
 	return GetStore().GetAssignmentsByCharacterIDs(ids)
 }
