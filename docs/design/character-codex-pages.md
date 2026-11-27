@@ -18,7 +18,7 @@ This replaces the single free-text `codex_url` field ("Codex page" button).
 
 Foreign keys are off, so cascades are by hand:
 - `DeleteCharacter` deletes its rows.
-- `DeletePage` and `DeleteCodex` delete the rows of the pages they remove.
+- `DeletePage` deletes the rows of the page it removes. `DeleteCodex` needs no cascade: it refuses while the codex has pages.
 - Reads also join on existing pages, so a dead row never shows.
 
 ## Rules
@@ -69,7 +69,7 @@ Foreign keys are off, so cascades are by hand:
   - `POST /api/characters/{id}/pages` `{page_id}`: owner only; 403 not owner, 404 page
     missing or not visible, 409 at 50 links. 201 (200 if already linked).
   - `DELETE /api/characters/{id}/pages/{pageId}`: owner only; 204 (also when not linked).
-  - The picker uses the existing codex page search (`GET /api/codices/pages`).
+  - The picker loads `GET /api/codices/titles` (every page the viewer can see) and `GET /api/codices` (codex names) once and filters client-side.
 
 ## Notifications
 None.
