@@ -28,6 +28,32 @@ type DiscordOutboxRow struct {
 	CreatedAt     string
 }
 
+// DiscordGameEvents are a game's Discord event settings (campaigns columns, admin-only).
+type DiscordGameEvents struct {
+	CampaignID string
+	On         bool
+	VoiceID    string
+	VoiceName  string
+	Cover      string // file name in UPLOAD_DIR, or ""
+}
+
+// DiscordEvent is the Discord scheduled event a session got. Status is the state the app moved it
+// to: scheduled, active, completed or cancelled.
+type DiscordEvent struct {
+	SessionID  string
+	CampaignID string
+	GuildID    string
+	EventID    string
+	Status     string
+}
+
+const (
+	DiscordEventScheduled = "scheduled"
+	DiscordEventActive    = "active"
+	DiscordEventCompleted = "completed"
+	DiscordEventCancelled = "cancelled"
+)
+
 // DiscordSettings are the admin-managed settings kept in app_settings.
 type DiscordSettings struct {
 	GuildID   string

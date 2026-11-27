@@ -64,3 +64,42 @@ func PruneDiscordOutbox(failedBefore string) error {
 func GetDiscordOutboxSummary(limit int) (int, []models.DiscordOutboxRow, error) {
 	return GetStore().GetDiscordOutboxSummary(limit)
 }
+
+func GetDiscordGameEvents(campaignID string) (models.DiscordGameEvents, error) {
+	return GetStore().GetDiscordGameEvents(campaignID)
+}
+
+func GetAllDiscordGameEvents() (map[string]models.DiscordGameEvents, error) {
+	return GetStore().GetAllDiscordGameEvents()
+}
+
+func SetDiscordGameEvents(campaignID string, on bool, voiceID, voiceName string) error {
+	return GetStore().SetDiscordGameEvents(campaignID, on, voiceID, voiceName)
+}
+
+// SetDiscordEventCover returns the previous cover file, for the caller to remove.
+func SetDiscordEventCover(campaignID, file string) (string, error) {
+	return GetStore().SetDiscordEventCover(campaignID, file)
+}
+
+func ClearLostDiscordVoice(campaignID, voiceID string) (bool, error) {
+	return GetStore().ClearLostDiscordVoice(campaignID, voiceID)
+}
+
+func SaveDiscordEvent(e models.DiscordEvent) error { return GetStore().SaveDiscordEvent(e) }
+
+func GetDiscordEvent(sessionID string) (*models.DiscordEvent, error) {
+	return GetStore().GetDiscordEvent(sessionID)
+}
+
+func GetDiscordEventsByStatus(campaignID string, statuses ...string) ([]models.DiscordEvent, error) {
+	return GetStore().GetDiscordEventsByStatus(campaignID, statuses...)
+}
+
+func SetDiscordEventStatus(sessionID, status string) error {
+	return GetStore().SetDiscordEventStatus(sessionID, status)
+}
+
+func DropQueuedDiscordEventCreate(sessionID string) (bool, error) {
+	return GetStore().DropQueuedDiscordEventCreate(sessionID)
+}

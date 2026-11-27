@@ -475,6 +475,14 @@ func (s *SQLiteStore) initSchema() error {
 		dm_error_at TEXT NOT NULL DEFAULT '',
 		linked_at TEXT NOT NULL
 	);
+	CREATE TABLE IF NOT EXISTS discord_events (
+		session_id TEXT PRIMARY KEY,
+		campaign_id TEXT NOT NULL,
+		guild_id TEXT NOT NULL,
+		event_id TEXT NOT NULL,
+		status TEXT NOT NULL,
+		created_at TEXT NOT NULL
+	);
 	CREATE TABLE IF NOT EXISTS discord_outbox (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		kind TEXT NOT NULL,
@@ -557,6 +565,19 @@ func (s *SQLiteStore) initSchema() error {
 	if !cols["discord_channel_name"] {
 		if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN discord_channel_name TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("failed to add campaigns.discord_channel_name column: %w", err)
+		}
+	}
+	// Discord scheduled events per game (docs/design/discord-events.md).
+	for _, col := range []struct{ name, def string }{
+		{"discord_events", "INTEGER NOT NULL DEFAULT 0"},
+		{"discord_voice_id", "TEXT NOT NULL DEFAULT ''"},
+		{"discord_voice_name", "TEXT NOT NULL DEFAULT ''"},
+		{"discord_event_cover", "TEXT NOT NULL DEFAULT ''"},
+	} {
+		if !cols[col.name] {
+			if _, err := s.db.Exec(`ALTER TABLE campaigns ADD COLUMN ` + col.name + ` ` + col.def); err != nil {
+				return fmt.Errorf("failed to add campaigns.%s column: %w", col.name, err)
+			}
 		}
 	}
 
@@ -2430,6 +2451,10 @@ func (s *SQLiteStore) DeleteCampaign(id string) error {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM discord_outbox WHERE campaign_id = ? AND status = 'queued'`, id); err != nil {
+		return err
+	}
+	// The handler queues the Discord deletions of these events after this commit.
+	if _, err := tx.Exec(`DELETE FROM discord_events WHERE campaign_id = ?`, id); err != nil {
 		return err
 	}
 	res, err := tx.Exec(`DELETE FROM campaigns WHERE id = ?`, id)

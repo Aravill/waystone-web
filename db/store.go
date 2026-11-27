@@ -58,6 +58,16 @@ type Store interface {
 	UpdateDiscordOutbox(id int64, status string, attempts int, nextAttemptAt, lastError string) error
 	PruneDiscordOutbox(failedBefore string) error
 	GetDiscordOutboxSummary(limit int) (queued int, failures []models.DiscordOutboxRow, err error)
+	GetDiscordGameEvents(campaignID string) (models.DiscordGameEvents, error)
+	GetAllDiscordGameEvents() (map[string]models.DiscordGameEvents, error)
+	SetDiscordGameEvents(campaignID string, on bool, voiceID, voiceName string) error
+	SetDiscordEventCover(campaignID, file string) (old string, err error)
+	ClearLostDiscordVoice(campaignID, voiceID string) (bool, error)
+	SaveDiscordEvent(e models.DiscordEvent) error
+	GetDiscordEvent(sessionID string) (*models.DiscordEvent, error)
+	GetDiscordEventsByStatus(campaignID string, statuses ...string) ([]models.DiscordEvent, error)
+	SetDiscordEventStatus(sessionID, status string) error
+	DropQueuedDiscordEventCreate(sessionID string) (bool, error)
 	GetCalendarToken(userID string) (string, error)
 	SetCalendarToken(userID, token string) error
 	GetUserIDByCalendarToken(token string) (string, error)
