@@ -221,6 +221,7 @@ func HandleAdminUserActions(w http.ResponseWriter, r *http.Request) {
 			adminError(w, http.StatusInternalServerError, "failed to delete user")
 			return
 		}
+		jukeboxRecheckUser(targetID)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 
@@ -244,6 +245,7 @@ func HandleAdminUserActions(w http.ResponseWriter, r *http.Request) {
 			adminError(w, http.StatusInternalServerError, "failed to block user")
 			return
 		}
+		jukeboxRecheckUser(targetID)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "blocked"})
 

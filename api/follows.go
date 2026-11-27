@@ -41,5 +41,6 @@ func HandleCampaignFollow(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "failed to update follow")
 		return
 	}
+	jukeboxRecheck(campaign.ID)
 	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "message": "unfollowed", "following": false})
 }
