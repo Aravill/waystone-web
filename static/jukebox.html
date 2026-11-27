@@ -90,7 +90,7 @@
                     <span class="jb-glyph" aria-hidden="true" x-text="dmStatusGlyph"></span>
                     <span x-text="dmStatusText"></span>
                 </p>
-                <div class="jb-meter" role="img" aria-label="Level of the sound you are sending"><div class="jb-meter-bar" x-ref="meter"></div></div>
+                <div class="jb-meter" role="img" aria-label="Level of the sound you are sending"><div class="jb-meter-bar"></div></div>
                 <div class="jb-field">
                     <label for="jbSend" class="jb-label">Send volume</label>
                     <input id="jbSend" type="range" min="0" max="1" step="0.01" x-model.number="sendVolume" @input="applySendVolume()">
@@ -151,6 +151,6 @@
         <div class="message" :class="messageType" x-show="messageVisible" x-text="messageText" role="status"></div>
     </main>
 
-    <script src="/static/jukebox.js?v=1"></script>
+    <script src="/static/jukebox.js?v=2"></script>
 </body>
 </html>

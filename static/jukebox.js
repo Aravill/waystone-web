@@ -282,9 +282,10 @@
                     rt.analyser.getByteTimeDomainData(data);
                     let peak = 0;
                     for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i] - 128));
-                    const bar = this.$refs.meter;
-                    if (bar) bar.style.width = Math.min(100, Math.round((peak / 128) * 100)) + '%';
                     rt.raf = requestAnimationFrame(tick);
+                    // Looked up each frame: the live view is an x-if, so the bar may not exist yet.
+                    const bar = document.querySelector('.jb-meter-bar');
+                    if (bar) bar.style.width = Math.min(100, Math.round((peak / 128) * 100)) + '%';
                 };
                 cancelAnimationFrame(rt.raf);
                 tick();
