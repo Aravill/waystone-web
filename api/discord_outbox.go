@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 	"waystone-web/db"
 	"waystone-web/discord"
@@ -69,6 +70,10 @@ func drainDiscordOutbox(ctx context.Context) {
 func handleDiscordRow(ctx context.Context, row models.DiscordOutboxRow) {
 	sendCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+	if strings.HasPrefix(row.Kind, "event_") {
+		handleDiscordEventRow(sendCtx, row)
+		return
+	}
 	var err error
 	if row.Kind == "dm" {
 		err = sendDM(sendCtx, row.Target, []byte(row.Payload))
@@ -92,13 +97,14 @@ func discordFail(row models.DiscordOutboxRow, msg string) {
 	}
 }
 
-// discordSettle records the outcome of one send attempt.
-func discordSettle(row models.DiscordOutboxRow, err error) {
+// discordSettle records the outcome of one send attempt. It reports whether the row has now
+// failed for good (it is retried otherwise, or was sent).
+func discordSettle(row models.DiscordOutboxRow, err error) bool {
 	if err == nil {
 		if e := db.DeleteDiscordOutbox(row.ID); e != nil {
 			log.Printf("discord outbox: %v", e)
 		}
-		return
+		return false
 	}
 	now := time.Now().UTC()
 	var de *discord.Error
@@ -109,18 +115,18 @@ func discordSettle(row models.DiscordOutboxRow, err error) {
 			if e := db.UpdateDiscordOutbox(row.ID, "queued", row.Attempts, now.Add(de.RetryAfter).Format(time.RFC3339), de.Message); e != nil {
 				log.Printf("discord outbox: %v", e)
 			}
-			return
+			return false
 		case row.Kind == "dm" && de.Code == discord.CodeCannotDM:
 			discordFail(row, "Discord can't DM this user (50007)")
-			return
+			return true
 		case row.Kind == "channel" && (de.Code == discord.CodeUnknownChannel || de.Code == discord.CodeMissingAccess || de.Status == http.StatusNotFound):
 			discordFail(row, "channel gone")
 			discordChannelLost(row)
-			return
+			return true
 		case de.Status >= 400 && de.Status < 500 && de.Status != http.StatusUnauthorized && de.Status != http.StatusRequestTimeout:
 			// Includes 50013 Missing Permissions: the row fails but the channel stays.
 			discordFail(row, de.Error())
-			return
+			return true
 		}
 	}
 	// Network error, 5xx or 401: retry with backoff until the row is too old.
@@ -130,7 +136,7 @@ func discordSettle(row models.DiscordOutboxRow, err error) {
 		if e := db.UpdateDiscordOutbox(row.ID, "failed", attempts, row.NextAttemptAt, err.Error()); e != nil {
 			log.Printf("discord outbox: %v", e)
 		}
-		return
+		return true
 	}
 	idx := attempts - 1
 	if idx >= len(discordBackoff) {
@@ -139,9 +145,10 @@ func discordSettle(row models.DiscordOutboxRow, err error) {
 	if e := db.UpdateDiscordOutbox(row.ID, "queued", attempts, now.Add(discordBackoff[idx]).Format(time.RFC3339), err.Error()); e != nil {
 		log.Printf("discord outbox: %v", e)
 	}
+	return false
 }
 
-// discordChannelLost clears a game's vanished channel and tells every admin.
+// discordChannelLost clears a game's vanished channel (which turns its events off) and tells every admin.
 func discordChannelLost(row models.DiscordOutboxRow) {
 	cleared, err := db.ClearLostDiscordChannel(row.CampaignID, row.Target)
 	if err != nil {
@@ -155,18 +162,7 @@ func discordChannelLost(row models.DiscordOutboxRow) {
 	if err != nil || campaign == nil {
 		return
 	}
-	users, err := db.GetAllUsers()
-	if err != nil {
-		log.Printf("discord channel lost: %v", err)
-		return
-	}
-	var admins []string
-	for i := range users {
-		if users[i].IsAdmin() && !users[i].Deleted && !users[i].Blocked {
-			admins = append(admins, users[i].ID)
-		}
-	}
-	notify("", admins, models.NotificationDiscordChannelLost, campaign, "", nil)
+	notifyDiscordAdmins(campaign, nil)
 }
 
 var errNoDiscordLink = errors.New("user has no Discord link")

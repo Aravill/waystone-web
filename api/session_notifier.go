@@ -12,7 +12,7 @@ import (
 // begins. It runs once now and then every minute until ctx is done. The notifications table
 // is the dedupe (one session_started row per session), so a restart never repeats one.
 // The DM is deliberately not notified. It also runs remindUpcomingSessions, remindOpenPolls and
-// postDuePolls. Errors are logged, never fatal.
+// postDuePolls, and advanceDiscordEvents. Errors are logged, never fatal.
 func StartSessionStartNotifier(ctx context.Context) {
 	go func() {
 		now := time.Now()
@@ -20,6 +20,7 @@ func StartSessionStartNotifier(ctx context.Context) {
 		remindUpcomingSessions(now)
 		remindOpenPolls(now)
 		postDuePolls(now)
+		advanceDiscordEvents(now)
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
 		for {
@@ -31,6 +32,7 @@ func StartSessionStartNotifier(ctx context.Context) {
 				remindUpcomingSessions(now)
 				remindOpenPolls(now)
 				postDuePolls(now)
+				advanceDiscordEvents(now)
 			}
 		}
 	}()

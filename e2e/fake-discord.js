@@ -1,5 +1,6 @@
 // A tiny fake of the Discord REST API, for the E2E server (DISCORD_API_BASE points here).
 // It records every message the app posts; GET /_messages lists them and DELETE /_messages clears them.
+// Scheduled events are kept too: GET /_events lists them (with their status, or deleted: true).
 const http = require('node:http');
 const env = require('./env');
 
@@ -7,10 +8,12 @@ const BOT_ID = '900000000000000001';
 const VIEW = 1n << 10n;
 const SEND = 1n << 11n;
 const EMBED = 1n << 14n;
+const CONNECT = 1n << 20n;
 const CHANNEL_OK = '700000000000000001';
 const CHANNEL_HIDDEN = '700000000000000002';
 
 const messages = [];
+const events = [];
 const linkedUsers = new Set();
 
 function send(res, status, body) {
@@ -42,6 +45,31 @@ const server = http.createServer(async (req, res) => {
     }
     return send(res, 200, messages);
   }
+  if (path === '/_events') {
+    if (req.method === 'DELETE') {
+      events.length = 0;
+      return send(res, 200, { ok: true });
+    }
+    return send(res, 200, events);
+  }
+  if ((m = path.match(/^\/guilds\/(\d+)\/scheduled-events$/)) && req.method === 'POST') {
+    const ev = { id: String(910000000000000000n + BigInt(events.length + 1)), guild_id: m[1], status: 1, ...JSON.parse(body || '{}') };
+    events.push(ev);
+    return send(res, 200, ev);
+  }
+  if ((m = path.match(/^\/guilds\/(\d+)\/scheduled-events\/(\d+)$/))) {
+    const ev = events.find((e) => e.id === m[2] && !e.deleted);
+    if (!ev) return send(res, 404, { code: 10070, message: 'Unknown Guild Scheduled Event' });
+    if (req.method === 'PATCH') {
+      Object.assign(ev, JSON.parse(body || '{}'));
+      return send(res, 200, ev);
+    }
+    if (req.method === 'DELETE') {
+      ev.deleted = true;
+      res.writeHead(204);
+      return res.end();
+    }
+  }
   if (path === '/oauth2/token' && req.method === 'POST') {
     const code = new URLSearchParams(body).get('code') || '';
     return send(res, 200, { access_token: 'tok-' + code, token_type: 'Bearer' });
@@ -58,7 +86,7 @@ const server = http.createServer(async (req, res) => {
   if ((m = path.match(/^\/guilds\/(\d+)$/)) && req.method === 'GET') {
     return send(res, 200, {
       id: m[1], name: 'Test Guild', owner_id: '1',
-      roles: [{ id: m[1], permissions: String(VIEW | SEND | EMBED) }],
+      roles: [{ id: m[1], permissions: String(VIEW | SEND | EMBED | CONNECT) }],
     });
   }
   if ((m = path.match(/^\/guilds\/(\d+)\/members\/(\d+)$/)) && req.method === 'GET') {

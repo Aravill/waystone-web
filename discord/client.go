@@ -26,6 +26,7 @@ const (
 	CodeMissingAccess  = 50001
 	CodeCannotDM       = 50007
 	CodeMissingPerms   = 50013
+	CodeUnknownEvent   = 10070
 )
 
 const (
@@ -33,6 +34,7 @@ const (
 	permViewChannel   = 1 << 10
 	permSendMessages  = 1 << 11
 	permEmbedLinks    = 1 << 14
+	permConnect       = 1 << 20
 )
 
 // Error is a non-2xx answer from Discord.
@@ -297,6 +299,16 @@ func parsePerm(s string) uint64 {
 // PostableChannels lists the guild's text and announcement channels where the bot can view the
 // channel, send messages and embed links, ordered by position.
 func (c *Client) PostableChannels(ctx context.Context, guildID string) ([]Channel, error) {
+	return c.channelsWith(ctx, guildID, []int{0, 5}, permViewChannel|permSendMessages|permEmbedLinks)
+}
+
+// VoiceChannels lists the guild's voice channels the bot can view and connect to, ordered by position.
+func (c *Client) VoiceChannels(ctx context.Context, guildID string) ([]Channel, error) {
+	return c.channelsWith(ctx, guildID, []int{2}, permViewChannel|permConnect)
+}
+
+// channelsWith lists the guild's channels of the given types where the bot has every permission in need.
+func (c *Client) channelsWith(ctx context.Context, guildID string, types []int, need uint64) ([]Channel, error) {
 	botID, err := c.botUserID(ctx)
 	if err != nil {
 		return nil, err
@@ -329,10 +341,13 @@ func (c *Client) PostableChannels(ctx context.Context, guildID string) ([]Channe
 	}
 	all := g.OwnerID == botID || base&permAdministrator != 0
 
-	need := uint64(permViewChannel | permSendMessages | permEmbedLinks)
 	out := []Channel{}
 	for _, ch := range channels {
-		if ch.Type != 0 && ch.Type != 5 {
+		wanted := false
+		for _, t := range types {
+			wanted = wanted || ch.Type == t
+		}
+		if !wanted {
 			continue
 		}
 		perms := base
@@ -366,6 +381,62 @@ func (c *Client) PostableChannels(ctx context.Context, guildID string) ([]Channe
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Position < out[j].Position })
 	return out, nil
+}
+
+// ScheduledEvent is a guild scheduled event (only the fields the app sends or reads).
+type ScheduledEvent struct {
+	ID                 string `json:"id,omitempty"`
+	GuildID            string `json:"guild_id,omitempty"`
+	ChannelID          string `json:"channel_id,omitempty"`
+	Name               string `json:"name,omitempty"`
+	Description        string `json:"description,omitempty"`
+	ScheduledStartTime string `json:"scheduled_start_time,omitempty"`
+	ScheduledEndTime   string `json:"scheduled_end_time,omitempty"`
+	PrivacyLevel       int    `json:"privacy_level,omitempty"`
+	EntityType         int    `json:"entity_type,omitempty"`
+	Image              string `json:"image,omitempty"` // a data URI when sending
+	Status             int    `json:"status,omitempty"`
+}
+
+// Scheduled event statuses.
+const (
+	EventScheduled = 1
+	EventActive    = 2
+	EventCompleted = 3
+	EventCanceled  = 4
+)
+
+func eventsPath(guildID string) string {
+	return "/guilds/" + url.PathEscape(guildID) + "/scheduled-events"
+}
+
+// CreateScheduledEvent creates a guild scheduled event and returns it as Discord stored it.
+func (c *Client) CreateScheduledEvent(ctx context.Context, guildID string, e ScheduledEvent) (*ScheduledEvent, error) {
+	body, err := json.Marshal(e)
+	if err != nil {
+		return nil, err
+	}
+	var out ScheduledEvent
+	if err := c.do(ctx, http.MethodPost, eventsPath(guildID), body, "application/json", "Bot "+c.token, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SetScheduledEventStatus moves an event to another status (active, completed or canceled).
+func (c *Client) SetScheduledEventStatus(ctx context.Context, guildID, eventID string, status int) error {
+	body, _ := json.Marshal(map[string]int{"status": status})
+	return c.do(ctx, http.MethodPatch, eventsPath(guildID)+"/"+url.PathEscape(eventID), body, "application/json", "Bot "+c.token, nil)
+}
+
+// DeleteScheduledEvent deletes an event.
+func (c *Client) DeleteScheduledEvent(ctx context.Context, guildID, eventID string) error {
+	return c.do(ctx, http.MethodDelete, eventsPath(guildID)+"/"+url.PathEscape(eventID), nil, "", "Bot "+c.token, nil)
+}
+
+// EventURL is the link Discord turns into an event card.
+func EventURL(guildID, eventID string) string {
+	return "https://discord.com/events/" + guildID + "/" + eventID
 }
 
 // CreateDM opens (or fetches) the DM channel with a user.

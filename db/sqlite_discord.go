@@ -78,8 +78,9 @@ func (s *SQLiteStore) GetDiscordSettings() (models.DiscordSettings, error) {
 }
 
 // SaveDiscordSettings stores the settings. Moving to another server (the old guild was set and
-// differs) clears every game's channel and drops queued channel posts; it returns how many games
-// lost their channel.
+// differs) clears every game's channel, voice channel and event cover, turns events off and drops
+// queued channel posts and event creations; it returns how many games lost their channel. The
+// caller removes the cover files.
 func (s *SQLiteStore) SaveDiscordSettings(st models.DiscordSettings) (int, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -105,7 +106,10 @@ func (s *SQLiteStore) SaveDiscordSettings(st models.DiscordSettings) (int, error
 			return 0, err
 		}
 		cleared = int(n)
-		if _, err := tx.Exec(`DELETE FROM discord_outbox WHERE kind = 'channel' AND status = 'queued'`); err != nil {
+		if _, err := tx.Exec(`UPDATE campaigns SET discord_events = 0, discord_voice_id = '', discord_voice_name = '', discord_event_cover = ''`); err != nil {
+			return 0, err
+		}
+		if _, err := tx.Exec(`DELETE FROM discord_outbox WHERE kind IN ('channel', 'event_create') AND status = 'queued'`); err != nil {
 			return 0, err
 		}
 	}
@@ -162,7 +166,7 @@ func (s *SQLiteStore) SetCampaignDiscordChannel(campaignID, channelID, channelNa
 }
 
 // ClearLostDiscordChannel clears the game's channel only if it still is channelID (the admin may
-// have picked another meanwhile). It reports whether it cleared anything.
+// have picked another meanwhile), and turns the game's events off. It reports whether it cleared anything.
 func (s *SQLiteStore) ClearLostDiscordChannel(campaignID, channelID string) (bool, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -173,7 +177,7 @@ func (s *SQLiteStore) ClearLostDiscordChannel(campaignID, channelID string) (boo
 	}
 	defer tx.Rollback()
 
-	res, err := tx.Exec(`UPDATE campaigns SET discord_channel_id = '', discord_channel_name = '' WHERE id = ? AND discord_channel_id = ?`, campaignID, channelID)
+	res, err := tx.Exec(`UPDATE campaigns SET discord_channel_id = '', discord_channel_name = '', discord_events = 0 WHERE id = ? AND discord_channel_id = ?`, campaignID, channelID)
 	if err != nil {
 		return false, err
 	}
@@ -182,7 +186,7 @@ func (s *SQLiteStore) ClearLostDiscordChannel(campaignID, channelID string) (boo
 		return false, err
 	}
 	if n > 0 {
-		if _, err := tx.Exec(`DELETE FROM discord_outbox WHERE kind = 'channel' AND status = 'queued' AND campaign_id = ?`, campaignID); err != nil {
+		if _, err := tx.Exec(`DELETE FROM discord_outbox WHERE kind IN ('channel', 'event_create') AND status = 'queued' AND campaign_id = ?`, campaignID); err != nil {
 			return false, err
 		}
 	}
