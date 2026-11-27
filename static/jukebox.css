@@ -1,0 +1,263 @@
+/* Jukebox pop-up (see docs/design/jukebox.md and STYLE_GUIDE.md) */
+[x-cloak] {
+    display: none !important;
+}
+
+.jukebox-page {
+    align-items: center;
+}
+
+.jb {
+    width: 100%;
+    max-width: 27.5rem;
+    padding: 1.5rem 1.25rem 2.5rem;
+}
+
+.jb-head {
+    margin: 0 0 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 3px double var(--ink);
+}
+
+.jb-kicker {
+    margin: 0 0 0.25rem;
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.jb-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 400;
+    line-height: 1.15;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
+
+.jb-block {
+    margin: 0 0 1.5rem;
+}
+
+.jb-text {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+}
+
+.jb-text--strong {
+    font-weight: 600;
+}
+
+.jb-note,
+.jb-hint {
+    margin: 0.5rem 0 0;
+    color: var(--muted);
+    font-size: 0.875rem;
+    line-height: 1.45;
+}
+
+.jb-error {
+    margin: 0.75rem 0;
+    padding-left: 0.625rem;
+    border-left: 0.25rem solid var(--rubric);
+    color: var(--ink);
+    font-size: 0.9375rem;
+}
+
+.jb-label {
+    display: block;
+    margin: 0 0 0.5rem;
+    padding: 0;
+    color: var(--ink);
+    font-size: 0.9375rem;
+    font-weight: 600;
+}
+
+/* Source choice */
+.jb-sources {
+    margin: 0 0 1rem;
+    padding: 0;
+    border: none;
+}
+
+.jb-source {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin: 0 0 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--line);
+    cursor: pointer;
+    font-weight: 400;
+}
+
+.jb-source:has(input:checked) {
+    border-color: var(--ink);
+    background: var(--folio);
+    outline: 1px solid var(--ink);
+    outline-offset: -2px;
+}
+
+.jb-source input {
+    flex: none;
+    margin-top: 0.25rem;
+}
+
+.jb-source-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.jb-source-name {
+    font-weight: 600;
+    font-size: 0.9375rem;
+}
+
+.jb-source .jb-hint {
+    margin: 0;
+}
+
+.jb-field {
+    margin: 0 0 1.25rem;
+}
+
+.jb-field select {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.5rem;
+    background: var(--folio);
+    color: var(--ink);
+    border: none;
+    border-bottom: 1px solid var(--ink);
+    font: inherit;
+    font-size: 1rem;
+}
+
+.jb-field select:focus {
+    outline: none;
+    border-bottom-color: var(--rubric);
+    box-shadow: inset 0 -1px 0 var(--rubric);
+}
+
+/* Status: glyph and words, never colour alone */
+.jb-status {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.jb-status.is-live { color: var(--verdigris); }
+.jb-status.is-paused { color: var(--ochre); }
+.jb-status.is-off { color: var(--muted); }
+
+.jb-glyph {
+    flex: none;
+}
+
+/* Level meter */
+.jb-meter {
+    height: 0.75rem;
+    margin: 0 0 1.25rem;
+    background: var(--folio);
+    border: 1px solid var(--line);
+}
+
+.jb-meter-bar {
+    width: 0;
+    height: 100%;
+    background: var(--ink);
+    transition: width 0.06s linear;
+}
+
+/* Volume sliders */
+.jb input[type="range"] {
+    display: block;
+    width: 100%;
+    height: 2.5rem;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: none;
+    accent-color: var(--ink);
+}
+
+.jb input[type="range"]:focus-visible {
+    outline: 2px solid var(--rubric);
+    outline-offset: 2px;
+}
+
+.jb-buttons {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.jb-buttons > button {
+    flex: 1;
+}
+
+.jb .submit-btn {
+    margin: 0 0 0.25rem;
+}
+
+/* Who is listening */
+.jb-people {
+    padding-top: 1rem;
+    border-top: 1px solid var(--ink);
+}
+
+.jb-people .section-header {
+    margin: 0 0 0.5rem;
+    font-size: 1.5625rem;
+}
+
+.jb-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.jb-person {
+    border-bottom: 1px solid var(--line);
+}
+
+.jb-person:empty,
+.jb-person[style*="display: none"] {
+    border-bottom: none;
+}
+
+.jb-person-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+}
+
+.jb-person-name {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.jb-crown {
+    color: var(--rubric);
+}
+
+.jb-person-tag {
+    flex: none;
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+@media (max-width: 480px) {
+    .jb {
+        padding: 1rem 1rem 2rem;
+    }
+
+    .jb-title {
+        font-size: 1.5rem;
+    }
+}
