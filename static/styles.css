@@ -4827,11 +4827,72 @@ select option {
     gap: 0.5rem;
 }
 
-.char-codex-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    text-decoration: none;
+.char-page-list {
+    margin: 0 0 0.75rem;
+    padding: 0;
+    list-style: none;
+}
+
+.char-page-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.375rem 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.char-page-codex {
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.char-page-remove {
+    margin-left: auto;
+    padding: 0 0.5rem;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--muted);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.char-page-remove:hover {
+    color: var(--rubric);
+}
+
+.char-link-results {
+    max-height: 20rem;
+    margin: 0 0 1rem;
+    padding: 0;
+    overflow: auto;
+    list-style: none;
+}
+
+.char-link-result {
+    display: block;
+    width: 100%;
+    padding: 0.625rem 0.5rem;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.char-link-result:hover,
+.char-link-result:focus-visible {
+    background: var(--folio);
+}
+
+.char-link-result small {
+    margin-left: 0.5rem;
+    color: var(--muted);
+    font-size: 0.8125rem;
 }
 
 .char-head {
@@ -4899,10 +4960,17 @@ select option {
 
 /* "❧ as Kael Ashenford": the character's name in the display face, like a title in a chronicle */
 .character-as {
+    display: inline-flex;
+    flex-wrap: nowrap;
     align-items: baseline;
+    gap: 0.25em;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .character-as-word {
+    flex: none;
+    white-space: nowrap;
     color: var(--muted);
     font-style: italic;
 }
@@ -4918,6 +4986,11 @@ select option {
     letter-spacing: 0.02em;
     color: var(--ink);
     text-decoration: none;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-bottom: 0.3em;
 }
 
 .character-as-name:hover {
