@@ -6,7 +6,7 @@
     <title>Waystone - Character</title>
     <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
     <script src="/static/theme.js?v=8"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=86">
+    <link rel="stylesheet" href="/static/styles.css?v=87">
     <link rel="stylesheet" href="/static/notifications.css?v=13">
     <script defer src="/static/vendor/alpinejs.min.js"></script>
 </head>
@@ -57,9 +57,6 @@
                     </p>
                     <div class="char-games" x-html="gameBadgesHtml(character.games)"></div>
                     <div class="char-head-actions">
-                        <template x-if="codexAccess && safeCodexUrl(character.codex_url) && !editing">
-                            <a class="campaign-action-btn char-codex-link" :href="safeCodexUrl(character.codex_url)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H19v13H5.5A1.5 1.5 0 0 0 4 18.5z"/><path d="M4 18.5A1.5 1.5 0 0 0 5.5 20H19v-3"/></svg> Codex page</a>
-                        </template>
                         <button type="button" class="campaign-action-btn" x-show="character.can_edit && !editing" @click="startEdit()">Edit</button>
                     </div>
                 </header>
@@ -94,11 +91,6 @@
                     <textarea id="editBg" rows="6" maxlength="10000" x-model="form.background"></textarea>
                     <p class="form-hint">Their backstory. Basic Markdown.</p>
                 </div>
-                <div class="form-group">
-                    <label for="editCodex">Codex page</label>
-                    <input id="editCodex" type="url" maxlength="2000" autocomplete="off" placeholder="https://waystone.aravill.org/codices/..." x-model="form.codex_url">
-                    <p class="form-hint">A link to this character's page in Codices (waystone.aravill.org only).</p>
-                </div>
                 <p class="game-form-error" role="alert" x-show="formError" x-text="'✗ ' + formError"></p>
 
                     <div class="game-form-btns">
@@ -124,15 +116,59 @@
                         <div class="game-text" x-html="markdown(character.background)"></div>
                     </section>
                     <p class="panel-empty" x-show="!character.description && !character.background">Nothing has been written about this character yet.</p>
+                    <section class="char-section" x-show="character.codex_pages.length > 0 || (character.can_edit && codexAccess)">
+                        <h2 class="section-header">Codex pages</h2>
+                        <ul class="char-page-list" x-show="character.codex_pages.length > 0">
+                            <template x-for="p in character.codex_pages" :key="p.page_id">
+                                <li>
+                                    <a :href="codexPageUrl(p)" x-text="p.title"></a>
+                                    <span class="char-page-codex" x-text="p.codex_name"></span>
+                                    <button type="button" class="char-page-remove" x-show="character.can_edit" :disabled="busy" :aria-label="'Unlink ' + p.title" @click="unlinkPage(p)">&times;</button>
+                                </li>
+                            </template>
+                        </ul>
+                        <p class="panel-empty" x-show="character.codex_pages.length === 0 && character.can_edit">No codex pages linked yet.</p>
+                        <button type="button" class="text-link" x-show="character.can_edit && codexAccess" @click="openLinkDialog()">+ Link a page</button>
+                    </section>
                 </div>
             </article>
         </template>
     </main>
 
+    <div id="linkPageModal" class="modal" :class="{ 'modal-open': linkDialog.open }" @click.self="closeLinkDialog()" @keydown.escape.window="linkDialog.open && closeLinkDialog()" role="dialog" aria-modal="true" aria-labelledby="linkPageTitle">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <p class="modal-eyebrow" x-text="character ? character.name : ''"></p>
+                    <h2 id="linkPageTitle">Link a codex page</h2>
+                </div>
+                <button type="button" class="modal-close" @click="closeLinkDialog()" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-form">
+                <div class="form-group">
+                    <label for="linkPageQ">Find a page</label>
+                    <input id="linkPageQ" type="search" maxlength="100" autocomplete="off" x-model="linkDialog.q">
+                </div>
+                <p x-show="linkDialog.loading">Loading pages...</p>
+                <p class="panel-empty" x-show="!linkDialog.loading && linkDialog.titles && !linkDialog.q.trim()">Type to find a page you can see.</p>
+                <p class="panel-empty" x-show="!linkDialog.loading && linkDialog.titles && linkDialog.q.trim() && linkResults.length === 0">No page matches.</p>
+                <ul class="char-link-results" x-show="linkResults.length > 0">
+                    <template x-for="p in linkResults" :key="p.id">
+                        <li><button type="button" class="char-link-result" :disabled="linkDialog.busy" @click="linkPage(p)"><span x-text="p.title"></span> <small x-text="p.codex_name"></small></button></li>
+                    </template>
+                </ul>
+                <p class="game-form-error" role="alert" x-show="linkDialog.error" x-text="'✗ ' + linkDialog.error"></p>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" @click="closeLinkDialog()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="message" class="message" :class="messageType" x-show="messageVisible" role="status" x-text="messageText"></div>
 
     <script src="/static/notifications.js?v=16"></script>
     <script src="/campaigns.js?v=69"></script>
-    <script src="/static/characters.js?v=3"></script>
+    <script src="/static/characters.js?v=4"></script>
 </body>
 </html>
