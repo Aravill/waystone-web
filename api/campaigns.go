@@ -848,6 +848,8 @@ func handleDeleteCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 		writeJSONError(w, http.StatusForbidden, "only an admin can delete a game")
 		return
 	}
+	events := liveDiscordEvents(campaignID) // DeleteCampaign drops these rows; Discord is told after
+	cover, _ := db.GetDiscordGameEvents(campaignID)
 	if err := db.DeleteCampaign(campaignID); err != nil {
 		if errors.Is(err, db.ErrCampaignNotFound) {
 			writeJSONError(w, http.StatusNotFound, err.Error())
@@ -855,6 +857,10 @@ func handleDeleteCampaign(w http.ResponseWriter, r *http.Request, campaignID str
 		}
 		writeJSONError(w, http.StatusInternalServerError, "failed to delete game")
 		return
+	}
+	removeDeletedGameDiscordEvents(events)
+	if cover.Cover != "" {
+		removeCodexFiles([]string{cover.Cover})
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "game deleted"})
 }
@@ -904,6 +910,9 @@ func HandleCampaignStatus(w http.ResponseWriter, r *http.Request) {
 			"to_status":   string(req.Status),
 		})
 		postStatusChanged(campaign, oldStatus, req.Status)
+		if req.Status == models.Finished || req.Status == models.Cancelled {
+			dropUnstartedDiscordEvents(campaign.ID)
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":                     "success",

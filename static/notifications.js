@@ -242,6 +242,7 @@
                     case 'session_reminder':
                         return `Reminder: the session of "${title}" is on ${when}`;
                     case 'discord_channel_lost':
+                        if (d.channel === 'voice') return `The Discord voice channel of "${title}" is gone, so its events are off. Pick another in Admin › Discord`;
                         return `The Discord channel of "${title}" is gone. Pick another in Admin › Discord`;
                     default:
                         return `Update for "${title}"`;

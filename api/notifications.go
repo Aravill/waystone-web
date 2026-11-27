@@ -85,6 +85,7 @@ func notifySessionChange(actorID string, campaign *models.Campaign, session mode
 		postSessionConfirmed(campaign, session)
 	case typ == models.NotificationSessionCancelled && was == string(models.SessionConfirmed):
 		postSessionCancelled(campaign, session)
+		cancelDiscordEvent(session)
 	}
 }
 

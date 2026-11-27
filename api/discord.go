@@ -189,13 +189,27 @@ func sessionNotification(typ models.NotificationType, s models.CampaignSession) 
 	return models.Notification{Type: typ, SessionID: s.ID, Data: sessionData(s)}
 }
 
+// postSessionConfirmed announces a confirmed session. When the game gets Discord events, the event
+// is created first and the post follows with its link (createDiscordEvent).
 func postSessionConfirmed(c *models.Campaign, s models.CampaignSession) {
 	if s.Manual {
 		return
 	}
-	postToChannel(c, models.DiscordEventSessionConfirmed,
-		"**"+mdEscape(c.Title)+"**: session confirmed for "+discordWhen(sessionData(s)),
-		sessionNotification(models.NotificationSessionConfirmed, s))
+	if discordEventsFor(c) {
+		queueDiscordEventRow("event_create", s.ID, c.ID, nil)
+		return
+	}
+	postSessionConfirmedNow(c, s, "")
+}
+
+// postSessionConfirmedNow queues the "session confirmed" post, with the Discord event's link when
+// there is one (Discord shows it as an event card).
+func postSessionConfirmedNow(c *models.Campaign, s models.CampaignSession, eventLink string) {
+	text := "**" + mdEscape(c.Title) + "**: session confirmed for " + discordWhen(sessionData(s))
+	if eventLink != "" {
+		text += "\n" + eventLink
+	}
+	postToChannel(c, models.DiscordEventSessionConfirmed, text, sessionNotification(models.NotificationSessionConfirmed, s))
 }
 
 func postSessionCancelled(c *models.Campaign, s models.CampaignSession) {
@@ -221,9 +235,11 @@ func postNewPoll(c *models.Campaign, dates []models.CampaignSession) {
 }
 
 func postSessionReminder(c *models.Campaign, s models.CampaignSession) {
-	postToChannel(c, models.DiscordEventSessionReminder,
-		"**"+mdEscape(c.Title)+"**: next session "+discordWhen(sessionData(s)),
-		sessionNotification(models.NotificationSessionReminder, s))
+	text := "**" + mdEscape(c.Title) + "**: next session " + discordWhen(sessionData(s))
+	if link := discordEventLink(s.ID); link != "" {
+		text += "\n" + link
+	}
+	postToChannel(c, models.DiscordEventSessionReminder, text, sessionNotification(models.NotificationSessionReminder, s))
 }
 
 func postSignupsOpened(c *models.Campaign) {
