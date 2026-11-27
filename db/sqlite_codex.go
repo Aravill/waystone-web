@@ -726,6 +726,7 @@ func (s *SQLiteStore) DeletePage(id string) (files, attachments []string, err er
 		`DELETE FROM page_tags WHERE page_id = ?`,
 		`DELETE FROM timeline_events WHERE page_id = ?`,
 		`DELETE FROM timeline_calendars WHERE page_id = ?`,
+		`DELETE FROM character_pages WHERE page_id = ?`,
 		`DELETE FROM pages WHERE id = ?`,
 	} {
 		if _, err := tx.Exec(q, id); err != nil {

@@ -123,6 +123,9 @@ type Store interface {
 	UpdateCharacter(c models.Character) error
 	SetCharacterStatus(id string, status models.CharacterStatus) error
 	DeleteCharacter(id string) error
+	GetCharacterPages(characterID string) ([]models.CharacterPage, error)
+	AddCharacterPage(characterID, pageID string) (bool, error)
+	RemoveCharacterPage(characterID, pageID string) error
 	GetAssignmentsByCharacterIDs(ids []string) (map[string][]models.CharacterAssignment, error)
 	GetCampaignAssignments(campaignID string) ([]models.CharacterAssignment, error)
 	GetActiveAssignmentsByUser(userID string) (map[string]models.CharacterAssignment, error)

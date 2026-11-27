@@ -3,16 +3,17 @@ package db
 import (
 	"database/sql"
 	"encoding/json"
+	"net/url"
 	"strings"
 	"time"
 	"waystone-web/models"
 )
 
-const characterColumns = `id, owner_id, system_id, name, description, background, codex_url, status, created_at, updated_at`
+const characterColumns = `id, owner_id, system_id, name, description, background, status, created_at, updated_at`
 
 func scanCharacter(row rowScanner) (models.Character, error) {
 	var c models.Character
-	err := row.Scan(&c.ID, &c.OwnerID, &c.SystemID, &c.Name, &c.Description, &c.Background, &c.CodexURL, &c.Status, &c.CreatedAt, &c.UpdatedAt)
+	err := row.Scan(&c.ID, &c.OwnerID, &c.SystemID, &c.Name, &c.Description, &c.Background, &c.Status, &c.CreatedAt, &c.UpdatedAt)
 	return c, err
 }
 
@@ -40,8 +41,8 @@ func endUserAssignments(tx *sql.Tx, campaignID, userID, at string) error {
 func (s *SQLiteStore) CreateCharacter(c models.Character) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	_, err := s.db.Exec(`INSERT INTO characters (`+characterColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.ID, c.OwnerID, c.SystemID, c.Name, c.Description, c.Background, c.CodexURL, c.Status, c.CreatedAt, c.UpdatedAt)
+	_, err := s.db.Exec(`INSERT INTO characters (`+characterColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.ID, c.OwnerID, c.SystemID, c.Name, c.Description, c.Background, c.Status, c.CreatedAt, c.UpdatedAt)
 	return err
 }
 
@@ -83,9 +84,9 @@ func (s *SQLiteStore) GetCharactersByOwner(ownerID string) ([]models.Character, 
 func (s *SQLiteStore) UpdateCharacter(c models.Character) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	res, err := s.db.Exec(`UPDATE characters SET system_id = ?, name = ?, description = ?, background = ?, codex_url = ?, updated_at = ?
+	res, err := s.db.Exec(`UPDATE characters SET system_id = ?, name = ?, description = ?, background = ?, updated_at = ?
 		WHERE id = ? AND (system_id = ? OR NOT EXISTS (SELECT 1 FROM character_assignments WHERE character_id = ? AND ended_at = ''))`,
-		c.SystemID, c.Name, c.Description, c.Background, c.CodexURL, c.UpdatedAt, c.ID, c.SystemID, c.ID)
+		c.SystemID, c.Name, c.Description, c.Background, c.UpdatedAt, c.ID, c.SystemID, c.ID)
 	if err != nil {
 		return err
 	}
@@ -140,6 +141,9 @@ func (s *SQLiteStore) DeleteCharacter(id string) error {
 		return ErrCharacterAssigned
 	}
 	if _, err := tx.Exec(`DELETE FROM character_assignments WHERE character_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM character_pages WHERE character_id = ?`, id); err != nil {
 		return err
 	}
 	res, err := tx.Exec(`DELETE FROM characters WHERE id = ?`, id)
@@ -305,4 +309,122 @@ func (s *SQLiteStore) CountCharactersBySystem(systemID string) (int, error) {
 	var n int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM characters WHERE system_id = ?`, systemID).Scan(&n)
 	return n, err
+}
+
+// MaxCharacterPages caps the codex pages linked to one character.
+const MaxCharacterPages = 50
+
+// GetCharacterPages returns the character's linked pages, oldest link first. Pages that no longer exist don't show.
+func (s *SQLiteStore) GetCharacterPages(characterID string) ([]models.CharacterPage, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	rows, err := s.db.Query(`SELECT cp.page_id, p.title, p.kind, p.codex_id, c.name
+		FROM character_pages cp JOIN pages p ON p.id = cp.page_id JOIN codices c ON c.id = p.codex_id
+		WHERE cp.character_id = ? ORDER BY cp.created_at, cp.rowid`, characterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []models.CharacterPage{}
+	for rows.Next() {
+		var p models.CharacterPage
+		if err := rows.Scan(&p.PageID, &p.Title, &p.Kind, &p.CodexID, &p.CodexName); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// AddCharacterPage links a page; it reports false when it was already linked. ErrCharacterPagesFull
+// at MaxCharacterPages links, ErrPageNotFound when the page doesn't exist.
+func (s *SQLiteStore) AddCharacterPage(characterID, pageID string) (bool, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	tx, err := s.db.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	var n int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM character_pages WHERE character_id = ? AND page_id = ?`, characterID, pageID).Scan(&n); err != nil {
+		return false, err
+	}
+	if n > 0 {
+		return false, nil
+	}
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM character_pages WHERE character_id = ?`, characterID).Scan(&n); err != nil {
+		return false, err
+	}
+	if n >= MaxCharacterPages {
+		return false, ErrCharacterPagesFull
+	}
+	res, err := tx.Exec(`INSERT INTO character_pages (character_id, page_id, created_at) SELECT ?, id, ? FROM pages WHERE id = ?`,
+		characterID, time.Now().UTC().Format(time.RFC3339Nano), pageID)
+	if err != nil {
+		return false, err
+	}
+	if rows, err := res.RowsAffected(); err != nil {
+		return false, err
+	} else if rows == 0 {
+		return false, ErrPageNotFound
+	}
+	return true, tx.Commit()
+}
+
+func (s *SQLiteStore) RemoveCharacterPage(characterID, pageID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	_, err := s.db.Exec(`DELETE FROM character_pages WHERE character_id = ? AND page_id = ?`, characterID, pageID)
+	return err
+}
+
+// migrateCharacterCodexURLs turns the old free-text characters.codex_url links into character_pages
+// rows (only /codices/p/{pageId}... of an existing page; anything else is dropped), then clears them.
+// It is idempotent: once cleared there is nothing left to do.
+func (s *SQLiteStore) migrateCharacterCodexURLs() error {
+	rows, err := s.db.Query(`SELECT id, codex_url FROM characters WHERE codex_url != ''`)
+	if err != nil {
+		return err
+	}
+	type legacy struct{ id, url string }
+	var all []legacy
+	for rows.Next() {
+		var l legacy
+		if err := rows.Scan(&l.id, &l.url); err != nil {
+			rows.Close()
+			return err
+		}
+		all = append(all, l)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(all) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	for _, l := range all {
+		u, err := url.Parse(l.url)
+		if err != nil {
+			continue
+		}
+		parts := strings.Split(u.Path, "/")
+		if len(parts) < 4 || parts[0] != "" || parts[1] != "codices" || parts[2] != "p" || parts[3] == "" {
+			continue
+		}
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO character_pages (character_id, page_id, created_at) SELECT ?, id, ? FROM pages WHERE id = ?`, l.id, now, parts[3]); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(`UPDATE characters SET codex_url = '' WHERE codex_url != ''`); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
