@@ -65,4 +65,4 @@ Rules:
 - **E2E:** extend the Discord spec and `e2e/fake-discord.js` with the scheduled-event routes. In the test, the admin turns on events for a game (voice channel and cover set), the DM confirms a session, and the fake receives an event with the voice channel and image, and a post containing its link. Then the DM cancels, and the event is deleted. Starting and ending by the ticker is checked by hand.
 - No env vars. No demo seed.
 
-*Later:* updating scheduled events when the voice channel or cover changes; external events for games without a voice channel; adding the event cover to the game card.
+*Later:* updating scheduled events when the voice channel or cover changes; external events at a physical address for games played in person (to come with a feature for in-person and online games, Michal 2026-11-27); adding the event cover to the game card.
