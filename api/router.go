@@ -72,6 +72,7 @@ func RegisterRoutes() {
 	http.Handle("/api/profile", middleware.AuthMiddleware(http.HandlerFunc(HandleProfile)))
 	http.Handle("/api/profile/setup-complete", middleware.AuthMiddleware(http.HandlerFunc(HandleProfileSetupComplete)))
 	http.Handle("/api/profile/calendar", middleware.AuthMiddleware(http.HandlerFunc(HandleCalendarToken)))
+	http.Handle("/api/jukebox/live", middleware.AuthMiddleware(http.HandlerFunc(HandleJukeboxLive)))
 
 	// Static files - MUST be registered BEFORE "/" handler to take precedence
 	fs := http.FileServer(http.Dir("./static"))
@@ -113,12 +114,17 @@ func RegisterRoutes() {
 	http.Handle("/campaigns", middleware.AuthMiddleware(http.HandlerFunc(ServePageWithFallback("campaigns.html"))))
 	gamePage := ServePageWithFallback("game.html")
 	calendarPage := ServePageWithFallback("calendar.html")
+	jukeboxPage := ServePageWithFallback("jukebox.html")
 	http.Handle("/games/", middleware.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// /games/{id}/calendar is the calendar page, /games/{id}/journal/{sessionId}[/edit|/history]
 		// the old journal URLs (they redirect to the codex page); every other /games/ path is the game page
 		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 		if len(parts) == 3 && parts[2] == "calendar" {
 			calendarPage(w, r)
+			return
+		}
+		if len(parts) == 3 && parts[2] == "jukebox" {
+			jukeboxPage(w, r)
 			return
 		}
 		if (len(parts) == 4 || len(parts) == 5 && (parts[4] == "edit" || parts[4] == "history")) && parts[2] == "journal" {
@@ -209,6 +215,10 @@ func HandleCampaignRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(parts) == 3 && parts[1] == "jukebox" && parts[2] == "ws" {
+		HandleJukeboxWS(w, r)
+		return
+	}
 	if len(parts) == 2 && parts[1] == "poll-schedule" {
 		HandlePollSchedule(w, r)
 		return

@@ -52,6 +52,8 @@ func main() {
 		MaxHeaderBytes:    64 << 10,
 	}
 
+	srv.RegisterOnShutdown(api.CloseJukebox)
+
 	go func() {
 		log.Printf("Server starting on http://localhost%s\n", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
