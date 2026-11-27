@@ -58,6 +58,12 @@ window.gamePage = function () {
             this.gameId = decodeURIComponent(location.pathname.split('/')[2] || '');
             window.addEventListener('resize', () => this.measureTale());
             document.addEventListener('keydown', (event) => this.onNoteKey(event));
+            // The header polls /api/jukebox/live and tells the page, so the button follows the game going on or off air.
+            window.addEventListener('jukebox:live', (event) => {
+                if (!this.campaign) return;
+                const g = (event.detail || []).find((x) => x.campaign_id === this.campaign.id);
+                this.campaign.jukebox = { live: !!g, paused: !!(g && g.paused) };
+            });
             await this.load();
             this.loadSchedule();
             if (new URLSearchParams(location.search).get('updated') === '1') {
@@ -147,6 +153,21 @@ window.gamePage = function () {
         },
         get isMember() {
             return this.isDM || this.isPlayer;
+        },
+        // The jukebox only exists while the game is Ongoing: the DM broadcasts, players and followers listen.
+        get jukeboxRole() {
+            if (this.campaign?.status !== 'Ongoing') return '';
+            if (this.isDM) return 'dm';
+            return this.isPlayer || this.campaign.is_following ? 'listener' : '';
+        },
+        get jukeboxLive() {
+            return !!this.campaign?.jukebox?.live;
+        },
+        get jukeboxPaused() {
+            return !!this.campaign?.jukebox?.paused;
+        },
+        openJukebox() {
+            window.open('/games/' + encodeURIComponent(this.campaign.id) + '/jukebox', 'waystone-jukebox', 'popup,width=440,height=640');
         },
         get statusClass() {
             return campaignStatusClass(this.campaign?.status);
