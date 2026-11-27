@@ -417,6 +417,9 @@
                     return;
                 }
                 rt.audio = new Audio();
+                rt.audio.hidden = true; // in the page so tests and tools can find it
+                rt.audio.id = 'jukeboxAudio';
+                document.body.appendChild(rt.audio);
                 rt.audio.preload = 'auto';
                 rt.audio.volume = this.volume;
                 rt.audio.muted = this.listenMuted;

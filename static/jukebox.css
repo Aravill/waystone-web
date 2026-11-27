@@ -98,12 +98,24 @@
     outline-offset: -2px;
 }
 
-.jb-source input {
+.jb-source input[type="radio"] {
     flex: none;
-    margin-top: 0.25rem;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0.125rem 0 0;
+    padding: 0;
+    border: 0;
+    accent-color: var(--ink);
+}
+
+.jb-source input[type="radio"]:focus-visible {
+    outline: 2px solid var(--rubric);
+    outline-offset: 2px;
 }
 
 .jb-source-body {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 0.125rem;
