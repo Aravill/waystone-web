@@ -19,6 +19,11 @@
         .dc-game td select { width: auto; min-width: 9rem; max-width: 100%; }
         .dc-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .dc-env { margin: 0.5rem 0 0 1.25rem; font-family: var(--font-mono, monospace); }
+        .dc-game td { vertical-align: middle; }
+        .dc-missing { outline: 2px solid var(--rubric); outline-offset: 2px; }
+        .dc-cover { display: flex; align-items: center; gap: 0.5rem; }
+        .dc-cover img { display: block; width: 4rem; height: 2.25rem; object-fit: cover; border: 1px solid var(--line); }
+        .dc-cover .campaign-link-button { white-space: nowrap; }
     </style>
 </head>
 <body x-data="adminDiscordPage()">
@@ -96,9 +101,10 @@
                     <h2 class="section-header">Games</h2>
                     <p class="form-hint" x-show="data.channels_error" x-text="data.channels_error"></p>
                     <p class="form-hint" x-show="!data.guild_id">Set the server ID above to pick channels.</p>
+                    <p class="form-hint" x-show="data.guild_id">Discord events: when a session is confirmed, the bot creates an event in the voice channel and the channel post links to it. Needs a text channel and a voice channel, and the bot's Create Events and Manage Events permissions.</p>
                     <table class="dc-game">
                         <thead>
-                            <tr><th>Game</th><th>Status</th><th>Channel</th><th></th></tr>
+                            <tr><th>Game</th><th>Status</th><th>Channel</th><th></th><th>Discord events</th><th>Voice channel</th><th>Event cover</th></tr>
                         </thead>
                         <tbody>
                             <template x-for="g in data.games" :key="g.id">
@@ -106,7 +112,7 @@
                                     <td x-text="g.title"></td>
                                     <td x-text="g.status"></td>
                                     <td>
-                                        <select :aria-label="'Channel for ' + g.title" :disabled="!data.guild_id" @change="setChannel(g, $event)">
+                                        <select :aria-label="'Channel for ' + g.title" :disabled="!data.guild_id" :class="{ 'dc-missing': g.missing === 'channel_id' }" @change="setChannel(g, $event)">
                                             <option value="" :selected="!g.channel_id">None</option>
                                             <template x-for="c in channelOptions(g)" :key="c.id">
                                                 <option :value="c.id" :selected="c.id === g.channel_id" x-text="'#' + c.name"></option>
@@ -114,9 +120,26 @@
                                         </select>
                                     </td>
                                     <td><button type="button" class="campaign-link-button" :disabled="!g.channel_id" @click="testGame(g)">Send test</button></td>
+                                    <td><label class="check-label"><input type="checkbox" :checked="g.events" :disabled="!data.guild_id" :aria-label="'Discord events for ' + g.title" @change="setEvents(g, $event)"> <span x-text="g.events ? 'On' : 'Off'"></span></label></td>
+                                    <td>
+                                        <select :aria-label="'Voice channel for ' + g.title" :disabled="!data.guild_id" :class="{ 'dc-missing': g.missing === 'voice_channel_id' }" @change="setVoice(g, $event)">
+                                            <option value="" :selected="!g.voice_id">None</option>
+                                            <template x-for="c in voiceOptions(g)" :key="c.id">
+                                                <option :value="c.id" :selected="c.id === g.voice_id" x-text="'🔊 ' + c.name"></option>
+                                            </template>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <div class="dc-cover">
+                                            <img x-show="g.cover" :src="g.cover ? coverUrl(g) : ''" alt="" :title="'Event cover of ' + g.title">
+                                            <button type="button" class="campaign-link-button" :disabled="!data.guild_id || g.uploading" @click="$el.closest('.dc-cover').querySelector('input[type=file]').click()" x-text="g.uploading ? 'Uploading…' : (g.cover ? 'Replace' : 'Upload')" :aria-label="(g.cover ? 'Replace' : 'Upload') + ' the event cover of ' + g.title"></button>
+                                            <button type="button" class="campaign-link-button" x-show="g.cover" @click="removeCover(g)" :aria-label="'Remove the event cover of ' + g.title">Remove</button>
+                                            <input type="file" accept="image/png,image/jpeg,image/webp" hidden @change="uploadCover(g, $event)">
+                                        </div>
+                                    </td>
                                 </tr>
                             </template>
-                            <tr x-show="data.games.length === 0"><td colspan="4" class="admin-empty">no games yet</td></tr>
+                            <tr x-show="data.games.length === 0"><td colspan="7" class="admin-empty">no games yet</td></tr>
                         </tbody>
                     </table>
                 </section>
@@ -132,7 +155,7 @@
                             <template x-for="f in data.outbox.failures" :key="f.id">
                                 <tr>
                                     <td x-text="formatTime(f.created_at)"></td>
-                                    <td x-text="(f.kind === 'dm' ? 'DM to ' : 'Channel of ') + (f.kind === 'dm' ? f.target_label : (f.campaign_title || f.target_label))"></td>
+                                    <td x-text="f.kind === 'dm' ? 'DM to ' + f.target_label : (f.kind.startsWith('event_') ? 'Event of ' : 'Channel of ') + (f.campaign_title || f.target_label)"></td>
                                     <td x-text="f.error"></td>
                                     <td x-text="f.attempts"></td>
                                 </tr>
@@ -163,6 +186,6 @@
     </div>
 
     <script src="/static/notifications.js?v=17"></script>
-    <script src="/admin-discord.js?v=2"></script>
+    <script src="/admin-discord.js?v=3"></script>
 </body>
 </html>
