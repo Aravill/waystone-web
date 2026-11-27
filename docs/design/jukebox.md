@@ -1,6 +1,15 @@
 # Jukebox
 
-**Status:** designed 2026-11-27, not built.
+**Status:** built 2026-11-27 (`api/jukebox.go`, `api/jukebox_webm.go`, `static/jukebox.*`, the header part in `static/notifications.js`; see CLAUDE.md).
+
+**Decisions made while building:**
+- The server re-wraps the stream instead of passing it through: every flush of the DM's chunks becomes one self-contained known-size Cluster with the source Timecode, so a late joiner simply starts at the next one (at most ~250 ms later) and nothing is special-cased. The init segment drops SeekHead, Cues, Tags and Void and always has an unknown-size Segment.
+- `ended` has a fourth reason, `deleted`, so a pop-up can say the game is gone. There is no `stopped`: when the DM stops, listeners stay connected and see Off air.
+- Following is always explicit (being accepted adds no follow row), so a kicked player who had also followed the game keeps listening as a follower.
+- No handler can change a game's DM today, so that recheck has no call site yet.
+- The pop-up checks access through `GET /api/campaigns/{id}` before connecting, because a browser can't read the status of a refused WebSocket handshake.
+- A game counts as live (header, game page) once the server has the stream's init segment. The header refreshes on the inbox's 60 s timer, so a page already open can lag up to a minute.
+- From the header, Listen on another game while broadcasting asks first, since it replaces the DM's pop-up.
 
 A game's DM streams music (usually Spotify) from their browser through Waystone, and the game's players and followers listen in a small pop-up window. This replaces playing music through a Discord screen share, because Discord mutes Spotify while the stream is on. Nothing about it is stored in the database. A stream exists only in server memory while the DM is broadcasting.
 
@@ -15,7 +24,7 @@ A game's DM streams music (usually Spotify) from their browser through Waystone,
 
 - The DM's browser captures audio, runs it through Web Audio (a gain node for send volume and mute, an analyser for the level meter) and encodes it with `MediaRecorder` as `audio/webm;codecs=opus` at about 128 kbps, in chunks of about 250 ms.
 - Chunks go over a **WebSocket** to the Go server (`github.com/coder/websocket` is already a dependency), and the server fans them out to listeners over their own WebSockets. Delay is about 1 to 3 seconds. That's fine for background music, and nothing new is needed in Caddy, Docker or the ports.
-- The server keeps a small EBML reader per stream so a listener can join mid-stream: it stores the **init segment** (EBML header, Segment and Tracks, everything before the first Cluster) and follows block boundaries in both unknown-size clusters (Chrome) and known-size ones (Firefox). A late joiner gets the init segment, then a synthetic unknown-size Cluster whose Timecode equals the current cluster's, then every following SimpleBlock as it is. Audio blocks are all keyframes, so they start at the live point with no seeking.
+- The server keeps a small EBML reader per stream so a listener can join mid-stream: it stores the **init segment** (EBML header, Segment and Tracks, everything before the first Cluster) and follows block boundaries in both unknown-size clusters (Chrome) and known-size ones (Firefox). A late joiner gets the init segment, then the next re-wrapped Cluster (see the decisions above). Audio blocks are all keyframes, so they start at the live point; the listener seeks to the start of its buffer once.
 - Listeners play through Media Source Extensions (`audio/webm; codecs="opus"`). If the buffer falls more than about 3 seconds behind live, they skip ahead, and old buffered data is trimmed.
 - **Restarts:** every new broadcast (a reconnect after a dropout, or a takeover from a second window) has a new init segment. The server tells listeners "new stream", and they reset their source buffer.
 - The WebSocket handlers must clear the `http.Server` read and write deadlines (30 s and 60 s in `main.go`) before upgrading, through `http.NewResponseController`, or long streams get cut. Ping and pong keep dead peers from lingering.
